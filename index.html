@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="lang-pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quanta Aulas | Matemática, Física e Química Online</title>
+  <meta name="description" content="Aulas particulares online com o Professor #1 do Brasil. Doutor pelo ITA, 481 avaliações 5 estrelas, 15 anos de experiência e 4.000+ aulas publicadas." />
+
+  <!-- Open Graph / WhatsApp / Facebook / LinkedIn -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://quantaaulas.com/" />
+  <meta property="og:title" content="Quanta Aulas | Matemática, Física e Química Online" />
+  <meta property="og:description" content="Aulas particulares online com o Professor #1 do Brasil. Doutor pelo ITA, 481 avaliações 5 estrelas, 15 anos de experiência e 4.000+ aulas publicadas." />
+  <meta property="og:image" content="https://quantaaulas.com/assets/preview.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="Quanta Aulas" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Quanta Aulas | Matemática, Física e Química Online" />
+  <meta name="twitter:description" content="Aulas particulares online com o Professor #1 do Brasil. Doutor pelo ITA." />
+  <meta name="twitter:image" content="https://quantaaulas.com/assets/preview.jpg" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
+  <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css?v=10" />
+</head>
+
+<body>
+  <!-- Mesh ambiente + grade -->
+  <div class="bg-ambient"></div>
+  <div class="bg-grid"></div>
+
+  <!-- ============== NAV ============== -->
+  <header class="nav">
+    <div class="container nav-inner">
+      <a href="#inicio" class="nav-logo" aria-label="Quanta Aulas">
+        <img src="assets/logo-quanta.png" alt="Quanta Aulas" class="logo-img" />
+        <span>
+          <span class="name">QUANTA AULAS</span>
+          <span class="tag" data-lang-inline="pt">A evolução do aprendizado</span>
+          <span class="tag" data-lang-inline="en">The evolution of learning</span>
+        </span>
+      </a>
+
+      <nav class="nav-links" aria-label="Navegação principal">
+        <a href="#inicio" class="nav-link"><span data-lang-inline="pt">Início</span><span data-lang-inline="en">Home</span></a>
+        <a href="#materias" class="nav-link"><span data-lang-inline="pt">Matérias</span><span data-lang-inline="en">Subjects</span></a>
+        <a href="#metodo" class="nav-link"><span data-lang-inline="pt">Método</span><span data-lang-inline="en">Method</span></a>
+        <a href="#depoimentos" class="nav-link"><span data-lang-inline="pt">Depoimentos</span><span data-lang-inline="en">Reviews</span></a>
+        <a href="#faq" class="nav-link">FAQ</a>
+        <a href="/agenda.html" class="nav-link"><span data-lang-inline="pt">Agenda</span><span data-lang-inline="en">Schedule</span></a>
+        <a href="/questoes/" class="nav-link"><span data-lang-inline="pt">Questões</span><span data-lang-inline="en">Practice</span></a>
+
+        <div class="lang-toggle">
+          <button type="button" data-set-lang="pt" class="active">PT</button>
+          <button type="button" data-set-lang="en">EN</button>
+        </div>
+
+        <a
+          href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20quero%20agendar%20uma%20aula."
+          target="_blank" rel="noopener noreferrer"
+          class="btn btn-primary nav-link"
+          style="padding:10px 16px;font-size:13px;"
+        >
+          <span data-lang-inline="pt">Agendar</span>
+          <span data-lang-inline="en">Book</span>
+          <svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </nav>
+
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="mobileMenu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <!-- Painel mobile -->
+    <div class="mobile-panel" id="mobileMenu">
+      <a href="#inicio"><span data-lang-inline="pt">Início</span><span data-lang-inline="en">Home</span></a>
+      <a href="#materias"><span data-lang-inline="pt">Matérias</span><span data-lang-inline="en">Subjects</span></a>
+      <a href="#metodo"><span data-lang-inline="pt">Método</span><span data-lang-inline="en">Method</span></a>
+      <a href="#depoimentos"><span data-lang-inline="pt">Depoimentos</span><span data-lang-inline="en">Reviews</span></a>
+      <a href="#faq">FAQ</a>
+      <a href="/agenda.html"><span data-lang-inline="pt">Agenda</span><span data-lang-inline="en">Schedule</span></a>
+      <a href="/questoes/"><span data-lang-inline="pt">Questões</span><span data-lang-inline="en">Practice</span></a>
+      <a href="https://www.instagram.com/quanta_aulas/" target="_blank" rel="noopener noreferrer">Instagram</a>
+      <a href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20quero%20mais%20informa%C3%A7%C3%B5es." target="_blank" rel="noopener noreferrer">WhatsApp</a>
+      <div class="lang-toggle" style="align-self:flex-start;margin-top:12px;">
+        <button type="button" data-set-lang="pt" class="active">PT</button>
+        <button type="button" data-set-lang="en">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============== HERO ============== -->
+    <section class="hero" id="inicio">
+      <div class="container">
+        <div class="hero-grid">
+          <div>
+            <div class="pill" style="margin-bottom:28px;">
+              <span class="dot"></span>
+              <span data-lang-inline="pt">Professor #1 do Brasil para aulas online</span>
+              <span data-lang-inline="en">#1 Professor in Brazil for online lessons</span>
+            </div>
+
+            <h1 class="h-display hero-headline" data-lang="pt">
+              <span class="word-1" style="margin-right:0.22em">Aulas</span>
+              <span class="word-2" style="margin-right:0.22em">particulares</span>
+              <span class="word-3" style="margin-right:0.22em">de</span>
+              <span class="word-4" style="margin-right:0.22em"><span class="grad-text">Matemática,</span></span>
+              <span class="word-5" style="margin-right:0.22em"><span class="grad-text">Física</span></span>
+              <span class="word-6" style="margin-right:0.22em"><span class="grad-text">e</span></span>
+              <span class="word-7" style="margin-right:0.22em"><span class="grad-text">Química</span></span>
+              <span class="word-8" style="margin-right:0.22em">com</span>
+              <span class="word-9" style="margin-right:0.22em">clareza real.</span>
+            </h1>
+
+            <h1 class="h-display hero-headline" data-lang="en">
+              <span class="word-1" style="margin-right:0.22em">Private</span>
+              <span class="word-2" style="margin-right:0.22em"><span class="grad-text">Math,</span></span>
+              <span class="word-3" style="margin-right:0.22em"><span class="grad-text">Physics</span></span>
+              <span class="word-4" style="margin-right:0.22em"><span class="grad-text">and</span></span>
+              <span class="word-5" style="margin-right:0.22em"><span class="grad-text">Chemistry</span></span>
+              <span class="word-6" style="margin-right:0.22em">lessons</span>
+              <span class="word-7" style="margin-right:0.22em">with</span>
+              <span class="word-8" style="margin-right:0.22em">real</span>
+              <span class="word-9" style="margin-right:0.22em">clarity.</span>
+            </h1>
+
+            <p class="lead hero-sub" data-lang="pt">
+              Doutor pelo ITA, 15 anos de experiência, 481 avaliações 5 estrelas e 4.000+ aulas publicadas.
+              Uma proposta feita para o aluno entender o raciocínio, ganhar confiança e evoluir de verdade.
+            </p>
+            <p class="lead hero-sub" data-lang="en">
+              PhD from ITA, 15 years of experience, 481 five-star reviews and 4,000+ published lessons.
+              A method designed for students to understand the reasoning, build confidence, and truly progress.
+            </p>
+
+            <div class="hero-cta-row">
+              <a class="btn btn-primary"
+                href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20quero%20agendar%20uma%20aula."
+                target="_blank" rel="noopener noreferrer">
+                <span data-lang-inline="pt">Agendar aula experimental</span>
+                <span data-lang-inline="en">Book a trial lesson</span>
+                <svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </a>
+              <a class="btn btn-ghost" href="#metodo">
+                <span data-lang-inline="pt">Como funciona</span>
+                <span data-lang-inline="en">How it works</span>
+              </a>
+            </div>
+
+            <div class="hero-trust">
+              <span class="tag">🎓 <span data-lang-inline="pt">Doutor pelo ITA</span><span data-lang-inline="en">PhD from ITA</span></span>
+              <span class="tag">★ 481 <span data-lang-inline="pt">avaliações 5 estrelas</span><span data-lang-inline="en">five-star reviews</span></span>
+              <span class="tag">⏱ 15 <span data-lang-inline="pt">anos de experiência</span><span data-lang-inline="en">years of experience</span></span>
+            </div>
+
+            <div class="countries-row">
+              <span>🇧🇷 Brasil</span>
+              <span>🇵🇹 Portugal</span>
+              <span>🇦🇴 Angola</span>
+              <span>🇲🇿 Moçambique</span>
+              <span>🇬🇧 <span data-lang-inline="pt">Aulas em inglês</span><span data-lang-inline="en">Lessons in English</span></span>
+            </div>
+          </div>
+
+          <!-- Hero card -->
+          <div class="hero-card">
+            <div class="hero-portrait">
+              <img class="portrait-photo"
+                src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=1024,h=1223,fit=crop/mePgp0r1NRh17xWl/sp090-A1azvDGwRxT5QJP2.jpg"
+                alt="Dr. Samuel Isidoro"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+              <div class="portrait-placeholder" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;position:absolute;inset:0;z-index:1;">
+                <img src="assets/logo-quanta.png" alt="" style="width:80px;height:80px;opacity:.85;filter:drop-shadow(0 0 12px var(--brand-glow));" />
+                <span style="font-family:var(--display);font-size:18px;font-weight:700;color:var(--ink);letter-spacing:-0.01em;text-transform:none;">Dr. Samuel Isidoro</span>
+              </div>
+              <div class="hero-card-meta">
+                <span class="stars">★★★★★</span>
+                <span style="opacity:.6;">5.0</span>
+              </div>
+            </div>
+
+            <div class="hero-card-body">
+              <div class="hero-card-label" data-lang="pt">AUTORIDADE & CONFIANÇA</div>
+              <div class="hero-card-label" data-lang="en">AUTHORITY & TRUST</div>
+              <div class="hero-card-quote" data-lang="pt">
+                "O foco da Quanta Aulas é fazer o aluno entender a lógica por trás da matéria, não só decorar fórmula."
+              </div>
+              <div class="hero-card-quote" data-lang="en">
+                "Quanta Aulas focuses on helping students understand the logic behind the material, not just memorize formulas."
+              </div>
+            </div>
+
+            <div class="stats-mini">
+              <div class="stat-mini">
+                <div class="stat-mini-num"><span data-counter="481">481</span></div>
+                <div class="stat-mini-label" data-lang="pt">avaliações 5 estrelas</div>
+                <div class="stat-mini-label" data-lang="en">five-star reviews</div>
+              </div>
+              <div class="stat-mini">
+                <div class="stat-mini-num"><span data-counter="15" data-suffix="+">15+</span></div>
+                <div class="stat-mini-label" data-lang="pt">anos de experiência</div>
+                <div class="stat-mini-label" data-lang="en">years of experience</div>
+              </div>
+              <div class="stat-mini">
+                <div class="stat-mini-num"><span data-counter="4000" data-suffix="+">4.000+</span></div>
+                <div class="stat-mini-label" data-lang="pt">aulas publicadas</div>
+                <div class="stat-mini-label" data-lang="en">published lessons</div>
+              </div>
+              <div class="stat-mini">
+                <div class="stat-mini-num"><span data-counter="10" data-suffix="+">10+</span></div>
+                <div class="stat-mini-label" data-lang="pt">países atendidos</div>
+                <div class="stat-mini-label" data-lang="en">countries served</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== MARQUEE ============== -->
+    <div class="marquee">
+      <div class="marquee-track">
+        <span class="marquee-item">🏆 <span data-lang-inline="pt">#1 Superprof Brasil</span><span data-lang-inline="en">#1 Superprof Brazil</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">🎓 <span data-lang-inline="pt">Doutor pelo ITA</span><span data-lang-inline="en">PhD from ITA</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">★ 481 <span data-lang-inline="pt">avaliações 5 estrelas</span><span data-lang-inline="en">five-star reviews</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">🌎 <span data-lang-inline="pt">Alunos em 10+ países</span><span data-lang-inline="en">Students in 10+ countries</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">⚡ 15 <span data-lang-inline="pt">anos de experiência</span><span data-lang-inline="en">years experience</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">✦ 4.000+ <span data-lang-inline="pt">aulas publicadas</span><span data-lang-inline="en">lessons published</span></span><span class="marquee-sep">✦</span>
+        <!-- duplicado para loop infinito -->
+        <span class="marquee-item">🏆 <span data-lang-inline="pt">#1 Superprof Brasil</span><span data-lang-inline="en">#1 Superprof Brazil</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">🎓 <span data-lang-inline="pt">Doutor pelo ITA</span><span data-lang-inline="en">PhD from ITA</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">★ 481 <span data-lang-inline="pt">avaliações 5 estrelas</span><span data-lang-inline="en">five-star reviews</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">🌎 <span data-lang-inline="pt">Alunos em 10+ países</span><span data-lang-inline="en">Students in 10+ countries</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">⚡ 15 <span data-lang-inline="pt">anos de experiência</span><span data-lang-inline="en">years experience</span></span><span class="marquee-sep">✦</span>
+        <span class="marquee-item">✦ 4.000+ <span data-lang-inline="pt">aulas publicadas</span><span data-lang-inline="en">lessons published</span></span><span class="marquee-sep">✦</span>
+      </div>
+    </div>
+
+    <!-- ============== MATÉRIAS ============== -->
+    <section class="section" id="materias">
+      <div class="container">
+        <div class="reveal section-head">
+          <div>
+            <div class="eyebrow" style="margin-bottom:16px;">
+              <span data-lang-inline="pt">01 — Matérias</span>
+              <span data-lang-inline="en">01 — Subjects</span>
+            </div>
+            <h2 class="h-section">
+              <span data-lang-inline="pt">Várias matérias.</span>
+              <span data-lang-inline="en">Many subjects.</span><br />
+              <span class="grad-text">
+                <span data-lang-inline="pt">Uma abordagem real.</span>
+                <span data-lang-inline="en">One real approach.</span>
+              </span>
+            </h2>
+          </div>
+          <p class="lead">
+            <span data-lang-inline="pt">Aulas individuais ou em grupos pequenos, do ensino médio à graduação. Material próprio, exercícios comentados e acompanhamento entre as aulas.</span>
+            <span data-lang-inline="en">Individual or small-group lessons, from high school to university. Custom material, annotated exercises and follow-up between sessions.</span>
+          </p>
+        </div>
+
+        <div class="reveal subjects-grid subjects-6">
+          <!-- Matemática -->
+          <div class="subject-card">
+            <div class="subject-num">01</div>
+            <div class="subject-arrow"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="subject-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h7M4 18h7M14 6l6 12M20 6l-6 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="12" r="1.5" fill="currentColor"/></svg>
+            </div>
+            <div class="subject-title" data-lang="pt">Matemática</div>
+            <div class="subject-title" data-lang="en">Mathematics</div>
+            <div class="subject-desc" data-lang="pt">Da álgebra ao cálculo. Aulas que constroem intuição e técnica em paralelo.</div>
+            <div class="subject-desc" data-lang="en">From algebra to calculus. Classes that build intuition and technique in parallel.</div>
+            <div class="subject-topics">
+              <span class="subject-topic" data-lang="pt">Cálculo</span><span class="subject-topic" data-lang="en">Calculus</span>
+              <span class="subject-topic" data-lang="pt">Álgebra</span><span class="subject-topic" data-lang="en">Algebra</span>
+              <span class="subject-topic" data-lang="pt">Geometria</span><span class="subject-topic" data-lang="en">Geometry</span>
+              <span class="subject-topic" data-lang="pt">Trigonometria</span><span class="subject-topic" data-lang="en">Trigonometry</span>
+            </div>
+          </div>
+
+          <!-- Física -->
+          <div class="subject-card">
+            <div class="subject-num">02</div>
+            <div class="subject-arrow"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="subject-icon">
+              <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="12" rx="10" ry="4" stroke="currentColor" stroke-width="1.8"/><ellipse cx="12" cy="12" rx="10" ry="4" stroke="currentColor" stroke-width="1.8" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" stroke="currentColor" stroke-width="1.8" transform="rotate(120 12 12)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+            </div>
+            <div class="subject-title" data-lang="pt">Física</div>
+            <div class="subject-title" data-lang="en">Physics</div>
+            <div class="subject-desc" data-lang="pt">Mecânica, eletromagnetismo, termodinâmica. Sempre partindo do fenômeno real.</div>
+            <div class="subject-desc" data-lang="en">Mechanics, electromagnetism, thermodynamics. Always starting from the real phenomenon.</div>
+            <div class="subject-topics">
+              <span class="subject-topic" data-lang="pt">Mecânica</span><span class="subject-topic" data-lang="en">Mechanics</span>
+              <span class="subject-topic" data-lang="pt">Eletromag.</span><span class="subject-topic" data-lang="en">EM</span>
+              <span class="subject-topic" data-lang="pt">Termodin.</span><span class="subject-topic" data-lang="en">Thermo</span>
+              <span class="subject-topic" data-lang="pt">Óptica</span><span class="subject-topic" data-lang="en">Optics</span>
+              <span class="subject-topic" data-lang="pt">Moderna</span><span class="subject-topic" data-lang="en">Modern</span>
+            </div>
+          </div>
+
+          <!-- Química -->
+          <div class="subject-card">
+            <div class="subject-num">03</div>
+            <div class="subject-arrow"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="subject-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M9 3h6M10 3v6L4 19a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-6-10V3" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="10" cy="16" r="1" fill="currentColor"/><circle cx="14" cy="18" r="1.2" fill="currentColor"/></svg>
+            </div>
+            <div class="subject-title" data-lang="pt">Química</div>
+            <div class="subject-title" data-lang="en">Chemistry</div>
+            <div class="subject-desc" data-lang="pt">Geral, orgânica e físico-química. Da estrutura atômica às reações em solução.</div>
+            <div class="subject-desc" data-lang="en">General, organic and physical chemistry. From atomic structure to reactions in solution.</div>
+            <div class="subject-topics">
+              <span class="subject-topic" data-lang="pt">Geral</span><span class="subject-topic" data-lang="en">General</span>
+              <span class="subject-topic" data-lang="pt">Orgânica</span><span class="subject-topic" data-lang="en">Organic</span>
+              <span class="subject-topic" data-lang="pt">Físico-Q.</span><span class="subject-topic" data-lang="en">Physical</span>
+              <span class="subject-topic" data-lang="pt">Inorgânica</span><span class="subject-topic" data-lang="en">Inorganic</span>
+            </div>
+          </div>
+
+          <!-- Estatística -->
+          <div class="subject-card">
+            <div class="subject-num">04</div>
+            <div class="subject-arrow"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="subject-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M3 21h18M6 21V11M11 21V7M16 21V13M21 21V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <div class="subject-title" data-lang="pt">Estatística</div>
+            <div class="subject-title" data-lang="en">Statistics</div>
+            <div class="subject-desc" data-lang="pt">Probabilidade, distribuições e inferência. Da intuição ao teste de hipóteses.</div>
+            <div class="subject-desc" data-lang="en">Probability, distributions and inference. From intuition to hypothesis testing.</div>
+            <div class="subject-topics">
+              <span class="subject-topic" data-lang="pt">Probabilidade</span><span class="subject-topic" data-lang="en">Probability</span>
+              <span class="subject-topic" data-lang="pt">Distribuições</span><span class="subject-topic" data-lang="en">Distributions</span>
+              <span class="subject-topic" data-lang="pt">Inferência</span><span class="subject-topic" data-lang="en">Inference</span>
+              <span class="subject-topic" data-lang="pt">Regressão</span><span class="subject-topic" data-lang="en">Regression</span>
+            </div>
+          </div>
+
+          <!-- Xadrez -->
+          <div class="subject-card">
+            <div class="subject-num">05</div>
+            <div class="subject-arrow"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="subject-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M9 3h6l-1 4h2v3l-3 2v6h3v3H8v-3h3v-6L8 10V7h2L9 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="subject-title">Xadrez</div>
+            <div class="subject-desc" data-lang="pt">Aberturas, táticas e estratégia. Do iniciante ao jogador competitivo.</div>
+            <div class="subject-desc" data-lang="en">Openings, tactics and strategy. From beginner to competitive player.</div>
+            <div class="subject-topics">
+              <span class="subject-topic" data-lang="pt">Aberturas</span><span class="subject-topic" data-lang="en">Openings</span>
+              <span class="subject-topic" data-lang="pt">Táticas</span><span class="subject-topic" data-lang="en">Tactics</span>
+              <span class="subject-topic" data-lang="pt">Finais</span><span class="subject-topic" data-lang="en">Endgames</span>
+              <span class="subject-topic" data-lang="pt">Estratégia</span><span class="subject-topic" data-lang="en">Strategy</span>
+            </div>
+          </div>
+
+          <!-- Bitcoin -->
+          <div class="subject-card">
+            <div class="subject-num">06</div>
+            <div class="subject-arrow"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="subject-icon">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9 7v10M14 7v10M8 9.5h6a2 2 0 010 4H8M8 13.5h6.5a2 2 0 010 4H8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <div class="subject-title">Bitcoin</div>
+            <div class="subject-desc" data-lang="pt">Como funciona, por que importa e como pensar a tecnologia sem hype.</div>
+            <div class="subject-desc" data-lang="en">How it works, why it matters and how to think about the tech beyond the hype.</div>
+            <div class="subject-topics">
+              <span class="subject-topic" data-lang="pt">Fundamentos</span><span class="subject-topic" data-lang="en">Fundamentals</span>
+              <span class="subject-topic" data-lang="pt">Blockchain</span><span class="subject-topic" data-lang="en">Blockchain</span>
+              <span class="subject-topic" data-lang="pt">Criptografia</span><span class="subject-topic" data-lang="en">Cryptography</span>
+              <span class="subject-topic" data-lang="pt">Custódia</span><span class="subject-topic" data-lang="en">Custody</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="subjects-extra">
+          <span data-lang-inline="pt">+ muitas outras matérias —</span>
+          <span data-lang-inline="en">+ many other subjects —</span>
+          <a href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20queria%20saber%20se%20voc%C3%AA%20d%C3%A1%20aula%20de..."
+             target="_blank" rel="noopener noreferrer">
+            <span data-lang-inline="pt">pergunte no WhatsApp</span>
+            <span data-lang-inline="en">ask on WhatsApp</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== MÉTODO ============== -->
+    <section class="section" id="metodo" style="padding-top:40px;">
+      <div class="container">
+        <div class="reveal section-head">
+          <div>
+            <div class="eyebrow" style="margin-bottom:16px;">
+              <span data-lang-inline="pt">02 — Método</span>
+              <span data-lang-inline="en">02 — Method</span>
+            </div>
+            <h2 class="h-section">
+              <span data-lang-inline="pt">Como funciona</span>
+              <span data-lang-inline="en">How it works</span><br />
+              <span class="grad-text">
+                <span data-lang-inline="pt">na prática.</span>
+                <span data-lang-inline="en">in practice.</span>
+              </span>
+            </h2>
+          </div>
+          <p class="lead">
+            <span data-lang-inline="pt">Quatro passos simples — do primeiro contato à evolução real. Sem enrolação, sem fórmula mágica.</span>
+            <span data-lang-inline="en">Four simple steps — from first contact to real progress. No fluff, no magic formula.</span>
+          </p>
+        </div>
+
+        <div class="method">
+          <div class="method-list">
+            <div class="method-step active">
+              <div class="step-num">01</div>
+              <div>
+                <div class="step-title" data-lang="pt">Diagnóstico</div>
+                <div class="step-title" data-lang="en">Diagnosis</div>
+                <div class="step-desc" data-lang="pt">Conversa inicial gratuita pra mapear lacunas, objetivo e ritmo ideal.</div>
+                <div class="step-desc" data-lang="en">A free first call to map gaps, goals and ideal pace.</div>
+              </div>
+              <div class="step-icon"><svg viewBox="0 0 16 16" fill="none" width="16" height="16"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">02</div>
+              <div>
+                <div class="step-title" data-lang="pt">Plano de estudos</div>
+                <div class="step-title" data-lang="en">Study plan</div>
+                <div class="step-desc" data-lang="pt">Roteiro semanal com os temas, exercícios e marcos de progresso.</div>
+                <div class="step-desc" data-lang="en">Weekly roadmap with topics, exercises and progress milestones.</div>
+              </div>
+              <div class="step-icon"><svg viewBox="0 0 16 16" fill="none" width="16" height="16"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">03</div>
+              <div>
+                <div class="step-title" data-lang="pt">Aulas com clareza real</div>
+                <div class="step-title" data-lang="en">Lessons with real clarity</div>
+                <div class="step-desc" data-lang="pt">Cada aula constrói raciocínio, não só fórmula. Tudo gravado pra revisar.</div>
+                <div class="step-desc" data-lang="en">Every class builds reasoning, not just formulas. All recorded for review.</div>
+              </div>
+              <div class="step-icon"><svg viewBox="0 0 16 16" fill="none" width="16" height="16"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">04</div>
+              <div>
+                <div class="step-title" data-lang="pt">Acompanhamento contínuo</div>
+                <div class="step-title" data-lang="en">Continuous follow-up</div>
+                <div class="step-desc" data-lang="pt">Material entre aulas, dúvidas no WhatsApp e ajuste de rota mensal.</div>
+                <div class="step-desc" data-lang="en">Materials between classes, WhatsApp Q&A, monthly course-correction.</div>
+              </div>
+              <div class="step-icon"><svg viewBox="0 0 16 16" fill="none" width="16" height="16"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            </div>
+          </div>
+
+          <div class="method-visual">
+            <div class="visual-grid"></div>
+
+            <!-- Stage 0 -->
+            <div class="visual-stage">
+              <div class="equation">
+                <span style="color:var(--ink-mute);">?</span>
+                <span class="e-op">→</span>
+                <span class="grad-text">x</span>
+              </div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--ink-mute);letter-spacing:0.06em;">
+                <span data-lang-inline="pt">/ DIAGNÓSTICO INICIAL</span>
+                <span data-lang-inline="en">/ INITIAL DIAGNOSIS</span>
+              </div>
+              <div class="visual-axis">
+                <svg viewBox="0 0 400 140" preserveAspectRatio="none">
+                  <line x1="20" y1="120" x2="380" y2="120" stroke="rgba(34,197,94,.3)" stroke-width="1.5"/>
+                  <line x1="20" y1="20" x2="20" y2="120" stroke="rgba(34,197,94,.3)" stroke-width="1.5"/>
+                  <circle cx="60" cy="100" r="4" fill="#1fd685"/>
+                  <circle cx="120" cy="80" r="4" fill="#1fd685"/>
+                  <circle cx="200" cy="60" r="4" fill="#1fd685"/>
+                  <circle cx="280" cy="50" r="4" fill="#1fd685"/>
+                  <circle cx="340" cy="35" r="4" fill="#1fd685"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Stage 1 -->
+            <div class="visual-stage" style="display:none;">
+              <div class="equation">
+                <span>f</span><span style="color:var(--ink-dim);">(t)</span>
+                <span class="e-op">=</span>
+                <span class="grad-text">∑ aulas</span>
+              </div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--ink-mute);">
+                <span data-lang-inline="pt">/ PLANO ESTRUTURADO</span>
+                <span data-lang-inline="en">/ STRUCTURED PLAN</span>
+              </div>
+              <div class="visual-axis">
+                <svg viewBox="0 0 400 140" preserveAspectRatio="none">
+                  <rect x="20" y="98"  width="32" height="22" fill="rgba(31,214,133,.18)" stroke="#1fd685"/>
+                  <rect x="68" y="76"  width="32" height="44" fill="rgba(31,214,133,.18)" stroke="#1fd685"/>
+                  <rect x="116" y="54" width="32" height="66" fill="rgba(31,214,133,.18)" stroke="#1fd685"/>
+                  <rect x="164" y="32" width="32" height="88" fill="rgba(31,214,133,.18)" stroke="#1fd685"/>
+                  <rect x="212" y="98" width="32" height="22" fill="rgba(31,214,133,.18)" stroke="#1fd685"/>
+                  <rect x="260" y="76" width="32" height="44" fill="rgba(31,214,133,.18)" stroke="#1fd685"/>
+                  <rect x="308" y="54" width="32" height="66" fill="rgba(31,214,133,.18)" stroke="#1fd685"/>
+                  <rect x="356" y="32" width="32" height="88" fill="rgba(31,214,133,.18)" stroke="#1fd685"/>
+                  <line x1="20" y1="120" x2="380" y2="120" stroke="rgba(34,197,94,.3)" stroke-width="1.5"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Stage 2 -->
+            <div class="visual-stage" style="display:none;">
+              <div class="equation">
+                <span class="grad-text">∂y</span>
+                <span style="margin:0 4px;color:var(--ink-dim);">/</span>
+                <span>∂x</span>
+                <span class="e-op">=</span>
+                <span>2x</span>
+                <span class="e-op">+</span>
+                <span>3</span>
+              </div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--ink-mute);">
+                <span data-lang-inline="pt">/ AULA AO VIVO</span>
+                <span data-lang-inline="en">/ LIVE LESSON</span>
+              </div>
+              <div class="visual-axis">
+                <svg viewBox="0 0 400 140" preserveAspectRatio="none">
+                  <line x1="20" y1="120" x2="380" y2="120" stroke="rgba(34,197,94,.3)" stroke-width="1.5"/>
+                  <line x1="20" y1="20" x2="20" y2="120" stroke="rgba(34,197,94,.3)" stroke-width="1.5"/>
+                  <path class="curve" d="M 20 120 Q 100 110, 160 70 T 280 30 T 380 25"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Stage 3 -->
+            <div class="visual-stage" style="display:none;">
+              <div class="equation">
+                <span>x</span>
+                <span class="e-op">→</span>
+                <span class="grad-text">∞</span>
+              </div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--ink-mute);">
+                <span data-lang-inline="pt">/ EVOLUÇÃO CONTÍNUA</span>
+                <span data-lang-inline="en">/ CONTINUOUS GROWTH</span>
+              </div>
+              <div class="visual-axis">
+                <svg viewBox="0 0 400 140" preserveAspectRatio="none">
+                  <line x1="20" y1="120" x2="380" y2="120" stroke="rgba(34,197,94,.3)" stroke-width="1.5"/>
+                  <line x1="20" y1="20" x2="20" y2="120" stroke="rgba(34,197,94,.3)" stroke-width="1.5"/>
+                  <path d="M 20 120 C 100 120, 140 100, 200 70 S 320 25, 380 20"
+                        fill="none" stroke="#1fd685" stroke-width="2.5"
+                        filter="drop-shadow(0 0 6px rgba(31,214,133,.35))"/>
+                  <circle cx="380" cy="20" r="6" fill="#1fd685">
+                    <animate attributeName="r" values="4;8;4" dur="1.6s" repeatCount="indefinite"/>
+                  </circle>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== DEPOIMENTOS ============== -->
+    <section class="section" id="depoimentos">
+      <div class="container">
+        <div class="reveal section-head">
+          <div>
+            <div class="eyebrow" style="margin-bottom:16px;">
+              <span data-lang-inline="pt">03 — Depoimentos</span>
+              <span data-lang-inline="en">03 — Testimonials</span>
+            </div>
+            <h2 class="h-section">
+              <span data-lang-inline="pt">481 alunos.</span>
+              <span data-lang-inline="en">481 students.</span><br />
+              <span class="grad-text">
+                <span data-lang-inline="pt">Resultados que falam.</span>
+                <span data-lang-inline="en">Results that speak.</span>
+              </span>
+            </h2>
+          </div>
+          <p class="lead">
+            <span data-lang-inline="pt">O que mais aparece nos depoimentos é "agora eu entendo".</span>
+            <span data-lang-inline="en">What shows up most in reviews is "now I get it".</span>
+          </p>
+        </div>
+
+        <div class="reveal testimonials">
+          <article class="testimonial">
+            <span class="quote-mark">"</span>
+            <div class="testimonial-text" data-lang="pt">Perfeito! Expressou pleno domínio do conteúdo e didática ótima.</div>
+            <div class="testimonial-text" data-lang="en">Perfect! He showed full mastery of the subject and excellent teaching.</div>
+            <div class="testimonial-meta">
+              <div class="avatar">B</div>
+              <div>
+                <div class="testimonial-name">Bruno</div>
+                <div class="testimonial-role" data-lang="pt">domínio e didática</div>
+                <div class="testimonial-role" data-lang="en">mastery & teaching</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="testimonial">
+            <span class="quote-mark">"</span>
+            <div class="testimonial-text" data-lang="pt">Professor Samuel foi excelente nas aulas, extremamente focado, conduziu tudo com muita organização e objetivo.</div>
+            <div class="testimonial-text" data-lang="en">Professor Samuel was excellent, extremely focused, and conducted the lessons with great organization and purpose.</div>
+            <div class="testimonial-meta">
+              <div class="avatar">C</div>
+              <div>
+                <div class="testimonial-name">Carlos</div>
+                <div class="testimonial-role" data-lang="pt">organização & foco</div>
+                <div class="testimonial-role" data-lang="en">organization & focus</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="testimonial">
+            <span class="quote-mark">"</span>
+            <div class="testimonial-text" data-lang="pt">Professor muito bom e solícito, recomendo para quem está precisando de ajuda.</div>
+            <div class="testimonial-text" data-lang="en">A very good and helpful tutor. I recommend him to anyone who needs support.</div>
+            <div class="testimonial-meta">
+              <div class="avatar">B</div>
+              <div>
+                <div class="testimonial-name">Brayan</div>
+                <div class="testimonial-role" data-lang="pt">solicitude</div>
+                <div class="testimonial-role" data-lang="en">helpfulness</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="testimonial">
+            <span class="quote-mark">"</span>
+            <div class="testimonial-text" data-lang="pt">Consegue explicar a matéria de forma simples e direta. Ajudou muito nos exames.</div>
+            <div class="testimonial-text" data-lang="en">He explains the subject in a simple and direct way. He helped a lot with exams.</div>
+            <div class="testimonial-meta">
+              <div class="avatar">F</div>
+              <div>
+                <div class="testimonial-name">Fernando</div>
+                <div class="testimonial-role" data-lang="pt">simplicidade</div>
+                <div class="testimonial-role" data-lang="en">simplicity</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="testimonial">
+            <span class="quote-mark">"</span>
+            <div class="testimonial-text" data-lang="pt">Professor atencioso e pró-ativo. Soube auxiliar no programa de estudo com clareza.</div>
+            <div class="testimonial-text" data-lang="en">Attentive and proactive teacher. He supported the study plan with clarity.</div>
+            <div class="testimonial-meta">
+              <div class="avatar">T</div>
+              <div>
+                <div class="testimonial-name">Tânia</div>
+                <div class="testimonial-role" data-lang="pt">atenção & apoio</div>
+                <div class="testimonial-role" data-lang="en">attention & support</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="testimonial">
+            <span class="quote-mark">"</span>
+            <div class="testimonial-text" data-lang="pt">Contato ágil e a primeira aula foi marcada rapidamente. Transmitiu segurança logo no início.</div>
+            <div class="testimonial-text" data-lang="en">The contact was quick and the first lesson was scheduled fast. It felt trustworthy from the beginning.</div>
+            <div class="testimonial-meta">
+              <div class="avatar">N</div>
+              <div>
+                <div class="testimonial-name">Natali</div>
+                <div class="testimonial-role" data-lang="pt">atendimento</div>
+                <div class="testimonial-role" data-lang="en">first contact</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="testimonial">
+            <span class="quote-mark">"</span>
+            <div class="testimonial-text" data-lang="pt">Professor muito preparado. O aluno ficou atento, animado e participativo durante a aula.</div>
+            <div class="testimonial-text" data-lang="en">A very well-prepared teacher. The student stayed focused, motivated and engaged.</div>
+            <div class="testimonial-meta">
+              <div class="avatar">F</div>
+              <div>
+                <div class="testimonial-name">Fernando</div>
+                <div class="testimonial-role" data-lang="pt">aulas com crianças</div>
+                <div class="testimonial-role" data-lang="en">teaching kids</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="testimonial">
+            <span class="quote-mark">"</span>
+            <div class="testimonial-text" data-lang="pt">Didática detalhada e objetiva ao mesmo tempo, com paciência e método muito elogiados.</div>
+            <div class="testimonial-text" data-lang="en">A teaching style that is both detailed and objective, with patience and a highly praised method.</div>
+            <div class="testimonial-meta">
+              <div class="avatar">G</div>
+              <div>
+                <div class="testimonial-name">Giovanni</div>
+                <div class="testimonial-role" data-lang="pt">clareza & paciência</div>
+                <div class="testimonial-role" data-lang="en">clarity & patience</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="testimonial" style="background:linear-gradient(135deg,var(--brand-soft),var(--bg-elev));border-color:var(--line-strong);">
+            <span class="quote-mark">★</span>
+            <div class="testimonial-text" style="color:var(--ink);font-weight:500;">
+              <span data-lang-inline="pt">Mais 473 avaliações 5 estrelas no Superprof — leia todas no perfil oficial.</span>
+              <span data-lang-inline="en">473 more 5-star reviews on Superprof — read them all on the official profile.</span>
+            </div>
+            <div class="testimonial-meta" style="border-top-color:var(--line-strong);">
+              <a class="btn btn-primary"
+                 href="https://www.superprof.com.br/doutor-pelo-ita-pos-doutor-europa-anos-experiencia-aulas-calmas-com-atencao-dificuldade-com.html"
+                 target="_blank" rel="noopener noreferrer"
+                 style="padding:10px 14px;font-size:13px;">
+                <span data-lang-inline="pt">Ver no Superprof</span>
+                <span data-lang-inline="en">See on Superprof</span>
+                <svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== FAQ ============== -->
+    <section class="section" id="faq" style="padding-bottom:60px;">
+      <div class="container">
+        <div class="reveal section-head" style="margin-bottom:40px;">
+          <div>
+            <div class="eyebrow" style="margin-bottom:16px;">
+              <span data-lang-inline="pt">04 — Dúvidas</span>
+              <span data-lang-inline="en">04 — FAQ</span>
+            </div>
+            <h2 class="h-section">
+              <span data-lang-inline="pt">Perguntas</span>
+              <span data-lang-inline="en">Frequent</span><br />
+              <span class="grad-text">
+                <span data-lang-inline="pt">frequentes.</span>
+                <span data-lang-inline="en">questions.</span>
+              </span>
+            </h2>
+          </div>
+          <p class="lead">
+            <span data-lang-inline="pt">Não achou sua dúvida? Manda no WhatsApp — respondo pessoalmente.</span>
+            <span data-lang-inline="en">Didn't find your question? Drop a message on WhatsApp — I answer personally.</span>
+          </p>
+        </div>
+
+        <div class="reveal faq">
+          <div class="faq-item open">
+            <div class="faq-q">
+              <span data-lang-inline="pt">Como funciona a aula experimental?</span>
+              <span data-lang-inline="en">How does the trial lesson work?</span>
+              <div class="faq-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="faq-a">
+              <div class="faq-a-inner" style="padding-top:4px;">
+                <span data-lang-inline="pt">É uma conversa inicial pelo WhatsApp ou videochamada, gratuita e sem compromisso. A gente conversa sobre seu objetivo, mapeia onde você está e te mostra o plano possível.</span>
+                <span data-lang-inline="en">A free, no-commitment first conversation by WhatsApp or video call. We talk about your goal, map where you are, and outline a possible plan.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-q">
+              <span data-lang-inline="pt">Quais matérias são atendidas?</span>
+              <span data-lang-inline="en">Which subjects are covered?</span>
+              <div class="faq-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="faq-a">
+              <div class="faq-a-inner" style="padding-top:4px;">
+                <span data-lang-inline="pt">Matemática, Física, Química, Estatística, Xadrez, Bitcoin e muitas outras. Se você não viu sua matéria, pergunta no WhatsApp — provavelmente atende.</span>
+                <span data-lang-inline="en">Math, Physics, Chemistry, Statistics, Chess, Bitcoin and many others. If your subject isn't listed, ask on WhatsApp — it's likely covered.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-q">
+              <span data-lang-inline="pt">Atende qual nível de ensino?</span>
+              <span data-lang-inline="en">What level do you teach?</span>
+              <div class="faq-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="faq-a">
+              <div class="faq-a-inner" style="padding-top:4px;">
+                <span data-lang-inline="pt">Do reforço escolar e ensino médio (vestibular, ENEM, ITA, IME) até disciplinas de graduação em ciências exatas e engenharias.</span>
+                <span data-lang-inline="en">From school reinforcement and high school (entrance exams, ITA, IME) to undergraduate STEM and engineering courses.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-q">
+              <span data-lang-inline="pt">As aulas são online ou presenciais?</span>
+              <span data-lang-inline="en">Are lessons online or in-person?</span>
+              <div class="faq-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="faq-a">
+              <div class="faq-a-inner" style="padding-top:4px;">
+                <span data-lang-inline="pt">Online por padrão, com ferramentas próprias para escrita matemática em tempo real. Tudo é gravado e fica disponível pra revisão.</span>
+                <span data-lang-inline="en">Online by default, with custom tools for real-time math writing. Everything is recorded and available for review.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-q">
+              <span data-lang-inline="pt">Atende alunos fora do Brasil?</span>
+              <span data-lang-inline="en">Do you teach students outside Brazil?</span>
+              <div class="faq-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="faq-a">
+              <div class="faq-a-inner" style="padding-top:4px;">
+                <span data-lang-inline="pt">Sim. Atendo alunos em vários países, principalmente de língua portuguesa (Brasil, Portugal, Angola, Moçambique e brasileiros vivendo fora). Também dou aulas em inglês, com horários flexíveis.</span>
+                <span data-lang-inline="en">Yes. I teach students in several countries, mostly Portuguese-speaking (Brazil, Portugal, Angola, Mozambique and Brazilians living abroad). Lessons in English are also available, with flexible scheduling.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-q">
+              <span data-lang-inline="pt">Posso pedir informações pelo WhatsApp?</span>
+              <span data-lang-inline="en">Can I ask for information via WhatsApp?</span>
+              <div class="faq-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="faq-a">
+              <div class="faq-a-inner" style="padding-top:4px;">
+                <span data-lang-inline="pt">Sim. O caminho mais rápido para tirar dúvidas, ver disponibilidade e entender a melhor opção é pelo WhatsApp.</span>
+                <span data-lang-inline="en">Yes. The fastest way to ask questions, check availability and understand the best option is through WhatsApp.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== CTA STRIP ============== -->
+    <section class="section" style="padding-top:0;">
+      <div class="container">
+        <div class="reveal cta-strip">
+          <div>
+            <div class="eyebrow" style="margin-bottom:16px;">
+              <span data-lang-inline="pt">— Próximo passo</span>
+              <span data-lang-inline="en">— Next step</span>
+            </div>
+            <h2 class="h-section" style="max-width:14ch;">
+              <span data-lang-inline="pt">Sua primeira conversa é por minha conta.</span>
+              <span data-lang-inline="en">Your first call is on me.</span>
+            </h2>
+          </div>
+          <a class="btn btn-primary"
+             href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20quero%20agendar%20uma%20aula."
+             target="_blank" rel="noopener noreferrer"
+             style="padding:18px 26px;font-size:16px;position:relative;z-index:1;">
+            <span data-lang-inline="pt">Agendar agora</span>
+            <span data-lang-inline="en">Book now</span>
+            <svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============== FOOTER ============== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <a href="#inicio" class="nav-logo" style="margin-bottom:16px;">
+            <img src="assets/logo-quanta.png" alt="Quanta Aulas" class="logo-img" />
+            <span>
+              <span class="name">QUANTA AULAS</span>
+              <span class="tag" data-lang-inline="pt">A evolução do aprendizado</span>
+              <span class="tag" data-lang-inline="en">The evolution of learning</span>
+            </span>
+          </a>
+          <p style="max-width:40ch;font-size:14px;margin-top:16px;color:var(--ink-dim);">
+            <span data-lang-inline="pt">Aulas particulares de Matemática, Física, Química e muito mais. Método próprio e clareza real.</span>
+            <span data-lang-inline="en">Private lessons in Math, Physics, Chemistry and much more. A unique method and real clarity.</span>
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h4><span data-lang-inline="pt">Navegar</span><span data-lang-inline="en">Navigate</span></h4>
+          <a href="#inicio"><span data-lang-inline="pt">Início</span><span data-lang-inline="en">Home</span></a>
+          <a href="#materias"><span data-lang-inline="pt">Matérias</span><span data-lang-inline="en">Subjects</span></a>
+          <a href="#metodo"><span data-lang-inline="pt">Método</span><span data-lang-inline="en">Method</span></a>
+          <a href="#depoimentos"><span data-lang-inline="pt">Depoimentos</span><span data-lang-inline="en">Reviews</span></a>
+          <a href="#faq">FAQ</a>
+        </div>
+
+        <div class="footer-col">
+          <h4><span data-lang-inline="pt">Contato</span><span data-lang-inline="en">Contact</span></h4>
+          <a href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20quero%20mais%20informa%C3%A7%C3%B5es." target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          <a href="https://www.instagram.com/quanta_aulas/" target="_blank" rel="noopener noreferrer">Instagram</a>
+          <a href="/agenda.html"><span data-lang-inline="pt">Agenda</span><span data-lang-inline="en">Schedule</span></a>
+          <a href="https://www.superprof.com.br/doutor-pelo-ita-pos-doutor-europa-anos-experiencia-aulas-calmas-com-atencao-dificuldade-com.html" target="_blank" rel="noopener noreferrer">Superprof</a>
+        </div>
+
+        <div class="footer-col">
+          <h4><span data-lang-inline="pt">Recursos</span><span data-lang-inline="en">Resources</span></h4>
+          <a href="/questoes/"><span data-lang-inline="pt">Questões</span><span data-lang-inline="en">Practice</span></a>
+          <a href="/aventurailhavoadora/"><span data-lang-inline="pt">A Aventura da Ilha Voadora</span><span data-lang-inline="en">A Aventura da Ilha Voadora</span></a>
+          <a href="/supervovoeve/">Super Vovó Eve</a>
+        </div>
+      </div>
+
+      <div class="footer-mega">QUANTA</div>
+
+      <div class="footer-bottom">
+        <span>
+          <span data-lang-inline="pt">© 2026 Quanta Aulas · Todos os direitos reservados</span>
+          <span data-lang-inline="en">© 2026 Quanta Aulas · All rights reserved</span>
+        </span>
+        <span>
+          <span data-lang-inline="pt">Feito com clareza</span>
+          <span data-lang-inline="en">Built with clarity</span>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- WhatsApp flutuante -->
+  <a class="whatsapp-float"
+     href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20quero%20mais%20informa%C3%A7%C3%B5es."
+     target="_blank" rel="noopener noreferrer"
+     aria-label="Falar no WhatsApp" title="Falar no WhatsApp">
+    <svg viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M19.11 17.02c-.28-.14-1.63-.8-1.89-.9-.25-.09-.44-.14-.62.14-.18.28-.72.9-.88 1.08-.16.18-.32.21-.6.07-.28-.14-1.16-.43-2.21-1.38-.82-.73-1.38-1.64-1.54-1.92-.16-.28-.02-.43.12-.57.13-.13.28-.32.42-.48.14-.16.18-.28.28-.46.09-.18.04-.35-.02-.48-.07-.14-.62-1.5-.85-2.05-.22-.53-.45-.46-.62-.47l-.53-.01c-.18 0-.48.07-.73.35s-.95.93-.95 2.27.98 2.64 1.12 2.82c.14.18 1.92 2.94 4.65 4.13.65.28 1.16.45 1.56.58.66.21 1.26.18 1.74.11.53-.08 1.63-.67 1.86-1.32.23-.65.23-1.21.16-1.32-.07-.11-.25-.18-.53-.32ZM16.02 4.5c-6.33 0-11.47 5.14-11.47 11.46 0 2.02.53 4 1.53 5.75L4.5 27.5l5.94-1.56a11.38 11.38 0 0 0 5.58 1.43h.01c6.32 0 11.47-5.15 11.47-11.47 0-3.06-1.19-5.93-3.36-8.1A11.37 11.37 0 0 0 16.02 4.5Zm0 20.96h-.01a9.45 9.45 0 0 1-4.82-1.32l-.35-.21-3.52.92.94-3.43-.23-.35a9.45 9.45 0 1 1 7.99 4.39Z"/>
+    </svg>
+  </a>
+
+  <script src="script.js?v=10"></script>
+</body>
+</html>

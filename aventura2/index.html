@@ -1,0 +1,1399 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ilhas Encantadas - Phaser</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <style>
+    :root {
+      --green: #32c46d;
+      --dark: #172820;
+      --yellow: #ffd64d;
+      --orange: #ff9e2f;
+      --pink: #ff6faf;
+      --blue: #38a9ff;
+      --ink: #1c2730;
+      --cream: #fff8e6;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #0f1e26;
+      color: var(--ink);
+      font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+      touch-action: none;
+      user-select: none;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    #game-shell {
+      position: relative;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at top left, rgba(255, 238, 137, 0.22), transparent 42%),
+        linear-gradient(180deg, #7ce9ff 0%, #c9fff2 54%, #213c2b 100%);
+    }
+
+    #game-root {
+      position: absolute;
+      inset: 0;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain;
+      image-rendering: pixelated;
+      background: transparent;
+    }
+
+    #hud {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      z-index: 20;
+      display: grid;
+      grid-template-columns: minmax(190px, 1fr) auto auto auto;
+      gap: 10px;
+      align-items: center;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    body.game-started #hud {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hud-panel,
+    .counter,
+    .level-chip {
+      border: 2px solid rgba(28, 39, 48, 0.14);
+      background: rgba(255, 255, 255, 0.85);
+      box-shadow: 0 8px 20px rgba(25, 64, 48, 0.18);
+      backdrop-filter: blur(8px);
+    }
+
+    .hud-panel {
+      min-width: 0;
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+
+    .hud-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+      color: #315442;
+    }
+
+    .health-track,
+    .charge-track {
+      position: relative;
+      height: 14px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(31, 53, 43, 0.16);
+      border: 1px solid rgba(20, 44, 32, 0.16);
+    }
+
+    .health-fill,
+    .charge-fill {
+      height: 100%;
+      width: 100%;
+      transition: width 120ms ease;
+    }
+
+    .health-fill {
+      background: linear-gradient(90deg, #41d879, #d8f85a, #ffb142);
+    }
+
+    .charge-track {
+      margin-top: 5px;
+      height: 8px;
+    }
+
+    .charge-fill {
+      background: linear-gradient(90deg, #54c7ff, #fb77ff, #ffdc4c);
+    }
+
+    .counter,
+    .level-chip {
+      min-height: 48px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-weight: 900;
+      color: #244436;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .counter small,
+    .level-chip small {
+      display: block;
+      margin-top: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      color: #6e8778;
+    }
+
+    #controls {
+      position: fixed;
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      bottom: max(12px, env(safe-area-inset-bottom));
+      z-index: 22;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    body.game-started #controls {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .control-btn {
+      width: clamp(70px, 22vw, 112px);
+      min-height: 58px;
+      border: 0;
+      border-bottom: 5px solid rgba(67, 44, 12, 0.28);
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fff7b4, #ffc341);
+      color: #37250c;
+      box-shadow: 0 12px 22px rgba(12, 38, 48, 0.24);
+      font: 900 13px/1.05 "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+      pointer-events: auto;
+      cursor: pointer;
+      touch-action: none;
+    }
+
+    .control-btn:active,
+    .control-btn.is-held {
+      transform: translateY(3px);
+      border-bottom-width: 2px;
+      filter: saturate(1.2);
+    }
+
+    .control-btn.secondary {
+      background: linear-gradient(180deg, #d8fbff, #6ed3ff);
+      color: #10364a;
+    }
+
+    .control-btn.magic {
+      background: linear-gradient(180deg, #ffd8fb, #b979ff);
+      color: #301146;
+    }
+
+    .control-btn:disabled {
+      opacity: 0.55;
+      filter: grayscale(0.45);
+    }
+
+    #start-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      overflow-y: auto;
+      touch-action: pan-y;
+      display: grid;
+      align-items: center;
+      padding: max(18px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+        max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+      background:
+        linear-gradient(180deg, rgba(115, 229, 255, 0.92), rgba(255, 255, 255, 0.28) 38%, rgba(105, 216, 123, 0.9)),
+        url("https://opengameart.org/sites/default/files/environment_forestbackground_2.png") center / cover no-repeat;
+    }
+
+    #start-screen.is-hidden {
+      display: none;
+    }
+
+    .start-wrap {
+      width: min(920px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero-title {
+      text-align: center;
+      color: #102b2e;
+      text-shadow: 0 3px 0 rgba(255, 255, 255, 0.58);
+    }
+
+    .hero-title h1 {
+      margin: 0;
+      font-size: clamp(34px, 9vw, 68px);
+      line-height: 0.9;
+      letter-spacing: 0;
+    }
+
+    .hero-title p {
+      max-width: 660px;
+      margin: 10px auto 0;
+      font-size: clamp(15px, 3.4vw, 21px);
+      font-weight: 800;
+      color: #254234;
+    }
+
+    .select-panel {
+      border: 2px solid rgba(255, 255, 255, 0.68);
+      border-radius: 8px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: 0 18px 40px rgba(25, 60, 48, 0.22);
+      backdrop-filter: blur(8px);
+    }
+
+    .select-panel h2 {
+      margin: 0 0 12px;
+      color: #173c35;
+      font-size: clamp(18px, 4.2vw, 26px);
+      text-align: center;
+    }
+
+    .character-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .character-card {
+      position: relative;
+      min-height: 116px;
+      border: 2px solid rgba(21, 48, 39, 0.12);
+      border-radius: 8px;
+      padding: 10px 8px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 255, 238, 0.9));
+      box-shadow: 0 8px 14px rgba(21, 48, 39, 0.11);
+      color: #244236;
+      cursor: pointer;
+    }
+
+    .character-card.is-selected {
+      border-color: #ff9c2a;
+      box-shadow: 0 0 0 4px rgba(255, 204, 64, 0.35), 0 10px 20px rgba(21, 48, 39, 0.12);
+    }
+
+    .character-card.is-locked {
+      opacity: 0.62;
+      filter: grayscale(0.16);
+    }
+
+    .avatar {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 8px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.9);
+      color: #fff;
+      font-weight: 900;
+      font-size: 20px;
+      box-shadow: 0 7px 15px rgba(31, 72, 55, 0.2);
+    }
+
+    .character-card strong {
+      display: block;
+      text-align: center;
+      font-size: 15px;
+    }
+
+    .character-card span {
+      display: block;
+      margin-top: 5px;
+      color: #657d70;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .start-actions {
+      position: sticky;
+      bottom: 0;
+      z-index: 4;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px 0 0;
+    }
+
+    .primary-btn,
+    .plain-btn {
+      min-height: 52px;
+      border-radius: 8px;
+      border: 0;
+      padding: 0 18px;
+      font: 900 15px/1 "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 12px 22px rgba(31, 51, 35, 0.22);
+    }
+
+    .primary-btn {
+      min-width: min(280px, 58vw);
+      background: linear-gradient(180deg, #ffe976, #ff9f2f);
+      color: #3e2606;
+      border-bottom: 5px solid rgba(93, 56, 6, 0.25);
+    }
+
+    .plain-btn {
+      background: rgba(255, 255, 255, 0.9);
+      color: #31493f;
+      border: 2px solid rgba(31, 56, 43, 0.12);
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.62;
+    }
+
+    .credits {
+      width: min(920px, 100%);
+      margin: 0 auto;
+      color: rgba(24, 47, 42, 0.9);
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .credits a {
+      color: #174c6a;
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      top: 82px;
+      z-index: 60;
+      max-width: min(92vw, 520px);
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      color: #1c3d32;
+      box-shadow: 0 12px 26px rgba(17, 42, 36, 0.25);
+      font-weight: 900;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -10px);
+      transition: opacity 170ms ease, transform 170ms ease;
+    }
+
+    #toast.is-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 720px) {
+      #hud {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+
+      .hud-panel {
+        grid-column: 1 / -1;
+      }
+
+      .character-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .start-actions {
+        flex-direction: column;
+      }
+
+      .primary-btn,
+      .plain-btn {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .character-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .character-card {
+        min-height: 88px;
+        display: grid;
+        grid-template-columns: 58px 1fr;
+        align-items: center;
+        column-gap: 8px;
+      }
+
+      .avatar {
+        margin: 0;
+      }
+
+      .character-card strong,
+      .character-card span {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="game-shell">
+    <div id="game-root"></div>
+
+    <section id="hud" aria-label="Status do jogo">
+      <div class="hud-panel">
+        <div class="hud-label">
+          <span id="hero-name">Davi</span>
+          <span id="life-text">7/7</span>
+        </div>
+        <div class="health-track"><div id="health-fill" class="health-fill"></div></div>
+        <div class="charge-track"><div id="charge-fill" class="charge-fill"></div></div>
+      </div>
+      <div class="counter"><span id="banana-score">0/10</span><small>bananas</small></div>
+      <div class="counter"><span id="score-value">0</span><small>pontos</small></div>
+      <div class="level-chip"><span id="level-value">Ilha 1</span><small>fase</small></div>
+    </section>
+
+    <nav id="controls" aria-label="Controles">
+      <button id="jump-btn" class="control-btn secondary" type="button">Pular</button>
+      <button id="attack-btn" class="control-btn" type="button">Poder</button>
+      <button id="burst-btn" class="control-btn magic" type="button" disabled>Explosão</button>
+    </nav>
+
+    <section id="start-screen">
+      <div class="start-wrap">
+        <header class="hero-title">
+          <h1>Ilhas Encantadas</h1>
+          <p>Davi, Daniel e Gabriela em uma floresta voadora cheia de pacotes secretos.</p>
+        </header>
+
+        <div class="select-panel">
+          <h2>Escolha o personagem</h2>
+          <div id="character-grid" class="character-grid"></div>
+          <div class="start-actions">
+            <button id="start-btn" class="primary-btn" type="button" disabled>Carregando...</button>
+            <button id="reset-btn" class="plain-btn" type="button">Reiniciar progresso</button>
+          </div>
+        </div>
+
+        <p class="credits">
+          Assets: OpenGameArt -
+          <a href="https://opengameart.org/content/2d-nature-platformer-tileset-16x16">Nature Platformer Tileset</a>,
+          <a href="https://opengameart.org/content/base-character-spritesheet-16x16">Hero spritesheet</a>,
+          <a href="https://opengameart.org/content/colorable-slime-spritesheet">Slime spritesheet</a>,
+          <a href="https://opengameart.org/content/banana">Banana</a>,
+          <a href="https://opengameart.org/content/forest-background-art">Forest Background Art</a>.
+        </p>
+      </div>
+    </section>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <script>
+    /*
+      Jogo em Phaser.js com assets remotos gratuitos do OpenGameArt.
+      O codigo evita Graphics/retangulos/circulos do Phaser: tudo no mundo do jogo
+      usa sprites, imagens, spritesheets e tilemap.
+    */
+
+    const ASSETS = {
+      background: "https://opengameart.org/sites/default/files/environment_forestbackground_2.png",
+      tiles: "https://opengameart.org/sites/default/files/nature-paltformer-tileset-16x16_1.png",
+      hero: "https://opengameart.org/sites/default/files/Hero.png",
+      slime: "https://opengameart.org/sites/default/files/greenslime_spritesheet_36x32.png",
+      banana: "https://opengameart.org/sites/default/files/fruit_banana_0.png"
+    };
+
+    const TILE_SIZE = 16;
+    const MAP_WIDTH = 92;
+    const MAP_HEIGHT = 30;
+    const BANANAS_TO_WIN = 10;
+    const MAX_HEALTH = 7;
+
+    const TILE_FRAMES = {
+      grass: 0,
+      dirt: 9,
+      brick: 31,
+      crate: 30,
+      crateOpen: 31,
+      redRock: 32,
+      sparkle: 30
+    };
+
+    const CHARACTERS = [
+      { id: "davi", name: "Davi", tint: 0x4aa8ff, unlocked: true },
+      { id: "daniel", name: "Daniel", tint: 0x78d66b, unlocked: true },
+      { id: "gabriela", name: "Gabriela", tint: 0xff80bd, unlocked: true },
+      { id: "tio-nuno", name: "Tio Nuno", tint: 0xffb347, unlocked: false },
+      { id: "mamae", name: "Mamãe", tint: 0xd786ff, unlocked: false },
+      { id: "papai", name: "Papai", tint: 0x65e2c4, unlocked: false },
+      { id: "vovo", name: "Vó", tint: 0xffe66b, unlocked: false }
+    ];
+
+    const state = {
+      selectedCharacter: "davi",
+      control: { jump: false, attack: false, burst: false },
+      progress: loadProgress()
+    };
+
+    const ui = {
+      startScreen: document.getElementById("start-screen"),
+      startBtn: document.getElementById("start-btn"),
+      resetBtn: document.getElementById("reset-btn"),
+      characterGrid: document.getElementById("character-grid"),
+      heroName: document.getElementById("hero-name"),
+      lifeText: document.getElementById("life-text"),
+      healthFill: document.getElementById("health-fill"),
+      chargeFill: document.getElementById("charge-fill"),
+      bananaScore: document.getElementById("banana-score"),
+      scoreValue: document.getElementById("score-value"),
+      levelValue: document.getElementById("level-value"),
+      jumpBtn: document.getElementById("jump-btn"),
+      attackBtn: document.getElementById("attack-btn"),
+      burstBtn: document.getElementById("burst-btn"),
+      toast: document.getElementById("toast")
+    };
+
+    renderCharacterCards();
+    bindInterface();
+
+    class IslandScene extends Phaser.Scene {
+      constructor() {
+        super("IslandScene");
+      }
+
+      init(data) {
+        this.level = data.level || 1;
+        this.characterId = data.characterId || state.selectedCharacter;
+        this.started = Boolean(data.started);
+        this.health = data.health || MAX_HEALTH;
+        this.score = data.score || 0;
+        this.bananas = 0;
+        this.charge = data.charge || 0;
+        this.moveTargetX = null;
+        this.lastShotAt = 0;
+        this.lastHurtAt = 0;
+      }
+
+      preload() {
+        this.load.image("forest", ASSETS.background);
+        this.load.image("tiles", ASSETS.tiles);
+        this.load.spritesheet("tilesetSprites", ASSETS.tiles, {
+          frameWidth: TILE_SIZE,
+          frameHeight: TILE_SIZE
+        });
+        this.load.spritesheet("hero", ASSETS.hero, {
+          frameWidth: 16,
+          frameHeight: 16
+        });
+        this.load.spritesheet("slime", ASSETS.slime, {
+          frameWidth: 36,
+          frameHeight: 32
+        });
+        this.load.image("banana", ASSETS.banana);
+      }
+
+      create() {
+        window.activeIslandScene = this;
+        this.createAnimations();
+        this.createWorld();
+        this.createControls();
+        this.updateHud();
+
+        if (this.started) {
+          document.body.classList.add("game-started");
+          switchMusic("game");
+        } else {
+          this.physics.pause();
+          this.input.enabled = false;
+          ui.startBtn.disabled = false;
+          ui.startBtn.textContent = "Começar aventura";
+        }
+      }
+
+      createAnimations() {
+        if (!this.anims.exists("hero-idle")) {
+          this.anims.create({
+            key: "hero-idle",
+            frames: this.anims.generateFrameNumbers("hero", { start: 0, end: 1 }),
+            frameRate: 4,
+            repeat: -1
+          });
+          this.anims.create({
+            key: "hero-run",
+            frames: this.anims.generateFrameNumbers("hero", { start: 4, end: 7 }),
+            frameRate: 8,
+            repeat: -1
+          });
+          this.anims.create({
+            key: "hero-jump",
+            frames: [{ key: "hero", frame: 8 }],
+            frameRate: 1
+          });
+          this.anims.create({
+            key: "slime-hop",
+            frames: this.anims.generateFrameNumbers("slime", { start: 0, end: 17 }),
+            frameRate: 10,
+            repeat: -1
+          });
+          this.anims.create({
+            key: "package-glow",
+            frames: [
+              { key: "tilesetSprites", frame: TILE_FRAMES.crate },
+              { key: "tilesetSprites", frame: TILE_FRAMES.crateOpen }
+            ],
+            frameRate: 2,
+            repeat: -1
+          });
+        }
+      }
+
+      createWorld() {
+        const levelData = buildLevelData(this.level);
+        this.map = this.make.tilemap({
+          data: levelData.tiles,
+          tileWidth: TILE_SIZE,
+          tileHeight: TILE_SIZE
+        });
+
+        this.bg = this.add.tileSprite(0, 0, 960, 540, "forest")
+          .setOrigin(0)
+          .setScrollFactor(0)
+          .setDepth(-20);
+
+        const tileset = this.map.addTilesetImage("tiles");
+        this.groundLayer = this.map.createLayer(0, tileset, 0, 0);
+        this.groundLayer.setDepth(1);
+        this.groundLayer.setCollisionByExclusion([-1]);
+
+        this.physics.world.setBounds(
+          -60,
+          -260,
+          MAP_WIDTH * TILE_SIZE + 120,
+          MAP_HEIGHT * TILE_SIZE + 420
+        );
+
+        this.packages = this.physics.add.staticGroup();
+        this.bananasGroup = this.physics.add.staticGroup();
+        this.charPacks = this.physics.add.staticGroup();
+        this.enemies = this.physics.add.group();
+        this.enemyShots = this.physics.add.group();
+        this.heroShots = this.physics.add.group();
+        this.crumbleTiles = this.physics.add.staticGroup();
+
+        this.createPlayer(levelData.spawn);
+        this.createPackages(levelData.packages);
+        this.createEnemies(levelData.enemies);
+        this.createCrumbleTiles(levelData.crumble);
+
+        this.physics.add.collider(this.player, this.groundLayer);
+        this.physics.add.collider(this.enemies, this.groundLayer);
+        this.physics.add.collider(this.enemyShots, this.groundLayer, (shot) => shot.destroy());
+        this.physics.add.collider(this.player, this.crumbleTiles, (_, tile) => this.crumble(tile));
+        this.physics.add.overlap(this.player, this.packages, (_, pack) => this.openPackage(pack));
+        this.physics.add.overlap(this.heroShots, this.packages, (shot, pack) => {
+          shot.destroy();
+          this.openPackage(pack);
+        });
+        this.physics.add.overlap(this.player, this.bananasGroup, (_, banana) => this.collectBanana(banana));
+        this.physics.add.overlap(this.player, this.charPacks, (_, pack) => this.collectCharacterPack(pack));
+        this.physics.add.overlap(this.heroShots, this.enemies, (shot, enemy) => this.hitEnemy(shot, enemy));
+        this.physics.add.overlap(this.player, this.enemies, () => this.hurtPlayer(1));
+        this.physics.add.overlap(this.player, this.enemyShots, (_, shot) => {
+          shot.destroy();
+          this.hurtPlayer(1);
+        });
+
+        this.cameras.main.setBounds(0, 0, MAP_WIDTH * TILE_SIZE, MAP_HEIGHT * TILE_SIZE);
+        this.cameras.main.setZoom(2);
+        this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+      }
+
+      createPlayer(spawn) {
+        const character = getCharacter(this.characterId);
+        this.player = this.physics.add.sprite(spawn.x, spawn.y, "hero", 0);
+        this.player.setScale(1.35);
+        this.player.setDepth(10);
+        this.player.setTint(character.tint);
+        this.player.body.setSize(10, 14);
+        this.player.body.setOffset(3, 2);
+        this.player.setMaxVelocity(190, 560);
+        this.player.play("hero-idle");
+      }
+
+      createPackages(packages) {
+        packages.forEach((item, index) => {
+          const pack = this.packages.create(item.x, item.y, "tilesetSprites", TILE_FRAMES.crate);
+          pack.setScale(1.2);
+          pack.setDepth(6);
+          pack.setData("kind", item.kind);
+          pack.setData("characterId", item.characterId || null);
+          pack.setData("opened", false);
+          pack.play("package-glow");
+          pack.refreshBody();
+
+          this.tweens.add({
+            targets: pack,
+            y: pack.y - 3,
+            duration: 760 + index * 35,
+            ease: "Sine.inOut",
+            yoyo: true,
+            repeat: -1
+          });
+        });
+      }
+
+      createEnemies(enemies) {
+        enemies.forEach((item) => {
+          const enemy = this.enemies.create(item.x, item.y, "slime", 0);
+          enemy.setScale(0.72);
+          enemy.setDepth(9);
+          enemy.setBounceX(1);
+          enemy.setCollideWorldBounds(false);
+          enemy.body.setSize(26, 16);
+          enemy.body.setOffset(5, 14);
+          enemy.setVelocityX(item.dir * item.speed);
+          enemy.setData("startX", item.x);
+          enemy.setData("range", item.range);
+          enemy.setData("speed", item.speed);
+          enemy.setData("nextShotAt", this.time.now + Phaser.Math.Between(800, 2200));
+          enemy.play("slime-hop");
+        });
+      }
+
+      createCrumbleTiles(tiles) {
+        tiles.forEach((item) => {
+          const tile = this.crumbleTiles.create(item.x, item.y, "tilesetSprites", TILE_FRAMES.redRock);
+          tile.setScale(1.05);
+          tile.setTint(0xff5454);
+          tile.setDepth(5);
+          tile.setData("falling", false);
+          tile.refreshBody();
+        });
+      }
+
+      createControls() {
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.keys = this.input.keyboard.addKeys({
+          left: Phaser.Input.Keyboard.KeyCodes.A,
+          right: Phaser.Input.Keyboard.KeyCodes.D,
+          jump: Phaser.Input.Keyboard.KeyCodes.W,
+          attack: Phaser.Input.Keyboard.KeyCodes.J,
+          burst: Phaser.Input.Keyboard.KeyCodes.K
+        });
+
+        this.input.on("pointerdown", (pointer) => {
+          if (!this.started) return;
+          const worldPoint = pointer.positionToCamera(this.cameras.main);
+          this.moveTargetX = Phaser.Math.Clamp(worldPoint.x, 12, MAP_WIDTH * TILE_SIZE - 12);
+
+          if (worldPoint.y < this.player.y - 34) {
+            state.control.jump = true;
+          }
+        });
+      }
+
+      begin(characterId) {
+        this.started = true;
+        this.characterId = characterId;
+        const character = getCharacter(characterId);
+        this.player.setTint(character.tint);
+        this.physics.resume();
+        this.input.enabled = true;
+        document.body.classList.add("game-started");
+        this.updateHud();
+      }
+
+      update(time, delta) {
+        if (!this.started) return;
+
+        this.updatePlayer(time);
+        this.updateEnemies(time);
+        this.updateProjectiles(time);
+
+        this.charge = Math.min(100, this.charge + delta * 0.006);
+        if (state.control.attack || this.keys.attack.isDown) this.firePower(time);
+        if (state.control.burst || Phaser.Input.Keyboard.JustDown(this.keys.burst)) {
+          state.control.burst = false;
+          this.fireBurst(time);
+        }
+
+        if (this.player.y > MAP_HEIGHT * TILE_SIZE + 92) {
+          this.hurtPlayer(1, true);
+        }
+
+        this.bg.tilePositionX = this.cameras.main.scrollX * 0.18;
+        this.updateHud();
+      }
+
+      updatePlayer() {
+        let direction = 0;
+        const keyboardLeft = this.cursors.left.isDown || this.keys.left.isDown;
+        const keyboardRight = this.cursors.right.isDown || this.keys.right.isDown;
+
+        if (keyboardLeft) direction -= 1;
+        if (keyboardRight) direction += 1;
+
+        if (this.moveTargetX !== null && direction === 0) {
+          const distance = this.moveTargetX - this.player.x;
+          if (Math.abs(distance) > 8) direction = Math.sign(distance);
+          else this.moveTargetX = null;
+        }
+
+        this.player.setVelocityX(direction * 142);
+
+        const wantsJump =
+          state.control.jump ||
+          Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
+          Phaser.Input.Keyboard.JustDown(this.cursors.space) ||
+          Phaser.Input.Keyboard.JustDown(this.keys.jump);
+
+        if (wantsJump && this.player.body.blocked.down) {
+          this.player.setVelocityY(-360);
+        }
+        state.control.jump = false;
+
+        if (direction !== 0) {
+          this.player.setFlipX(direction < 0);
+          if (this.player.body.blocked.down) this.player.play("hero-run", true);
+        } else if (this.player.body.blocked.down) {
+          this.player.play("hero-idle", true);
+        }
+
+        if (!this.player.body.blocked.down) this.player.play("hero-jump", true);
+      }
+
+      updateEnemies(time) {
+        this.enemies.children.each((enemy) => {
+          if (!enemy.active) return;
+          const startX = enemy.getData("startX");
+          const range = enemy.getData("range");
+          const speed = enemy.getData("speed");
+
+          if (enemy.x < startX - range) enemy.setVelocityX(speed);
+          if (enemy.x > startX + range) enemy.setVelocityX(-speed);
+          if (enemy.body.blocked.left) enemy.setVelocityX(Math.abs(speed));
+          if (enemy.body.blocked.right) enemy.setVelocityX(-Math.abs(speed));
+          enemy.setFlipX(enemy.body.velocity.x < 0);
+
+          if (time > enemy.getData("nextShotAt")) {
+            this.fireEnemyPower(enemy);
+            enemy.setData("nextShotAt", time + Phaser.Math.Between(1500, 2900));
+          }
+        });
+      }
+
+      updateProjectiles(time) {
+        this.heroShots.children.each((shot) => {
+          if (shot.active && time - shot.getData("bornAt") > 1450) shot.destroy();
+        });
+        this.enemyShots.children.each((shot) => {
+          if (shot.active && time - shot.getData("bornAt") > 2200) shot.destroy();
+        });
+      }
+
+      firePower(time = this.time.now) {
+        if (time - this.lastShotAt < 180) return;
+        this.lastShotAt = time;
+        this.charge = Math.min(100, this.charge + 5.5);
+
+        const direction = this.player.flipX ? -1 : 1;
+        const shot = this.heroShots.create(
+          this.player.x + direction * 17,
+          this.player.y - 4,
+          "tilesetSprites",
+          TILE_FRAMES.sparkle
+        );
+        shot.setScale(1.35);
+        shot.setDepth(12);
+        shot.setTint(0xfff37a);
+        shot.body.allowGravity = false;
+        shot.setVelocity(direction * 360, 0);
+        shot.setData("bornAt", time);
+      }
+
+      fireBurst(time = this.time.now) {
+        if (this.charge < 100) return;
+        this.charge = 0;
+        const amount = 16;
+
+        for (let i = 0; i < amount; i += 1) {
+          const angle = (Math.PI * 2 * i) / amount;
+          const shot = this.heroShots.create(this.player.x, this.player.y - 6, "tilesetSprites", TILE_FRAMES.sparkle);
+          shot.setScale(1.45);
+          shot.setDepth(13);
+          shot.setTint(0xff8dff);
+          shot.body.allowGravity = false;
+          shot.setVelocity(Math.cos(angle) * 330, Math.sin(angle) * 330);
+          shot.setData("bornAt", time);
+        }
+
+        showToast("Explosão mágica carregada!");
+      }
+
+      fireEnemyPower(enemy) {
+        const direction = this.player.x < enemy.x ? -1 : 1;
+        const shot = this.enemyShots.create(
+          enemy.x + direction * 14,
+          enemy.y - 5,
+          "tilesetSprites",
+          TILE_FRAMES.sparkle
+        );
+        shot.setScale(1.2);
+        shot.setDepth(11);
+        shot.setTint(0x81f5ff);
+        shot.body.allowGravity = false;
+        shot.setVelocity(direction * 130, Phaser.Math.Between(-22, 16));
+        shot.setData("bornAt", this.time.now);
+      }
+
+      openPackage(pack) {
+        if (!pack.active || pack.getData("opened")) return;
+        pack.setData("opened", true);
+        pack.stop();
+        pack.setFrame(TILE_FRAMES.crateOpen);
+        pack.setAlpha(0.68);
+        if (pack.body) pack.body.enable = false;
+
+        const kind = pack.getData("kind");
+        if (kind === "banana") {
+          const banana = this.bananasGroup.create(pack.x, pack.y - 23, "banana");
+          banana.setScale(0.11);
+          banana.setDepth(14);
+          banana.refreshBody();
+        } else {
+          const charPack = this.charPacks.create(pack.x, pack.y - 22, "tilesetSprites", TILE_FRAMES.sparkle);
+          charPack.setScale(1.5);
+          charPack.setTint(getCharacter(pack.getData("characterId")).tint);
+          charPack.setDepth(14);
+          charPack.setData("characterId", pack.getData("characterId"));
+          charPack.refreshBody();
+        }
+
+        this.score += 10;
+        this.tweens.add({
+          targets: pack,
+          y: pack.y + 5,
+          duration: 180,
+          yoyo: true,
+          ease: "Sine.out"
+        });
+      }
+
+      collectBanana(banana) {
+        if (!banana.active) return;
+        banana.disableBody(true, true);
+        this.bananas += 1;
+        this.score += 80;
+        this.charge = Math.min(100, this.charge + 9);
+
+        if (this.bananas >= BANANAS_TO_WIN) {
+          this.finishLevel();
+        } else {
+          showToast(`Banana ${this.bananas}/${BANANAS_TO_WIN}`);
+        }
+      }
+
+      collectCharacterPack(pack) {
+        if (!pack.active) return;
+        const characterId = pack.getData("characterId");
+        pack.disableBody(true, true);
+        this.score += 120;
+
+        if (!state.progress.packs[characterId]) state.progress.packs[characterId] = 0;
+        state.progress.packs[characterId] += 1;
+
+        const amount = state.progress.packs[characterId];
+        if (amount >= 5) state.progress.unlocked[characterId] = true;
+        saveProgress();
+        renderCharacterCards();
+
+        const character = getCharacter(characterId);
+        const status = amount >= 5 ? "desbloqueado" : `${amount}/5 pacotes`;
+        showToast(`${character.name}: ${status}`);
+      }
+
+      hitEnemy(shot, enemy) {
+        shot.destroy();
+        enemy.disableBody(true, true);
+        this.score += 160;
+        this.charge = Math.min(100, this.charge + 14);
+      }
+
+      crumble(tile) {
+        if (!tile.active || tile.getData("falling")) return;
+        tile.setData("falling", true);
+        tile.setTint(0xff2d2d);
+
+        this.time.delayedCall(360, () => {
+          if (!tile.active) return;
+          tile.disableBody(true, true);
+          this.tweens.add({
+            targets: tile,
+            alpha: 0,
+            y: tile.y + 44,
+            duration: 340,
+            ease: "Sine.in"
+          });
+        });
+      }
+
+      hurtPlayer(amount, fell = false) {
+        const now = this.time.now;
+        if (!fell && now - this.lastHurtAt < 900) return;
+        this.lastHurtAt = now;
+        this.health = Math.max(0, this.health - amount);
+        this.cameras.main.shake(160, 0.008);
+        this.player.setTintFill(0xffffff);
+        this.time.delayedCall(90, () => this.player.clearTint().setTint(getCharacter(this.characterId).tint));
+
+        if (this.health <= 0) {
+          showToast("Você perdeu as 7 vidas. Tentando de novo!");
+          this.time.delayedCall(650, () => {
+            this.scene.restart({
+              level: 1,
+              characterId: this.characterId,
+              started: true,
+              health: MAX_HEALTH,
+              score: 0,
+              charge: 0
+            });
+          });
+          return;
+        }
+
+        if (fell) {
+          this.player.setPosition(64, 230);
+          this.player.setVelocity(0, 0);
+          this.moveTargetX = null;
+        }
+
+        showToast(`${this.health}/${MAX_HEALTH} vidas`);
+      }
+
+      finishLevel() {
+        this.started = false;
+        this.physics.pause();
+        this.score += 500 + this.level * 120;
+        this.updateHud();
+        showToast(`Ilha ${this.level} completa!`);
+
+        this.time.delayedCall(1100, () => {
+          this.scene.restart({
+            level: this.level + 1,
+            characterId: this.characterId,
+            started: true,
+            health: Math.min(MAX_HEALTH, this.health + 2),
+            score: this.score,
+            charge: this.charge
+          });
+        });
+      }
+
+      updateHud() {
+        const character = getCharacter(this.characterId);
+        ui.heroName.textContent = character.name;
+        ui.lifeText.textContent = `${this.health}/${MAX_HEALTH}`;
+        ui.healthFill.style.width = `${(this.health / MAX_HEALTH) * 100}%`;
+        ui.chargeFill.style.width = `${this.charge}%`;
+        ui.bananaScore.textContent = `${this.bananas}/${BANANAS_TO_WIN}`;
+        ui.scoreValue.textContent = String(this.score);
+        ui.levelValue.textContent = `Ilha ${this.level}`;
+        ui.burstBtn.disabled = this.charge < 100;
+      }
+    }
+
+    const config = {
+      type: Phaser.CANVAS,
+      parent: "game-root",
+      width: 960,
+      height: 540,
+      backgroundColor: "rgba(0,0,0,0)",
+      pixelArt: true,
+      roundPixels: true,
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+      },
+      physics: {
+        default: "arcade",
+        arcade: {
+          gravity: { y: 760 },
+          debug: false
+        }
+      },
+      scene: [IslandScene]
+    };
+
+    const game = new Phaser.Game(config);
+
+    function buildLevelData(level) {
+      const tiles = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(-1));
+      const packages = [];
+      const enemies = [];
+      const crumble = [];
+      const islandShift = Math.min(6, level - 1);
+
+      const addIsland = (x, y, width, depth = 4) => {
+        for (let row = 0; row < depth; row += 1) {
+          for (let col = 0; col < width; col += 1) {
+            const tileX = x + col;
+            const tileY = y + row;
+            if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) continue;
+            tiles[tileY][tileX] = row === 0 ? TILE_FRAMES.grass : TILE_FRAMES.dirt;
+          }
+        }
+      };
+
+      addIsland(0, 24, 15, 5);
+      addIsland(19, 21, 12, 5);
+      addIsland(35, 18, 14, 6);
+      addIsland(55, 22, 13, 5);
+      addIsland(73, 19, 16, 6);
+      addIsland(12 + islandShift, 15, 8, 2);
+      addIsland(50 - islandShift, 13, 8, 2);
+      addIsland(68, 11, 7, 2);
+
+      for (let i = 0; i < 10; i += 1) {
+        const spot = [
+          { x: 90, y: 354 },
+          { x: 345, y: 306 },
+          { x: 642, y: 258 },
+          { x: 946, y: 322 },
+          { x: 1260, y: 274 },
+          { x: 245, y: 210 },
+          { x: 810, y: 178 },
+          { x: 1125, y: 146 },
+          { x: 500, y: 274 },
+          { x: 1030, y: 322 }
+        ][i];
+        packages.push({ ...spot, kind: "banana" });
+      }
+
+      const lockedCharacters = CHARACTERS.filter((character) => !isCharacterUnlocked(character.id));
+      lockedCharacters.slice(0, 4).forEach((character, index) => {
+        const spot = [
+          { x: 295, y: 162 },
+          { x: 735, y: 130 },
+          { x: 880, y: 274 },
+          { x: 1210, y: 146 }
+        ][index];
+        packages.push({ ...spot, kind: "character", characterId: character.id });
+      });
+
+      enemies.push(
+        { x: 355, y: 300, dir: 1, speed: 42 + level * 3, range: 76 },
+        { x: 630, y: 250, dir: -1, speed: 46 + level * 3, range: 92 },
+        { x: 920, y: 315, dir: 1, speed: 48 + level * 4, range: 74 },
+        { x: 1240, y: 265, dir: -1, speed: 52 + level * 4, range: 96 }
+      );
+
+      for (let i = 0; i < 6; i += 1) {
+        crumble.push({ x: 34 * TILE_SIZE + i * TILE_SIZE, y: 16 * TILE_SIZE });
+      }
+      for (let i = 0; i < 5; i += 1) {
+        crumble.push({ x: 55 * TILE_SIZE + i * TILE_SIZE, y: 20 * TILE_SIZE });
+      }
+
+      return {
+        tiles,
+        packages,
+        enemies,
+        crumble,
+        spawn: { x: 58, y: 310 }
+      };
+    }
+
+    function bindInterface() {
+      ui.startBtn.addEventListener("click", () => {
+        const scene = window.activeIslandScene;
+        if (!scene) return;
+        ui.startScreen.classList.add("is-hidden");
+        startMusic("game");
+        scene.begin(state.selectedCharacter);
+      });
+
+      ui.resetBtn.addEventListener("click", () => {
+        localStorage.removeItem("ilhasEncantadasPhaserProgress");
+        state.progress = loadProgress();
+        state.selectedCharacter = "davi";
+        renderCharacterCards();
+        showToast("Progresso reiniciado");
+      });
+
+      document.addEventListener("pointerdown", () => startMusic("menu"), { once: true });
+      bindHoldButton(ui.attackBtn, "attack");
+      bindHoldButton(ui.jumpBtn, "jump", true);
+      bindHoldButton(ui.burstBtn, "burst", true);
+    }
+
+    function bindHoldButton(button, key, tapOnly = false) {
+      const press = (event) => {
+        event.preventDefault();
+        if (button.disabled) return;
+        button.classList.add("is-held");
+        state.control[key] = true;
+        startMusic("game");
+      };
+      const release = (event) => {
+        event.preventDefault();
+        button.classList.remove("is-held");
+        if (!tapOnly) state.control[key] = false;
+      };
+
+      button.addEventListener("pointerdown", press);
+      button.addEventListener("pointerup", release);
+      button.addEventListener("pointercancel", release);
+      button.addEventListener("pointerleave", release);
+    }
+
+    function renderCharacterCards() {
+      ui.characterGrid.innerHTML = "";
+      CHARACTERS.forEach((character) => {
+        const unlocked = isCharacterUnlocked(character.id);
+        const count = state.progress.packs[character.id] || 0;
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = `character-card${state.selectedCharacter === character.id ? " is-selected" : ""}${unlocked ? "" : " is-locked"}`;
+        card.disabled = !unlocked;
+        card.innerHTML = `
+          <span class="avatar" style="background:#${character.tint.toString(16).padStart(6, "0")}">${initials(character.name)}</span>
+          <span>
+            <strong>${character.name}</strong>
+            <span>${unlocked ? "liberado" : `${count}/5 pacotes`}</span>
+          </span>
+        `;
+        card.addEventListener("click", () => {
+          state.selectedCharacter = character.id;
+          renderCharacterCards();
+          startMusic("menu");
+        });
+        ui.characterGrid.appendChild(card);
+      });
+    }
+
+    function initials(name) {
+      return name
+        .split(" ")
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+    }
+
+    function getCharacter(id) {
+      return CHARACTERS.find((character) => character.id === id) || CHARACTERS[0];
+    }
+
+    function isCharacterUnlocked(id) {
+      const character = getCharacter(id);
+      return character.unlocked || Boolean(state.progress.unlocked[id]);
+    }
+
+    function loadProgress() {
+      const fallback = { packs: {}, unlocked: {} };
+      try {
+        return JSON.parse(localStorage.getItem("ilhasEncantadasPhaserProgress")) || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function saveProgress() {
+      localStorage.setItem("ilhasEncantadasPhaserProgress", JSON.stringify(state.progress));
+    }
+
+    let toastTimer = 0;
+    function showToast(message) {
+      clearTimeout(toastTimer);
+      ui.toast.textContent = message;
+      ui.toast.classList.add("is-visible");
+      toastTimer = setTimeout(() => ui.toast.classList.remove("is-visible"), 1300);
+    }
+
+    /*
+      Musica 8-bit gerada no navegador. Nao depende de arquivos externos e so
+      comeca depois de um toque/clique, respeitando as regras de audio do celular.
+    */
+    let audioContext = null;
+    let musicTimer = null;
+    let musicMode = "menu";
+    let beat = 0;
+
+    const tracks = {
+      menu: [392, 523, 659, 523, 440, 587, 698, 587],
+      game: [330, 392, 494, 587, 494, 392, 349, 440, 523, 659, 587, 494]
+    };
+
+    function startMusic(mode) {
+      musicMode = mode;
+      if (!audioContext) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        audioContext = new AudioCtx();
+      }
+      audioContext.resume();
+      if (!musicTimer) scheduleMusic();
+    }
+
+    function switchMusic(mode) {
+      musicMode = mode;
+      if (audioContext) startMusic(mode);
+    }
+
+    function scheduleMusic() {
+      if (!audioContext) return;
+      const melody = tracks[musicMode];
+      const now = audioContext.currentTime;
+      const note = melody[beat % melody.length];
+      const harmony = melody[(beat + 2) % melody.length] / 2;
+      playChipNote(note, now, 0.12, 0.045);
+      if (beat % 2 === 0) playChipNote(harmony, now, 0.16, 0.025, "triangle");
+      if (beat % 4 === 0) playChipNote(98, now, 0.05, 0.04);
+      beat += 1;
+      musicTimer = setTimeout(scheduleMusic, musicMode === "menu" ? 190 : 155);
+    }
+
+    function playChipNote(frequency, start, duration, volume, type = "square") {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(volume, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(start);
+      oscillator.stop(start + duration + 0.02);
+    }
+  </script>
+</body>
+</html>

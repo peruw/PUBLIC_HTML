@@ -1,0 +1,2792 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Aventura das Ilhas Voadoras</title>
+  <style>
+    :root {
+      --ink: #22313a;
+      --panel: rgba(255, 255, 255, 0.9);
+      --line: rgba(34, 49, 58, 0.14);
+      --accent: #ffb629;
+      --green: #4fa95d;
+      --pink: #f0709d;
+      --blue: #3e8edb;
+      --shadow: 0 16px 48px rgba(29, 49, 58, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background: #a8e5ff;
+      touch-action: none;
+      user-select: none;
+    }
+
+    button {
+      border: 0;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    #game {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100dvh;
+      background: #a8e5ff;
+      display: block;
+    }
+
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+      background:
+        linear-gradient(180deg, rgba(189, 239, 255, 0.96), rgba(244, 255, 232, 0.9)),
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.95), transparent 32%),
+        radial-gradient(circle at 80% 12%, rgba(255, 230, 164, 0.72), transparent 26%);
+      z-index: 30;
+    }
+
+    .screen.hidden,
+    .hidden {
+      display: none !important;
+    }
+
+    #welcomeScreen {
+      padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+      background:
+        linear-gradient(180deg, rgba(126, 220, 255, 0.96), rgba(255, 245, 180, 0.9) 56%, rgba(175, 238, 151, 0.92)),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 12px, transparent 12px 30px);
+    }
+
+    .welcome-card {
+      width: min(920px, 100%);
+      min-height: min(720px, calc(100dvh - 36px));
+      padding: clamp(18px, 4vw, 34px);
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 14px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .welcome-title {
+      text-align: center;
+      display: grid;
+      gap: 8px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .welcome-title h1 {
+      color: #243b58;
+      text-shadow: 0 4px 0 rgba(255, 255, 255, 0.75);
+    }
+
+    .welcome-scene {
+      min-height: 310px;
+      position: relative;
+      isolation: isolate;
+    }
+
+    .sun-badge {
+      position: absolute;
+      right: 7%;
+      top: 7%;
+      width: clamp(74px, 15vw, 130px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: #ffd84f;
+      box-shadow: 0 0 0 12px rgba(255, 248, 169, 0.5), 0 14px 28px rgba(207, 142, 38, 0.22);
+      z-index: 0;
+    }
+
+    .cloud-shape {
+      position: absolute;
+      width: 150px;
+      height: 54px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow:
+        42px -14px 0 8px rgba(255, 255, 255, 0.86),
+        86px 2px 0 -2px rgba(255, 255, 255, 0.86);
+      z-index: 1;
+    }
+
+    .cloud-shape.one {
+      left: 4%;
+      top: 12%;
+    }
+
+    .cloud-shape.two {
+      right: 18%;
+      top: 36%;
+      transform: scale(0.72);
+      opacity: 0.8;
+    }
+
+    .rainbow-bridge {
+      position: absolute;
+      left: 3%;
+      right: 3%;
+      bottom: 16%;
+      height: 96px;
+      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      border-top: 16px solid #ff6b8f;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      box-shadow:
+        inset 0 14px 0 #ffd45d,
+        inset 0 28px 0 #6fcd76,
+        inset 0 42px 0 #5fb9ff,
+        inset 0 56px 0 #9b75df;
+      opacity: 0.82;
+      z-index: 0;
+    }
+
+    .cover-island {
+      position: absolute;
+      left: 50%;
+      bottom: 4%;
+      width: min(560px, 82vw);
+      height: min(330px, 44vw);
+      min-height: 245px;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+
+    .cover-island::before {
+      content: "";
+      position: absolute;
+      left: 4%;
+      right: 4%;
+      top: 12%;
+      height: 58%;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #9bef76, #54bc58);
+      box-shadow: inset 0 -12px 0 rgba(44, 134, 69, 0.22), 0 20px 26px rgba(39, 91, 83, 0.18);
+    }
+
+    .cover-island::after {
+      content: "";
+      position: absolute;
+      left: 24%;
+      right: 24%;
+      top: 51%;
+      height: 48%;
+      clip-path: polygon(0 0, 100% 0, 50% 100%);
+      background: linear-gradient(180deg, #92765b, #6c5846);
+      filter: drop-shadow(0 22px 20px rgba(41, 70, 66, 0.22));
+    }
+
+    .cover-tree,
+    .cover-gift,
+    .cover-banana,
+    .cover-person {
+      position: absolute;
+      z-index: 3;
+    }
+
+    .cover-tree {
+      width: 34px;
+      height: 74px;
+      background: #8a613a;
+      border-radius: 12px;
+      bottom: 38%;
+    }
+
+    .cover-tree::before {
+      content: "";
+      position: absolute;
+      left: -28px;
+      top: -28px;
+      width: 92px;
+      height: 62px;
+      border-radius: 50%;
+      background: #3fb45e;
+      box-shadow: inset 12px 10px 0 rgba(255, 255, 255, 0.16);
+    }
+
+    .cover-tree.left {
+      left: 11%;
+    }
+
+    .cover-tree.right {
+      right: 12%;
+      transform: scale(0.88);
+    }
+
+    .cover-gift {
+      width: 58px;
+      height: 50px;
+      border-radius: 8px;
+      background: #ffd66b;
+      box-shadow: inset 0 10px 0 #ff9f2f, inset 24px 0 0 #8d62d7, 0 10px 0 rgba(43, 88, 62, 0.24);
+      bottom: 28%;
+      left: 23%;
+    }
+
+    .cover-gift.two {
+      left: auto;
+      right: 24%;
+      bottom: 33%;
+      transform: scale(0.86) rotate(4deg);
+    }
+
+    .cover-banana {
+      left: 50%;
+      top: 28%;
+      width: 120px;
+      height: 66px;
+      transform: translateX(-50%) rotate(-5deg);
+    }
+
+    .cover-banana span {
+      position: absolute;
+      width: 62px;
+      height: 34px;
+      border: solid #ffca32;
+      border-width: 0 0 9px 0;
+      border-radius: 0 0 60px 60px;
+      filter: drop-shadow(0 3px 0 #b17923);
+      transform-origin: 100% 50%;
+    }
+
+    .cover-banana span:nth-child(1) { left: 10px; top: 8px; transform: rotate(-32deg); }
+    .cover-banana span:nth-child(2) { left: 26px; top: 6px; transform: rotate(-14deg); }
+    .cover-banana span:nth-child(3) { left: 40px; top: 8px; transform: rotate(5deg); }
+    .cover-banana span:nth-child(4) { left: 52px; top: 15px; transform: rotate(22deg); }
+
+    .cover-person {
+      --shirt: #3e8edb;
+      --hair: #2b1a13;
+      left: 50%;
+      bottom: 31%;
+      width: 44px;
+      height: 78px;
+      transform: translateX(-50%);
+    }
+
+    .cover-person::before {
+      content: "";
+      position: absolute;
+      left: 9px;
+      top: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #efbd8f;
+      box-shadow: inset 0 6px 0 var(--hair);
+    }
+
+    .cover-person::after {
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 30px;
+      width: 34px;
+      height: 44px;
+      border-radius: 14px 14px 10px 10px;
+      background: linear-gradient(180deg, var(--shirt), var(--shirt) 62%, #29344b 63%);
+    }
+
+    .cover-person.daniel {
+      left: 42%;
+      transform: translateX(-50%) scale(0.86);
+      --shirt: #58b957;
+    }
+
+    .cover-person.gabriela {
+      left: 58%;
+      transform: translateX(-50%) scale(0.82);
+      --shirt: #f26d9b;
+      --hair: #5b3624;
+    }
+
+    .cover-person.gabriela::before {
+      box-shadow:
+        inset 0 6px 0 var(--hair),
+        -12px 6px 0 -4px var(--hair),
+        12px 6px 0 -4px var(--hair);
+    }
+
+    .welcome-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 4;
+    }
+
+    .menu-music-toggle {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      right: max(12px, env(safe-area-inset-right));
+      z-index: 50;
+      width: 46px;
+      min-height: 46px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 8px 22px rgba(29, 49, 58, 0.16);
+      font-weight: 900;
+      font-size: 1.15rem;
+    }
+
+    .menu-card {
+      width: min(960px, 100%);
+      max-height: calc(100dvh - 34px);
+      overflow: auto;
+      padding: clamp(18px, 4vw, 34px);
+      border: 1px solid rgba(255, 255, 255, 0.62);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    #startScreen {
+      padding-bottom: max(108px, calc(env(safe-area-inset-bottom) + 96px));
+    }
+
+    .title-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 6vw, 4rem);
+      line-height: 0.95;
+      letter-spacing: 0;
+      color: #23424b;
+    }
+
+    .subtitle {
+      font-size: clamp(1rem, 2.4vw, 1.2rem);
+      color: #46636a;
+    }
+
+    .character-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .character-card {
+      min-height: 166px;
+      padding: 12px;
+      border: 2px solid transparent;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.74);
+      box-shadow: 0 8px 22px rgba(29, 49, 58, 0.11);
+      display: grid;
+      justify-items: center;
+      align-content: start;
+      gap: 8px;
+      position: relative;
+    }
+
+    .character-card.selected {
+      border-color: var(--accent);
+      background: #fff7df;
+    }
+
+    .character-card.locked {
+      opacity: 0.72;
+    }
+
+    .name {
+      font-weight: 800;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .small {
+      color: #62757b;
+      font-size: 0.84rem;
+      text-align: center;
+      line-height: 1.25;
+    }
+
+    .avatar-preview {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      display: grid;
+      place-items: end center;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.9), transparent 23%),
+        linear-gradient(180deg, #c7f5ff, #edfbdc);
+      box-shadow: inset 0 -7px 18px rgba(35, 66, 75, 0.08);
+      overflow: hidden;
+    }
+
+    .mini-person {
+      --skin: #f2bf8e;
+      --hair: #2b1a13;
+      --shirt: #5ab05a;
+      --pants: #243f67;
+      width: 38px;
+      height: 62px;
+      position: relative;
+    }
+
+    .mini-person::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 2px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--skin);
+      box-shadow: inset 0 5px 0 var(--hair);
+    }
+
+    .mini-person::after {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 25px;
+      width: 26px;
+      height: 34px;
+      border-radius: 12px 12px 8px 8px;
+      background: linear-gradient(180deg, var(--shirt), var(--shirt) 62%, var(--pants) 63%);
+      box-shadow:
+        -8px 4px 0 -4px var(--skin),
+        8px 4px 0 -4px var(--skin);
+    }
+
+    .mini-person.gabriela::before {
+      box-shadow:
+        inset 0 5px 0 var(--hair),
+        -11px 5px 0 -4px var(--hair),
+        11px 5px 0 -4px var(--hair);
+    }
+
+    .mini-person.vo::before {
+      box-shadow: inset 0 7px 0 #d8d8dd;
+    }
+
+    .mini-person.tio::before {
+      box-shadow:
+        inset 0 5px 0 var(--hair),
+        0 15px 0 -7px rgba(55, 37, 28, 0.8);
+    }
+
+    .mini-person.papai::before {
+      box-shadow:
+        inset 0 5px 0 #233347,
+        0 -5px 0 -1px #315b9d;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+
+    .start-actions {
+      position: fixed;
+      left: 50%;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      z-index: 45;
+      width: min(520px, calc(100vw - 28px));
+      margin: 0;
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 12px 30px rgba(29, 49, 58, 0.2);
+      backdrop-filter: blur(14px);
+      transform: translateX(-50%);
+    }
+
+    .start-actions button {
+      flex: 1 1 0;
+      min-width: 0;
+      padding-inline: 10px;
+      white-space: nowrap;
+    }
+
+    .primary,
+    .secondary,
+    .tiny-action {
+      min-height: 46px;
+      border-radius: 12px;
+      padding: 0 18px;
+      font-weight: 800;
+      box-shadow: 0 8px 18px rgba(29, 49, 58, 0.13);
+    }
+
+    .primary {
+      color: #273127;
+      background: linear-gradient(180deg, #ffd862, #ffb629);
+    }
+
+    .secondary,
+    .tiny-action {
+      background: #ffffff;
+      border: 1px solid var(--line);
+    }
+
+    .tiny-action {
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+    }
+
+    #hud {
+      position: fixed;
+      inset: max(10px, env(safe-area-inset-top)) 10px auto 10px;
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+      align-items: start;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .hud-left,
+    .hud-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .hud-pill {
+      min-height: 38px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 8px 20px rgba(29, 49, 58, 0.14);
+      font-weight: 800;
+      backdrop-filter: blur(10px);
+    }
+
+    .hud-button {
+      pointer-events: auto;
+      min-width: 42px;
+      min-height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 8px 20px rgba(29, 49, 58, 0.14);
+      font-weight: 900;
+    }
+
+    #controls {
+      position: fixed;
+      right: max(14px, env(safe-area-inset-right));
+      bottom: max(88px, calc(env(safe-area-inset-bottom) + 88px));
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 11;
+      opacity: 0.93;
+    }
+
+    .attack-button {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 10px 22px rgba(29, 49, 58, 0.2);
+      display: grid;
+      place-items: center;
+      font-size: 0.86rem;
+      font-weight: 900;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .attack-button:active,
+    .attack-button.pressed {
+      transform: translateY(1px);
+      background: #ffe9a8;
+    }
+
+    .quick-attack {
+      color: #362342;
+      background: linear-gradient(180deg, #fff6b8, #ffb629);
+    }
+
+    .burst-attack {
+      color: #ffffff;
+      background: #5941a8;
+    }
+
+    .charge-fill {
+      position: absolute;
+      inset: auto 0 0;
+      height: var(--charge, 0%);
+      background: linear-gradient(180deg, #ff7db4, #ffcf57);
+      transition: height 0.12s linear;
+      z-index: 0;
+    }
+
+    .attack-button span:not(.charge-fill) {
+      position: relative;
+      z-index: 1;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    #tip {
+      position: fixed;
+      left: 50%;
+      bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px));
+      transform: translateX(-50%);
+      max-width: min(560px, calc(100vw - 196px));
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 8px 22px rgba(29, 49, 58, 0.14);
+      font-weight: 800;
+      text-align: center;
+      z-index: 11;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    #tip.fade {
+      opacity: 0;
+      transform: translate(-50%, 8px);
+    }
+
+    .dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 25;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(31, 55, 65, 0.34);
+      backdrop-filter: blur(4px);
+    }
+
+    .dialog-card {
+      width: min(560px, 100%);
+      max-height: calc(100dvh - 36px);
+      overflow: auto;
+      padding: 22px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow);
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.75);
+    }
+
+    .dialog h2 {
+      font-size: clamp(1.6rem, 6vw, 2.4rem);
+      line-height: 1;
+      margin-bottom: 10px;
+    }
+
+    .progress-list {
+      display: grid;
+      gap: 10px;
+      margin: 16px 0;
+      text-align: left;
+    }
+
+    .progress-row {
+      display: grid;
+      grid-template-columns: 88px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-radius: 12px;
+      background: #f8fbf5;
+    }
+
+    .bar {
+      height: 12px;
+      border-radius: 999px;
+      background: #dce9df;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #68c170, #ffca4d);
+    }
+
+    @media (max-width: 680px) {
+      .welcome-card {
+        min-height: calc(100dvh - 36px);
+        border-radius: 18px;
+        gap: 10px;
+      }
+
+      .welcome-scene {
+        min-height: 330px;
+      }
+
+      .cover-island {
+        width: 96vw;
+        height: 300px;
+        min-height: 300px;
+      }
+
+      .cloud-shape {
+        transform: scale(0.7);
+      }
+
+      .cloud-shape.two {
+        transform: scale(0.56);
+      }
+
+      .rainbow-bridge {
+        bottom: 23%;
+        height: 74px;
+      }
+
+      .cover-banana {
+        top: 24%;
+        transform: translateX(-50%) rotate(-5deg) scale(0.92);
+      }
+
+      .welcome-actions .primary {
+        width: min(300px, 100%);
+      }
+
+      .menu-card {
+        border-radius: 16px;
+      }
+
+      .character-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .start-actions {
+        width: calc(100vw - 22px);
+        padding: 8px;
+        gap: 8px;
+      }
+
+      .start-actions button {
+        font-size: 0.92rem;
+      }
+
+      .character-card {
+        min-height: 150px;
+      }
+
+      #hud {
+        align-items: start;
+      }
+
+      .hud-pill {
+        min-height: 34px;
+        padding: 7px 9px;
+        font-size: 0.84rem;
+      }
+
+      #controls {
+        gap: 10px;
+      }
+
+      .attack-button {
+        width: 64px;
+        height: 64px;
+        font-size: 0.78rem;
+      }
+
+      #tip {
+        right: max(12px, env(safe-area-inset-right));
+        left: auto;
+        transform: none;
+        max-width: calc(100vw - 168px);
+        font-size: 0.82rem;
+      }
+
+      #tip.fade {
+        transform: translateY(8px);
+      }
+
+      .progress-row {
+        grid-template-columns: 74px 1fr auto;
+        font-size: 0.9rem;
+      }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      #controls {
+        opacity: 0.78;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Aventura das Ilhas Voadoras"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="hud-left">
+      <div class="hud-pill" id="hudCharacter">Davi</div>
+      <div class="hud-pill" id="hudIsland">Ilha das Bananas</div>
+      <div class="hud-pill" id="hudBananas">Bananas 0/10</div>
+      <div class="hud-pill" id="hudShield">Vidas 3 | Acertos 0/7</div>
+    </div>
+    <div class="hud-right">
+      <button class="hud-button" id="charactersButton" type="button" aria-label="Personagens">P</button>
+      <button class="hud-button" id="musicButton" type="button" aria-label="Ligar ou desligar musica">♪</button>
+      <button class="hud-button" id="pauseButton" type="button" aria-label="Pausar">II</button>
+    </div>
+  </div>
+
+  <div id="controls" class="hidden" aria-label="Ataques">
+    <button class="attack-button quick-attack" id="quickAttackButton" type="button" aria-label="Ataque rapido"><span>ATAQUE</span></button>
+    <button class="attack-button burst-attack" id="burstAttackButton" type="button" aria-label="Explosao carregada">
+      <span class="charge-fill" id="chargeFill"></span>
+      <span id="chargeLabel">0%</span>
+    </button>
+  </div>
+
+  <div id="tip" class="hidden">Pegue pacotes para achar bananas e surpresas.</div>
+
+  <section id="welcomeScreen" class="screen">
+    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar musica">♪</button>
+    <div class="welcome-card">
+      <div class="welcome-title">
+        <h1>Aventura das Ilhas Voadoras</h1>
+        <p class="subtitle">Davi, Daniel e Gabriela em uma floresta encantada cheia de pacotes, bananas e ilhas no céu.</p>
+      </div>
+      <div class="welcome-scene" aria-hidden="true">
+        <div class="sun-badge"></div>
+        <div class="cloud-shape one"></div>
+        <div class="cloud-shape two"></div>
+        <div class="rainbow-bridge"></div>
+        <div class="cover-island">
+          <div class="cover-tree left"></div>
+          <div class="cover-tree right"></div>
+          <div class="cover-gift"></div>
+          <div class="cover-gift two"></div>
+          <div class="cover-banana"><span></span><span></span><span></span><span></span></div>
+          <div class="cover-person davi"></div>
+          <div class="cover-person daniel"></div>
+          <div class="cover-person gabriela"></div>
+        </div>
+      </div>
+      <div class="welcome-actions">
+        <button id="enterSelectionButton" class="primary" type="button">Entrar na aventura</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="startScreen" class="screen hidden">
+    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar musica">♪</button>
+    <div class="menu-card">
+      <div class="title-row">
+        <h1>Aventura das Ilhas Voadoras</h1>
+        <p class="subtitle">Escolha um personagem, abra pacotes e junte 10 bananas para viajar para outra ilha.</p>
+      </div>
+      <div id="startCharacters" class="character-grid"></div>
+    </div>
+    <div class="actions start-actions">
+      <button id="startButton" class="primary" type="button">Começar aventura</button>
+      <button id="resetButton" class="secondary" type="button">Reiniciar progresso</button>
+    </div>
+  </section>
+
+  <div id="levelDialog" class="dialog hidden" role="dialog" aria-modal="true">
+    <div class="dialog-card">
+      <h2>Fase completa!</h2>
+      <p id="levelText" class="subtitle">Você juntou 10 bananas.</p>
+      <div class="actions">
+        <button id="nextIslandButton" class="primary" type="button">Ir para a próxima ilha</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lockerDialog" class="dialog hidden" role="dialog" aria-modal="true">
+    <div class="dialog-card">
+      <h2>Personagens</h2>
+      <p class="subtitle">Ache 5 pacotes do mesmo personagem para desbloquear.</p>
+      <div id="lockerList" class="progress-list"></div>
+      <div class="actions">
+        <button id="closeLockerButton" class="primary" type="button">Voltar ao jogo</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pauseDialog" class="dialog hidden" role="dialog" aria-modal="true">
+    <div class="dialog-card">
+      <h2>Pausado</h2>
+      <p class="subtitle">A ilha fica esperando enquanto vocês respiram.</p>
+      <div class="actions">
+        <button id="resumeButton" class="primary" type="button">Continuar</button>
+        <button id="menuButton" class="secondary" type="button">Voltar ao menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gameOverDialog" class="dialog hidden" role="dialog" aria-modal="true">
+    <div class="dialog-card">
+      <h2>Fim de jogo!</h2>
+      <p id="gameOverText" class="subtitle">As ilhas ainda esperam por vocês.</p>
+      <div class="actions">
+        <button id="retryButton" class="primary" type="button">Tentar de novo</button>
+        <button id="gameOverMenuButton" class="secondary" type="button">Voltar ao início</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.querySelector("#game");
+    const ctx = canvas.getContext("2d");
+    const hud = document.querySelector("#hud");
+    const controls = document.querySelector("#controls");
+    const welcomeScreen = document.querySelector("#welcomeScreen");
+    const startScreen = document.querySelector("#startScreen");
+    const startCharacters = document.querySelector("#startCharacters");
+    const lockerList = document.querySelector("#lockerList");
+    const levelDialog = document.querySelector("#levelDialog");
+    const lockerDialog = document.querySelector("#lockerDialog");
+    const pauseDialog = document.querySelector("#pauseDialog");
+    const gameOverDialog = document.querySelector("#gameOverDialog");
+    const tip = document.querySelector("#tip");
+    const hudCharacter = document.querySelector("#hudCharacter");
+    const hudIsland = document.querySelector("#hudIsland");
+    const hudBananas = document.querySelector("#hudBananas");
+    const hudShield = document.querySelector("#hudShield");
+    const quickAttackButton = document.querySelector("#quickAttackButton");
+    const burstAttackButton = document.querySelector("#burstAttackButton");
+    const chargeFill = document.querySelector("#chargeFill");
+    const chargeLabel = document.querySelector("#chargeLabel");
+    const levelText = document.querySelector("#levelText");
+    const gameOverText = document.querySelector("#gameOverText");
+
+    const STORAGE_KEY = "ilhas-voadoras-progresso-v1";
+    const BANANAS_TO_WIN = 10;
+
+    const characters = [
+      {
+        id: "davi",
+        name: "Davi",
+        note: "mais velho e aventureiro",
+        unlockedAtStart: true,
+        skin: "#efb783",
+        hair: "#1e1612",
+        shirt: "#465665",
+        detail: "#62bc58",
+        pants: "#29344b",
+        className: "davi",
+        height: 1.1
+      },
+      {
+        id: "daniel",
+        name: "Daniel",
+        note: "do meio e ligeiro",
+        unlockedAtStart: true,
+        skin: "#efbd8f",
+        hair: "#2d1c13",
+        shirt: "#58b957",
+        detail: "#ffffff",
+        pants: "#263c5d",
+        className: "daniel",
+        height: 0.96
+      },
+      {
+        id: "gabriela",
+        name: "Gabriela",
+        note: "a criadora das bananas",
+        unlockedAtStart: true,
+        skin: "#f0bd8e",
+        hair: "#5b3624",
+        shirt: "#f26d9b",
+        detail: "#ffe9f1",
+        pants: "#ee8cae",
+        className: "gabriela",
+        height: 0.92
+      },
+      {
+        id: "vo",
+        name: "Vó",
+        note: "pacotes 0/5",
+        skin: "#f0c39a",
+        hair: "#d8d8dd",
+        shirt: "#b889d8",
+        detail: "#fff3a5",
+        pants: "#6f5794",
+        className: "vo",
+        height: 0.94
+      },
+      {
+        id: "tio",
+        name: "Tio Nuno",
+        note: "pacotes 0/5",
+        skin: "#e7b180",
+        hair: "#33231b",
+        shirt: "#3e8edb",
+        detail: "#ffcf57",
+        pants: "#23415f",
+        className: "tio",
+        height: 1.06
+      },
+      {
+        id: "mamae",
+        name: "Mamãe",
+        note: "pacotes 0/5",
+        skin: "#edb98a",
+        hair: "#593222",
+        shirt: "#ef6f73",
+        detail: "#ffe1a8",
+        pants: "#655073",
+        className: "mamae",
+        height: 1
+      },
+      {
+        id: "papai",
+        name: "Papai",
+        note: "pacotes 0/5",
+        skin: "#eab385",
+        hair: "#233347",
+        shirt: "#f19b45",
+        detail: "#2f62a2",
+        pants: "#394f67",
+        className: "papai",
+        height: 1.08
+      }
+    ];
+
+    const islands = [
+      {
+        name: "Ilha das Bananas",
+        short: "Bananas",
+        skyTop: "#9ce7ff",
+        skyBottom: "#f5ffe2",
+        ground: "#75cc63",
+        grass: "#4aa65a",
+        edge: "#3d8a4f",
+        rock: "#9c8463",
+        detail: "banana"
+      },
+      {
+        name: "Ilha dos Cogumelos",
+        short: "Cogumelos",
+        skyTop: "#d7c2ff",
+        skyBottom: "#fff1f7",
+        ground: "#7ed36e",
+        grass: "#4eaa6a",
+        edge: "#9871b9",
+        rock: "#8f7468",
+        detail: "mushroom"
+      },
+      {
+        name: "Ilha das Estrelas",
+        short: "Estrelas",
+        skyTop: "#8cb7ff",
+        skyBottom: "#e9fff9",
+        ground: "#66cfa4",
+        grass: "#319b7d",
+        edge: "#557bc4",
+        rock: "#807592",
+        detail: "star"
+      }
+    ];
+
+    const state = {
+      mode: "welcome",
+      width: 0,
+      height: 0,
+      dpr: 1,
+      last: 0,
+      time: 0,
+      selectedId: "davi",
+      islandIndex: 0,
+      bananas: 0,
+      lives: 3,
+      hits: 0,
+      packagesOpened: 0,
+      packages: [],
+      enemies: [],
+      powers: [],
+      playerShots: [],
+      dangerZones: [],
+      rewards: [],
+      decorations: [],
+      clouds: [],
+      dangerTimer: 3,
+      rapidAttackHeld: false,
+      attackCooldown: 0,
+      burstCharge: 0,
+      player: {
+        x: 0,
+        y: 0,
+        speed: 210,
+        facing: 1,
+        radius: 20,
+        hitCooldown: 0,
+        fallCooldown: 0,
+        target: null
+      },
+      keys: {
+        up: false,
+        down: false,
+        left: false,
+        right: false
+      },
+      music: {
+        context: null,
+        master: null,
+        enabled: true,
+        running: false,
+        track: "menu",
+        timer: 0,
+        step: 0
+      },
+      progress: null
+    };
+
+    function defaultProgress() {
+      const progress = {};
+      for (const character of characters) {
+        progress[character.id] = {
+          unlocked: Boolean(character.unlockedAtStart),
+          pieces: character.unlockedAtStart ? 5 : 0
+        };
+      }
+      return progress;
+    }
+
+    function loadProgress() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        const progress = defaultProgress();
+        if (saved && typeof saved === "object") {
+          for (const character of characters) {
+            if (saved[character.id]) {
+              progress[character.id].unlocked = Boolean(saved[character.id].unlocked || character.unlockedAtStart);
+              progress[character.id].pieces = Math.min(5, Number(saved[character.id].pieces) || 0);
+              if (character.unlockedAtStart) {
+                progress[character.id].unlocked = true;
+                progress[character.id].pieces = 5;
+              }
+            }
+          }
+        }
+        return progress;
+      } catch (error) {
+        return defaultProgress();
+      }
+    }
+
+    function saveProgress() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+    }
+
+    function characterById(id) {
+      return characters.find((character) => character.id === id) || characters[0];
+    }
+
+    function resize() {
+      state.dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      state.width = Math.floor(window.innerWidth);
+      state.height = Math.floor(window.innerHeight);
+      canvas.width = Math.floor(state.width * state.dpr);
+      canvas.height = Math.floor(state.height * state.dpr);
+      canvas.style.width = `${state.width}px`;
+      canvas.style.height = `${state.height}px`;
+      ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+      if (!state.player.x || !state.player.y) {
+        state.player.x = state.width / 2;
+        state.player.y = state.height / 2 + 20;
+      }
+      clampPlayerToIsland();
+      if (state.player.target) {
+        state.player.target = clampPointToIsland(state.player.target.x, state.player.target.y);
+      }
+    }
+
+    function mulberry32(seed) {
+      return function random() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    function islandShape() {
+      const rx = Math.min(state.width * 0.42, 440);
+      const ry = Math.min(state.height * 0.28, 210);
+      return {
+        cx: state.width / 2,
+        cy: state.height * 0.54,
+        rx: Math.max(190, rx),
+        ry: Math.max(120, ry)
+      };
+    }
+
+    function pointOnIsland(u, v) {
+      const island = islandShape();
+      return {
+        x: island.cx + u * island.rx,
+        y: island.cy + v * island.ry
+      };
+    }
+
+    function randomPointInIsland(random) {
+      const angle = random() * Math.PI * 2;
+      const radius = Math.sqrt(random()) * 0.82;
+      return {
+        u: Math.cos(angle) * radius,
+        v: Math.sin(angle) * radius
+      };
+    }
+
+    function choosePackageContent(random = Math.random) {
+      const locked = characters.filter((character) => !state.progress[character.id].unlocked);
+      if (locked.length > 0 && random() < 0.34) {
+        const character = locked[Math.floor(random() * locked.length)];
+        return {
+          type: "piece",
+          characterId: character.id
+        };
+      }
+      return { type: "banana" };
+    }
+
+    function newPackage(random = Math.random) {
+      let spot = randomPointInIsland(random);
+      let attempts = 0;
+      while (attempts < 20) {
+        const point = pointOnIsland(spot.u, spot.v);
+        const dx = point.x - state.player.x;
+        const dy = point.y - state.player.y;
+        if (Math.hypot(dx, dy) > 95) break;
+        spot = randomPointInIsland(random);
+        attempts += 1;
+      }
+      return {
+        id: `${Date.now()}-${Math.floor(random() * 100000)}`,
+        u: spot.u,
+        v: spot.v,
+        hidden: random() < 0.55,
+        bob: random() * Math.PI * 2,
+        content: choosePackageContent(random),
+        opened: false
+      };
+    }
+
+    function newEnemy(random, index) {
+      let spot = randomPointInIsland(random);
+      let attempts = 0;
+      while (attempts < 20 && Math.hypot(spot.u, spot.v) < 0.38) {
+        spot = randomPointInIsland(random);
+        attempts += 1;
+      }
+      return {
+        id: `enemy-${index}-${Math.floor(random() * 100000)}`,
+        homeU: spot.u,
+        homeV: spot.v,
+        u: spot.u,
+        v: spot.v,
+        phase: random() * Math.PI * 2,
+        cooldown: 0.7 + random() * 1.3,
+        fireEvery: 1.75 + random() * 0.65,
+        hp: 3,
+        color: index % 2 === 0 ? "#6d49b8" : "#d64d7f"
+      };
+    }
+
+    function setupIsland() {
+      const random = mulberry32(1200 + state.islandIndex * 97 + state.packagesOpened);
+      state.packages = Array.from({ length: 13 }, () => newPackage(random));
+      state.enemies = Array.from({ length: Math.min(4, 2 + state.islandIndex) }, (_, index) => newEnemy(random, index));
+      state.powers = [];
+      state.playerShots = [];
+      state.dangerZones = [];
+      state.dangerTimer = 2.4;
+      state.rewards = [];
+      state.decorations = Array.from({ length: 24 }, (_, index) => {
+        const spot = randomPointInIsland(random);
+        const detail = islands[state.islandIndex].detail;
+        const typeRoll = random();
+        let type = "tree";
+        if (typeRoll > 0.72) type = detail;
+        else if (typeRoll > 0.55) type = "bush";
+        return {
+          id: index,
+          type,
+          u: spot.u,
+          v: spot.v,
+          scale: 0.72 + random() * 0.68,
+          sway: random() * Math.PI * 2
+        };
+      });
+      state.clouds = Array.from({ length: 9 }, (_, index) => ({
+        x: random() * state.width,
+        y: state.height * (0.08 + random() * 0.34),
+        speed: 9 + random() * 18,
+        scale: 0.65 + random() * 1.1,
+        id: index
+      }));
+      const island = islandShape();
+      state.player.x = island.cx;
+      state.player.y = island.cy + island.ry * 0.15;
+      state.player.target = null;
+      state.player.fallCooldown = 1;
+    }
+
+    function renderCharacterCards(container, selectingFromMenu) {
+      container.innerHTML = "";
+      for (const character of characters) {
+        const progress = state.progress[character.id];
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = `character-card${state.selectedId === character.id ? " selected" : ""}${progress.unlocked ? "" : " locked"}`;
+        const status = progress.unlocked ? "Liberado" : `${progress.pieces}/5 pacotes`;
+        card.innerHTML = `
+          <div class="avatar-preview">
+            <div class="mini-person ${character.className}" style="--skin:${character.skin};--hair:${character.hair};--shirt:${character.shirt};--pants:${character.pants}"></div>
+          </div>
+          <div class="name">${character.name}</div>
+          <div class="small">${progress.unlocked ? character.note : status}</div>
+        `;
+        card.addEventListener("click", () => {
+          if (progress.unlocked) {
+            state.selectedId = character.id;
+            renderCharacterCards(container, selectingFromMenu);
+            updateHud();
+            showTip(`${character.name} entrou na aventura.`);
+          } else if (selectingFromMenu) {
+            showTip(`Ainda faltam ${5 - progress.pieces} pacotes para liberar ${character.name}.`);
+          }
+        });
+        container.appendChild(card);
+      }
+    }
+
+    function renderLocker() {
+      lockerList.innerHTML = "";
+      for (const character of characters) {
+        const progress = state.progress[character.id];
+        const row = document.createElement("div");
+        row.className = "progress-row";
+        const count = progress.unlocked ? "Liberado" : `${progress.pieces}/5`;
+        row.innerHTML = `
+          <strong>${character.name}</strong>
+          <div class="bar"><span style="width:${Math.min(100, progress.pieces * 20)}%"></span></div>
+          <button class="tiny-action" type="button">${progress.unlocked ? "Jogar" : count}</button>
+        `;
+        const button = row.querySelector("button");
+        button.disabled = !progress.unlocked;
+        button.addEventListener("click", () => {
+          state.selectedId = character.id;
+          lockerDialog.classList.add("hidden");
+          setMode("playing");
+          updateHud();
+          showTip(`${character.name} escolhido.`);
+        });
+        lockerList.appendChild(row);
+      }
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      const playing = mode === "playing";
+      hud.classList.toggle("hidden", !playing);
+      controls.classList.toggle("hidden", !playing);
+      tip.classList.toggle("hidden", !playing);
+      welcomeScreen.classList.toggle("hidden", mode !== "welcome");
+      startScreen.classList.toggle("hidden", mode !== "menu");
+      if (playing) {
+        levelDialog.classList.add("hidden");
+        pauseDialog.classList.add("hidden");
+        gameOverDialog.classList.add("hidden");
+      }
+    }
+
+    function enterSelection() {
+      renderCharacterCards(startCharacters, true);
+      setMode("menu");
+      startMusic("menu");
+    }
+
+    function startGame() {
+      state.bananas = 0;
+      state.lives = 3;
+      state.hits = 0;
+      state.burstCharge = 0;
+      state.rapidAttackHeld = false;
+      state.packagesOpened = 0;
+      setupIsland();
+      setMode("playing");
+      startMusic("gameplay");
+      updateHud();
+      showTip("Abra pacotes. As bananas estão escondidas dentro deles.");
+    }
+
+    function updateHud() {
+      const character = characterById(state.selectedId);
+      hudCharacter.textContent = character.name;
+      hudIsland.textContent = islands[state.islandIndex].name;
+      hudBananas.textContent = `Bananas ${state.bananas}/${BANANAS_TO_WIN}`;
+      hudShield.textContent = `Vidas ${state.lives} | Acertos ${state.hits}/7`;
+    }
+
+    let tipTimer = 0;
+    function showTip(message) {
+      tip.textContent = message;
+      tip.classList.remove("hidden", "fade");
+      clearTimeout(tipTimer);
+      tipTimer = setTimeout(() => tip.classList.add("fade"), 2200);
+    }
+
+    function ensureAudio() {
+      if (state.music.context) {
+        if (state.music.context.state === "suspended") {
+          state.music.context.resume();
+        }
+        return true;
+      }
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return false;
+      const context = new AudioContext();
+      const master = context.createGain();
+      master.gain.value = 0.05;
+      master.connect(context.destination);
+      state.music.context = context;
+      state.music.master = master;
+      return true;
+    }
+
+    function playNote(frequency, duration, volume = 0.16, type = "square") {
+      if (!state.music.context || !state.music.master || !frequency) return;
+      const context = state.music.context;
+      const now = context.currentTime;
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, now);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.exponentialRampToValueAtTime(volume, now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      oscillator.connect(gain);
+      gain.connect(state.music.master);
+      oscillator.start(now);
+      oscillator.stop(now + duration + 0.03);
+    }
+
+    function musicTick() {
+      if (!state.music.running) return;
+      const songs = {
+        menu: {
+          melody: [523, 659, 784, 0, 880, 784, 659, 0, 587, 698, 784, 0, 659, 587, 523, 0],
+          bass: [262, 0, 330, 0, 349, 0, 330, 0, 294, 0, 349, 0, 330, 0, 262, 0],
+          delay: 210,
+          note: 0.14
+        },
+        gameplay: {
+          melody: [659, 0, 784, 659, 523, 587, 659, 0, 784, 880, 784, 659, 587, 523, 587, 0],
+          bass: [196, 0, 196, 0, 262, 0, 262, 0, 220, 0, 220, 0, 247, 0, 247, 0],
+          delay: 165,
+          note: 0.12
+        }
+      };
+      const song = songs[state.music.track] || songs.menu;
+      const step = state.music.step % song.melody.length;
+      playNote(song.melody[step], song.note, state.music.track === "menu" ? 0.12 : 0.16, "square");
+      if (step % 2 === 0) playNote(song.bass[step], 0.11, 0.07, "triangle");
+      if (state.music.track === "gameplay" && step % 8 === 4) playNote(1046, 0.045, 0.045, "square");
+      if (state.music.track === "menu" && step % 8 === 2) playNote(1046, 0.05, 0.04, "sine");
+      state.music.step += 1;
+      state.music.timer = window.setTimeout(musicTick, song.delay);
+    }
+
+    function updateMusicButton() {
+      const buttons = document.querySelectorAll("#musicButton, .menu-music-toggle");
+      for (const button of buttons) {
+      button.textContent = state.music.enabled ? "♪" : "×";
+      button.setAttribute("aria-label", state.music.enabled ? "Desligar musica" : "Ligar musica");
+      }
+    }
+
+    function currentMusicTrack() {
+      return state.mode === "playing" || state.mode === "level" ? "gameplay" : "menu";
+    }
+
+    function startMusic() {
+      const track = currentMusicTrack();
+      if (!state.music.enabled || !ensureAudio()) {
+        updateMusicButton();
+        return;
+      }
+      if (state.music.track !== track) {
+        clearTimeout(state.music.timer);
+        state.music.step = 0;
+        state.music.running = false;
+        state.music.track = track;
+      }
+      if (state.music.running) return;
+      state.music.running = true;
+      musicTick();
+      updateMusicButton();
+    }
+
+    function stopMusic() {
+      state.music.running = false;
+      clearTimeout(state.music.timer);
+      updateMusicButton();
+    }
+
+    function toggleMusic() {
+      state.music.enabled = !state.music.enabled;
+      if (state.music.enabled) {
+        startMusic();
+        if (state.mode === "playing") showTip("Musiquinha 8-bit ligada.");
+      } else {
+        stopMusic();
+        if (state.mode === "playing") showTip("Musiquinha desligada.");
+      }
+    }
+
+    function playPackageSound(kind) {
+      if (!state.music.context && !ensureAudio()) return;
+      if (kind === "piece") {
+        playNote(784, 0.08, 0.18, "square");
+        window.setTimeout(() => playNote(988, 0.1, 0.16, "square"), 80);
+        return;
+      }
+      playNote(523, 0.06, 0.15, "square");
+      window.setTimeout(() => playNote(659, 0.06, 0.14, "square"), 65);
+    }
+
+    function playHitSound() {
+      if (!state.music.context && !ensureAudio()) return;
+      playNote(196, 0.08, 0.16, "sawtooth");
+      window.setTimeout(() => playNote(147, 0.12, 0.12, "square"), 75);
+    }
+
+    function openPackage(packageItem) {
+      if (packageItem.opened || state.mode !== "playing") return;
+      packageItem.opened = true;
+      state.packagesOpened += 1;
+      const packagePoint = pointOnIsland(packageItem.u, packageItem.v);
+
+      const content = packageItem.content || choosePackageContent();
+      const pieceCharacter = content.type === "piece" ? characterById(content.characterId) : null;
+      const giveCharacterPiece = pieceCharacter && !state.progress[pieceCharacter.id].unlocked;
+
+      if (giveCharacterPiece) {
+        const character = pieceCharacter;
+        const progress = state.progress[character.id];
+        progress.pieces = Math.min(5, progress.pieces + 1);
+        playPackageSound("piece");
+        state.rewards.push({ type: "piece", x: packagePoint.x, y: packagePoint.y - 12, age: 0, label: character.name });
+        if (progress.pieces >= 5) {
+          progress.unlocked = true;
+          saveProgress();
+          renderCharacterCards(startCharacters, true);
+          showTip(`Pacote raro: ${character.name} foi desbloqueado!`);
+        } else {
+          saveProgress();
+          showTip(`Pacote raro: peça de ${character.name} (${progress.pieces}/5).`);
+        }
+      } else {
+        state.bananas = Math.min(BANANAS_TO_WIN, state.bananas + 1);
+        playPackageSound("banana");
+        state.rewards.push({ type: "banana", x: packagePoint.x, y: packagePoint.y - 12, age: 0 });
+        showTip(`Você achou uma banana no pacote (${state.bananas}/${BANANAS_TO_WIN}).`);
+      }
+
+      state.packages = state.packages.filter((item) => item !== packageItem);
+      state.packages.push(newPackage());
+      updateHud();
+
+      if (state.bananas >= BANANAS_TO_WIN) {
+        completeLevel();
+      }
+    }
+
+    function completeLevel() {
+      setMode("level");
+      const current = islands[state.islandIndex].name;
+      const next = islands[(state.islandIndex + 1) % islands.length].name;
+      levelText.textContent = `${current} completa. Próxima parada: ${next}.`;
+      levelDialog.classList.remove("hidden");
+    }
+
+    function nextIsland() {
+      state.islandIndex = (state.islandIndex + 1) % islands.length;
+      state.bananas = 0;
+      state.hits = 0;
+      state.burstCharge = 0;
+      setupIsland();
+      updateHud();
+      setMode("playing");
+      showTip(`Bem-vindos à ${islands[state.islandIndex].name}.`);
+    }
+
+    function updatePlayer(dt) {
+      let dx = 0;
+      let dy = 0;
+      if (state.keys.left) dx -= 1;
+      if (state.keys.right) dx += 1;
+      if (state.keys.up) dy -= 1;
+      if (state.keys.down) dy += 1;
+
+      if (dx || dy) {
+        state.player.target = null;
+        const length = Math.hypot(dx, dy);
+        dx /= length;
+        dy /= length;
+        state.player.x += dx * state.player.speed * dt;
+        state.player.y += dy * state.player.speed * dt;
+        if (dx !== 0) state.player.facing = dx > 0 ? 1 : -1;
+        clampPlayerToIsland();
+      } else if (state.player.target) {
+        const targetDx = state.player.target.x - state.player.x;
+        const targetDy = state.player.target.y - state.player.y;
+        const distance = Math.hypot(targetDx, targetDy);
+        if (distance < 7) {
+          state.player.target = null;
+        } else {
+          const step = Math.min(state.player.speed * 1.08 * dt, distance);
+          state.player.x += (targetDx / distance) * step;
+          state.player.y += (targetDy / distance) * step;
+          if (Math.abs(targetDx) > 1) state.player.facing = targetDx > 0 ? 1 : -1;
+          clampPlayerToIsland();
+        }
+      }
+
+      for (const packageItem of state.packages) {
+        const point = pointOnIsland(packageItem.u, packageItem.v);
+        const distance = Math.hypot(point.x - state.player.x, point.y - state.player.y);
+        if (distance < state.player.radius + 19) {
+          openPackage(packageItem);
+          break;
+        }
+      }
+    }
+
+    function enemyPoint(enemy) {
+      return pointOnIsland(enemy.u, enemy.v);
+    }
+
+    function updateEnemies(dt) {
+      state.player.hitCooldown = Math.max(0, state.player.hitCooldown - dt);
+
+      for (const enemy of state.enemies) {
+        enemy.u = enemy.homeU + Math.cos(state.time * 0.75 + enemy.phase) * 0.07;
+        enemy.v = enemy.homeV + Math.sin(state.time * 0.9 + enemy.phase) * 0.07;
+        enemy.cooldown -= dt;
+        if (enemy.cooldown <= 0) {
+          firePower(enemy);
+          enemy.cooldown = enemy.fireEvery;
+        }
+      }
+
+      for (const power of state.powers) {
+        power.x += power.vx * dt;
+        power.y += power.vy * dt;
+        power.age += dt;
+        power.spin += dt * 5;
+      }
+
+      state.powers = state.powers.filter((power) => {
+        if (power.age > 3.2) return false;
+        if (power.x < -40 || power.x > state.width + 40 || power.y < -40 || power.y > state.height + 40) return false;
+        const distance = Math.hypot(power.x - state.player.x, power.y - state.player.y);
+        if (distance < state.player.radius + 11) {
+          handlePowerHit();
+          return false;
+        }
+        return true;
+      });
+    }
+
+    function updateRewards(dt) {
+      for (const reward of state.rewards) {
+        reward.age += dt;
+        reward.y -= dt * 28;
+      }
+      state.rewards = state.rewards.filter((reward) => reward.age < 1.1);
+    }
+
+    function updateAttacks(dt) {
+      state.attackCooldown = Math.max(0, state.attackCooldown - dt);
+      state.burstCharge = Math.min(1, state.burstCharge + dt / 4.2);
+      if (state.rapidAttackHeld && state.attackCooldown <= 0) {
+        fireQuickAttack();
+      }
+
+      for (const shot of state.playerShots) {
+        shot.x += shot.vx * dt;
+        shot.y += shot.vy * dt;
+        shot.age += dt;
+        shot.spin += dt * 8;
+      }
+
+      state.playerShots = state.playerShots.filter((shot) => {
+        if (shot.age > 1.7 || shot.x < -50 || shot.x > state.width + 50 || shot.y < -50 || shot.y > state.height + 50) return false;
+        for (const enemy of state.enemies) {
+          const point = enemyPoint(enemy);
+          if (Math.hypot(shot.x - point.x, shot.y - point.y) < 25) {
+            enemy.hp -= shot.power;
+            state.rewards.push({ type: "piece", x: point.x, y: point.y - 20, age: 0, label: "POW!" });
+            if (enemy.hp <= 0) enemy.defeated = true;
+            return false;
+          }
+        }
+        return true;
+      });
+      state.enemies = state.enemies.filter((enemy) => !enemy.defeated);
+      updateChargeButton();
+    }
+
+    function updateHazards(dt) {
+      state.player.fallCooldown = Math.max(0, state.player.fallCooldown - dt);
+      state.dangerTimer -= dt;
+      if (state.dangerTimer <= 0) {
+        spawnDangerZone();
+        state.dangerTimer = 4 + Math.random() * 2.3;
+      }
+
+      for (const zone of state.dangerZones) {
+        zone.age += dt;
+        const point = pointOnIsland(zone.u, zone.v);
+        if (!zone.triggered && zone.age > 1.25 && zone.age < 2.8) {
+          const distance = Math.hypot(state.player.x - point.x, state.player.y - point.y);
+          if (distance < zone.radius) {
+            zone.triggered = true;
+            loseLife("A parte vermelha da ilha caiu!");
+          }
+        }
+      }
+      state.dangerZones = state.dangerZones.filter((zone) => zone.age < 3.1);
+
+      const island = islandShape();
+      const edgeDistance = Math.hypot((state.player.x - island.cx) / island.rx, (state.player.y - island.cy) / island.ry);
+      if (edgeDistance > 0.82) {
+        loseLife("Chegou muito perto da borda e caiu!");
+      }
+    }
+
+    function spawnDangerZone() {
+      const spot = randomPointInIsland(Math.random);
+      state.dangerZones.push({
+        u: spot.u,
+        v: spot.v,
+        radius: 48 + Math.random() * 28,
+        age: 0,
+        crack: Math.random() * Math.PI * 2,
+        triggered: false
+      });
+    }
+
+    function fireQuickAttack() {
+      state.attackCooldown = 0.16;
+      const direction = attackDirection();
+      spawnPlayerShot(direction.x, direction.y, 360, 1, "#66d9ff");
+      playNote(880, 0.045, 0.08, "square");
+    }
+
+    function fireBurstAttack() {
+      if (state.burstCharge < 1 || state.mode !== "playing") {
+        showTip("A explosão ainda está carregando.");
+        return;
+      }
+      state.burstCharge = 0;
+      const total = 18;
+      for (let i = 0; i < total; i += 1) {
+        const angle = (Math.PI * 2 * i) / total;
+        spawnPlayerShot(Math.cos(angle), Math.sin(angle), 310, 2, "#ffcf57");
+      }
+      playNote(988, 0.08, 0.14, "square");
+      window.setTimeout(() => playNote(1318, 0.12, 0.1, "square"), 80);
+      updateChargeButton();
+      showTip("Explosão mágica!");
+    }
+
+    function attackDirection() {
+      let nearest = null;
+      let nearestDistance = Infinity;
+      for (const enemy of state.enemies) {
+        const point = enemyPoint(enemy);
+        const distance = Math.hypot(point.x - state.player.x, point.y - state.player.y);
+        if (distance < nearestDistance) {
+          nearest = point;
+          nearestDistance = distance;
+        }
+      }
+      if (nearest) {
+        const dx = nearest.x - state.player.x;
+        const dy = nearest.y - state.player.y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        return { x: dx / length, y: dy / length };
+      }
+      return { x: state.player.facing || 1, y: 0 };
+    }
+
+    function spawnPlayerShot(dx, dy, speed, power, color) {
+      state.playerShots.push({
+        x: state.player.x,
+        y: state.player.y - 18,
+        vx: dx * speed,
+        vy: dy * speed,
+        age: 0,
+        spin: 0,
+        power,
+        color
+      });
+    }
+
+    function updateChargeButton() {
+      const percent = Math.round(state.burstCharge * 100);
+      if (chargeFill) chargeFill.style.setProperty("--charge", `${percent}%`);
+      if (chargeLabel) chargeLabel.textContent = state.burstCharge >= 1 ? "EXP!" : `${percent}%`;
+      if (burstAttackButton) burstAttackButton.classList.toggle("pressed", state.burstCharge >= 1);
+    }
+
+    function firePower(enemy) {
+      const point = enemyPoint(enemy);
+      const dx = state.player.x - point.x;
+      const dy = state.player.y - point.y;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const speed = 115 + state.islandIndex * 18;
+      state.powers.push({
+        x: point.x,
+        y: point.y - 18,
+        vx: (dx / length) * speed,
+        vy: (dy / length) * speed,
+        age: 0,
+        spin: enemy.phase,
+        color: enemy.color
+      });
+    }
+
+    function handlePowerHit() {
+      if (state.player.hitCooldown > 0) return;
+      state.player.hitCooldown = 1.35;
+      state.hits += 1;
+      playHitSound();
+      if (state.hits >= 7) {
+        loseLife("Os bichinhos acertaram 7 poderes!");
+      } else {
+        showTip(`O poder acertou! Faltam ${7 - state.hits} acertos para perder uma vida.`);
+      }
+      updateHud();
+    }
+
+    function loseLife(reason) {
+      if (state.player.fallCooldown > 0) return;
+      state.lives -= 1;
+      state.hits = 0;
+      state.player.hitCooldown = 1.4;
+      state.player.fallCooldown = 1.4;
+      state.playerShots = [];
+      state.powers = [];
+      updateHud();
+      if (state.lives <= 0) {
+        gameOver(reason);
+        return;
+      }
+      respawnPlayer();
+      showTip(`${reason} Perdeu uma vida. Vidas: ${state.lives}.`);
+    }
+
+    function respawnPlayer() {
+      const island = islandShape();
+      state.player.x = island.cx;
+      state.player.y = island.cy + island.ry * 0.12;
+      state.player.target = null;
+    }
+
+    function gameOver(reason) {
+      setMode("gameover");
+      state.rapidAttackHeld = false;
+      controls.classList.add("hidden");
+      hud.classList.add("hidden");
+      gameOverText.textContent = `${reason} As vidas acabaram.`;
+      gameOverDialog.classList.remove("hidden");
+      stopMusic();
+    }
+
+    function clampPlayerToIsland() {
+      const point = clampPointToIsland(state.player.x, state.player.y);
+      state.player.x = point.x;
+      state.player.y = point.y;
+    }
+
+    function clampPointToIsland(x, y) {
+      const island = islandShape();
+      const nx = (x - island.cx) / island.rx;
+      const ny = (y - island.cy) / island.ry;
+      const length = Math.hypot(nx, ny);
+      if (length > 0.88) {
+        return {
+          x: island.cx + (nx / length) * island.rx * 0.88,
+          y: island.cy + (ny / length) * island.ry * 0.88
+        };
+      }
+      return { x, y };
+    }
+
+    function draw() {
+      const theme = islands[state.islandIndex];
+      drawSky(theme);
+      drawDistantIslands(theme);
+      drawClouds();
+      drawIsland(theme);
+      drawDangerZones();
+      drawDecorations(theme, false);
+      drawPackages();
+      drawEnemies();
+      drawPowers();
+      drawPlayerShots();
+      drawRewards();
+      drawMoveTarget();
+      drawDecorations(theme, true);
+      drawPlayer();
+      drawSparkles(theme);
+    }
+
+    function drawSky(theme) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, state.height);
+      gradient.addColorStop(0, theme.skyTop);
+      gradient.addColorStop(1, theme.skyBottom);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, state.width, state.height);
+
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = "#ffffff";
+      for (let i = 0; i < 22; i += 1) {
+        const x = (i * 97 + state.time * 12) % (state.width + 120) - 60;
+        const y = 30 + ((i * 53) % Math.max(80, state.height * 0.5));
+        ctx.beginPath();
+        ctx.arc(x, y, 1.4 + (i % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawClouds() {
+      ctx.save();
+      for (const cloud of state.clouds) {
+        cloud.x += cloud.speed * 0.016;
+        if (cloud.x > state.width + 90) cloud.x = -100;
+        ctx.globalAlpha = 0.74;
+        ctx.fillStyle = "#ffffff";
+        const s = cloud.scale;
+        roundedCloud(cloud.x, cloud.y, s);
+      }
+      ctx.restore();
+    }
+
+    function roundedCloud(x, y, scale) {
+      ctx.beginPath();
+      ctx.ellipse(x, y + 12 * scale, 34 * scale, 16 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 25 * scale, y + 7 * scale, 28 * scale, 18 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(x - 27 * scale, y + 8 * scale, 24 * scale, 15 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 2 * scale, y - 3 * scale, 24 * scale, 20 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawDistantIslands(theme) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      const items = [
+        { x: state.width * 0.13, y: state.height * 0.35, s: 0.46 },
+        { x: state.width * 0.84, y: state.height * 0.28, s: 0.36 },
+        { x: state.width * 0.74, y: state.height * 0.73, s: 0.28 }
+      ];
+      for (const item of items) {
+        ctx.fillStyle = theme.rock;
+        ctx.beginPath();
+        ctx.moveTo(item.x - 90 * item.s, item.y);
+        ctx.quadraticCurveTo(item.x, item.y + 44 * item.s, item.x + 80 * item.s, item.y);
+        ctx.quadraticCurveTo(item.x + 20 * item.s, item.y + 120 * item.s, item.x - 18 * item.s, item.y + 92 * item.s);
+        ctx.quadraticCurveTo(item.x - 60 * item.s, item.y + 64 * item.s, item.x - 90 * item.s, item.y);
+        ctx.fill();
+        ctx.fillStyle = theme.ground;
+        ctx.beginPath();
+        ctx.ellipse(item.x, item.y - 3 * item.s, 92 * item.s, 28 * item.s, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawIsland(theme) {
+      const island = islandShape();
+      ctx.save();
+      ctx.fillStyle = "rgba(61, 77, 70, 0.18)";
+      ctx.beginPath();
+      ctx.ellipse(island.cx, island.cy + island.ry + 92, island.rx * 0.72, 28, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const rockGradient = ctx.createLinearGradient(0, island.cy, 0, island.cy + island.ry + 120);
+      rockGradient.addColorStop(0, theme.rock);
+      rockGradient.addColorStop(1, "#6f6256");
+      ctx.fillStyle = rockGradient;
+      ctx.beginPath();
+      ctx.moveTo(island.cx - island.rx * 0.9, island.cy + island.ry * 0.2);
+      ctx.bezierCurveTo(
+        island.cx - island.rx * 0.45,
+        island.cy + island.ry * 1.1,
+        island.cx - island.rx * 0.18,
+        island.cy + island.ry * 1.62,
+        island.cx,
+        island.cy + island.ry * 1.78
+      );
+      ctx.bezierCurveTo(
+        island.cx + island.rx * 0.16,
+        island.cy + island.ry * 1.62,
+        island.cx + island.rx * 0.52,
+        island.cy + island.ry * 1.05,
+        island.cx + island.rx * 0.9,
+        island.cy + island.ry * 0.2
+      );
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = theme.edge;
+      ctx.beginPath();
+      ctx.ellipse(island.cx, island.cy + 12, island.rx * 1.02, island.ry * 1.02, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const groundGradient = ctx.createRadialGradient(island.cx - 80, island.cy - 60, 30, island.cx, island.cy, island.rx);
+      groundGradient.addColorStop(0, "#a9ef86");
+      groundGradient.addColorStop(1, theme.ground);
+      ctx.fillStyle = groundGradient;
+      ctx.beginPath();
+      ctx.ellipse(island.cx, island.cy, island.rx, island.ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.45)";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.ellipse(island.cx - 6, island.cy - 8, island.rx * 0.82, island.ry * 0.76, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawDangerZones() {
+      for (const zone of state.dangerZones) {
+        const point = pointOnIsland(zone.u, zone.v);
+        const warning = zone.age < 1.25;
+        const alpha = warning ? 0.28 + Math.sin(state.time * 10) * 0.12 : 0.68;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.15, alpha);
+        ctx.fillStyle = warning ? "#ff5e6c" : "#c92535";
+        ctx.beginPath();
+        ctx.ellipse(point.x, point.y, zone.radius * 1.1, zone.radius * 0.72, zone.crack, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#7b1f2b";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(point.x - zone.radius * 0.6, point.y - 4);
+        ctx.lineTo(point.x - zone.radius * 0.15, point.y + 8);
+        ctx.lineTo(point.x + zone.radius * 0.18, point.y - 7);
+        ctx.lineTo(point.x + zone.radius * 0.58, point.y + 6);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function drawDecorations(theme, frontLayer) {
+      const sorted = [...state.decorations].sort((a, b) => pointOnIsland(a.u, a.v).y - pointOnIsland(b.u, b.v).y);
+      for (const decoration of sorted) {
+        const point = pointOnIsland(decoration.u, decoration.v);
+        const isFront = point.y > state.player.y + 5;
+        if (isFront !== frontLayer) continue;
+        const sway = Math.sin(state.time * 1.5 + decoration.sway) * 2;
+        if (decoration.type === "tree") drawTree(point.x + sway, point.y, decoration.scale, theme);
+        if (decoration.type === "bush") drawBush(point.x, point.y, decoration.scale, theme);
+        if (decoration.type === "banana") drawBananaPlant(point.x, point.y, decoration.scale);
+        if (decoration.type === "mushroom") drawMushroom(point.x, point.y, decoration.scale);
+        if (decoration.type === "star") drawStarFlower(point.x, point.y, decoration.scale);
+      }
+    }
+
+    function drawTree(x, y, scale, theme) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#805f38";
+      ctx.fillRect(-5, -34, 10, 42);
+      ctx.fillStyle = theme.grass;
+      ctx.beginPath();
+      ctx.arc(-14, -36, 18, 0, Math.PI * 2);
+      ctx.arc(8, -46, 21, 0, Math.PI * 2);
+      ctx.arc(22, -30, 17, 0, Math.PI * 2);
+      ctx.arc(1, -24, 20, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.24)";
+      ctx.beginPath();
+      ctx.arc(4, -52, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBush(x, y, scale, theme) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = theme.grass;
+      ctx.beginPath();
+      ctx.arc(-13, -4, 14, 0, Math.PI * 2);
+      ctx.arc(2, -10, 18, 0, Math.PI * 2);
+      ctx.arc(17, -4, 14, 0, Math.PI * 2);
+      ctx.rect(-28, -4, 56, 18);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBananaPlant(x, y, scale) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.strokeStyle = "#4c9b52";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(0, 6);
+      ctx.lineTo(0, -34);
+      ctx.stroke();
+      ctx.fillStyle = "#58b65e";
+      for (const angle of [-0.95, -0.42, 0.36, 0.92]) {
+        ctx.save();
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.ellipse(0, -30, 10, 28, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.strokeStyle = "#ffcb37";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(12, -18, 12, 0.3, 1.5);
+      ctx.arc(20, -18, 12, 0.35, 1.55);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawMushroom(x, y, scale) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#fff0dc";
+      ctx.fillRect(-8, -18, 16, 26);
+      ctx.fillStyle = "#f05e76";
+      ctx.beginPath();
+      ctx.ellipse(0, -20, 28, 18, 0, Math.PI, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#fff7e5";
+      for (const dot of [[-12, -24], [1, -31], [12, -20]]) {
+        ctx.beginPath();
+        ctx.arc(dot[0], dot[1], 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawStarFlower(x, y, scale) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.strokeStyle = "#3b927e";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, 4);
+      ctx.lineTo(0, -20);
+      ctx.stroke();
+      ctx.fillStyle = "#ffdf54";
+      drawStar(0, -26, 6, 18, 8);
+      ctx.restore();
+    }
+
+    function drawPackages() {
+      for (const packageItem of state.packages) {
+        const point = pointOnIsland(packageItem.u, packageItem.v);
+        const bob = Math.sin(state.time * 3 + packageItem.bob) * 4;
+        if (packageItem.hidden) {
+          drawHiddenLeaves(point.x, point.y + 7);
+        }
+        drawGiftBox(point.x, point.y + bob, packageItem.hidden, packageItem.content);
+      }
+    }
+
+    function drawHiddenLeaves(x, y) {
+      ctx.save();
+      ctx.fillStyle = "rgba(47, 128, 71, 0.9)";
+      for (let i = 0; i < 5; i += 1) {
+        ctx.beginPath();
+        ctx.ellipse(x - 20 + i * 10, y + Math.sin(i) * 3, 13, 8, i * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawGiftBox(x, y, hidden, content) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = "rgba(39, 58, 58, 0.18)";
+      ctx.beginPath();
+      ctx.ellipse(0, 19, 22, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = hidden ? 0.92 : 1;
+      ctx.fillStyle = "#ffd66b";
+      ctx.fillRect(-17, -12, 34, 28);
+      ctx.fillStyle = "#ff9f2f";
+      ctx.fillRect(-19, -18, 38, 9);
+      ctx.fillStyle = "#8d62d7";
+      ctx.fillRect(-3, -18, 6, 34);
+      ctx.fillStyle = "#6d49b8";
+      ctx.fillRect(-19, -4, 38, 6);
+      ctx.strokeStyle = "rgba(96, 59, 35, 0.22)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-17, -12, 34, 28);
+      ctx.beginPath();
+      ctx.arc(-7, -21, 7, 0.2, Math.PI * 1.55);
+      ctx.arc(7, -21, 7, Math.PI * 1.45, Math.PI * 0.8, true);
+      ctx.strokeStyle = "#8d62d7";
+      ctx.stroke();
+      drawPackageSpark(0, -31);
+      ctx.restore();
+    }
+
+    function drawPeekingBanana(x, y) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(1.16, 1.16);
+      const bananas = [
+        [-0.62, -13, 3, 19],
+        [-0.34, -7, -3, 20],
+        [-0.08, 0, -5, 21],
+        [0.18, 7, -3, 20],
+        [0.46, 13, 3, 19],
+        [0.02, 0, 5, 17]
+      ];
+      for (const banana of bananas) {
+        drawOneBanana(...banana);
+      }
+      ctx.fillStyle = "#7a5630";
+      roundedRect(-4, -18, 8, 16, 3);
+      ctx.fill();
+      ctx.fillStyle = "#6aa34b";
+      ctx.beginPath();
+      ctx.ellipse(0, -15, 7, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawOneBanana(angle, x, y, radius) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#b17923";
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0.12, Math.PI * 0.94);
+      ctx.stroke();
+      ctx.strokeStyle = "#f8ca2f";
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0.12, Math.PI * 0.94);
+      ctx.stroke();
+      ctx.strokeStyle = "#ffe87f";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, -1, radius - 2, 0.18, Math.PI * 0.82);
+      ctx.stroke();
+      ctx.fillStyle = "#775331";
+      ctx.beginPath();
+      ctx.arc(Math.cos(0.12) * radius, Math.sin(0.12) * radius, 2, 0, Math.PI * 2);
+      ctx.arc(Math.cos(Math.PI * 0.94) * radius, Math.sin(Math.PI * 0.94) * radius, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawPackageSpark(x, y) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.sin(state.time * 3) * 0.2);
+      ctx.fillStyle = "#9e69ff";
+      drawStar(0, 0, 5, 14, 5);
+      ctx.fillStyle = "#fff2a8";
+      drawStar(0, 0, 2, 7, 5);
+      ctx.restore();
+    }
+
+    function drawEnemies() {
+      for (const enemy of state.enemies) {
+        const point = enemyPoint(enemy);
+        drawEnemy(point.x, point.y, enemy);
+      }
+    }
+
+    function drawEnemy(x, y, enemy) {
+      ctx.save();
+      ctx.translate(x, y);
+      const bounce = Math.sin(state.time * 4 + enemy.phase) * 3;
+      ctx.translate(0, bounce);
+      ctx.fillStyle = "rgba(38, 36, 54, 0.22)";
+      ctx.beginPath();
+      ctx.ellipse(0, 20, 22, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = enemy.color;
+      ctx.beginPath();
+      ctx.moveTo(-18, -4);
+      ctx.quadraticCurveTo(-24, -30, -7, -22);
+      ctx.lineTo(-1, -13);
+      ctx.lineTo(7, -22);
+      ctx.quadraticCurveTo(24, -30, 18, -4);
+      ctx.quadraticCurveTo(18, 18, 0, 19);
+      ctx.quadraticCurveTo(-18, 18, -18, -4);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffe77a";
+      ctx.beginPath();
+      ctx.arc(-7, -3, 4, 0, Math.PI * 2);
+      ctx.arc(7, -3, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#26213c";
+      ctx.beginPath();
+      ctx.arc(-6, -2, 1.7, 0, Math.PI * 2);
+      ctx.arc(8, -2, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#ffd85c";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(16, 4);
+      ctx.lineTo(28, -10);
+      ctx.stroke();
+      ctx.fillStyle = "#fff2a8";
+      drawStar(30, -13, 3, 8, 5);
+      ctx.restore();
+    }
+
+    function drawPowers() {
+      for (const power of state.powers) {
+        ctx.save();
+        ctx.translate(power.x, power.y);
+        ctx.rotate(power.spin);
+        ctx.fillStyle = power.color;
+        ctx.globalAlpha = 0.88;
+        drawStar(0, 0, 5, 13, 6);
+        ctx.fillStyle = "#fff4b8";
+        ctx.globalAlpha = 0.95;
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawPlayerShots() {
+      for (const shot of state.playerShots) {
+        ctx.save();
+        ctx.translate(shot.x, shot.y);
+        ctx.rotate(shot.spin);
+        ctx.globalAlpha = 0.92;
+        ctx.fillStyle = shot.color;
+        drawStar(0, 0, 4, shot.power > 1 ? 14 : 10, 5);
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(0, 0, shot.power > 1 ? 4 : 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawRewards() {
+      for (const reward of state.rewards) {
+        const alpha = Math.max(0, 1 - reward.age / 1.1);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        if (reward.type === "banana") {
+          drawPeekingBanana(reward.x, reward.y);
+        } else {
+          ctx.translate(reward.x, reward.y);
+          drawPackageSpark(0, 0);
+          ctx.fillStyle = "#27313c";
+          ctx.font = "700 12px Trebuchet MS, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(reward.label || "Novo", 0, 28);
+        }
+        ctx.restore();
+      }
+    }
+
+    function drawMoveTarget() {
+      if (!state.player.target || state.mode !== "playing") return;
+      const pulse = Math.sin(state.time * 7) * 0.5 + 0.5;
+      const x = state.player.target.x;
+      const y = state.player.target.y;
+      ctx.save();
+      ctx.globalAlpha = 0.78;
+      ctx.strokeStyle = "#fff3a4";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, 15 + pulse * 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      drawStar(x, y - 1, 4, 10 + pulse * 2, 5);
+      ctx.restore();
+    }
+
+    function drawPlayer() {
+      const character = characterById(state.selectedId);
+      if (state.player.hitCooldown > 0 && Math.floor(state.time * 16) % 2 === 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        drawAvatar(state.player.x, state.player.y, character, 1, state.player.facing);
+        ctx.restore();
+        return;
+      }
+      drawAvatar(state.player.x, state.player.y, character, 1, state.player.facing);
+    }
+
+    function drawAvatar(x, y, character, scale, facing) {
+      const s = scale * character.height;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(facing, 1);
+      ctx.fillStyle = "rgba(42, 50, 55, 0.2)";
+      ctx.beginPath();
+      ctx.ellipse(0, 24 * s, 21 * s, 7 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = character.pants;
+      ctx.lineWidth = 7 * s;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-7 * s, 14 * s);
+      ctx.lineTo(-10 * s, 27 * s);
+      ctx.moveTo(7 * s, 14 * s);
+      ctx.lineTo(11 * s, 27 * s);
+      ctx.stroke();
+
+      ctx.fillStyle = character.shirt;
+      roundedRect(-15 * s, -15 * s, 30 * s, 34 * s, 11 * s);
+      ctx.fill();
+      ctx.fillStyle = character.detail;
+      ctx.globalAlpha = 0.95;
+      roundedRect(-10 * s, -2 * s, 20 * s, 5 * s, 3 * s);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      ctx.strokeStyle = character.skin;
+      ctx.lineWidth = 6 * s;
+      ctx.beginPath();
+      ctx.moveTo(-15 * s, -5 * s);
+      ctx.lineTo(-24 * s, 6 * s);
+      ctx.moveTo(15 * s, -5 * s);
+      ctx.lineTo(22 * s, 7 * s);
+      ctx.stroke();
+
+      if (character.id === "gabriela") {
+        ctx.fillStyle = character.hair;
+        ctx.beginPath();
+        ctx.arc(-16 * s, -33 * s, 9 * s, 0, Math.PI * 2);
+        ctx.arc(16 * s, -33 * s, 9 * s, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ff8eb7";
+        ctx.beginPath();
+        ctx.arc(-19 * s, -38 * s, 3 * s, 0, Math.PI * 2);
+        ctx.arc(19 * s, -38 * s, 3 * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = character.skin;
+      ctx.beginPath();
+      ctx.arc(0, -32 * s, 17 * s, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = character.hair;
+      ctx.beginPath();
+      if (character.id === "vo") {
+        ctx.arc(0, -43 * s, 15 * s, Math.PI, Math.PI * 2);
+        ctx.arc(0, -51 * s, 8 * s, 0, Math.PI * 2);
+      } else if (character.id === "papai") {
+        ctx.rect(-15 * s, -50 * s, 30 * s, 12 * s);
+        ctx.fill();
+        ctx.fillStyle = character.detail;
+        roundedRect(-17 * s, -52 * s, 34 * s, 8 * s, 4 * s);
+      } else {
+        ctx.arc(0, -39 * s, 17 * s, Math.PI, Math.PI * 2);
+        ctx.lineTo(17 * s, -34 * s);
+        ctx.quadraticCurveTo(3 * s, -47 * s, -17 * s, -34 * s);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = "#2c3437";
+      ctx.beginPath();
+      ctx.arc(-5 * s, -31 * s, 1.8 * s, 0, Math.PI * 2);
+      ctx.arc(6 * s, -31 * s, 1.8 * s, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#b96b54";
+      ctx.lineWidth = 1.8 * s;
+      ctx.beginPath();
+      ctx.arc(1 * s, -25 * s, 5 * s, 0.1, Math.PI - 0.1);
+      ctx.stroke();
+
+      if (character.id === "tio") {
+        ctx.strokeStyle = "#27313c";
+        ctx.lineWidth = 1.8 * s;
+        ctx.beginPath();
+        ctx.arc(-6 * s, -31 * s, 5 * s, 0, Math.PI * 2);
+        ctx.arc(7 * s, -31 * s, 5 * s, 0, Math.PI * 2);
+        ctx.moveTo(-1 * s, -31 * s);
+        ctx.lineTo(2 * s, -31 * s);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(55,37,28,0.8)";
+        ctx.beginPath();
+        ctx.ellipse(1 * s, -20 * s, 8 * s, 4 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    function roundedRect(x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function drawSparkles(theme) {
+      ctx.save();
+      const island = islandShape();
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = theme.detail === "star" ? "#fff5a3" : "#fff8d0";
+      for (let i = 0; i < 16; i += 1) {
+        const angle = i * 1.713 + state.time * 0.45;
+        const radius = 0.18 + (i % 6) * 0.11;
+        const x = island.cx + Math.cos(angle) * island.rx * radius;
+        const y = island.cy + Math.sin(angle * 1.4) * island.ry * radius;
+        drawStar(x, y, 3, 7 + Math.sin(state.time * 3 + i) * 1.5, 5);
+      }
+      ctx.restore();
+    }
+
+    function drawStar(x, y, inner, outer, points) {
+      ctx.beginPath();
+      for (let i = 0; i < points * 2; i += 1) {
+        const radius = i % 2 === 0 ? outer : inner;
+        const angle = -Math.PI / 2 + i * Math.PI / points;
+        const px = x + Math.cos(angle) * radius;
+        const py = y + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function loop(timestamp) {
+      const seconds = timestamp / 1000;
+      const dt = Math.min(0.033, seconds - (state.last || seconds));
+      state.last = seconds;
+      state.time = seconds;
+      if (state.mode === "playing") {
+        updatePlayer(dt);
+        updateEnemies(dt);
+        updateRewards(dt);
+        updateAttacks(dt);
+        updateHazards(dt);
+      }
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function bindControls() {
+      window.addEventListener("keydown", (event) => {
+        const key = event.key.toLowerCase();
+        if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)) {
+          state.player.target = null;
+        }
+        if (key === "arrowup" || key === "w") state.keys.up = true;
+        if (key === "arrowdown" || key === "s") state.keys.down = true;
+        if (key === "arrowleft" || key === "a") state.keys.left = true;
+        if (key === "arrowright" || key === "d") state.keys.right = true;
+        if (key === " " && state.mode === "playing") {
+          event.preventDefault();
+          state.rapidAttackHeld = true;
+          fireQuickAttack();
+        }
+        if (key === "q" && state.mode === "playing") {
+          fireBurstAttack();
+        }
+      });
+      window.addEventListener("keyup", (event) => {
+        const key = event.key.toLowerCase();
+        if (key === "arrowup" || key === "w") state.keys.up = false;
+        if (key === "arrowdown" || key === "s") state.keys.down = false;
+        if (key === "arrowleft" || key === "a") state.keys.left = false;
+        if (key === "arrowright" || key === "d") state.keys.right = false;
+        if (key === " ") state.rapidAttackHeld = false;
+      });
+
+      if (quickAttackButton) {
+        const pressAttack = (event) => {
+          event.preventDefault();
+          if (state.mode !== "playing") return;
+          state.rapidAttackHeld = true;
+          quickAttackButton.classList.add("pressed");
+          fireQuickAttack();
+        };
+        const releaseAttack = (event) => {
+          event.preventDefault();
+          state.rapidAttackHeld = false;
+          quickAttackButton.classList.remove("pressed");
+        };
+        quickAttackButton.addEventListener("pointerdown", pressAttack);
+        quickAttackButton.addEventListener("pointerup", releaseAttack);
+        quickAttackButton.addEventListener("pointercancel", releaseAttack);
+        quickAttackButton.addEventListener("pointerleave", releaseAttack);
+      }
+
+      if (burstAttackButton) {
+        burstAttackButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          fireBurstAttack();
+        });
+      }
+
+      let draggingToMove = false;
+      const setTouchTarget = (event) => {
+        if (state.mode !== "playing") return;
+        event.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const point = clampPointToIsland(event.clientX - rect.left, event.clientY - rect.top);
+        state.player.target = point;
+      };
+      canvas.addEventListener("pointerdown", (event) => {
+        if (state.mode !== "playing") return;
+        draggingToMove = true;
+        canvas.setPointerCapture?.(event.pointerId);
+        setTouchTarget(event);
+      });
+      canvas.addEventListener("pointermove", (event) => {
+        if (!draggingToMove || event.pointerType === "mouse") return;
+        setTouchTarget(event);
+      });
+      window.addEventListener("pointerup", () => {
+        draggingToMove = false;
+      });
+      window.addEventListener("pointercancel", () => {
+        draggingToMove = false;
+      });
+    }
+
+    function init() {
+      state.progress = loadProgress();
+      resize();
+      setupIsland();
+      renderCharacterCards(startCharacters, true);
+      updateHud();
+      updateMusicButton();
+      updateChargeButton();
+      bindControls();
+      setMode("welcome");
+      requestAnimationFrame(loop);
+
+      document.querySelector("#enterSelectionButton").addEventListener("click", enterSelection);
+      document.querySelector("#startButton").addEventListener("click", startGame);
+      document.querySelector("#nextIslandButton").addEventListener("click", nextIsland);
+      document.querySelector("#musicButton").addEventListener("click", toggleMusic);
+      for (const button of document.querySelectorAll(".menu-music-toggle")) {
+        button.addEventListener("click", toggleMusic);
+      }
+      document.querySelector("#charactersButton").addEventListener("click", () => {
+        renderLocker();
+        lockerDialog.classList.remove("hidden");
+        setMode("locker");
+      });
+      document.querySelector("#closeLockerButton").addEventListener("click", () => {
+        lockerDialog.classList.add("hidden");
+        setMode("playing");
+      });
+      document.querySelector("#pauseButton").addEventListener("click", () => {
+        pauseDialog.classList.remove("hidden");
+        setMode("paused");
+      });
+      document.querySelector("#resumeButton").addEventListener("click", () => {
+        pauseDialog.classList.add("hidden");
+        setMode("playing");
+      });
+      document.querySelector("#menuButton").addEventListener("click", () => {
+        pauseDialog.classList.add("hidden");
+        setMode("welcome");
+        startMusic();
+        renderCharacterCards(startCharacters, true);
+      });
+      document.querySelector("#resetButton").addEventListener("click", () => {
+        state.progress = defaultProgress();
+        state.selectedId = "davi";
+        saveProgress();
+        renderCharacterCards(startCharacters, true);
+        showTip("Progresso reiniciado.");
+      });
+      document.querySelector("#retryButton").addEventListener("click", () => {
+        gameOverDialog.classList.add("hidden");
+        startGame();
+      });
+      document.querySelector("#gameOverMenuButton").addEventListener("click", () => {
+        gameOverDialog.classList.add("hidden");
+        setMode("welcome");
+        startMusic();
+      });
+      window.addEventListener("resize", resize);
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="lang-pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agenda — Quanta Aulas</title>
+  <meta name="description" content="Confira os horários disponíveis para aulas particulares com o Dr. Samuel." />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://quantaaulas.com/agenda.html" />
+  <meta property="og:title" content="Agenda — Quanta Aulas" />
+  <meta property="og:description" content="Confira os horários disponíveis para aulas particulares com o Dr. Samuel." />
+  <meta property="og:image" content="https://quantaaulas.com/assets/agenda-preview.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="Quanta Aulas" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Agenda — Quanta Aulas" />
+  <meta name="twitter:description" content="Horários disponíveis para aulas com o Dr. Samuel." />
+  <meta name="twitter:image" content="https://quantaaulas.com/assets/agenda-preview.jpg" />
+
+  <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
+  <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css?v=10" />
+</head>
+
+<body>
+  <div class="bg-ambient"></div>
+  <div class="bg-grid"></div>
+
+  <header class="nav">
+    <div class="container nav-inner">
+      <a href="/" class="nav-logo" aria-label="Quanta Aulas">
+        <img src="assets/logo-quanta.png" alt="Quanta Aulas" class="logo-img" />
+        <span>
+          <span class="name">QUANTA AULAS</span>
+          <span class="tag" data-lang-inline="pt">A evolução do aprendizado</span>
+          <span class="tag" data-lang-inline="en">The evolution of learning</span>
+        </span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="/" class="nav-link"><span data-lang-inline="pt">Início</span><span data-lang-inline="en">Home</span></a>
+        <a href="/#materias" class="nav-link"><span data-lang-inline="pt">Matérias</span><span data-lang-inline="en">Subjects</span></a>
+        <a href="/#metodo" class="nav-link"><span data-lang-inline="pt">Método</span><span data-lang-inline="en">Method</span></a>
+        <a href="/#depoimentos" class="nav-link"><span data-lang-inline="pt">Depoimentos</span><span data-lang-inline="en">Reviews</span></a>
+        <a href="/#faq" class="nav-link">FAQ</a>
+        <a href="/agenda.html" class="nav-link" style="color:var(--brand);"><span data-lang-inline="pt">Agenda</span><span data-lang-inline="en">Schedule</span></a>
+        <a href="/questoes/" class="nav-link"><span data-lang-inline="pt">Questões</span><span data-lang-inline="en">Practice</span></a>
+
+        <div class="lang-toggle">
+          <button type="button" data-set-lang="pt" class="active">PT</button>
+          <button type="button" data-set-lang="en">EN</button>
+        </div>
+
+        <a
+          href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20quero%20agendar%20uma%20aula."
+          target="_blank" rel="noopener noreferrer"
+          class="btn btn-primary nav-link"
+          style="padding:10px 16px;font-size:13px;">
+          WhatsApp
+          <svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </nav>
+
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="mobileMenu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div class="mobile-panel" id="mobileMenu">
+      <a href="/"><span data-lang-inline="pt">Início</span><span data-lang-inline="en">Home</span></a>
+      <a href="/#materias"><span data-lang-inline="pt">Matérias</span><span data-lang-inline="en">Subjects</span></a>
+      <a href="/#metodo"><span data-lang-inline="pt">Método</span><span data-lang-inline="en">Method</span></a>
+      <a href="/#depoimentos"><span data-lang-inline="pt">Depoimentos</span><span data-lang-inline="en">Reviews</span></a>
+      <a href="/#faq">FAQ</a>
+      <a href="/agenda.html"><span data-lang-inline="pt">Agenda</span><span data-lang-inline="en">Schedule</span></a>
+      <a href="/questoes/"><span data-lang-inline="pt">Questões</span><span data-lang-inline="en">Practice</span></a>
+      <a href="https://www.instagram.com/quanta_aulas/" target="_blank" rel="noopener noreferrer">Instagram</a>
+      <a href="https://wa.me/554796442089" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+      <div class="lang-toggle" style="align-self:flex-start;margin-top:12px;">
+        <button type="button" data-set-lang="pt" class="active">PT</button>
+        <button type="button" data-set-lang="en">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section" style="padding:80px 0 60px;">
+      <div class="container">
+        <div class="section-head reveal">
+          <div>
+            <div class="eyebrow" style="margin-bottom:16px;">
+              <span data-lang-inline="pt">Disponibilidade</span>
+              <span data-lang-inline="en">Availability</span>
+            </div>
+            <h1 class="h-section" style="font-size:clamp(40px,5vw,64px);">
+              <span data-lang-inline="pt">Agenda</span>
+              <span data-lang-inline="en">Schedule</span>
+              <br/>
+              <span class="grad-text">
+                <span data-lang-inline="pt">em tempo real.</span>
+                <span data-lang-inline="en">in real time.</span>
+              </span>
+            </h1>
+          </div>
+          <p class="lead">
+            <span data-lang-inline="pt">Os horários abaixo refletem minha agenda do Google. Para confirmar uma aula, fale comigo no WhatsApp.</span>
+            <span data-lang-inline="en">The times below reflect my live Google calendar. To confirm a lesson, message me on WhatsApp.</span>
+          </p>
+        </div>
+
+        <div class="reveal" style="border:1px solid var(--line-strong);border-radius:var(--radius-lg);overflow:hidden;background:var(--bg-elev);box-shadow:var(--shadow-card);">
+          <iframe
+            src="https://calendar.google.com/calendar/embed?src=samuel.isidoro.santos%40gmail.com&ctz=America%2FSao_Paulo"
+            style="width:100%;min-height:640px;height:75vh;border:0;display:block;"
+            title="Agenda Google Calendar"
+            loading="lazy"
+          ></iframe>
+        </div>
+
+        <div class="reveal cta-strip" style="margin-top:48px;">
+          <div>
+            <div class="eyebrow" style="margin-bottom:16px;">
+              <span data-lang-inline="pt">— Próximo passo</span>
+              <span data-lang-inline="en">— Next step</span>
+            </div>
+            <h2 class="h-section" style="max-width:18ch;">
+              <span data-lang-inline="pt">Encontrou um horário?</span>
+              <span data-lang-inline="en">Found a time?</span>
+            </h2>
+          </div>
+          <a class="btn btn-primary"
+             href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20um%20hor%C3%A1rio%20na%20agenda%20e%20quero%20agendar%20uma%20aula."
+             target="_blank" rel="noopener noreferrer"
+             style="padding:18px 26px;font-size:16px;position:relative;z-index:1;">
+            <span data-lang-inline="pt">Confirmar no WhatsApp</span>
+            <span data-lang-inline="en">Confirm on WhatsApp</span>
+            <svg class="btn-arrow" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom" style="border-top:none;padding-top:0;">
+        <span>
+          <span data-lang-inline="pt">© 2026 Quanta Aulas · Todos os direitos reservados</span>
+          <span data-lang-inline="en">© 2026 Quanta Aulas · All rights reserved</span>
+        </span>
+        <span>
+          <a href="/" style="color:var(--ink-mute);text-decoration:none;">
+            <span data-lang-inline="pt">Voltar ao início</span>
+            <span data-lang-inline="en">Back to home</span>
+          </a>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <a class="whatsapp-float"
+     href="https://wa.me/554796442089?text=Ol%C3%A1%20Dr.%20Samuel!%20Vi%20o%20site%20e%20quero%20mais%20informa%C3%A7%C3%B5es."
+     target="_blank" rel="noopener noreferrer"
+     aria-label="Falar no WhatsApp" title="Falar no WhatsApp">
+    <svg viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M19.11 17.02c-.28-.14-1.63-.8-1.89-.9-.25-.09-.44-.14-.62.14-.18.28-.72.9-.88 1.08-.16.18-.32.21-.6.07-.28-.14-1.16-.43-2.21-1.38-.82-.73-1.38-1.64-1.54-1.92-.16-.28-.02-.43.12-.57.13-.13.28-.32.42-.48.14-.16.18-.28.28-.46.09-.18.04-.35-.02-.48-.07-.14-.62-1.5-.85-2.05-.22-.53-.45-.46-.62-.47l-.53-.01c-.18 0-.48.07-.73.35s-.95.93-.95 2.27.98 2.64 1.12 2.82c.14.18 1.92 2.94 4.65 4.13.65.28 1.16.45 1.56.58.66.21 1.26.18 1.74.11.53-.08 1.63-.67 1.86-1.32.23-.65.23-1.21.16-1.32-.07-.11-.25-.18-.53-.32ZM16.02 4.5c-6.33 0-11.47 5.14-11.47 11.46 0 2.02.53 4 1.53 5.75L4.5 27.5l5.94-1.56a11.38 11.38 0 0 0 5.58 1.43h.01c6.32 0 11.47-5.15 11.47-11.47 0-3.06-1.19-5.93-3.36-8.1A11.37 11.37 0 0 0 16.02 4.5Zm0 20.96h-.01a9.45 9.45 0 0 1-4.82-1.32l-.35-.21-3.52.92.94-3.43-.23-.35a9.45 9.45 0 1 1 7.99 4.39Z"/>
+    </svg>
+  </a>
+
+  <script src="script.js?v=10"></script>
+</body>
+</html>
