@@ -1,0 +1,18 @@
+# Garante que crawlers de redes sociais consigam acessar o site para gerar prévias de link
+<IfModule mod_setenvif.c>
+  SetEnvIfNoCase User-Agent "facebookexternalhit" allow_bot
+  SetEnvIfNoCase User-Agent "Facebot" allow_bot
+  SetEnvIfNoCase User-Agent "WhatsApp" allow_bot
+  SetEnvIfNoCase User-Agent "Twitterbot" allow_bot
+  SetEnvIfNoCase User-Agent "LinkedInBot" allow_bot
+  SetEnvIfNoCase User-Agent "TelegramBot" allow_bot
+  SetEnvIfNoCase User-Agent "Slackbot" allow_bot
+  SetEnvIfNoCase User-Agent "Discordbot" allow_bot
+</IfModule>
+
+<IfModule mod_authz_core.c>
+  <RequireAny>
+    Require all granted
+    Require env allow_bot
+  </RequireAny>
+</IfModule>
