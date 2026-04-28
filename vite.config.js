@@ -52,6 +52,8 @@ export default defineConfig({
       'script.js',
       'assets',
       'questoes/questoes.json',
+      'robots.txt',
+      '.htaccess',
     ]),
   ],
 });
