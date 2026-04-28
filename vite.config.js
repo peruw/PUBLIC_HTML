@@ -36,5 +36,5 @@ export default defineConfig({
       },
     },
   },
-  plugins: [copyStaticFiles(['script.js'])],
+  plugins: [copyStaticFiles(['script.js', 'questoes/questoes.json'])],
 });
