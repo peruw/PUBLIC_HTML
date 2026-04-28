@@ -1,7 +1,19 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
-import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { resolve, dirname, join } from 'path';
+import { copyFileSync, existsSync, mkdirSync, statSync, readdirSync } from 'fs';
+
+function copyRecursive(src, dest) {
+  const stat = statSync(src);
+  if (stat.isDirectory()) {
+    mkdirSync(dest, { recursive: true });
+    for (const entry of readdirSync(src)) {
+      copyRecursive(join(src, entry), join(dest, entry));
+    }
+  } else {
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(src, dest);
+  }
+}
 
 function copyStaticFiles(files) {
   return {
@@ -11,8 +23,7 @@ function copyStaticFiles(files) {
         const src = resolve(__dirname, file);
         const dest = resolve(__dirname, 'dist', file);
         if (existsSync(src)) {
-          mkdirSync(dirname(dest), { recursive: true });
-          copyFileSync(src, dest);
+          copyRecursive(src, dest);
         }
       }
     },
@@ -36,5 +47,11 @@ export default defineConfig({
       },
     },
   },
-  plugins: [copyStaticFiles(['script.js', 'questoes/questoes.json'])],
+  plugins: [
+    copyStaticFiles([
+      'script.js',
+      'assets',
+      'questoes/questoes.json',
+    ]),
+  ],
 });
