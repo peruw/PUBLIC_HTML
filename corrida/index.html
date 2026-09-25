@@ -3,13 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="/conta/boot.js?v=20260925" data-app="corrida"></script>
 <title>Corrida Quanta</title>
 <meta name="description" content="Corrida Quanta: resolva a conta e atravesse o portal certo antes de bater. Jogo de cálculo mental da Quanta Aulas.">
 
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://quantaaulas.com/corrida/">
+<link rel="canonical" href="https://quantaaulas.com/corrida/">
 <meta property="og:title" content="Corrida Quanta | Quanta Aulas">
 <meta property="og:description" content="Resolva a conta e atravesse o portal certo. A cada acerto, mais rápido. Até onde você chega?">
-<meta property="og:image" content="https://quantaaulas-com-359870.hostingersite.com/assets/preview.jpg">
+<meta property="og:image" content="https://quantaaulas.com/corrida/og.jpg?v=1">
+<meta property="og:image:secure_url" content="https://quantaaulas.com/corrida/og.jpg?v=1">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Corrida Quanta: o corredor chega aos portais com as respostas de uma conta">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://quantaaulas.com/corrida/og.jpg?v=1">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="Quanta Aulas">
 
@@ -19,7 +29,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@500;700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -79,7 +88,8 @@
     text-shadow: 2px 2px 0 #000;
   }
   .brand img { width: 26px; height: 26px; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 #000); }
-  .stats { display: flex; align-items: center; gap: 6px; }
+  .stats { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .stats > * { flex-shrink: 0; }
   .box {
     font-family: var(--pixel); font-size: 11px; line-height: 1;
     padding: 8px 10px;
@@ -179,6 +189,9 @@
     --c: var(--ink);
   }
   .combo-meter.show { opacity: 1; }
+  @media (max-aspect-ratio: 1/1) {
+    .combo-meter { top: auto; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 96px); transform: none; }
+  }
   .cm-label { font-family: var(--pixel); font-size: 10px; color: var(--c); text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }
   .cm-num {
     display: inline-block; margin: 6px 0 4px;
@@ -269,6 +282,7 @@
     box-shadow: 4px 4px 0 #000; transition: opacity .2s steps(3), transform .2s steps(3);
   }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (pointer: coarse) { body.playing .toast { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 84px); } }
   .toast small { display: block; color: var(--ink); font-size: 12px; margin-top: 2px; }
 
   /* ===== Telas ===== */
@@ -279,6 +293,7 @@
     background: linear-gradient(180deg, rgba(4,16,11,0.25), rgba(4,16,11,0.75));
   }
   .overlay.show { display: flex; }
+  #pauseScreen { background: var(--bg); }
   .card {
     width: 100%; max-width: 440px; max-height: 100%; overflow: auto;
     padding: 24px 22px 20px;
@@ -340,6 +355,10 @@
   }
   .account b { color: var(--ink); font-family: var(--pixel-text); font-size: 16px; font-weight: 700; }
   .account .acts { display: flex; gap: 12px; flex: none; font-size: 13px; }
+  .account .acts a.link, .online-line a.link { display: inline; margin: 0; font: inherit; }
+  .account .acc-sync { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-dim); }
+  /* a barra de conta do site (/conta/game.mjs) fica escondida: o status dela aparece no menu */
+  body > aside[aria-label="Conta e salvamento"] { display: none !important; }
   .login-box { margin: 0 0 14px; }
   .login-box small { display: block; margin-top: 10px; color: var(--ink-dim); font-size: 13px; line-height: 1.4; }
 
@@ -449,7 +468,17 @@
   .field:focus { border-color: var(--gold); }
   .err { min-height: 1.3em; margin: 0 0 10px; color: var(--danger); font-size: 14px; }
 
+  @media (max-width: 600px) {
+    .brand span, .mult.show { display: none; }
+    .box { padding: 7px 7px; font-size: 10px; }
+    .hearts { padding: 5px 6px; }
+    .pbtn { width: 30px; height: 30px; }
+  }
   @media (max-height: 520px) {
+    #startScreen .card { display: flex; flex-direction: column; }
+    #startScreen .card > * { flex-shrink: 0; }
+    #startScreen .account-slot { order: 1; margin-top: 14px; }
+    #startScreen .account-slot .account, #startScreen .account-slot .login-box { margin-bottom: 0; }
     .question { top: calc(max(10px, env(safe-area-inset-top)) + 48px); }
     .q-inner { padding: 11px 12px 6px; }
     .q-row { flex-direction: row; gap: 12px; }
@@ -1016,6 +1045,15 @@
   const postGateMat = new T.MeshLambertMaterial(); tint(postGateMat.color, 'gate');
   const innerPostGeo = new T.BoxGeometry(0.3, 5.3, 0.4);
   const beamGeo = new T.BoxGeometry(9.4, 1.18, 0.6);
+  const padMat = new T.MeshBasicMaterial({ color: C.brand, transparent: true, opacity: 0.35 });
+  const panelPool = [], bannerPool = [], gateGeoCache = {};
+  function gateGeos(n) {
+    if (!gateGeoCache[n]) {
+      const pw = ROAD / n - 0.42;
+      gateGeoCache[n] = { panel: new T.PlaneGeometry(pw, 3.9), pad: new T.BoxGeometry(pw, 0.06, 1.2) };
+    }
+    return gateGeoCache[n];
+  }
   function makeGate(q, answers, xs) {
     const g = new T.Group();
     const n = xs.length, pw = ROAD / n - 0.42, len = Math.max(...answers.map((v) => String(v).length));
@@ -1025,24 +1063,25 @@
       const p = new T.Mesh(k < 2 ? postGateGeo : innerPostGeo, postGateMat); p.position.set(x, 2.65, 0); g.add(p);
       const cap = new T.Mesh(capGeo, capMat); cap.scale.set(k < 2 ? 1.3 : 0.8, 1, 1.3); cap.position.set(x, 5.36, 0); g.add(cap);
     });
-    const panelGeo = new T.PlaneGeometry(pw, 3.9);
-    const padGeo = new T.BoxGeometry(pw, 0.06, 1.2);
+    const geos = gateGeos(n);
     const btex = bannerTex(`${q.text} = ?`);
     // portais e placa ignoram a neblina: continuam nítidos mesmo longe
-    const bfront = new T.MeshBasicMaterial({ map: btex, fog: false });
+    const bfront = bannerPool.pop() || new T.MeshBasicMaterial({ fog: false });
+    bfront.map = btex; bfront.needsUpdate = true;
     const beam = new T.Mesh(beamGeo, [postGateMat, postGateMat, postGateMat, postGateMat, bfront, postGateMat]);
     beam.position.set(0, 5.95, 0); g.add(beam);
     const pads = [];
     const panels = xs.map((lx, i) => {
-      const mat = new T.MeshBasicMaterial({ map: panelTex(answers[i], 'idle', pw, len), transparent: true, side: T.DoubleSide, depthWrite: false, fog: false });
-      const m = new T.Mesh(panelGeo, mat); m.position.set(lx, 2.3, 0); g.add(m);
-      const pad = new T.Mesh(padGeo, new T.MeshBasicMaterial({ color: C.brand, transparent: true, opacity: 0.35 }));
+      const mat = panelPool.pop() || new T.MeshBasicMaterial({ transparent: true, side: T.DoubleSide, depthWrite: false, fog: false });
+      mat.map = panelTex(answers[i], 'idle', pw, len); mat.needsUpdate = true;
+      const m = new T.Mesh(geos.panel, mat); m.position.set(lx, 2.3, 0); g.add(m);
+      const pad = new T.Mesh(geos.pad, padMat);
       pad.position.set(lx, 0.04, 0.2); g.add(pad); pads.push(pad);
       return m;
     });
     g.position.z = CFG.spawnZ;
     scene.add(g);
-    return { group: g, panels, pads, banner: btex, bfront, pw, len, geos: [panelGeo, padGeo] };
+    return { group: g, panels, pads, banner: btex, bfront, pw, len };
   }
   function setPanel(gate, i, state) {
     const m = gate.obj.panels[i];
@@ -1053,10 +1092,8 @@
   function removeGate(gate) {
     const o = gate.obj;
     scene.remove(o.group);
-    o.panels.forEach((m) => { m.material.map.dispose(); m.material.dispose(); });
-    o.pads.forEach((m) => m.material.dispose());
-    o.banner.dispose(); o.bfront.dispose();
-    o.geos.forEach((geo) => geo.dispose());
+    o.panels.forEach((m) => { m.material.map.dispose(); panelPool.push(m.material); });
+    o.banner.dispose(); bannerPool.push(o.bfront);
   }
 
   // ================= Som =================
@@ -1201,6 +1238,8 @@
     const tags = [quick ? 'RESPOSTA RÁPIDA +10' : '', dashed ? 'DASH!' : ''].filter(Boolean).join(' · ');
     el.innerHTML = `${esc(pick(words))}${tags ? `<small>${tags}</small>` : ''}`;
     $('fx').appendChild(el);
+    const fit = (W - 24) / el.offsetWidth;
+    if (fit < 1) el.style.fontSize = Math.floor(parseFloat(getComputedStyle(el).fontSize) * fit) + 'px';
     setTimeout(() => el.remove(), 950);
   }
   function popText(html, color, top, big, accent) {
@@ -1318,11 +1357,13 @@
       dash: 0, dashCd: 0, dashHeld: false, lunge: 0,
     });
     fxCall('clear');
+    clearTimeout(recordTimer);
+    runUnlocks = [];
     useSkin(P.data.skin);
     setTrackLanes(2);
-    runId = null;
-    if (onlineReady && !embedded && QC.Online.user) { const me = ++runReq; QC.Online.startRun().then((id) => { if (me === runReq) runId = id; }); }
-    if (themeIdx !== 0) applyTheme(1, false);
+    // bilhete do ranking: pedido só depois de a corrida anterior terminar de ser enviada
+    runTicket = onlineReady && !embedded && QC.Online.user ? submitting.then(() => QC.Online.startRun()) : null;
+    applyTheme(1, themeIdx === 0);
     if (creatures) creatures.clear();
     if (music) { try { music.resume(); music.play(0); } catch (e) {} }
     ['startScreen', 'overScreen', 'pauseScreen'].forEach((id) => $(id).classList.remove('show'));
@@ -1362,22 +1403,29 @@
   function liveStats() {
     return { score: S.score, hits: S.hits, maxCombo: S.maxCombo, maxLevel: S.level, maxSpeed: S.maxSpeedSeen / CFG.startSpeed };
   }
+  let runUnlocks = [];
   function announceUnlocks(ids) {
-    ids.forEach((id) => {
-      const sk = QC.Skins.get(id);
-      toast(`★ NOVA SKIN DESBLOQUEADA ★<small>${esc(sk.name)}: equipe no menu Skins</small>`);
-    });
-    if (ids.length) stinger('unlock');
+    if (!ids.length) return;
+    runUnlocks.push(...ids);
+    P.save(); // a skin nova fica salva mesmo se a aba fechar no meio da corrida
+    // em tela pequena o aviso cobriria a pista e o combo: aí ele aparece só no fim da corrida
+    if (!matchMedia('(max-height: 520px), (max-width: 600px)').matches) {
+      ids.forEach((id) => {
+        const sk = QC.Skins.get(id);
+        toast(`★ NOVA SKIN DESBLOQUEADA ★<small>${esc(sk.name)}: equipe no menu Skins</small>`);
+      });
+    }
+    stinger('unlock');
   }
 
-  function levelUp() {
+  function levelUp(extra) {
     S.level++;
     const info = applyTheme(S.level, false);
     flash('rgba(255,255,255,0.9)', 0.55);
     if (creatures) creatures.celebrate();
     if (music) { try { music.play(info.index); } catch (e) {} }
     stinger('levelup');
-    setTimeout(() => popText(`NÍVEL ${S.level}!<small>${esc(info.theme.name.toUpperCase())}</small>`, '#ffd23f', '44%', true), 150);
+    setTimeout(() => popText(`NÍVEL ${S.level}!<small>${esc(info.theme.name.toUpperCase())}${extra ? ' · ' + extra : ''}</small>`, '#ffd23f', '44%', true), 150);
   }
 
   function resolveGate(g) {
@@ -1389,6 +1437,7 @@
       burst(lx, 2.3, g.z, 'good', 34, 1.6);
       S.hits++; S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
       const quick = g.decidedFrac >= 0.5;
+      const lvUp = S.hits % CFG.hitsPerLevel === 0;
       const startFever = !S.fever && S.combo >= FEVER_AT;
       if (startFever) S.fever = true;
       const mult = multFor(S.combo) * (S.fever ? 2 : 1);
@@ -1400,7 +1449,7 @@
       flash(TIER_COLORS[tierOf(S.combo)], 0.14 + tierOf(S.combo) * 0.04);
       const rp = toScreen(S.x, 2.2, 0);
       popText(`+${pts}${mult > 1 ? ` <span style="color:#ffd23f">x${mult}</span>` : ''}`, '#7dffc0', `${Math.round(rp.y / H * 100) - 6}%`);
-      praise(S.combo, quick, S.dash > 0.25);
+      if (!lvUp) praise(S.combo, quick, S.dash > 0.25);
       fxCall('sparks', rp.x, rp.y, TIER_COLORS[tierOf(S.combo)], 16 + S.combo * 2);
       const sc = $('hudScore');
       if (fx) {
@@ -1415,14 +1464,15 @@
         fxCall('shockwave', cm.left + cm.width / 2, cm.top + cm.height / 2, TIER_COLORS[tierOf(S.combo)]);
         if (S.combo >= 20) fxCall('confetti', 60);
         sfx.milestone(S.combo);
-        if (!startFever) setTimeout(() => popText(`COMBO ${S.combo}!`, TIER_COLORS[tierOf(S.combo)], '50%', true), 120);
+        if (!startFever && !lvUp) setTimeout(() => popText(`COMBO ${S.combo}!`, TIER_COLORS[tierOf(S.combo)], '50%', true), 120);
       }
       if (startFever) {
-        setTimeout(() => popText('MODO FEBRE!<small>PONTOS EM DOBRO ATÉ ERRAR</small>', '#ff9a2e', '50%', true), 120);
+        // no mesmo acerto que sobe de nível, a febre entra depois do carimbo do nível
+        setTimeout(() => { if (S.mode === 'play') popText('MODO FEBRE!<small>PONTOS EM DOBRO ATÉ ERRAR</small>', '#ff9a2e', '50%', true); }, lvUp ? 1950 : 120);
         stinger('record');
       }
       paintCombo(true);
-      if (S.hits % CFG.hitsPerLevel === 0) levelUp();
+      if (lvUp) levelUp(S.combo % 5 === 0 ? `COMBO ${S.combo}` : '');
       announceUnlocks(P.checkUnlocks(liveStats()));
     } else {
       g.state = 'crash';
@@ -1470,25 +1520,26 @@
     if (music) { try { music.stop(); } catch (e) {} }
     const run = {
       score: S.score, hits: S.hits, maxLevel: S.level, maxCombo: S.maxCombo,
-      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, runId,
+      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, ticket: runTicket,
     };
-    runId = null;
+    runTicket = null;
     const res = P.applyRun(run);
     stinger(res.record ? 'record' : 'gameover');
 
     countUp($('rScore'), S.score, 900); countUp($('rHits'), S.hits, 700); countUp($('rCombo'), S.maxCombo, 700);
     $('rLevel').textContent = S.level;
     S.fever = false; paintCombo(false);
-    if (res.record) setTimeout(() => { fxCall('fireworks', 8); fxCall('confetti', 90); }, 400);
+    if (res.record) recordTimer = setTimeout(() => { if (S.mode === 'over') { fxCall('fireworks', 8); fxCall('confetti', 90); } }, 400);
     $('newRecord').classList.toggle('show', res.record);
     $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
     $('overTip').textContent = pick(TIPS);
     countUp($('xpGain'), res.xpGained, 900);
     countUp($('xpTotal'), P.data.xp, 1100, P.data.xp - res.xpGained);
     const un = $('unlocked');
-    const all = res.newSkins.concat(sessionUnlocks.splice(0));
+    const all = [...new Set(runUnlocks.concat(res.newSkins))];
+    runUnlocks = [];
     un.classList.toggle('show', all.length > 0);
-    un.textContent = all.length ? `★ Skin nova: ${[...new Set(all)].map((id) => QC.Skins.get(id).name).join(', ')}!` : '';
+    un.textContent = all.length ? `★ Skin nova: ${all.map((id) => QC.Skins.get(id).name).join(', ')}!` : '';
     paintNextUnlock();
     $('overScreen').classList.add('show');
     $('question').classList.remove('show');
@@ -1497,7 +1548,7 @@
     submitOnline(run);
     if (S.gate) { removeGate(S.gate); S.gate = null; }
   }
-  const sessionUnlocks = [];
+  let recordTimer = 0;
   // números que sobem rolando
   function countUp(el, to, ms, from) {
     const a = from || 0, t0 = performance.now();
@@ -1653,7 +1704,7 @@
     audio();
     S.preview = id;
     changeOutfit(id); // mostra no corredor, mesmo bloqueada
-    if (P.select(id)) { pushProgressSoon(); refreshMenus(); }
+    if (P.select(id)) refreshMenus();
     renderLocker();
   });
 
@@ -1664,6 +1715,7 @@
     loadBoard(boardPeriod);
   }));
   let boardReq = 0;
+  const BOARD_SIZE = 20;
   async function loadBoard(period) {
     const el = $('board');
     const req = ++boardReq;
@@ -1672,36 +1724,58 @@
       return;
     }
     el.innerHTML = '<li class="board-msg">Carregando...</li>';
-    const rows = await QC.Online.leaderboard(period, 20);
+    const rows = await QC.Online.leaderboard(period, BOARD_SIZE);
     if (req !== boardReq) return;
     if (!rows) { el.innerHTML = `<li class="board-msg">${embedded ? 'O ranking funciona no site: quantaaulas.com/corrida' : 'Não foi possível carregar o ranking. Tente de novo.'}</li>`; return; }
     if (!rows.length) { el.innerHTML = `<li class="board-msg">Ninguém pontuou ${period === 'week' ? 'nesta semana' : 'ainda'}. O primeiro lugar pode ser seu!</li>`; return; }
-    let html = '', prev = 0;
-    rows.forEach((r) => {
-      if (prev && r.rank > prev + 1 && r.is_me) html += '<li class="gap">···</li>';
+    let html = '';
+    rows.forEach((r, i) => {
+      if (i >= BOARD_SIZE && r.is_me) html += '<li class="gap">···</li>';
       const sk = QC.Skins.get(r.skin);
       html += `<li class="${r.is_me ? 'me' : ''}"><span class="pos">#${r.rank}</span><span class="nm">${esc(r.nickname)}<small>${esc(sk.name)}</small></span><span class="sc">${fmt(r.score)}</span></li>`;
-      prev = r.rank;
     });
     el.innerHTML = html;
   }
 
-  // ================= Conta e nuvem =================
+  // ================= Conta (a do site) e ranking =================
+  // O login é o único do site (/conta/). O progresso (skins, XP, recordes) fica em
+  // 'quanta-corrida-profile' e a conta do site sincroniza sozinha; aqui só apelido e ranking.
   let onlineReady = false;
-  const cloud = { revision: 0, nickname: '', synced: false };
+  const cloud = { nickname: '', loaded: false };
   const GOOGLE_SVG = '<svg viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>';
+  const accountUrl = (QC.Online && QC.Online.accountUrl) || '/conta/?return=%2Fcorrida%2F';
+
+  // status da barra de conta do site (escondida neste jogo), ex.: "Salvo na sua conta"
+  let siteStatus = '';
+  function watchSiteBar() {
+    const sel = 'aside[aria-label="Conta e salvamento"] [role="status"]';
+    const read = () => {
+      const el = document.querySelector(sel);
+      const txt = el ? el.textContent.trim() : '';
+      if (txt !== siteStatus) { siteStatus = txt; refreshMenus(); }
+      return el;
+    };
+    const el = read();
+    if (el) { new MutationObserver(read).observe(el, { childList: true, characterData: true, subtree: true }); return; }
+    const mo = new MutationObserver(() => {
+      const found = read();
+      if (found) { mo.disconnect(); new MutationObserver(read).observe(found, { childList: true, characterData: true, subtree: true }); }
+    });
+    mo.observe(document.body, { childList: true });
+  }
 
   function accountHtml() {
+    if (embedded) {
+      return '<div class="account"><span>Seu progresso fica salvo neste aparelho. Para entrar no ranking, jogue em <b style="font-size:13px">quantaaulas.com/corrida</b>.</span></div>';
+    }
     const u = onlineReady && QC.Online.user;
     if (u) {
-      return `<div class="account"><span>Jogando como<br><b>${esc(cloud.nickname || u.firstName || 'Jogador')}</b></span>
-        <span class="acts"><button class="link" type="button" data-act="nick">Apelido</button><button class="link" type="button" data-act="out">Sair</button></span></div>`;
+      const sync = siteStatus ? `<small class="acc-sync">${esc(siteStatus)}</small>` : '';
+      return `<div class="account"><span>Conta Quanta<br><b>${esc(cloud.nickname || u.firstName || 'Jogador')}</b>${sync}</span>
+        <span class="acts"><button class="link" type="button" data-act="nick">Apelido</button><a class="link" href="${accountUrl}">Minha conta</a></span></div>`;
     }
-    if (embedded || !onlineReady) {
-      return `<div class="account"><span>Seu progresso fica salvo neste aparelho.${embedded ? ' Para entrar no ranking, jogue em <b style="font-size:13px">quantaaulas.com/corrida</b>.' : ''}</span></div>`;
-    }
-    return `<div class="login-box"><button class="btn alt google" type="button" data-act="in">${GOOGLE_SVG} Entrar com Google</button>
-      <small>Guarde suas skins em qualquer aparelho e apareça no ranking.</small></div>`;
+    return `<div class="login-box"><a class="btn alt google" href="${accountUrl}">${GOOGLE_SVG} Entrar com Google</a>
+      <small>Um login só para todo o site da Quanta: suas skins, seu XP e o ranking ficam salvos junto com os outros apps.</small></div>`;
   }
   function refreshMenus() {
     $$('.account-slot').forEach((el) => { el.innerHTML = accountHtml(); });
@@ -1710,13 +1784,9 @@
     const total = QC.Skins.list.length;
     $('skinCount').textContent = `${P.data.skins.filter((id) => QC.Skins.list.some((s) => s.id === id)).length}/${total}`;
   }
-  document.addEventListener('click', async (e) => {
+  document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (!b) return;
-    const act = b.dataset.act;
-    if (act === 'in') { b.disabled = true; const r = await QC.Online.signIn(); if (r && r.error) { b.disabled = false; toast('Não foi possível abrir o login do Google.<small>Tente de novo.</small>'); } }
-    else if (act === 'out') { await QC.Online.signOut(); cloud.nickname = ''; cloud.revision = 0; cloud.synced = false; refreshMenus(); }
-    else if (act === 'nick') openScreen('nickScreen');
+    if (b && b.dataset.act === 'nick') openScreen('nickScreen');
   });
 
   $('nickForm').addEventListener('submit', async (e) => {
@@ -1728,84 +1798,74 @@
     const r = await QC.Online.setNickname(val);
     $('nickSave').disabled = false;
     if (r && r.ok) {
-      cloud.nickname = r.nickname; closePanel(); refreshMenus();
+      cloud.nickname = r.nickname; cloud.loaded = true; closePanel(); refreshMenus();
       toast(`Apelido salvo: ${esc(r.nickname)}`);
-      if (pendingRun) { const run = pendingRun; pendingRun = null; submitOnline(run); }
+      if (S.mode === 'over' && $('onlineLine').dataset.needsNick) {
+        $('onlineLine').textContent = 'Pronto! Seu melhor resultado já aparece no ranking.';
+        delete $('onlineLine').dataset.needsNick;
+      }
     } else {
       err.textContent = {
         taken: 'Esse apelido já está em uso. Tente outro.',
         blocked: 'Esse apelido não é permitido. Escolha outro.',
         invalid: 'Use de 3 a 16 letras, números, espaço ou _.',
+        too_fast: 'Você trocou de apelido agora há pouco. Espere 30 segundos e tente de novo.',
+        anonymous: 'Entre com sua conta Quanta para escolher um apelido.',
       }[r && r.error] || 'Sem conexão. Tente de novo.';
     }
   });
 
-  // puxa o progresso da nuvem e mescla com o deste aparelho
-  async function syncFromCloud() {
+  // apelido do jogador (tenta de novo se a rede falhar; só pede apelido quando sabe que não tem)
+  let meTries = 0, meTimer = 0, nickAsked = false;
+  async function loadMe() {
+    clearTimeout(meTimer);
     if (!onlineReady || !QC.Online.user) return;
+    const uid = QC.Online.user.id;
     const me = await QC.Online.getMe();
-    if (!me) return;
-    cloud.revision = me.revision || 0;
-    cloud.nickname = me.nickname || '';
-    cloud.synced = true;
-    const before = new Set(P.data.skins);
-    P.merge(Object.assign({}, me.progress || {}, { bestScore: Math.max((me.progress && me.progress.bestScore) || 0, me.best_score || 0) }));
-    sessionUnlocks.push(...P.data.skins.filter((id) => !before.has(id) && QC.Skins.list.some((s) => s.id === id)));
-    if (S.mode !== 'play') useSkin(P.data.skin);
-    refreshMenus();
-    await pushProgress();
-    if (!cloud.nickname && S.mode !== 'play') openScreen('nickScreen');
-  }
-
-  let pushing = false, pushAgain = false, pushTimer = 0;
-  function pushProgressSoon() { clearTimeout(pushTimer); pushTimer = setTimeout(pushProgress, 800); }
-  async function pushProgress() {
-    if (!onlineReady || !QC.Online.user || !cloud.synced) return;
-    if (pushing) { pushAgain = true; return; }
-    pushing = true;
-    try {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const r = await QC.Online.saveProgress(P.data, cloud.revision);
-        if (r && r.ok) { cloud.revision = r.revision; break; }
-        if (r && r.error === 'too_fast') { setTimeout(pushProgressSoon, 2500); break; }
-        if (r && r.conflict) {
-          const me = await QC.Online.getMe();
-          if (!me) break;
-          cloud.revision = me.revision; P.merge(me.progress || {});
-          continue;
-        }
-        break;
-      }
-    } finally {
-      pushing = false;
-      if (pushAgain) { pushAgain = false; pushProgressSoon(); }
-    }
-  }
-
-  let pendingRun = null;
-  let runId = null, runReq = 0;
-  async function submitOnline(run) {
-    const line = $('onlineLine');
-    if (!onlineReady || embedded) { line.textContent = ''; return; }
-    if (!QC.Online.user) { line.innerHTML = 'Entre com Google no menu inicial para aparecer no ranking.'; return; }
-    await pushProgress();
-    if (run.score <= 0) { line.textContent = ''; return; }
-    if (!cloud.nickname) {
-      pendingRun = run;
-      line.innerHTML = '<button class="link" type="button" data-act="nick">Escolha um apelido</button> para aparecer no ranking.';
+    if (!QC.Online.user || QC.Online.user.id !== uid) return;
+    if (!me) {
+      if (meTries < 4) { meTries++; meTimer = setTimeout(loadMe, 2500 * meTries); }
       return;
     }
+    meTries = 0;
+    cloud.loaded = true;
+    cloud.nickname = me.nickname || '';
+    refreshMenus();
+    if (!cloud.nickname && !nickAsked && !openPanel && (S.mode === 'menu' || S.mode === 'over')) { nickAsked = true; openScreen('nickScreen'); }
+  }
+
+  // envia as corridas em fila: a próxima só pede bilhete depois que a anterior foi registrada
+  let submitting = Promise.resolve();
+  let runTicket = null;
+  function submitOnline(run) {
+    submitting = submitting.then(() => sendRun(run)).catch(() => {});
+    return submitting;
+  }
+  async function sendRun(run) {
+    const line = $('onlineLine');
+    delete line.dataset.needsNick;
+    if (embedded) { line.textContent = ''; return; }
+    if (!onlineReady || !QC.Online.user) {
+      if (!run.ticket) line.innerHTML = `<a class="link" href="${accountUrl}">Entre com sua conta Quanta</a> para aparecer no ranking.`;
+      return;
+    }
+    if (run.score <= 0) { line.textContent = ''; return; }
     line.textContent = 'Enviando para o ranking...';
+    run.runId = run.ticket ? await run.ticket : null;
     const r = await QC.Online.submitRun(run);
     if (r && r.ok && r.rank_week) {
       line.innerHTML = `Ranking da semana: <b>#${r.rank_week}</b> · Geral: <b>#${r.rank_all}</b>`;
+    } else if (r && r.ok && cloud.loaded && !cloud.nickname) {
+      line.innerHTML = 'Corrida salva. <button class="link" type="button" data-act="nick">Escolha um apelido</button> para aparecer no ranking.';
+      line.dataset.needsNick = '1';
     } else if (r && r.ok) {
-      line.textContent = 'Corrida salva.';
+      line.textContent = 'Corrida salva no ranking.';
     } else {
       line.textContent = {
         too_fast: 'Espere alguns segundos entre uma corrida e outra para contar no ranking.',
-        no_run: 'Esta corrida começou antes do login, então não conta no ranking.',
+        no_run: 'Esta corrida não entrou no ranking: a conta não respondeu quando ela começou.',
         invalid: 'Esta corrida não pôde ser validada para o ranking.',
+        limit: 'Você chegou ao limite de corridas de hoje no ranking. Amanhã tem mais!',
       }[r && r.error] || 'Não deu para enviar ao ranking agora.';
     }
   }
@@ -2017,13 +2077,14 @@
   updateHud();
   requestAnimationFrame(frame);
 
-  // login/ranking: só no site (não funciona dentro de prévias incorporadas)
-  if (QC.Online) {
-    QC.Online.onChange(() => { cloud.synced = false; refreshMenus(); syncFromCloud(); });
+  // conta do site e ranking: só no próprio site (não em prévias incorporadas)
+  if (QC.Online && !embedded) {
+    watchSiteBar();
+    QC.Online.onChange(() => { cloud.nickname = ''; cloud.loaded = false; meTries = 0; refreshMenus(); loadMe(); });
     QC.Online.init().then((ok) => {
       onlineReady = ok;
       refreshMenus();
-      if (ok && QC.Online.user) syncFromCloud();
+      if (ok && QC.Online.user) loadMe();
     });
   }
 

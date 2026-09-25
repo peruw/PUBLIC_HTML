@@ -1,5 +1,5 @@
 // Corrida Quanta — progresso do jogador: XP acumulado, recordes e skins desbloqueadas.
-// Salvo no navegador; quando a pessoa entra com Google, é mesclado com a nuvem (QC.Online).
+// Salvo no navegador; com login, a conta única do site (/conta/) sincroniza esta chave.
 (() => {
   'use strict';
   window.QC = window.QC || {};
@@ -47,27 +47,6 @@
     save() {
       this.data.updatedAt = Date.now();
       try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) {}
-    },
-
-    // mescla com a nuvem sem perder nada: maior valor de cada contador, união das skins
-    merge(other) {
-      const a = this.data, b = sanitize(other);
-      this.data = {
-        v: 1,
-        xp: Math.max(a.xp, b.xp),
-        bestScore: Math.max(a.bestScore, b.bestScore),
-        maxLevel: Math.max(a.maxLevel, b.maxLevel),
-        maxCombo: Math.max(a.maxCombo, b.maxCombo),
-        maxSpeed: Math.max(a.maxSpeed, b.maxSpeed),
-        totalHits: Math.max(a.totalHits, b.totalHits),
-        runs: Math.max(a.runs, b.runs),
-        skins: [...new Set([...a.skins, ...b.skins])],
-        skin: (b.updatedAt > a.updatedAt ? b.skin : a.skin) || 'quanta',
-        updatedAt: Math.max(a.updatedAt, b.updatedAt),
-      };
-      this.checkUnlocks();
-      this.save();
-      return this.data;
     },
 
     // valor atual do critério de desbloqueio (stats = progresso ou dados ao vivo da corrida)

@@ -1,17 +1,21 @@
-// Corrida Quanta — conta, progresso na nuvem e ranking (Supabase do projeto fisora, login Google).
-// Tudo aqui é opcional: sem internet ou sem a biblioteca, o jogo segue no modo local.
+// Corrida Quanta — apelido e ranking (Supabase do projeto fisora).
+// O login é o único do site (/conta/): o jogo só lê essa sessão. Skins, XP e recordes
+// ficam em localStorage ('quanta-corrida-profile') e a conta do site sincroniza sozinha.
+// Tudo aqui é opcional: sem internet ou sem conta, o jogo segue no modo local.
 (() => {
   'use strict';
   window.QC = window.QC || {};
 
-  const CONFIG = {
-    url: 'https://rnbyvrzarzvkvixtxoli.supabase.co',
-    key: 'sb_publishable_KSX31Bo5Gn8CQUL6KTWNBg_2ncUCCxy',
-  };
-
+  const RETURN = '/corrida/';
   let sb = null;
   let user = null;
   const listeners = [];
+
+  // sessão antiga do login próprio do jogo (antes da conta única)
+  try {
+    localStorage.removeItem('sb-rnbyvrzarzvkvixtxoli-auth-token');
+    localStorage.removeItem('sb-rnbyvrzarzvkvixtxoli-auth-token-code-verifier');
+  } catch (e) {}
 
   function toUser(u) {
     if (!u) return null;
@@ -25,6 +29,13 @@
     };
   }
   function emit() { listeners.forEach((cb) => { try { cb(user); } catch (e) {} }); }
+
+  // o cliente é o mesmo da conta do site (/conta/client.mjs, a mesma instância que /conta/game.mjs usa)
+  function siteClient(ms) {
+    const load = import('/conta/client.mjs').then((m) => m.client || null);
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), ms));
+    return Promise.race([load, timeout]).catch(() => null);
+  }
 
   // Chamada RPC com tempo-limite; devolve { data } ou { error }
   async function rpc(fn, args, ms) {
@@ -43,26 +54,23 @@
   const Online = {
     get available() { return !!sb; },
     get user() { return user; },
+    // login e "Minha conta" são a página de conta do site, que volta para o jogo
+    accountUrl: '/conta/?return=' + encodeURIComponent(RETURN),
 
     async init() {
       if (sb) return true;
-      if (!window.supabase || !window.supabase.createClient) return false;
+      const client = await siteClient(10000);
+      if (!client) return false;
       try {
-        sb = window.supabase.createClient(CONFIG.url, CONFIG.key, {
-          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
-        });
-        const { data } = await sb.auth.getSession();
+        const { data } = await client.auth.getSession();
+        sb = client;
         user = toUser(data && data.session && data.session.user);
-        sb.auth.onAuthStateChange((_ev, session) => {
+        client.auth.onAuthStateChange((_ev, session) => {
           const nu = toUser(session && session.user);
           const changed = (nu && nu.id) !== (user && user.id);
           user = nu;
           if (changed) emit();
         });
-        // limpa ?code=... da barra de endereço depois do retorno do Google
-        if (/[?&](code|error)=/.test(location.search)) {
-          history.replaceState(null, '', location.pathname + location.hash);
-        }
         return true;
       } catch (e) {
         sb = null;
@@ -72,36 +80,16 @@
 
     onChange(cb) { listeners.push(cb); },
 
-    async signIn() {
-      if (!sb) return { error: 'offline' };
-      const redirectTo = location.origin + location.pathname;
-      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
-      return error ? { error: error.message } : { ok: true };
-    },
-
-    async signOut() {
-      if (!sb) return;
-      try { await sb.auth.signOut(); } catch (e) {}
-      user = null;
-      emit();
-    },
-
-    // { nickname, progress, revision, best_score }
+    // { nickname, best_score, ... } ou null se falhou
     async getMe() {
       const r = await rpc('corrida_get_me');
       return r.error ? null : r.data;
     },
 
-    // { ok, nickname } ou { ok:false, error:'invalid'|'blocked'|'taken'|... }
+    // { ok, nickname } ou { ok:false, error:'invalid'|'blocked'|'taken'|'too_fast'|... }
     async setNickname(nick) {
       const r = await rpc('corrida_set_nickname', { p_nickname: nick });
       return r.error ? { ok: false, error: 'offline' } : r.data;
-    },
-
-    // { ok, revision } ou { ok:false, conflict:true, revision }
-    async saveProgress(progress, revision) {
-      const r = await rpc('corrida_save_progress', { p_progress: progress, p_expected_revision: revision });
-      return r.error ? { ok: false, error: r.error } : r.data;
     },
 
     // bilhete de uso único pedido no início de cada corrida (o servidor marca a hora)
