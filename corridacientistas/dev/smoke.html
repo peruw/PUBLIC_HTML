@@ -1,0 +1,9 @@
+<!doctype html><html><body style="margin:0"><script type="module">
+import * as THREE from '../js/three.js';
+const r = new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0x88ccff);
+const c = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 100); c.position.set(2,2,4); c.lookAt(0,0,0);
+s.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2));
+s.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({color:0xff4444})));
+r.render(s,c); window.ok = r.capabilities.isWebGL2; console.log('webgl2', r.capabilities.isWebGL2);
+</script></body></html>
