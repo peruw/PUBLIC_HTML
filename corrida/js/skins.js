@@ -96,10 +96,35 @@
         }
         return k.own(new T.MeshLambertMaterial(o));
       },
+      // mat pode ser uma lista de 6 (uma por face); faces com o mesmo material viram 1 draw call só
       box(w, h, d, mat, x, y, z, parent) {
-        const m = new T.Mesh(k.geo(w, h, d), mat);
+        let geo = null;
+        if (Array.isArray(mat)) {
+          const uniq = [];
+          const idx = mat.map((mm) => { let i = uniq.indexOf(mm); if (i < 0) { i = uniq.length; uniq.push(mm); } return i; });
+          if (uniq.length > 1) geo = k.geoFaces(w, h, d, idx);
+          mat = uniq.length > 1 ? uniq : uniq[0];
+        }
+        const m = new T.Mesh(geo || k.geo(w, h, d), mat);
         m.position.set(x, y, z); parent.add(m);
         return m;
+      },
+      geoFaces(w, h, d, idx) {
+        const key = w + '|' + h + '|' + d + '|' + idx.join('');
+        let g = geos.get(key);
+        if (!g) {
+          g = new T.BoxGeometry(w, h, d);
+          const src = g.index.array, out = [];
+          g.clearGroups();
+          for (let mi = 0, n = Math.max.apply(null, idx); mi <= n; mi++) {
+            const start = out.length;
+            for (let f = 0; f < 6; f++) if (idx[f] === mi) for (let j = 0; j < 6; j++) out.push(src[f * 6 + j]);
+            g.addGroup(start, out.length - start, mi);
+          }
+          g.setIndex(out);
+          geos.set(key, g);
+        }
+        return g;
       },
       pivot(x, y, z, parent) {
         const p = new T.Group(); p.position.set(x, y, z); parent.add(p);
@@ -488,8 +513,8 @@
       RAINBOW.forEach((c, i) => P(g, c, 4 + i, 4 + (i % 2), 1, 3));
     });
     torso(k, r, F(white, back, front));
-    const faceM = face(k, '#fbf7ff', ['........', '........', '.l....l.', '..ee.ee.', '..ee.ee.', '.c....c.', '...mm...', '........'],
-      { l: '#3a2a4a', e: '#3a2a4a', c: '#ffb3da', m: '#ff7ab8' });
+    const faceM = face(k, '#fbf7ff', ['........', '........', '.l....l.', '.we..we.', '.ee..ee.', 'c......c', '...mm...', '........'],
+      { l: '#3a2a4a', e: '#3a2a4a', w: '#ffffff', c: '#ffb3da', m: '#ff7ab8' });
     skull(k, r, F(white, null, faceM));
     // orelhas
     for (const s of [-1, 1]) {
