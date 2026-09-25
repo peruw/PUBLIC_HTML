@@ -135,6 +135,7 @@ export default defineConfig({
       'questoes/questoes.json',
       'corrida/js',
       'corrida/og.jpg',
+      'corrida/.htaccess',
       'robots.txt',
       '.htaccess',
       'professores/data',

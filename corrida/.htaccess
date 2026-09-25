@@ -1,0 +1,10 @@
+# Scripts e imagens do jogo ficam no cache do navegador por 7 dias: visitas seguintes não
+# pedem esses arquivos de novo. Ao mudar um script, troque o ?v= nas tags de index.html.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|jpg|png)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
