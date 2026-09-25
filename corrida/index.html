@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Corrida Quanta | Quanta Aulas</title>
+<meta name="description" content="Corrida Quanta: resolva a conta e escolha a porta certa antes de bater na parede. Jogo de cálculo mental da Quanta Aulas.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Corrida Quanta | Quanta Aulas">
+<meta property="og:description" content="Resolva a conta e escolha a porta certa antes de bater na parede. Quanto você consegue fazer?">
+<meta property="og:image" content="https://quantaaulas-com-359870.hostingersite.com/assets/preview.jpg">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Quanta Aulas">
+
+<link rel="icon" type="image/png" href="/assets/logo-quanta.png">
+<link rel="apple-touch-icon" href="/assets/logo-quanta.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07120d;
+    --bg-elev: #0e1d16;
+    --bg-card: #112620;
+    --line: rgba(34, 197, 94, 0.14);
+    --line-strong: rgba(34, 197, 94, 0.28);
+    --ink: #e8f5ee;
+    --ink-dim: #9db0a6;
+    --ink-mute: #6b8076;
+    --brand: #1fd685;
+    --brand-deep: #16a86a;
+    --brand-soft: rgba(31, 214, 133, 0.12);
+    --brand-glow: rgba(31, 214, 133, 0.35);
+    --warn: #f5b94a;
+    --danger: #ef4444;
+    --display: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--display);
+    -webkit-font-smoothing: antialiased;
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;
+  }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ===== HUD ===== */
+  .hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: max(12px, env(safe-area-inset-top)) 16px 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    pointer-events: none; z-index: 2;
+  }
+  .hud-brand {
+    display: flex; align-items: center; gap: 8px;
+    pointer-events: auto; text-decoration: none; color: var(--ink);
+  }
+  .hud-brand img { width: 30px; height: 30px; }
+  .hud-brand span { font-weight: 800; font-size: 14px; letter-spacing: 0.08em; }
+  .hud-stats { display: flex; align-items: center; gap: 8px; }
+  .chip {
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    padding: 7px 11px; border-radius: 999px;
+    background: rgba(14, 29, 22, 0.8); border: 1px solid var(--line-strong);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    white-space: nowrap;
+  }
+  .chip b { color: var(--brand); font-weight: 700; }
+  .chip.lives { letter-spacing: 2px; color: var(--danger); }
+  .icon-btn {
+    pointer-events: auto; cursor: pointer;
+    width: 36px; height: 36px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: rgba(14, 29, 22, 0.8); border: 1px solid var(--line-strong);
+    color: var(--ink); font-size: 15px;
+  }
+
+  .question {
+    position: fixed; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 54px);
+    transform: translateX(-50%);
+    z-index: 2; pointer-events: none;
+    padding: 12px 28px;
+    border-radius: 18px;
+    background: rgba(14, 29, 22, 0.88);
+    border: 1px solid var(--line-strong);
+    box-shadow: 0 0 40px -8px var(--brand-glow), 0 24px 48px -24px rgba(0,0,0,0.6);
+    font-weight: 800; font-size: clamp(30px, 7vw, 48px); letter-spacing: -0.02em;
+    white-space: nowrap;
+    opacity: 0; transition: opacity .2s, transform .2s;
+  }
+  .question.show { opacity: 1; }
+  .question.pop { transform: translateX(-50%) scale(1.08); }
+  .question .q-mark { color: var(--brand); }
+  .level-tag {
+    display: block; text-align: center;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--brand);
+    margin-bottom: 2px;
+  }
+
+  /* ===== Overlays ===== */
+  .overlay {
+    position: fixed; inset: 0; z-index: 5;
+    display: none; align-items: center; justify-content: center;
+    padding: 16px;
+    background: radial-gradient(60% 50% at 50% 30%, rgba(31, 214, 133, 0.14), transparent 70%), rgba(7, 18, 13, 0.82);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .overlay.show { display: flex; }
+  .card {
+    width: 100%; max-width: 440px;
+    padding: 32px 28px 28px;
+    border-radius: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--line-strong);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 48px -24px rgba(0,0,0,0.6);
+    text-align: center;
+  }
+  .card img.logo { width: 64px; height: 64px; filter: drop-shadow(0 0 18px var(--brand-glow)); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--brand);
+    margin: 14px 0 6px;
+  }
+  .card h1 { margin: 0 0 10px; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+  .card h1 .brand { color: var(--brand); }
+  .card p { margin: 0 0 18px; color: var(--ink-dim); line-height: 1.55; font-size: 15px; }
+  .howto {
+    list-style: none; padding: 0; margin: 0 0 22px;
+    display: grid; gap: 8px; text-align: left;
+  }
+  .howto li {
+    display: flex; gap: 10px; align-items: flex-start;
+    font-size: 14px; color: var(--ink-dim); line-height: 1.45;
+  }
+  .howto li span.k {
+    flex: none; font-family: var(--mono); font-size: 12px; font-weight: 700;
+    color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 2px 7px; min-width: 28px; text-align: center;
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%;
+    padding: 15px 20px; border: 0; border-radius: 14px; cursor: pointer;
+    font-family: var(--display); font-size: 17px; font-weight: 800;
+    background: var(--brand); color: #04110b;
+    box-shadow: 0 10px 30px -10px var(--brand-glow);
+    transition: transform .15s, background .15s;
+  }
+  .btn:hover { background: #3ee49a; transform: translateY(-1px); }
+  .btn:active { transform: translateY(1px); }
+  .btn.ghost {
+    background: transparent; color: var(--ink); border: 1px solid var(--line-strong);
+    box-shadow: none; margin-top: 10px; font-size: 15px; font-weight: 700;
+    text-decoration: none;
+  }
+  .btn.ghost:hover { background: var(--brand-soft); }
+  .results { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 18px; }
+  .results div {
+    background: var(--bg-elev); border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 6px;
+  }
+  .results b { display: block; font-size: 26px; font-weight: 800; color: var(--ink); }
+  .results small { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-mute); }
+  .card .new-record { color: var(--warn); font-weight: 800; margin: 0 0 10px; display: none; }
+  .card .new-record.show { display: block; }
+  .best-line { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); margin-top: 14px; }
+  .best-line b { color: var(--brand); }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Corrida Quanta"></canvas>
+
+<div class="hud">
+  <a class="hud-brand" href="/" title="Voltar ao site Quanta Aulas">
+    <img src="/assets/logo-quanta.png" alt="Quanta Aulas">
+    <span>QUANTA</span>
+  </a>
+  <div class="hud-stats">
+    <div class="chip" id="hudScore">0 <b>pts</b></div>
+    <div class="chip lives" id="hudLives">♥♥♥</div>
+    <button class="icon-btn" id="btnSound" type="button" aria-label="Som">🔊</button>
+    <button class="icon-btn" id="btnPause" type="button" aria-label="Pausar">❚❚</button>
+  </div>
+</div>
+
+<div class="question" id="question">
+  <span class="level-tag" id="levelTag">Nível 1</span>
+  <span id="questionText"></span>
+</div>
+
+<!-- Tela inicial -->
+<div class="overlay show" id="startScreen">
+  <div class="card">
+    <img class="logo" src="/assets/logo-quanta.png" alt="Quanta Aulas">
+    <div class="eyebrow">Quanta Aulas · Cálculo mental</div>
+    <h1>Corrida <span class="brand">Quanta</span></h1>
+    <p>Seu corredor não para. Resolva a conta e passe pela porta com a resposta certa antes de bater na parede.</p>
+    <ul class="howto">
+      <li><span class="k">← →</span> Setas, A/D, toque no lado da tela ou deslize o dedo.</li>
+      <li><span class="k">♥</span> Você tem 3 vidas. Errou a porta, perde uma.</li>
+      <li><span class="k">×2</span> Acertos seguidos multiplicam os pontos. A velocidade e o nível sobem.</li>
+    </ul>
+    <button class="btn" id="btnStart" type="button">Jogar ▶</button>
+    <div class="best-line">Seu recorde: <b id="bestStart">0</b> pts</div>
+  </div>
+</div>
+
+<!-- Pausa -->
+<div class="overlay" id="pauseScreen">
+  <div class="card">
+    <div class="eyebrow">Pausado</div>
+    <h1>Respira.</h1>
+    <p>Quando estiver pronto, é só voltar.</p>
+    <button class="btn" id="btnResume" type="button">Continuar ▶</button>
+    <a class="btn ghost" href="/">Voltar ao site</a>
+  </div>
+</div>
+
+<!-- Fim de jogo -->
+<div class="overlay" id="overScreen">
+  <div class="card">
+    <img class="logo" src="/assets/logo-quanta.png" alt="">
+    <div class="eyebrow">Fim de corrida</div>
+    <h1 id="overTitle">Boa corrida!</h1>
+    <p class="new-record" id="newRecord">★ Novo recorde! ★</p>
+    <div class="results">
+      <div><b id="rScore">0</b><small>Pontos</small></div>
+      <div><b id="rHits">0</b><small>Acertos</small></div>
+      <div><b id="rCombo">0</b><small>Sequência</small></div>
+    </div>
+    <p id="overTip"></p>
+    <button class="btn" id="btnRetry" type="button">Jogar de novo ↻</button>
+    <a class="btn ghost" href="/">Voltar ao site</a>
+    <div class="best-line">Recorde: <b id="bestOver">0</b> pts</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ================= Configuração =================
+  const CFG = {
+    lanes: [-1.25, 1.25],   // posição x (mundo) de cada porta
+    roadHalf: 2.6,          // meia largura da pista
+    camH: 3.2,              // altura da câmera ("meio de cima")
+    playerZ: 4,             // distância do corredor à câmera
+    spawnZ: 40,             // onde a parede nasce
+    wallH: 2.3,
+    wallDepth: 0.45,
+    startSpeed: 6.2,        // unidades/s  (~5,8 s para responder)
+    speedStep: 0.22,
+    maxSpeed: 14,
+    hitsPerLevel: 5,
+    lives: 3,
+  };
+
+  const COLORS = {
+    bg: '#07120d', brand: '#1fd685', brandDeep: '#16a86a', ink: '#e8f5ee',
+    dim: '#9db0a6', card: '#112620', elev: '#0e1d16', warn: '#f5b94a', danger: '#ef4444',
+  };
+
+  // ================= Utilidades =================
+  const $ = (id) => document.getElementById(id);
+  const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  };
+
+  // ================= Gerador de contas =================
+  // Cada nível adiciona um tipo de conta; do nível 5 em diante mistura tudo e aumenta os números.
+  function makeQuestion(level) {
+    let a, b, c, text, ans;
+    const big = Math.max(0, level - 5); // cresce depois do nível 5
+    const types = ['add'];
+    if (level >= 2) types.push('sub');
+    if (level >= 3) types.push('mul');
+    if (level >= 4) types.push('div');
+    if (level >= 6) types.push('mix');
+    const type = level <= 4 && Math.random() < 0.6 ? types[types.length - 1] : pick(types);
+
+    switch (type) {
+      case 'add':
+        a = rand(2, 12 + big * 15); b = rand(2, 12 + big * 15);
+        text = `${a} + ${b}`; ans = a + b; break;
+      case 'sub':
+        a = rand(6, 20 + big * 15); b = rand(1, a - 1);
+        text = `${a} − ${b}`; ans = a - b; break;
+      case 'mul':
+        a = rand(2, 9 + Math.min(big, 3)); b = rand(2, 9);
+        text = `${a} × ${b}`; ans = a * b; break;
+      case 'div':
+        b = rand(2, 9); ans = rand(2, 9 + Math.min(big, 3)); a = b * ans;
+        text = `${a} ÷ ${b}`; break;
+      case 'mix':
+        a = rand(2, 9); b = rand(2, 9); c = rand(1, 15);
+        if (Math.random() < 0.5) { text = `${a} × ${b} + ${c}`; ans = a * b + c; }
+        else { c = rand(1, a * b - 1); text = `${a} × ${b} − ${c}`; ans = a * b - c; }
+        break;
+    }
+    return { text, ans, wrong: makeDistractor(ans, type, a, b) };
+  }
+
+  // Resposta errada "plausível": perto da certa, erro típico de conta.
+  function makeDistractor(ans, type, a, b) {
+    const opts = [ans + 1, ans - 1, ans + 2, ans - 2, ans + 10, ans - 10];
+    if (type === 'mul') opts.push(a * (b + 1), a * (b - 1), (a + 1) * b, a + b);
+    if (type === 'div') opts.push(ans + 1, ans - 1, b);
+    if (type === 'sub') opts.push(a + b);
+    const valid = opts.filter((v) => v !== ans && v >= 0);
+    return pick(valid);
+  }
+
+  // ================= Canvas / projeção =================
+  const canvas = $('game');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+  let horizon = 0, focal = 0, kx = 1, cx = 0;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    horizon = H * 0.30;
+    const playerY = H * 0.84;
+    focal = (playerY - horizon) * CFG.playerZ / CFG.camH;
+    // estreita a pista em telas verticais (celular)
+    const roadPx = CFG.roadHalf * focal / CFG.playerZ;
+    kx = Math.min(1, (W * 0.47) / roadPx);
+    cx = W / 2;
+  }
+  window.addEventListener('resize', resize);
+
+  // mundo (x, y altura, z profundidade) -> tela
+  function proj(x, y, z) {
+    const s = focal / z;
+    return { x: cx + x * s * kx, y: horizon + (CFG.camH - y) * s, s };
+  }
+
+  // ================= Estado =================
+  const S = {
+    mode: 'menu',      // menu | play | pause | over
+    score: 0, lives: CFG.lives, hits: 0, combo: 0, bestCombo: 0,
+    level: 1, speed: CFG.startSpeed,
+    lane: 0, playerX: CFG.lanes[0], targetX: CFG.lanes[0],
+    gate: null, gap: 0,
+    travel: 0, t: 0, shake: 0, flash: 0, flashColor: COLORS.brand,
+    particles: [], floaters: [], symbols: [],
+    stumble: 0,
+  };
+  let best = store.get('quanta-corrida-best', 0);
+  let soundOn = store.get('quanta-corrida-sound', true);
+
+  // símbolos matemáticos flutuando no fundo
+  for (let i = 0; i < 26; i++) {
+    S.symbols.push({
+      ch: pick(['π', 'Σ', '√', '∞', '÷', '×', '+', '−', '=', '%', 'Δ', '∫']),
+      x: Math.random(), y: Math.random() * 0.3, size: 12 + Math.random() * 18,
+      sp: 0.004 + Math.random() * 0.01, a: 0.05 + Math.random() * 0.1,
+    });
+  }
+
+  // ================= Som (WebAudio, sem arquivos) =================
+  let actx = null;
+  function beep(freq, dur, type = 'sine', vol = 0.15, when = 0) {
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = actx.currentTime + when;
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g).connect(actx.destination);
+      o.start(t0); o.stop(t0 + dur);
+    } catch (e) {}
+  }
+  const sfx = {
+    good() { beep(660, 0.1, 'triangle'); beep(990, 0.16, 'triangle', 0.15, 0.08); },
+    bad() { beep(180, 0.3, 'sawtooth', 0.12); beep(120, 0.35, 'square', 0.08, 0.05); },
+    move() { beep(420, 0.05, 'sine', 0.05); },
+    level() { [523, 659, 784, 1046].forEach((f, i) => beep(f, 0.14, 'triangle', 0.12, i * 0.09)); },
+  };
+
+  // ================= Controle =================
+  function setLane(i) {
+    if (S.mode !== 'play') return;
+    i = clamp(i, 0, CFG.lanes.length - 1);
+    if (i !== S.lane) sfx.move();
+    S.lane = i; S.targetX = CFG.lanes[i];
+  }
+
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (k === 'arrowleft' || k === 'a') { setLane(S.lane - 1); e.preventDefault(); }
+    else if (k === 'arrowright' || k === 'd') { setLane(S.lane + 1); e.preventDefault(); }
+    else if (k === 'p' || k === 'escape') togglePause();
+    else if ((k === 'enter' || k === ' ') && (S.mode === 'menu' || S.mode === 'over')) { startGame(); e.preventDefault(); }
+  });
+
+  // toque: deslizar ou tocar no lado da tela
+  let touchX0 = null, swiped = false;
+  canvas.addEventListener('pointerdown', (e) => { touchX0 = e.clientX; swiped = false; });
+  canvas.addEventListener('pointermove', (e) => {
+    if (touchX0 === null || swiped) return;
+    const dx = e.clientX - touchX0;
+    if (Math.abs(dx) > 30) { setLane(dx < 0 ? 0 : 1); swiped = true; }
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (touchX0 !== null && !swiped) setLane(e.clientX < W / 2 ? 0 : 1);
+    touchX0 = null;
+  });
+
+  // ================= Fluxo do jogo =================
+  function startGame() {
+    Object.assign(S, {
+      mode: 'play', score: 0, lives: CFG.lives, hits: 0, combo: 0, bestCombo: 0,
+      level: 1, speed: CFG.startSpeed, lane: 0, playerX: CFG.lanes[0], targetX: CFG.lanes[0],
+      gate: null, gap: 0.6, particles: [], floaters: [], shake: 0, flash: 0, stumble: 0,
+    });
+    $('startScreen').classList.remove('show');
+    $('overScreen').classList.remove('show');
+    $('pauseScreen').classList.remove('show');
+    $('question').classList.remove('show');
+    updateHud();
+  }
+
+  function spawnGate() {
+    const q = makeQuestion(S.level);
+    const correctSide = Math.random() < 0.5 ? 0 : 1;
+    const answers = correctSide === 0 ? [q.ans, q.wrong] : [q.wrong, q.ans];
+    S.gate = { z: CFG.spawnZ, q, answers, correctSide, state: 'coming', timer: 0, chosen: -1 };
+    $('questionText').innerHTML = `${q.text} = <span class="q-mark">?</span>`;
+    $('levelTag').textContent = `Nível ${S.level}`;
+    const qe = $('question');
+    qe.classList.add('show', 'pop');
+    setTimeout(() => qe.classList.remove('pop'), 180);
+  }
+
+  function resolveGate(g) {
+    g.chosen = S.lane;
+    const pos = proj(S.playerX, 1, CFG.playerZ);
+    if (S.lane === g.correctSide) {
+      g.state = 'pass';
+      S.hits++; S.combo++; S.bestCombo = Math.max(S.bestCombo, S.combo);
+      const mult = Math.min(1 + Math.floor(S.combo / 3), 5);
+      const pts = 10 * mult;
+      S.score += pts;
+      S.speed = Math.min(CFG.maxSpeed, S.speed + CFG.speedStep);
+      S.flash = 0.35; S.flashColor = COLORS.brand;
+      burst(pos.x, pos.y - 40, COLORS.brand, 26);
+      S.floaters.push({ x: pos.x, y: pos.y - 90, text: mult > 1 ? `+${pts}  ×${mult}` : `+${pts}`, color: COLORS.brand, life: 1 });
+      sfx.good();
+      if (S.hits % CFG.hitsPerLevel === 0) {
+        S.level++;
+        S.floaters.push({ x: W / 2, y: H * 0.45, text: `NÍVEL ${S.level}!`, color: COLORS.warn, life: 1.4, big: true });
+        setTimeout(() => sfx.level(), 150);
+      }
+    } else {
+      g.state = 'crash';
+      S.lives--; S.combo = 0;
+      S.shake = 0.5; S.flash = 0.5; S.flashColor = COLORS.danger; S.stumble = 0.7;
+      burst(pos.x, pos.y - 60, COLORS.danger, 30);
+      S.floaters.push({ x: pos.x, y: pos.y - 110, text: `Era ${g.q.ans}`, color: COLORS.danger, life: 1.4 });
+      sfx.bad();
+      if (navigator.vibrate) navigator.vibrate(120);
+    }
+    $('question').classList.remove('show');
+    updateHud();
+  }
+
+  function gameOver() {
+    S.mode = 'over';
+    const isRecord = S.score > best;
+    if (isRecord) { best = S.score; store.set('quanta-corrida-best', best); }
+    $('rScore').textContent = S.score;
+    $('rHits').textContent = S.hits;
+    $('rCombo').textContent = S.bestCombo;
+    $('bestOver').textContent = best;
+    $('bestStart').textContent = best;
+    $('newRecord').classList.toggle('show', isRecord && S.score > 0);
+    $('overTitle').textContent = S.hits >= 20 ? 'Mandou muito!' : S.hits >= 8 ? 'Boa corrida!' : 'Bora de novo?';
+    $('overTip').textContent = pick([
+      'Dica: na multiplicação, olhe o último algarismo. 7 × 8 termina em 6, então 56.',
+      'Dica: para somar 9, some 10 e tire 1.',
+      'Dica: dividir é perguntar "quantas vezes cabe". 42 ÷ 6: 6 × 7 = 42.',
+      'Dica: número par vezes qualquer número dá sempre par.',
+      'Dica: 25 − 8 é o mesmo que 25 − 10 + 2.',
+    ]);
+    $('overScreen').classList.add('show');
+    $('question').classList.remove('show');
+  }
+
+  function togglePause() {
+    if (S.mode === 'play') { S.mode = 'pause'; $('pauseScreen').classList.add('show'); }
+    else if (S.mode === 'pause') { S.mode = 'play'; $('pauseScreen').classList.remove('show'); }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') togglePause(); });
+
+  function updateHud() {
+    $('hudScore').innerHTML = `${S.score} <b>pts</b>`;
+    $('hudLives').textContent = '♥'.repeat(Math.max(0, S.lives)) + '♡'.repeat(Math.max(0, CFG.lives - S.lives));
+  }
+
+  function burst(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = 120 + Math.random() * 260;
+      S.particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, life: 0.6 + Math.random() * 0.5, color, r: 2 + Math.random() * 3 });
+    }
+  }
+
+  // ================= Atualização =================
+  function update(dt) {
+    S.t += dt;
+    // fundo sempre anima um pouco, mesmo no menu
+    const moving = S.mode === 'play' || S.mode === 'menu';
+    const runSpeed = S.mode === 'menu' ? 4 : (S.stumble > 0 ? S.speed * 0.25 : S.speed);
+    if (moving) S.travel += runSpeed * dt;
+
+    for (const s of S.symbols) { s.x -= s.sp * dt * (moving ? 3 : 1); if (s.x < -0.05) { s.x = 1.05; s.y = Math.random() * 0.3; } }
+
+    S.shake = Math.max(0, S.shake - dt);
+    S.flash = Math.max(0, S.flash - dt);
+    for (const p of S.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; p.life -= dt; }
+    S.particles = S.particles.filter((p) => p.life > 0);
+    for (const f of S.floaters) { f.y -= 50 * dt; f.life -= dt * 0.8; }
+    S.floaters = S.floaters.filter((f) => f.life > 0);
+
+    if (S.mode !== 'play') return;
+
+    S.playerX = lerp(S.playerX, S.targetX, 1 - Math.pow(0.0001, dt));
+    S.stumble = Math.max(0, S.stumble - dt);
+
+    const g = S.gate;
+    if (!g) {
+      S.gap -= dt;
+      if (S.gap <= 0) spawnGate();
+      return;
+    }
+    if (g.state === 'coming') {
+      g.z -= S.speed * dt;
+      if (g.z <= CFG.playerZ + 0.3) resolveGate(g);
+    } else if (g.state === 'pass') {
+      g.z -= S.speed * dt;
+      g.timer += dt;
+      if (g.z < 1.2) { S.gate = null; S.gap = 0.35; }
+    } else if (g.state === 'crash') {
+      g.timer += dt;
+      if (g.timer > 0.9) {
+        S.gate = null; S.gap = 0.5;
+        if (S.lives <= 0) gameOver();
+      }
+    }
+  }
+
+  // ================= Desenho =================
+  function draw() {
+    ctx.save();
+    if (S.shake > 0) {
+      const m = S.shake * 18;
+      ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
+    }
+    drawBackground();
+    drawRoad();
+
+    const g = S.gate;
+    // parede atrás do corredor -> desenha antes; depois dele (passando) -> desenha por cima
+    if (g && g.z >= CFG.playerZ) drawGate(g);
+    drawPlayer();
+    if (g && g.z < CFG.playerZ) drawGate(g);
+
+    drawEffects();
+    ctx.restore();
+
+    if (S.flash > 0) {
+      ctx.fillStyle = S.flashColor;
+      ctx.globalAlpha = S.flash * 0.35;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawBackground() {
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, '#040b08');
+    sky.addColorStop(1, '#0c2419');
+    ctx.fillStyle = sky;
+    ctx.fillRect(-30, -30, W + 60, horizon + 31);
+
+    // brilho no horizonte
+    const glow = ctx.createRadialGradient(cx, horizon, 10, cx, horizon, W * 0.6);
+    glow.addColorStop(0, 'rgba(31,214,133,0.28)');
+    glow.addColorStop(1, 'rgba(31,214,133,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-30, -30, W + 60, horizon + 60);
+
+    ctx.fillStyle = COLORS.brand;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const s of S.symbols) {
+      ctx.globalAlpha = s.a;
+      ctx.font = `700 ${s.size}px ${'Plus Jakarta Sans'}, sans-serif`;
+      ctx.fillText(s.ch, s.x * W, 20 + s.y * H);
+    }
+    ctx.globalAlpha = 1;
+
+    // chão fora da pista
+    ctx.fillStyle = '#081510';
+    ctx.fillRect(-30, horizon, W + 60, H - horizon + 30);
+    // linha do horizonte
+    ctx.fillStyle = 'rgba(31,214,133,0.35)';
+    ctx.fillRect(-30, horizon - 1, W + 60, 2);
+  }
+
+  function drawRoad() {
+    const zNear = 1.2, zFar = 80;
+    const L = CFG.roadHalf;
+    const a = proj(-L, 0, zFar), b = proj(L, 0, zFar), c = proj(L, 0, zNear), d = proj(-L, 0, zNear);
+
+    const road = ctx.createLinearGradient(0, horizon, 0, H);
+    road.addColorStop(0, '#0b1f17');
+    road.addColorStop(1, '#123326');
+    ctx.fillStyle = road;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fill();
+
+    // linhas transversais da grade (dão a sensação de movimento)
+    const step = 2;
+    const off = S.travel % step;
+    ctx.lineWidth = 1;
+    for (let z = zNear + step - off; z < zFar; z += step) {
+      const l = proj(-L, 0, z), r = proj(L, 0, z);
+      ctx.strokeStyle = `rgba(31,214,133,${clamp(0.22 - z * 0.004, 0.02, 0.22)})`;
+      ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(r.x, r.y); ctx.stroke();
+    }
+    // linhas longitudinais
+    for (const x of [-L * 0.5, L * 0.5]) {
+      const p1 = proj(x, 0, zFar), p2 = proj(x, 0, zNear);
+      ctx.strokeStyle = 'rgba(31,214,133,0.08)';
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    }
+    // faixa central tracejada
+    const dash = 3;
+    const dOff = S.travel % (dash * 2);
+    ctx.fillStyle = 'rgba(232,245,238,0.35)';
+    for (let z = zNear - dOff; z < zFar; z += dash * 2) {
+      const z1 = Math.max(zNear, z), z2 = z + dash;
+      if (z2 <= zNear) continue;
+      const w = 0.06;
+      const p1 = proj(-w, 0, z1), p2 = proj(w, 0, z1), p3 = proj(w, 0, z2), p4 = proj(-w, 0, z2);
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.fill();
+    }
+    // bordas com brilho
+    ctx.save();
+    ctx.shadowColor = COLORS.brand; ctx.shadowBlur = 14;
+    ctx.strokeStyle = COLORS.brand; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(d.x, d.y); ctx.moveTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawGate(g) {
+    const z = Math.max(g.z, 0.6);
+    const L = CFG.roadHalf + 0.25, Hh = CFG.wallH, D = CFG.wallDepth;
+    let alpha = clamp((CFG.spawnZ - g.z) / 4, 0, 1); // surge suavemente
+    if (g.state === 'pass') alpha *= clamp(1 - g.timer * 5, 0, 1);
+    if (alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const fl = proj(-L, Hh, z), fr = proj(L, Hh, z), bl = proj(-L, Hh, z + D), br = proj(L, Hh, z + D);
+    const base = proj(0, 0, z);
+    const s = fl.s * kx; // pixels por unidade (horizontal)
+    const sy = fl.s;     // pixels por unidade (vertical)
+
+    // topo da parede (visto de cima)
+    ctx.fillStyle = '#1b4a36';
+    ctx.beginPath(); ctx.moveTo(bl.x, bl.y); ctx.lineTo(br.x, br.y); ctx.lineTo(fr.x, fr.y); ctx.lineTo(fl.x, fl.y); ctx.closePath(); ctx.fill();
+
+    // frente da parede
+    const wallTop = fl.y, wallBot = base.y;
+    const wallGrad = ctx.createLinearGradient(0, wallTop, 0, wallBot);
+    wallGrad.addColorStop(0, '#15392a'); wallGrad.addColorStop(1, '#0d2419');
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(fl.x, wallTop, fr.x - fl.x, wallBot - wallTop);
+    ctx.strokeStyle = 'rgba(31,214,133,0.5)'; ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.strokeRect(fl.x, wallTop, fr.x - fl.x, wallBot - wallTop);
+
+    // portas
+    const doorW = 2.0, doorH = 1.9;
+    CFG.lanes.forEach((lx, i) => {
+      const p = proj(lx - doorW / 2, doorH, z);
+      const w = doorW * s, h = doorH * sy;
+      const isCorrect = i === g.correctSide;
+      let fill = 'rgba(7,18,13,0.85)', stroke = COLORS.brand, text = COLORS.ink;
+      if (g.state === 'pass' && i === g.chosen) { fill = 'rgba(31,214,133,0.25)'; }
+      if (g.state === 'crash') {
+        if (i === g.chosen) { fill = 'rgba(239,68,68,0.35)'; stroke = COLORS.danger; }
+        if (isCorrect) { fill = 'rgba(31,214,133,0.25)'; }
+      }
+      roundRect(p.x, p.y, w, h, 0.18 * s);
+      ctx.fillStyle = fill; ctx.fill();
+      ctx.save();
+      ctx.shadowColor = stroke; ctx.shadowBlur = 0.25 * s;
+      ctx.strokeStyle = stroke; ctx.lineWidth = Math.max(1.5, 0.07 * s);
+      ctx.stroke();
+      ctx.restore();
+
+      // número na porta
+      const fs = Math.max(8, 0.78 * sy);
+      ctx.font = `800 ${fs}px 'Plus Jakarta Sans', sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = text;
+      ctx.fillText(String(g.answers[i]), p.x + w / 2, p.y + h * 0.52);
+    });
+
+    // placa no alto com "?"
+    const sign = proj(-0.45, Hh + 0.02, z);
+    ctx.fillStyle = COLORS.brand;
+    roundRect(sign.x, sign.y - 0.08 * sy, 0.9 * s, 0.34 * sy, 0.1 * s); ctx.fill();
+    ctx.fillStyle = '#04110b';
+    ctx.font = `800 ${Math.max(6, 0.26 * sy)}px 'Plus Jakarta Sans', sans-serif`;
+    ctx.fillText('?', sign.x + 0.45 * s, sign.y + 0.09 * sy);
+
+    ctx.restore();
+  }
+
+  function drawPlayer() {
+    const z = CFG.playerZ;
+    const foot = proj(S.playerX, 0, z);
+    const u = foot.s * kx; // tamanho de uma unidade em pixels
+    const running = S.mode === 'play' || S.mode === 'menu';
+    const phase = S.travel * 2.2;
+    const bob = running ? Math.abs(Math.sin(phase)) * 0.08 * u : 0;
+    const lean = (S.targetX - S.playerX) * 0.12 + (S.stumble > 0 ? Math.sin(S.t * 40) * 0.08 : 0);
+
+    // sombra
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath(); ctx.ellipse(foot.x, foot.y, 0.42 * u, 0.12 * u, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(foot.x, foot.y - bob);
+    ctx.rotate(lean);
+
+    const legSwing = running ? Math.sin(phase) : 0;
+    const limb = (x1, y1, x2, y2, w, color) => {
+      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    };
+    // pernas (vista de trás: sobem e descem)
+    const hipY = -0.72 * u;
+    limb(-0.13 * u, hipY, -0.15 * u, -0.08 * u - Math.max(0, legSwing) * 0.22 * u, 0.15 * u, '#0f7a4c');
+    limb(0.13 * u, hipY, 0.15 * u, -0.08 * u - Math.max(0, -legSwing) * 0.22 * u, 0.15 * u, '#0f7a4c');
+    // tênis
+    ctx.fillStyle = COLORS.ink;
+    ctx.beginPath(); ctx.ellipse(-0.15 * u, -0.06 * u - Math.max(0, legSwing) * 0.22 * u, 0.1 * u, 0.06 * u, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0.15 * u, -0.06 * u - Math.max(0, -legSwing) * 0.22 * u, 0.1 * u, 0.06 * u, 0, 0, Math.PI * 2); ctx.fill();
+
+    // braços
+    const shY = -1.25 * u;
+    limb(-0.3 * u, shY, -0.42 * u, shY + (0.42 - legSwing * 0.15) * u, 0.12 * u, COLORS.brandDeep);
+    limb(0.3 * u, shY, 0.42 * u, shY + (0.42 + legSwing * 0.15) * u, 0.12 * u, COLORS.brandDeep);
+
+    // tronco (camiseta Quanta)
+    ctx.fillStyle = COLORS.brand;
+    roundRect(-0.33 * u, -1.38 * u, 0.66 * u, 0.74 * u, 0.2 * u); ctx.fill();
+    // alvo da logo nas costas
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.035 * u;
+    ctx.beginPath(); ctx.arc(0, -1.02 * u, 0.17 * u, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -1.02 * u, 0.08 * u, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(0, -1.02 * u, 0.025 * u, 0, Math.PI * 2); ctx.fill();
+
+    // cabeça (nuca / cabelo)
+    ctx.fillStyle = '#f1c9a5';
+    ctx.beginPath(); ctx.arc(0, -1.6 * u, 0.22 * u, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a1d14';
+    ctx.beginPath(); ctx.arc(0, -1.64 * u, 0.22 * u, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -1.6 * u, 0.21 * u, 0.17 * u, 0, Math.PI, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawEffects() {
+    for (const p of S.particles) {
+      ctx.globalAlpha = clamp(p.life * 1.5, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const f of S.floaters) {
+      ctx.globalAlpha = clamp(f.life, 0, 1);
+      ctx.font = `800 ${f.big ? 44 : 26}px 'Plus Jakarta Sans', sans-serif`;
+      ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(4,11,8,0.8)';
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+
+    // indicador de sequência
+    if (S.mode === 'play' && S.combo >= 3) {
+      const mult = Math.min(1 + Math.floor(S.combo / 3), 5);
+      ctx.font = `800 16px 'JetBrains Mono', monospace`;
+      ctx.fillStyle = COLORS.warn;
+      ctx.fillText(`🔥 ${S.combo} seguidas · ×${mult}`, W / 2, H - 22);
+    }
+  }
+
+  // ================= Loop =================
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ================= Botões =================
+  $('btnStart').addEventListener('click', startGame);
+  $('btnRetry').addEventListener('click', startGame);
+  $('btnResume').addEventListener('click', togglePause);
+  $('btnPause').addEventListener('click', togglePause);
+  const soundBtn = $('btnSound');
+  const paintSound = () => { soundBtn.textContent = soundOn ? '🔊' : '🔇'; };
+  soundBtn.addEventListener('click', () => { soundOn = !soundOn; store.set('quanta-corrida-sound', soundOn); paintSound(); });
+  paintSound();
+  $('bestStart').textContent = best;
+
+  resize();
+  updateHud();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
