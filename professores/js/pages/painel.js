@@ -10,7 +10,7 @@
 
 import '../../css/contas.css';
 import { sb } from '../supabase.js';
-import { isConfigured } from '../config.js';
+import { isConfigured, SITE_URL } from '../config.js';
 import {
   initChrome, h, toast, errorMsg, notConfiguredNotice, avatarEl, planBadge, brl, emptyState,
   skeletonCards, modal, qsGet, qsSet, SUBJECT_LEVELS,
@@ -132,6 +132,15 @@ function field({ label, kind = 'input', type = 'text', value = '', maxlength, hi
     if (!err.hidden) setError('');
   });
   return { wrap, input, setError };
+}
+
+/** Foca um campo mostrando também o rótulo (o nav fixo cobriria o topo). */
+function focusField(el) {
+  if (!el) return;
+  const box = el.closest('.pf-field, .pf-fieldset') || el;
+  const r = box.getBoundingClientRect();
+  if (r.top < 96 || r.bottom > window.innerHeight) box.scrollIntoView({ block: 'center' });
+  el.focus({ preventScroll: true });
 }
 
 function checkbox(label, checked, attrs = {}) {
@@ -339,7 +348,7 @@ function mountAnuncio(panel) {
   const slugPreview = h('p', { class: 'pf-slug-preview' });
   slugF.wrap.append(slugPreview);
   const renderSlugPreview = () => {
-    slugPreview.replaceChildren('quantaaulas.com/professores/p/', h('b', {}, slugF.input.value.trim() || '…'));
+    slugPreview.replaceChildren(`${SITE_URL.replace(/^https?:\/\//, '')}/professores/p/`, h('b', {}, slugF.input.value.trim() || '…'));
   };
   renderSlugPreview();
   slugF.input.addEventListener('input', renderSlugPreview);
@@ -412,7 +421,7 @@ function mountAnuncio(panel) {
     let label = text;
     if (!ok && href) label = h('a', { href }, text);
     else if (!ok && focus) {
-      label = h('a', { href: '#', onClick: (e) => { e.preventDefault(); focus.focus(); } }, text);
+      label = h('a', { href: '#', onClick: (e) => { e.preventDefault(); focusField(focus); } }, text);
     }
     return h('li', { class: ok ? 'is-ok' : 'is-missing' },
       h('span', { class: 'pf-ck-icon', 'aria-hidden': 'true' }, ok ? '✓' : ''),
@@ -478,7 +487,7 @@ function mountAnuncio(panel) {
     }
     if (first) {
       alert.textContent = 'Confira os campos destacados.';
-      first.focus();
+      focusField(first);
       return;
     }
     if (v.published) {
@@ -487,7 +496,7 @@ function mountAnuncio(panel) {
         alert.textContent = `Para publicar, complete: ${miss.map((m) => m.text.toLowerCase()).join('; ')}. Você pode salvar sem publicar desmarcando "Publicar meu anúncio".`;
         if (miss.some((m) => m.key === 'modes')) { modesErr.textContent = 'Escolha aulas online e/ou presenciais.'; modesErr.hidden = false; }
         if (miss.some((m) => m.key === 'city')) { cityErr.textContent = 'Escolha estado e cidade para aulas presenciais.'; cityErr.hidden = false; }
-        (miss[0].focus || pub.input).focus();
+        focusField(miss[0].focus || pub.input);
         return;
       }
     }
@@ -535,11 +544,11 @@ function mountAnuncio(panel) {
       if (code === '23505' && /slug/i.test(text)) {
         slugF.setError('Este endereço já está em uso por outro professor. Escolha outro.');
         alert.textContent = 'Este endereço de perfil já está em uso. Escolha outro.';
-        slugF.input.focus();
+        focusField(slugF.input);
       } else if (code === '23514' && /slug/i.test(text)) {
         slugF.setError('Endereço inválido: use letras minúsculas, números e hífens.');
         alert.textContent = 'Endereço de perfil inválido.';
-        slugF.input.focus();
+        focusField(slugF.input);
       } else {
         // P0001 (validação do banco) chega em PT, ex.: "Adicione ao menos uma matéria antes de publicar."
         alert.textContent = errorMsg(err);
@@ -644,8 +653,8 @@ function mountMaterias(panel) {
           return btn;
         });
         const levelsBox = h('div', { class: 'pf-subj-levels', hidden: !selected.has(id) },
-          h('span', { class: 'pf-label-sm', id: `pfLv${id}` }, 'Níveis (opcional)'),
-          h('div', { class: 'pf-chips', role: 'group', 'aria-labelledby': `pfLv${id}` }, chips));
+          h('span', { class: 'pf-label-sm', 'aria-hidden': 'true' }, 'Níveis (opcional)'),
+          h('div', { class: 'pf-chips', role: 'group', 'aria-label': `Níveis de ${s.name} (opcional)` }, chips));
         const el = h('div', { class: ['pf-subj', selected.has(id) ? 'is-on' : null] },
           h('label', { class: 'pf-check' }, input, h('span', {}, s.name)),
           levelsBox);
@@ -1032,7 +1041,7 @@ function mountPerfil(panel) {
     const name = nameF.input.value.replace(/\s+/g, ' ').trim();
     if (name.length < 2) {
       nameF.setError('Informe seu nome completo.');
-      nameF.input.focus();
+      focusField(nameF.input);
       return;
     }
     setBusy(btn, true);

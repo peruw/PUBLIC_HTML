@@ -16,6 +16,8 @@ const CORS = {
   'access-control-allow-headers': '*',
   'access-control-allow-methods': '*',
   'access-control-expose-headers': '*',
+  // Como o GoTrue real: com este cabeçalho o auth-js expõe error.code (ex.: over_email_send_rate_limit)
+  'x-supabase-api-version': '2024-01-01',
 };
 
 const user = (extra = {}) => ({
@@ -532,7 +534,8 @@ test.describe('painel', () => {
     await expect(page.getByText('Você chegou ao limite do plano Básico.')).toBeVisible();
     await expect(page.getByRole('checkbox', { name: 'Biologia' })).toBeDisabled();
     // Níveis
-    await page.getByRole('group', { name: 'Níveis (opcional)' }).first().getByRole('button', { name: 'Ensino superior' }).click();
+    await page.getByRole('group', { name: 'Níveis de Matemática (opcional)' }).getByRole('button', { name: 'Ensino superior' }).click();
+    await expect(page.getByRole('group', { name: 'Níveis de Matemática (opcional)' }).getByRole('button', { name: 'Ensino médio' })).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('checkbox', { name: 'Física' }).uncheck();
     await expect(page.getByRole('checkbox', { name: 'Biologia' })).toBeEnabled();
 
@@ -631,7 +634,7 @@ test.describe('termos e privacidade', () => {
       const errors = trackErrors(page);
       await mockSupabase(page);
       await page.goto(path);
-      const text = await page.locator('article.pf-prose').innerText();
+      const text = await page.locator('main').innerText();
       for (const s of must) expect(text).toContain(s);
       // Minuta só como comentário HTML (não aparece na tela)
       expect(await page.content()).toContain('MINUTA');

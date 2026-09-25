@@ -4,7 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tira-dúvidas — Professores | Quanta Aulas</title>
-  <meta name="description" content="Pergunte e receba respostas de professores particulares de todas as matérias." />
+  <meta name="description" content="Tira-dúvidas grátis: pergunte sobre qualquer matéria e receba respostas de professores particulares. Matemática, física, química, redação, inglês e muito mais." />
+  <link rel="canonical" href="https://quantaaulas.com/professores/duvidas.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Tira-dúvidas grátis com professores | Quanta Aulas" />
+  <meta property="og:description" content="Pergunte sobre qualquer matéria: professores particulares respondem de graça." />
+  <meta property="og:url" content="https://quantaaulas.com/professores/duvidas.html" />
 
   <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
   <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
@@ -24,18 +29,96 @@
   <!-- @include professores/partials/nav.html -->
 
   <main id="app" class="pf-main" data-page="duvidas">
-    <section class="pf-page">
+    <!-- ============== HERO ============== -->
+    <section class="pf-hero pf-qa-hero" aria-labelledby="qaHeroTitulo">
       <div class="container">
-        <header class="pf-page-head">
-          <div class="eyebrow">Perguntas e respostas</div>
-          <h1 class="pf-title">Tira-dúvidas</h1>
-          <p class="lead">Faça sua pergunta e receba respostas de professores. Grátis.</p>
-        </header>
-
-        <!-- Conteúdo montado por /professores/js/pages/duvidas.js -->
-        <div id="pageBody" class="pf-page-body">
-          <p class="pf-loading" role="status">Carregando…</p>
+        <div class="eyebrow">Tira-dúvidas grátis</div>
+        <h1 id="qaHeroTitulo" class="pf-hero-title">Travou num exercício? <span class="grad-text">Pergunte.</span></h1>
+        <p class="lead pf-hero-lead">
+          Professores particulares respondem de graça. Pergunte sobre qualquer matéria, da tabuada ao cálculo,
+          e receba explicações de quem ensina todos os dias.
+        </p>
+        <div class="pf-qa-hero-actions">
+          <a href="#perguntar" id="btnPerguntar" class="btn btn-primary" aria-controls="perguntar" aria-expanded="false">
+            Fazer uma pergunta
+            <svg class="btn-arrow" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a href="#perguntas" class="btn btn-ghost">Ver perguntas</a>
         </div>
+        <ol class="pf-qa-steps" aria-label="Como funciona">
+          <li><span class="pf-qa-step-num" aria-hidden="true">1</span><span><strong>Pergunte</strong> com detalhes: enunciado, o que já tentou.</span></li>
+          <li><span class="pf-qa-step-num" aria-hidden="true">2</span><span><strong>Professores respondem</strong> de graça, com explicação.</span></li>
+          <li><span class="pf-qa-step-num" aria-hidden="true">3</span><span><strong>Gostou?</strong> Fale com o professor e marque uma aula.</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============== NOVA PERGUNTA (aberta pelo botão ou por #perguntar) ============== -->
+    <section id="perguntar" class="pf-qa-ask-sec" aria-labelledby="perguntarTitulo" hidden>
+      <div class="container">
+        <div class="pf-panel pf-qa-ask">
+          <h2 id="perguntarTitulo" class="pf-section-title" tabindex="-1">Fazer uma pergunta</h2>
+          <!-- Formulário (logado) ou convite para entrar: montado por /professores/js/pages/duvidas.js -->
+          <div id="askBody"><p class="pf-loading" role="status">Carregando…</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== LISTA ============== -->
+    <section id="perguntas" class="pf-results-section pf-qa-list-sec" aria-labelledby="perguntasTitulo">
+      <div class="container pf-qa-layout">
+        <div class="pf-qa-col">
+          <!-- Sem JS, a busca funciona via GET (?q=&materia=) -->
+          <form id="qaBusca" class="pf-qa-search" role="search" action="/professores/duvidas.html" method="get" novalidate>
+            <div class="pf-field pf-qa-search-q">
+              <label class="pf-label" for="fQ">Buscar nas perguntas</label>
+              <input id="fQ" name="q" type="search" class="pf-input" maxlength="80" autocomplete="off"
+                     placeholder="Ex.: equação do 2º grau, present perfect" />
+            </div>
+            <div class="pf-field pf-qa-search-m">
+              <label class="pf-label" for="fMateria">Matéria</label>
+              <select id="fMateria" name="materia" class="pf-select">
+                <option value="">Todas as matérias</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary pf-qa-search-btn">Buscar</button>
+          </form>
+
+          <nav class="pf-chips pf-qa-chips" id="qaMaterias" aria-label="Matérias populares">
+            <a class="pf-chip" href="/professores/duvidas.html" data-materia="">Todas</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=matematica" data-materia="matematica">Matemática</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=fisica" data-materia="fisica">Física</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=quimica" data-materia="quimica">Química</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=biologia" data-materia="biologia">Biologia</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=portugues" data-materia="portugues">Português</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=redacao" data-materia="redacao">Redação</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=ingles" data-materia="ingles">Inglês</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=historia" data-materia="historia">História</a>
+            <a class="pf-chip" href="/professores/duvidas.html?materia=programacao" data-materia="programacao">Programação</a>
+          </nav>
+
+          <div class="pf-results-head pf-qa-results-head">
+            <h2 id="perguntasTitulo" class="pf-results-title" tabindex="-1">Perguntas recentes</h2>
+            <p id="qaCount" class="pf-muted" role="status" aria-live="polite"></p>
+          </div>
+          <div id="qaResultados" class="pf-qa-results" aria-busy="false">
+            <noscript><p class="pf-muted">Ative o JavaScript para ver as perguntas.</p></noscript>
+          </div>
+          <nav id="qaPaginacao" class="pf-pagination pf-qa-pagination" aria-label="Paginação"></nav>
+        </div>
+
+        <aside class="pf-qa-aside" aria-label="Saiba mais">
+          <div class="pf-panel pf-qa-side-card">
+            <h2 class="pf-qa-side-title">Quer aula particular?</h2>
+            <p class="pf-muted">Encontre professores de todas as matérias, online ou perto de você.</p>
+            <a id="qaBuscaLink" class="btn btn-ghost btn-sm btn-block" href="/professores/">Buscar professores</a>
+          </div>
+          <div class="pf-panel pf-qa-side-card" id="qaTutorCard">
+            <h2 class="pf-qa-side-title">Você é professor?</h2>
+            <p class="pf-muted">Responda dúvidas, mostre como você explica e seja encontrado por novos alunos. Suas respostas aparecem no seu perfil.</p>
+            <a id="qaTutorLink" class="btn btn-ghost btn-sm btn-block" href="/professores/entrar.html?modo=cadastro&amp;tipo=professor">Criar meu anúncio grátis</a>
+          </div>
+        </aside>
       </div>
     </section>
   </main>

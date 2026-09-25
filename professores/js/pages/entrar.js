@@ -103,6 +103,7 @@ let fieldSeq = 0;
  * Campo com rótulo, dica e mensagem de erro ligados por aria-describedby.
  * @returns {{ wrap: HTMLElement, input: HTMLInputElement, setError: (msg?: string) => void }}
  */
+// (todos os campos destas telas são obrigatórios: sem asterisco, com "required")
 function field({ label, type = 'text', name, autocomplete, hint, maxlength, inputmode, value, required = true, password = false }) {
   const id = `pfIn${++fieldSeq}`;
   const hintId = hint ? `${id}-hint` : null;
@@ -129,7 +130,7 @@ function field({ label, type = 'text', name, autocomplete, hint, maxlength, inpu
     control = h('div', { class: 'pf-pass' }, input, btn);
   }
   const wrap = h('div', { class: 'pf-field' },
-    h('label', { class: 'pf-label', for: id }, label, required ? h('span', { class: 'pf-req', 'aria-hidden': 'true' }, ' *') : null),
+    h('label', { class: 'pf-label', for: id }, label),
     control,
     hint ? h('p', { class: 'pf-hint', id: hintId }, hint) : null,
     err);
@@ -141,6 +142,15 @@ function field({ label, type = 'text', name, autocomplete, hint, maxlength, inpu
   };
   input.addEventListener('input', () => { if (!err.hidden) setError(''); });
   return { wrap, input, setError };
+}
+
+/** Foca um campo mostrando também o rótulo (o nav fixo cobriria o topo). */
+function focusField(el) {
+  if (!el) return;
+  const box = el.closest('.pf-field, .pf-fieldset') || el;
+  const r = box.getBoundingClientRect();
+  if (r.top < 96 || r.bottom > window.innerHeight) box.scrollIntoView({ block: 'center' });
+  el.focus({ preventScroll: true });
 }
 
 function submitButton(label) {
@@ -178,7 +188,7 @@ function authErrorText(err) {
   if (code === 'weak_password') {
     return 'Senha fraca. Use pelo menos 8 caracteres, misturando letras e números (evite senhas óbvias).';
   }
-  if (code === 'over_email_send_rate_limit') {
+  if (code === 'over_email_send_rate_limit' || /email rate limit/i.test(err?.message || '')) {
     return 'Muitos e-mails enviados em pouco tempo. Aguarde alguns minutos e tente de novo.';
   }
   if (code === 'over_request_rate_limit' || err?.status === 429) {
@@ -301,7 +311,7 @@ function renderLogin(card, notice) {
     let first = null;
     if (!EMAIL_RE.test(em)) { email.setError('Informe um e-mail válido.'); first ||= email.input; }
     if (!pw) { pass.setError('Informe sua senha.'); first ||= pass.input; }
-    if (first) { first.focus(); return; }
+    if (first) { focusField(first); return; }
 
     setBusy(btn, true, 'Entrando…');
     try {
@@ -399,7 +409,7 @@ function renderSignup(card, notice) {
     if (pw.length < 8) { pass.setError('A senha precisa ter pelo menos 8 caracteres.'); first ||= pass.input; }
     else if (!/[A-Za-zÀ-ÿ]/.test(pw) || !/\d/.test(pw)) { pass.setError('Use letras e números na senha.'); first ||= pass.input; }
     if (!terms.checked) { setTermsError('Para criar a conta, é preciso aceitar os Termos de Uso e a Política de Privacidade.'); first ||= terms; }
-    if (first) { first.focus(); return; }
+    if (first) { focusField(first); return; }
 
     setBusy(btn, true, 'Criando conta…');
     try {
@@ -421,7 +431,7 @@ function renderSignup(card, notice) {
     } catch (err) {
       setBusy(btn, false);
       alert.textContent = authErrorText(err);
-      if (err?.code === 'weak_password') pass.input.focus();
+      if (err?.code === 'weak_password') focusField(pass.input);
     }
   });
 
@@ -464,7 +474,7 @@ function renderForgot(card, notice) {
     const em = email.input.value.trim();
     if (!EMAIL_RE.test(em)) {
       email.setError('Informe um e-mail válido.');
-      email.input.focus();
+      focusField(email.input);
       return;
     }
     setBusy(btn, true, 'Enviando…');
@@ -496,6 +506,7 @@ function renderForgot(card, notice) {
 function renderNewPassword(card, notice, session) {
   if (!session) {
     card.append(
+      notice,
       h('div', { class: 'pf-notice pf-notice--warn', role: 'status' },
         h('h2', { class: 'pf-notice-title' }, 'Link inválido ou expirado'),
         h('p', {}, 'Para criar uma nova senha, abra o link mais recente que enviamos por e-mail, neste mesmo navegador. Os links valem por pouco tempo e funcionam uma única vez.')),
@@ -509,7 +520,7 @@ function renderNewPassword(card, notice, session) {
   const alert = alertBox();
   const btn = submitButton('Salvar nova senha');
   const who = session.user?.email ? h('p', { class: 'pf-auth-sub' }, 'Conta: ', h('strong', {}, session.user.email)) : null;
-  const form = h('form', { class: 'pf-form', novalidate: true, 'aria-label': 'Nova senha' }, who, pass.wrap, pass2.wrap, alert, btn);
+  const form = h('form', { class: 'pf-form', novalidate: true, 'aria-label': 'Criar nova senha' }, who, pass.wrap, pass2.wrap, alert, btn);
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -521,7 +532,7 @@ function renderNewPassword(card, notice, session) {
     if (pw.length < 8) { pass.setError('A senha precisa ter pelo menos 8 caracteres.'); first ||= pass.input; }
     else if (!/[A-Za-zÀ-ÿ]/.test(pw) || !/\d/.test(pw)) { pass.setError('Use letras e números na senha.'); first ||= pass.input; }
     if (pass2.input.value !== pw) { pass2.setError('As senhas não conferem.'); first ||= pass2.input; }
-    if (first) { first.focus(); return; }
+    if (first) { focusField(first); return; }
 
     setBusy(btn, true, 'Salvando…');
     try {

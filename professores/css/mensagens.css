@@ -1,0 +1,317 @@
+/* ============================================
+   Mensagens (dono: mensagens)
+   Complementa .pf-chat / .pf-conv-* / .pf-bubble* / .pf-composer de professores.css.
+   Também usado pelo botão de contato do perfil (components/contact.js).
+   ============================================ */
+
+/* ---------- Botão de contato (perfil) ---------- */
+.pf-contact { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pf-contact-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-mute);
+}
+.pf-contact-ico {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pf-contact-existing { margin: 0; font-size: 13px; color: var(--ink-dim); }
+.pf-contact-existing a { color: var(--brand); }
+/* Na barra fixa do celular só cabe o botão */
+.pf-cta-bar-action .pf-contact { flex-direction: row; justify-content: flex-end; }
+.pf-cta-bar-action :is(.pf-contact-hint, .pf-contact-existing) { display: none; }
+
+.pf-contact-form { display: flex; flex-direction: column; gap: 14px; }
+.pf-contact-intro { margin: 0; color: var(--ink-dim); font-size: 14px; }
+.pf-contact-text { min-height: 150px; }
+.pf-contact-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.pf-contact-meta .pf-counter { align-self: auto; margin-left: auto; }
+.pf-contact-form .pf-error:empty { display: none; }
+.pf-contact-form .pf-error { margin: 0; }
+.pf-contact-hint--modal {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-soft);
+  color: var(--ink-dim);
+}
+
+/* ---------- Aviso de segurança ---------- */
+.pf-msg-safety {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  border-color: rgba(245, 185, 74, 0.35);
+  background: rgba(245, 185, 74, 0.05);
+}
+.pf-msg-safety strong { color: var(--ink); }
+.pf-msg-safety-ico {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--warn);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Ícones de traço (voltar, enviar, seta) */
+.pf-msg-ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Estrutura ---------- */
+.pf-chat { scroll-margin-top: 84px; }
+.pf-conv-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+}
+.pf-conv-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.pf-conv-pane-title { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 700; }
+.pf-conv-pane .pf-conv-list { flex: 1; min-height: 0; border-right: 0; }
+.pf-conv-status:empty { display: none; }
+.pf-conv-status { padding: 16px; }
+.pf-conv-status .pf-empty { padding: 28px 16px; }
+.pf-conv-error { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; font-size: 14px; }
+.pf-conv-error p { margin: 0; }
+
+/* ---------- Itens da lista ---------- */
+.pf-conv-list > li { margin: 0; }
+.pf-conv-item { position: relative; }
+.pf-conv-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.pf-conv-item.is-active { box-shadow: inset 3px 0 0 var(--brand); }
+.pf-conv-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pf-conv-role {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.pf-conv-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; align-self: start; padding-top: 2px; }
+.pf-conv-time { white-space: nowrap; }
+.pf-conv-item.is-unread .pf-conv-time { color: var(--brand); }
+.pf-conv-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.pf-conv-skel {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.pf-conv-skel .pf-skel-avatar { width: 44px; height: 44px; }
+.pf-conv-skel .pf-skel-lines { padding-top: 0; }
+
+/* ---------- Conversa ---------- */
+.pf-thread { min-height: 0; }
+.pf-thread-head { min-height: 69px; }
+.pf-thread-back {
+  display: none; /* só no celular */
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-left: -6px;
+  padding: 8px 10px 8px 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pf-thread-back:hover { color: var(--ink); background: var(--bg-card); }
+.pf-thread-avatar { display: inline-flex; flex: none; text-decoration: none; }
+.pf-thread-who { display: flex; flex-direction: column; min-width: 0; }
+.pf-thread-title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-thread-title:focus { outline: none; }
+.pf-thread-title:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.pf-thread-link { color: inherit; text-decoration: none; }
+.pf-thread-link:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.pf-thread-sub { margin: 0; font-size: 12.5px; color: var(--ink-mute); }
+.pf-thread-sublink { color: var(--brand); }
+
+.pf-thread-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.pf-thread-empty p { margin: 0; }
+.pf-thread-empty-title { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 700; color: var(--ink); }
+.pf-thread-empty .btn { margin-top: 8px; }
+.pf-thread-loading { margin: auto; color: var(--ink-mute); font-family: var(--mono); font-size: 13px; }
+.pf-thread-error {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  font-size: 14px;
+}
+.pf-thread-error p { margin: 0; }
+.pf-thread-start,
+.pf-thread-none { margin: 0 auto 4px; font-size: 12px; color: var(--ink-mute); text-align: center; }
+.pf-thread-none { margin: auto; font-size: 14px; }
+
+/* Área das bolhas (rola) + aviso "Novas mensagens" */
+.pf-bubbles-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pf-bubbles-wrap .pf-bubbles { flex: 1; min-height: 0; overscroll-behavior: contain; }
+.pf-bubbles:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.pf-older { display: flex; justify-content: center; padding-bottom: 4px; }
+.pf-older-btn { padding: 6px 14px; font-size: 13px; }
+.pf-day-sep { display: flex; justify-content: center; margin: 10px 0 4px; }
+.pf-day-sep span {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+
+.pf-msg { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.pf-msg--me { align-items: flex-end; }
+.pf-msg .pf-bubble { max-width: min(78%, 560px); }
+.pf-msg-body { white-space: pre-line; }
+.pf-msg.is-pending .pf-bubble { opacity: 0.65; }
+.pf-msg-sending { font-style: italic; }
+.pf-bubble-meta { display: flex; align-items: baseline; gap: 12px; margin-top: 4px; white-space: normal; }
+.pf-bubble--me .pf-bubble-meta { justify-content: flex-end; }
+.pf-bubble-meta .pf-bubble-time { margin-top: 0; }
+.pf-msg-actions { margin-left: auto; opacity: 0; transition: opacity 0.15s ease; }
+.pf-msg-actions .pf-link-btn { font-size: 11px; line-height: 1.2; }
+.pf-msg:hover .pf-msg-actions,
+.pf-msg:focus-within .pf-msg-actions { opacity: 1; }
+@media (hover: none) { .pf-msg-actions { opacity: 0.85; } }
+
+.pf-new-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--brand);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+}
+.pf-new-pill .pf-msg-ico { width: 14px; height: 14px; }
+
+/* ---------- Envio ---------- */
+.pf-composer { background: var(--bg-elev); }
+.pf-composer .pf-composer-input { min-height: 46px; padding-top: 11px; padding-bottom: 11px; line-height: 1.4; }
+.pf-composer-send { flex: none; height: 46px; }
+.pf-composer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 0 14px 10px;
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+.pf-composer-foot p { margin: 0; }
+.pf-composer-counter { margin-left: auto; }
+.pf-composer-status:empty { display: none; }
+.pf-composer-status { flex-basis: 100%; color: var(--ink-dim); }
+.pf-composer-status.is-error { color: #fca5a5; }
+
+/* ---------- Celular: um painel por vez ---------- */
+@media (max-width: 760px) {
+  .pf-conv-pane { border-right: 0; }
+  .pf-chat.is-thread-open .pf-conv-pane { display: none; }
+  .pf-chat.is-thread-open {
+    height: calc(100dvh - 88px);
+    min-height: 380px;
+  }
+  .pf-chat.is-thread-open .pf-bubbles { min-height: 0; }
+  .pf-thread-back { display: inline-flex; }
+  .pf-thread-head { padding: 10px 12px; gap: 10px; }
+  .pf-bubbles { padding: 14px 12px; }
+  .pf-msg .pf-bubble { max-width: 86%; }
+  .pf-composer { padding: 10px; gap: 8px; }
+  .pf-composer-send span { display: none; } /* só o ícone */
+  .pf-composer-send { padding: 0 14px; }
+  .pf-composer-foot { padding: 0 12px 8px; }
+  .pf-msg-safety { padding: 12px 14px; font-size: 13px; }
+}
+@media (max-width: 760px) and (pointer: coarse) {
+  .pf-composer-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-msg-actions { transition: none; }
+}
+
+/* ---------- Cabeçalho da página ---------- */
+.pf-msg-head { margin-bottom: 20px; }
+.pf-msg-lead { margin: 10px 0 0; max-width: 60ch; color: var(--ink-dim); font-size: 15px; }
+@media (max-width: 760px) {
+  .pf-msg-head { margin-bottom: 14px; }
+  .pf-msg-lead { font-size: 14px; }
+}

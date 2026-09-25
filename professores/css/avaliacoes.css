@@ -1,0 +1,238 @@
+/* ============================================
+   Avaliações (perfil do professor + aba do painel) — dono: avaliações
+   Usa as variáveis de /styles.css e a base de professores.css.
+   ============================================ */
+
+.pf-rv { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.pf-rv > .pf-rv-title { margin: 0; }
+.pf-rv-title:focus { outline: none; }
+.pf-rv-title:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; border-radius: 4px; }
+.pf-rv-summary-box:empty,
+.pf-rv-user:empty { display: none; }
+
+/* ---------- Resumo ---------- */
+.pf-rv-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px 32px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+  min-width: 0;
+}
+.pf-rv-summary.is-compact { grid-template-columns: minmax(0, 1fr); }
+.pf-rv-score {
+  display: grid;
+  grid-template-columns: auto;
+  justify-items: start;
+  gap: 6px;
+  min-width: 0;
+}
+.pf-rv-avg {
+  font-family: var(--display);
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.pf-rv-score .pf-rating { font-size: 18px; }
+/* número e contagem já aparecem em volta (o aria-label do starsEl continua completo) */
+.pf-rv-score .pf-rating-num,
+.pf-rv-score .pf-rating-count { display: none; }
+.pf-rv-total { font-size: 13px; color: var(--ink-mute); }
+
+.pf-rv-dist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.pf-rv-dist li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr) 2.8em;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.pf-rv-dist-label { white-space: nowrap; }
+.pf-rv-dist-n { text-align: right; color: var(--ink-mute); }
+.pf-rv-bar {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.pf-rv-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: var(--warn);
+}
+@media (max-width: 560px) {
+  .pf-rv-summary { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 16px; }
+  .pf-rv-score { grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 12px; }
+  .pf-rv-avg { grid-row: span 2; font-size: 40px; }
+}
+
+/* ---------- Caixa do visitante (entrar / aviso / formulário / sua avaliação) ---------- */
+.pf-rv-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--brand-soft);
+  min-width: 0;
+}
+@media (max-width: 480px) { .pf-rv-box { padding: 16px; } }
+.pf-rv-hint {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--line);
+}
+.pf-rv-hint > p { flex: 1 1 220px; font-size: 14px; color: var(--ink-dim); }
+.pf-rv-box-title { font-size: 18px; line-height: 1.25; }
+.pf-rv-box-title:focus { outline: none; }
+.pf-rv-box-text { font-size: 14px; }
+.pf-rv-own-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.pf-rv-checking { margin: 0; }
+
+/* ---------- Formulário ---------- */
+.pf-rv-form { gap: 16px; }
+.pf-rv-picker-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.pf-rv-stars { display: inline-flex; gap: 2px; }
+.pf-rv-star-opt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+/* rádio nativo invisível, mas focável e clicável sobre a estrela */
+.pf-rv-star-opt input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.pf-rv-star {
+  font-size: 32px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.2);
+  transition: color 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+}
+.pf-rv-star-opt.is-on .pf-rv-star { color: var(--warn); }
+.pf-rv-star-opt:hover .pf-rv-star { transform: scale(1.12); }
+.pf-rv-star-opt:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 0; }
+.pf-rv-picked { font-size: 14px; font-weight: 600; color: var(--warn); min-width: 9ch; }
+.pf-rv-picked.is-placeholder { font-weight: 400; color: var(--ink-mute); }
+.pf-rv-comment { min-height: 110px; }
+.pf-rv-form-meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pf-rv-form-error:empty { display: none; }
+
+/* ---------- Lista ---------- */
+.pf-rv-listbox { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.pf-rv-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pf-rv-item + .pf-rv-item { border-top: 1px solid var(--line); }
+.pf-rv-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 0;
+  min-width: 0;
+  border-radius: 8px;
+}
+.pf-rv-item:first-child > .pf-rv-card { padding-top: 4px; }
+.pf-rv-card:focus { outline: none; }
+.pf-rv-card:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; }
+.pf-rv-card.is-own .pf-rv-name-text { color: var(--brand); }
+.pf-rv-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pf-rv-who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pf-rv-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 0;
+}
+.pf-rv-name-text { overflow-wrap: anywhere; min-width: 0; }
+a.pf-rv-name-text { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+a.pf-rv-name-text:hover { color: var(--brand); text-decoration-color: var(--brand); }
+.pf-rv-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+.pf-rv-meta .pf-rating { font-size: 13px; }
+.pf-rv-time { white-space: nowrap; }
+.pf-rv-edited { color: var(--ink-mute); }
+.pf-rv-text { font-size: 15px; line-height: 1.6; color: var(--ink-dim); max-width: 75ch; }
+.pf-rv-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.pf-rv-actions .btn { padding: 8px 14px; }
+.pf-rv-editing { gap: 14px; padding: 18px 0; }
+.pf-rv-status { font-size: 13px; color: var(--ink-mute); }
+.pf-rv-status:empty { display: none; }
+.pf-rv-more { align-self: flex-start; }
+.pf-rv-empty {
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--ink-dim);
+  font-size: 14px;
+  text-align: center;
+}
+.pf-rv-loading .pf-skeleton-card { background: transparent; }
+.pf-rv-error { padding: 16px 18px; gap: 8px; }
+.pf-rv-error-title { font-weight: 600; color: var(--ink); }
+
+/* ---------- Aba do painel ---------- */
+.pf-rv-tab { display: flex; flex-direction: column; gap: 36px; min-width: 0; }
+.pf-rv-section { min-width: 0; }
+.pf-rv-intro { margin-bottom: 16px; }
+.pf-rv-intro h2 { font-size: 22px; margin-bottom: 6px; }
+.pf-rv-intro h2:focus { outline: none; }
+.pf-rv-intro p { font-size: 15px; max-width: 70ch; }
+.pf-rv-panel { gap: 18px; }
+.pf-rv-banned { margin-bottom: 16px; padding: 14px 18px; }
+.pf-rv-public { font-size: 14px; }
+.pf-rv-public a { color: var(--brand); text-underline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-rv-star { transition: none; }
+  .pf-rv-star-opt:hover .pf-rv-star { transform: none; }
+}

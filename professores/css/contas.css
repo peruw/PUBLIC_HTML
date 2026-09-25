@@ -5,6 +5,16 @@
    Usa as variáveis de /styles.css e a base de professores.css.
    ============================================ */
 
+/* ---------- Comum às telas de conta ---------- */
+/* Campo focado (ex.: primeiro erro) não fica escondido atrás do nav fixo */
+:is(.pf-auth, .pf-dash-panels) :is(input, select, textarea, button) { scroll-margin-top: 110px; }
+
+/* Campo inválido com borda vermelha (a regra base de professores.css é mais específica que .is-invalid) */
+.pf-field.is-invalid :is(input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea),
+.pf-field input[aria-invalid="true"]:not([type=checkbox]):not([type=radio]):not([type=file]) {
+  border-color: #ef4444;
+}
+
 /* ---------- Entrar / cadastro ---------- */
 .pf-auth {
   display: grid;
@@ -87,7 +97,8 @@
 
 /* Senha com botão mostrar/ocultar */
 .pf-pass { position: relative; }
-.pf-field .pf-pass input { padding-right: 92px; }
+/* (mesma especificidade da regra base de professores.css + 1, para vencer o padding dela) */
+.pf-field .pf-pass input:not([type=checkbox]):not([type=radio]):not([type=file]) { padding-right: 92px; }
 .pf-pass-toggle {
   position: absolute;
   right: 6px;
@@ -291,7 +302,7 @@
   font-size: 16px;
   pointer-events: none;
 }
-.pf-field .pf-money input { padding-left: 44px; }
+.pf-field .pf-money input:not([type=checkbox]):not([type=radio]):not([type=file]) { padding-left: 44px; }
 
 .pf-slug-preview {
   font-family: var(--mono);
@@ -427,7 +438,10 @@
   background: linear-gradient(135deg, var(--brand), rgba(31, 214, 133, 0.15));
 }
 .pf-photo-frame > * { width: 130px !important; height: 130px !important; border-radius: 50%; }
-.pf-photo-frame .pf-avatar--initials { font-size: 44px !important; }
+.pf-photo-frame .pf-avatar--initials {
+  font-size: 44px !important;
+  background: linear-gradient(var(--brand-soft), var(--brand-soft)), var(--bg-elev);
+}
 .pf-photo-frame canvas { display: block; object-fit: cover; background: var(--bg); }
 .pf-photo-controls { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .pf-file {

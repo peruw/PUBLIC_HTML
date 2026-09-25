@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dúvida — Professores | Quanta Aulas</title>
   <meta name="description" content="Pergunta e respostas de professores no tira-dúvidas do Quanta Aulas." />
+  <meta property="og:type" content="article" />
 
   <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
   <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
@@ -24,15 +25,14 @@
   <!-- @include professores/partials/nav.html -->
 
   <main id="app" class="pf-main" data-page="duvida">
-    <section class="pf-page">
+    <section class="pf-page pf-qa-page">
       <div class="container">
-        <header class="pf-page-head">
-          <div class="eyebrow">Tira-dúvidas</div>
-          <h1 class="pf-title">Dúvida</h1>
-        </header>
-
-        <!-- Conteúdo montado por /professores/js/pages/duvida.js -->
+        <!-- Pergunta, respostas e formulários: montados por /professores/js/pages/duvida.js -->
         <div id="pageBody" class="pf-page-body">
+          <header class="pf-page-head">
+            <div class="eyebrow">Tira-dúvidas</div>
+            <h1 class="pf-title">Dúvida</h1>
+          </header>
           <p class="pf-loading" role="status">Carregando…</p>
         </div>
       </div>
