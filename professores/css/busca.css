@@ -1,0 +1,147 @@
+/* ============================================
+   Busca de professores (/professores/) — complementa professores.css
+   Importado por /professores/js/pages/busca.js
+   ============================================ */
+
+/* Atalhos de matéria no hero */
+.pf-hero-chips { align-items: center; }
+.pf-hero-chips-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-right: 4px;
+}
+
+/* Modalidade "Online": aviso no lugar de Estado/Cidade (mesma altura de um campo) */
+.pf-local-note {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  line-height: 1.4;
+}
+
+/* Título dos resultados recebe foco (tabindex=-1) ao trocar de página/filtro */
+.pf-results-title { overflow-wrap: anywhere; }
+.pf-results-title:focus { outline: none; }
+.pf-results-title:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; border-radius: 4px; }
+
+/* Filtros ativos */
+.pf-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: -4px 0 16px;
+}
+.pf-active-label { font-size: 13px; color: var(--ink-mute); }
+.pf-active-list { list-style: none; margin: 0; padding: 0; }
+.pf-filter-chip { max-width: 100%; }
+.pf-filter-chip > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28ch; }
+.pf-filter-x { font-size: 15px; line-height: 1; color: var(--ink-mute); }
+.pf-filter-chip:hover .pf-filter-x { color: var(--brand); }
+
+/* Lista de cards */
+.pf-tutor-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pf-tutor-list > li { min-width: 0; }
+
+.pf-tutor-card { box-shadow: var(--shadow-card); }
+.pf-tutor-card:focus-within { border-color: var(--brand); }
+.pf-tutor-card .pf-tutor-link:focus-visible { outline: none; }
+.pf-tutor-card:has(.pf-tutor-link:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+.pf-tutor-card:hover .pf-tutor-link { color: var(--brand); }
+
+/* Premium: destaque dourado */
+.pf-tutor-card.is-premium {
+  background:
+    linear-gradient(135deg, rgba(245, 185, 74, 0.08), transparent 45%),
+    var(--bg-elev);
+}
+.pf-tutor-card.is-premium:hover {
+  background:
+    linear-gradient(135deg, rgba(245, 185, 74, 0.12), transparent 50%),
+    var(--bg-card);
+}
+
+.pf-tutor-subjects { list-style: none; margin: 4px 0 0; padding: 0; }
+.pf-tutor-subjects .pf-chip { cursor: inherit; }
+.pf-chip-more { color: var(--brand); border-style: dashed; }
+
+.pf-tutor-meta { align-items: center; }
+.pf-tutor-where { display: inline-flex; align-items: center; gap: 5px; overflow-wrap: anywhere; }
+.pf-ico {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pf-new { letter-spacing: 0.08em; }
+
+/* "Ver perfil" é só visual: o clique atravessa até o link do nome (card inteiro clicável) */
+.pf-tutor-side .pf-card-cta { pointer-events: none; }
+.pf-tutor-card:hover .pf-card-cta { border-color: var(--brand); color: var(--brand); }
+
+@media (max-width: 640px) {
+  /* avatarEl() define o tamanho inline: no celular o avatar encolhe */
+  .pf-tutor-avatar .pf-avatar {
+    width: 56px !important;
+    height: 56px !important;
+    font-size: 20px !important;
+  }
+  .pf-tutor-name { font-size: 17px; }
+  .pf-tutor-price { font-size: 19px; }
+}
+
+/* Paginação (complementa .pf-pagination) */
+.pf-pagination .pf-page-current,
+.pf-pagination .pf-page-disabled,
+.pf-pagination .pf-page-gap {
+  min-width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.pf-pagination .pf-page-current { font-weight: 600; }
+.pf-pagination .pf-page-disabled {
+  border: 1px solid var(--line);
+  color: var(--ink-mute);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.pf-pagination .pf-page-gap { min-width: 20px; padding: 0 4px; color: var(--ink-mute); }
+@media (max-width: 420px) {
+  .pf-pagination { gap: 6px; }
+  .pf-pagination :is(a, span) { min-width: 36px; padding: 0 9px; }
+}
+
+/* Estados */
+.pf-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.pf-busca-error .pf-notice-title { color: #fca5a5; font-size: 17px; }
+
+/* Resultados ocupam pelo menos a altura de alguns cards (evita "pulo" do rodapé) */
+.pf-results { min-height: 240px; }
+
+@media (max-width: 900px) {
+  .pf-results-head .pf-field-inline { margin-left: 0; width: 100%; }
+  .pf-results-head .pf-field-inline .pf-select { flex: 1; width: auto; }
+}

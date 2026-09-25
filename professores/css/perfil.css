@@ -1,0 +1,278 @@
+/* ============================================
+   Perfil público do professor (/professores/p/<slug>) — complementa professores.css
+   Importado por /professores/js/pages/perfil.js
+   ============================================ */
+
+.pf-profile-page { padding-top: 32px; }
+
+/* Trilha */
+.pf-breadcrumb ol {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+.pf-breadcrumb li { min-width: 0; overflow-wrap: anywhere; }
+.pf-breadcrumb li + li::before { content: '›'; margin-right: 6px; color: var(--ink-mute); }
+.pf-breadcrumb a { color: var(--ink-dim); text-decoration: none; }
+.pf-breadcrumb a:hover { color: var(--brand); }
+.pf-breadcrumb [aria-current] { color: var(--ink); }
+
+/* Grade: cabeçalho + conteúdo à esquerda, card de contato fixo à direita */
+.pf-profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-areas: "head side" "body side";
+  gap: 20px 32px;
+  align-items: start;
+}
+.pf-profile-head { grid-area: head; }
+.pf-profile-side {
+  grid-area: side;
+  position: sticky;
+  top: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.pf-profile-body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .pf-profile {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "head" "side" "body";
+  }
+  .pf-profile-side { position: static; }
+}
+
+/* Cabeçalho */
+.pf-profile-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 26px;
+  align-items: center;
+  padding: 28px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+.pf-profile-head.is-premium {
+  border-color: rgba(245, 185, 74, 0.45);
+  background: linear-gradient(135deg, rgba(245, 185, 74, 0.1), transparent 50%), var(--bg-elev);
+  box-shadow: var(--shadow-card), 0 20px 50px -30px rgba(245, 185, 74, 0.55);
+}
+.pf-profile-avatar .pf-avatar { box-shadow: 0 0 0 4px var(--bg-elev), 0 0 0 5px var(--line-strong); }
+.pf-profile-head.is-premium .pf-profile-avatar .pf-avatar { box-shadow: 0 0 0 4px var(--bg-elev), 0 0 0 5px rgba(245, 185, 74, 0.6); }
+.pf-profile-id { min-width: 0; }
+.pf-profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.pf-profile-name {
+  font-size: clamp(28px, 3.4vw, 42px);
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.pf-profile-headline {
+  margin: 10px 0 0;
+  max-width: 60ch;
+  font-size: 17px;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
+.pf-profile-facts {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+.pf-profile-facts li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.pf-profile-rating { color: inherit; text-decoration: none; border-radius: 6px; }
+.pf-profile-rating:hover .pf-rating-count { color: var(--brand); }
+
+.pf-ico {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 560px) {
+  .pf-profile-head { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px; }
+  /* avatarEl() define o tamanho inline */
+  .pf-profile-avatar .pf-avatar { width: 88px !important; height: 88px !important; font-size: 32px !important; }
+  .pf-profile-headline { font-size: 16px; }
+}
+
+/* Seções */
+.pf-profile-section { padding: 26px 28px; }
+@media (max-width: 480px) { .pf-profile-section { padding: 20px 18px; } }
+.pf-profile-section > .pf-section-title { margin-bottom: 14px; }
+.pf-bio { margin: 0; color: var(--ink-dim); line-height: 1.75; }
+.pf-mount { min-width: 0; }
+/* Componente que não renderizou nada (ex.: professor sem respostas no tira-dúvidas): seção some */
+.pf-profile-section:has(> .pf-mount:empty) { display: none; }
+
+.pf-subject-list { list-style: none; margin: 0; padding: 0; }
+.pf-subject-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pf-subject-item:first-child { padding-top: 0; }
+.pf-subject-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.pf-subject-name {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+a.pf-subject-name:hover { color: var(--brand); }
+.pf-levels { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-levels .pf-chip { cursor: default; }
+.pf-levels-none { font-size: 13px; }
+
+/* Card de contato */
+.pf-cta-card { display: flex; flex-direction: column; gap: 14px; }
+.pf-cta-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.pf-cta-price .pf-price {
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.pf-cta-price small,
+.pf-cta-bar-price small { font-size: 14px; color: var(--ink-mute); }
+.pf-price-none { font-family: var(--display); font-size: 22px; font-weight: 700; color: var(--ink); }
+.pf-cta-note { margin: 0; font-size: 13px; color: var(--ink-mute); }
+.pf-cta-action { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pf-cta-action .btn { width: 100%; justify-content: center; }
+.pf-cta-list {
+  list-style: none;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+.pf-cta-list li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.pf-cta-list .pf-ico { margin-top: 3px; }
+.pf-cta-foot { display: flex; justify-content: flex-end; }
+
+.pf-safety { padding: 18px 20px; font-size: 13px; color: var(--ink-mute); box-shadow: none; }
+.pf-safety p { margin: 0; }
+.pf-safety .pf-safety-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-family: var(--display);
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+
+.pf-profile-notice { margin-bottom: 20px; }
+
+/* Barra fixa de contato (só no celular; aparece quando o card de contato sai da tela) */
+.pf-cta-bar { display: none; }
+@media (max-width: 900px) {
+  body.pf-has-cta-bar { padding-bottom: 84px; }
+  body.pf-has-cta-bar .pf-toasts { bottom: 96px; }
+  .pf-cta-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40; /* abaixo do nav/menu mobile (50) e dos avisos */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: rgba(14, 29, 22, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line-strong);
+    box-shadow: 0 -16px 40px -20px rgba(0, 0, 0, 0.8);
+    transform: translateY(110%);
+    visibility: hidden;
+    transition: transform 0.2s ease, visibility 0.2s;
+  }
+  .pf-cta-bar.is-visible { transform: none; visibility: visible; }
+  .pf-cta-bar:has(.pf-cta-bar-action:empty) { display: none; }
+}
+.pf-cta-bar-info { display: flex; flex-direction: column; flex: 0 0 auto; min-width: 0; max-width: 48%; }
+.pf-cta-bar-name {
+  font-size: 12px;
+  color: var(--ink-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-cta-bar-price { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.pf-cta-bar-price .pf-price { font-family: var(--display); font-size: 20px; font-weight: 800; color: var(--ink); }
+.pf-cta-bar-price .pf-price-none { font-size: 16px; }
+.pf-cta-bar-price small { font-size: 12px; }
+/* botão encolhe e quebra linha: o preço nunca fica coberto */
+.pf-cta-bar-action { flex: 0 1 auto; min-width: 0; display: flex; justify-content: flex-end; }
+.pf-cta-bar-action .btn { padding: 11px 16px; font-size: 14px; line-height: 1.25; white-space: normal; text-align: center; justify-content: center; }
+
+/* 404 e carregamento */
+.pf-profile-404 { max-width: 640px; padding: 24px 0; }
+.pf-profile-404 .eyebrow { margin-bottom: 14px; }
+.pf-profile-404 .lead { margin: 14px 0 24px; }
+
+.pf-profile-skel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  padding: 28px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.pf-profile-skel-avatar { width: 112px; height: 112px; border-radius: 50%; }
+@media (max-width: 560px) {
+  .pf-profile-skel { padding: 20px; gap: 16px; }
+  .pf-profile-skel-avatar { width: 72px; height: 72px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-cta-bar { transition: none; }
+}

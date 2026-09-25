@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de privacidade — Professores | Quanta Aulas</title>
+  <meta name="description" content="Como o portal de professores do Quanta Aulas trata seus dados pessoais, conforme a LGPD (Lei 13.709/2018) e o Marco Civil da Internet." />
+
+  <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
+  <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/professores/css/professores.css" />
+</head>
+
+<body>
+  <div class="bg-ambient"></div>
+  <div class="bg-grid"></div>
+
+  <!-- @include professores/partials/nav.html -->
+
+  <!--
+    MINUTA — revisar com advogado antes da publicação.
+    Dados do controlador preenchidos em 25/09/2026 (ver docs/PROFESSORES.md, "Dados do responsável").
+    Conferir se a descrição dos operadores e prazos bate com a configuração real (Supabase, Mercado Pago, e-mail).
+  -->
+
+  <main id="app" class="pf-main" data-page="privacidade">
+    <section class="pf-page">
+      <div class="container">
+        <header class="pf-page-head">
+          <div class="eyebrow">Documentos</div>
+          <h1 class="pf-title">Política de privacidade</h1>
+          <p class="lead">Como tratamos seus dados pessoais no portal de professores do Quanta Aulas, de acordo com a Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018) e o Marco Civil da Internet (Lei 12.965/2014).</p>
+          <p class="pf-legal-meta">Última atualização: 25 de setembro de 2026 · Versão 1.0</p>
+        </header>
+
+        <div id="pageBody" class="pf-page-body pf-legal">
+          <nav class="pf-legal-toc" aria-label="Sumário da política de privacidade">
+            <details open>
+              <summary>Sumário</summary>
+              <ol>
+                <li><a href="#controlador">Quem é o controlador</a></li>
+                <li><a href="#dados">Dados que coletamos</a></li>
+                <li><a href="#finalidades">Finalidades e bases legais</a></li>
+                <li><a href="#publico">O que fica público</a></li>
+                <li><a href="#compartilhamento">Operadores e compartilhamento</a></li>
+                <li><a href="#internacional">Transferência internacional</a></li>
+                <li><a href="#retencao">Por quanto tempo guardamos</a></li>
+                <li><a href="#direitos">Seus direitos</a></li>
+                <li><a href="#menores">Crianças e adolescentes</a></li>
+                <li><a href="#cookies">Cookies e armazenamento local</a></li>
+                <li><a href="#seguranca">Segurança</a></li>
+                <li><a href="#automatizadas">Ordenação da busca</a></li>
+                <li><a href="#alteracoes">Alterações desta política</a></li>
+                <li><a href="#contato">Contato e encarregado</a></li>
+              </ol>
+            </details>
+          </nav>
+
+          <article class="pf-prose">
+            <section class="pf-legal-summary" aria-labelledby="resumo">
+              <h2 id="resumo">Resumo</h2>
+              <ul>
+                <li>Coletamos só o necessário para você usar o portal: conta, anúncio de professor, mensagens, avaliações, perguntas e respostas e, para professores com plano pago, dados do pagamento.</li>
+                <li>Não vendemos seus dados e não usamos cookies de publicidade ou de rastreamento.</li>
+                <li>Seu e-mail nunca é exibido publicamente. Alunos aparecem com nome abreviado (ex.: “Maria S.”).</li>
+                <li>Você pode baixar uma cópia dos seus dados e excluir sua conta a qualquer momento, sozinho, em <a href="/professores/painel.html#conta">Meu painel → Conta</a>.</li>
+                <li>Pagamentos são processados pelo Mercado Pago: nós não recebemos os dados do seu cartão.</li>
+              </ul>
+            </section>
+
+            <h2 id="controlador">1. Quem é o controlador</h2>
+            <p>O controlador dos dados pessoais tratados no portal de professores (<strong>quantaaulas.com/professores/</strong>) é <strong>Samuel Isidoro dos Santos Júnior</strong>, responsável pela marca <strong>Quanta Aulas</strong>, inscrito no CPF sob o nº 080.930.309-48, com sede em Joinville/SC (“Quanta Aulas”, “nós”).</p>
+            <p>O encarregado pelo tratamento de dados pessoais (DPO) pode ser contatado pelo e-mail <a href="mailto:aulas@isidoropreparatorio.com.br">aulas@isidoropreparatorio.com.br</a>.</p>
+            <p>Esta política vale para alunos, responsáveis e professores que usam o portal e complementa os <a href="/professores/termos.html">Termos de Uso</a>.</p>
+
+            <h2 id="dados">2. Dados que coletamos</h2>
+            <h3>2.1 Dados que você nos informa</h3>
+            <ul>
+              <li><strong>Cadastro:</strong> nome completo, e-mail, senha e tipo de conta (aluno ou professor), além da data em que você aceitou os Termos e esta Política. A senha é guardada pelo nosso provedor de autenticação apenas em formato criptografado (hash); ninguém da equipe tem acesso a ela.</li>
+              <li><strong>Anúncio de professor:</strong> título, apresentação, valor da hora-aula, modalidades (online/presencial), estado e cidade, matérias e níveis de ensino, endereço do perfil e, se você enviar, foto.</li>
+              <li><strong>Foto de perfil:</strong> a imagem que você enviar, reduzida para 512 px no seu próprio navegador antes do envio.</li>
+              <li><strong>Conteúdo que você cria:</strong> mensagens trocadas com outros usuários, avaliações, perguntas e respostas do tira-dúvidas e denúncias.</li>
+              <li><strong>Pagamentos de planos (professores):</strong> plano, período, valor, status e identificadores da transação no Mercado Pago. Os dados do cartão ou da conta usada no Pix são informados diretamente ao Mercado Pago e não chegam até nós.</li>
+              <li><strong>Contato com a gente:</strong> o que você escrever ao falar com o suporte ou com o encarregado.</li>
+            </ul>
+            <h3>2.2 Dados coletados automaticamente</h3>
+            <ul>
+              <li><strong>Registros de acesso:</strong> endereço IP, data e hora de acesso, e informações técnicas do navegador e do dispositivo, registrados pelos nossos provedores de hospedagem e autenticação.</li>
+              <li><strong>Dados de uso necessários ao serviço:</strong> datas de criação e atualização de conteúdo, horário da última leitura de cada conversa (para indicar mensagens não lidas) e registros de limite de uso (para evitar spam).</li>
+              <li><strong>Sessão:</strong> tokens de acesso guardados no armazenamento local do seu navegador (veja a seção <a href="#cookies">Cookies e armazenamento local</a>).</li>
+            </ul>
+            <h3>2.3 Dados sensíveis</h3>
+            <p>Não pedimos dados pessoais sensíveis (como origem racial, convicção religiosa, opinião política, saúde ou vida sexual). Pedimos que você também não os inclua em anúncios, avaliações, perguntas ou respostas, que são públicos.</p>
+
+            <h2 id="finalidades">3. Para que usamos seus dados (finalidades e bases legais)</h2>
+            <p>Tratamos dados pessoais somente com base legal prevista no art. 7º da LGPD:</p>
+            <div class="pf-table-wrap">
+              <table class="pf-table">
+                <caption class="pf-sr-only">Finalidades do tratamento e respectivas bases legais</caption>
+                <thead>
+                  <tr><th scope="col">Finalidade</th><th scope="col">Base legal (LGPD)</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Criar e manter sua conta, autenticar seu acesso e recuperar a senha.</td><td>Execução de contrato (art. 7º, V)</td></tr>
+                  <tr><td>Exibir o anúncio do professor e permitir que alunos o encontrem na busca.</td><td>Execução de contrato (art. 7º, V)</td></tr>
+                  <tr><td>Permitir mensagens entre alunos e professores e avisar por e-mail sobre mensagens novas.</td><td>Execução de contrato (art. 7º, V)</td></tr>
+                  <tr><td>Publicar avaliações, perguntas e respostas do tira-dúvidas.</td><td>Execução de contrato (art. 7º, V)</td></tr>
+                  <tr><td>Vender planos pagos, confirmar pagamentos e ativar os benefícios.</td><td>Execução de contrato (art. 7º, V)</td></tr>
+                  <tr><td>Guardar registros fiscais e contábeis e emitir documentos fiscais.</td><td>Cumprimento de obrigação legal (art. 7º, II)</td></tr>
+                  <tr><td>Guardar registros de acesso a aplicações.</td><td>Cumprimento de obrigação legal (art. 7º, II; art. 15 do Marco Civil)</td></tr>
+                  <tr><td>Manter a segurança da plataforma, prevenir fraudes, spam e abusos, aplicar limites de uso e analisar denúncias (moderação).</td><td>Legítimo interesse (art. 7º, IX, e art. 10)</td></tr>
+                  <tr><td>Enviar comunicados sobre sua conta e sobre mudanças nos Termos ou nesta Política.</td><td>Execução de contrato e legítimo interesse</td></tr>
+                  <tr><td>Defender nossos direitos em processos judiciais, administrativos ou arbitrais.</td><td>Exercício regular de direitos (art. 7º, VI)</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>Quando usamos o legítimo interesse, tratamos apenas os dados estritamente necessários e respeitamos suas expectativas e seus direitos. Você pode se opor a esse tratamento pelo contato da seção <a href="#contato">Contato e encarregado</a>.</p>
+            <p><strong>Não vendemos</strong> dados pessoais, não os usamos para publicidade de terceiros e não criamos perfis de comportamento para anúncios.</p>
+
+            <h2 id="publico">4. O que fica público</h2>
+            <ul>
+              <li><strong>Anúncio de professor publicado:</strong> nome, foto, título, apresentação, valor da hora-aula, modalidades, cidade e estado, matérias e níveis, nota média, avaliações recebidas e respostas no tira-dúvidas. Anúncios não publicados, suspensos ou de contas suspensas não aparecem para o público.</li>
+              <li><strong>Alunos:</strong> em avaliações e perguntas aparece apenas o nome abreviado (ex.: “Maria S.”).</li>
+              <li><strong>Nunca são públicos:</strong> e-mail, senha, mensagens privadas, pagamentos e denúncias.</li>
+            </ul>
+            <p>Páginas públicas podem ser indexadas por mecanismos de busca (como o Google). Se você despublicar o anúncio ou excluir a conta, o conteúdo sai do portal na hora, mas pode continuar por algum tempo no cache desses serviços, que não controlamos.</p>
+            <p><strong>Mensagens</strong> são visíveis apenas para os participantes da conversa. A moderação só acessa uma mensagem quando ela é denunciada por um dos participantes ou quando houver ordem judicial.</p>
+
+            <h2 id="compartilhamento">5. Operadores e compartilhamento</h2>
+            <p>Para funcionar, o portal usa fornecedores que tratam dados em nosso nome (operadores), sempre limitados às nossas instruções e a esta Política:</p>
+            <ul>
+              <li><strong>Supabase, Inc.</strong> — banco de dados, autenticação, armazenamento de fotos e funções do servidor. Os dados ficam em servidores da região de São Paulo (Brasil), mas a empresa é sediada nos Estados Unidos e pode acessá-los de lá para suporte e manutenção (veja a seção <a href="#internacional">Transferência internacional</a>).</li>
+              <li><strong>Mercado Pago</strong> (MercadoPago.com Representações Ltda.) — processamento dos pagamentos dos planos, por Pix ou cartão. O Mercado Pago também é controlador dos dados que você informa diretamente a ele, conforme a política de privacidade dele.</li>
+              <li><strong>Provedor de e-mail transacional</strong> (serviço SMTP contratado pela Quanta Aulas) — envio de e-mails de confirmação de cadastro, recuperação de senha e aviso de mensagens novas.</li>
+              <li><strong>Hospedagem do site</strong> (Hostinger) — entrega das páginas e registros de acesso do servidor web.</li>
+              <li><strong>Google Fonts</strong> — as fontes do site são carregadas dos servidores do Google, que recebem o seu endereço IP ao carregar a página.</li>
+            </ul>
+            <p>Também podemos compartilhar dados: (i) com autoridades públicas, quando houver obrigação legal ou ordem judicial; (ii) para proteger direitos, a segurança dos usuários ou apurar fraudes e ilícitos; e (iii) em caso de reorganização societária (fusão, aquisição), mantidas as garantias desta Política.</p>
+            <p>Entre usuários: quando você envia uma mensagem, o destinatário vê seu nome, sua foto (se houver) e o conteúdo enviado.</p>
+
+            <h2 id="internacional">6. Transferência internacional de dados</h2>
+            <p>Alguns operadores (como o Supabase e, possivelmente, o provedor de e-mail) são sediados fora do Brasil. Nesses casos, a transferência internacional ocorre com base no art. 33 da LGPD, mediante cláusulas contratuais e garantias de proteção oferecidas pelos fornecedores (como acordos de tratamento de dados — DPA — e cláusulas-padrão), observada a regulamentação da Autoridade Nacional de Proteção de Dados (ANPD). Sempre que possível, escolhemos armazenar os dados no Brasil.</p>
+
+            <h2 id="retencao">7. Por quanto tempo guardamos seus dados</h2>
+            <ul>
+              <li><strong>Conta, perfil, anúncio e foto:</strong> enquanto a conta existir. Ao excluir a conta, são apagados imediatamente.</li>
+              <li><strong>Mensagens, avaliações, perguntas e respostas:</strong> enquanto a conta existir. Ao excluir a conta, o conteúdo de sua autoria e as conversas de que você participa são apagados.</li>
+              <li><strong>Registros de acesso a aplicações:</strong> 6 (seis) meses, conforme o art. 15 do Marco Civil da Internet, ou por prazo maior se houver requisição de autoridade.</li>
+              <li><strong>Registros de pagamento e fiscais:</strong> 5 (cinco) anos, conforme a legislação tributária. Depois da exclusão da conta, eles ficam desvinculados do seu perfil.</li>
+              <li><strong>Denúncias:</strong> podem ser mantidas, desvinculadas da conta de quem denunciou, pelo tempo necessário para o histórico de moderação e para a defesa de direitos.</li>
+              <li><strong>Cópias de segurança (backups):</strong> dados excluídos saem dos backups no ciclo normal de rotação do provedor.</li>
+            </ul>
+            <p>Terminado o prazo, os dados são eliminados ou anonimizados, salvo as hipóteses de conservação do art. 16 da LGPD.</p>
+
+            <h2 id="direitos">8. Seus direitos</h2>
+            <p>Pelo art. 18 da LGPD, você pode pedir a qualquer momento:</p>
+            <ul>
+              <li>confirmação de que tratamos seus dados e <strong>acesso</strong> a eles;</li>
+              <li><strong>correção</strong> de dados incompletos, inexatos ou desatualizados;</li>
+              <li><strong>anonimização, bloqueio ou eliminação</strong> de dados desnecessários, excessivos ou tratados em desconformidade com a lei;</li>
+              <li><strong>portabilidade</strong> dos dados a outro fornecedor;</li>
+              <li><strong>eliminação</strong> dos dados tratados com base no consentimento;</li>
+              <li>informação sobre as entidades com quem compartilhamos dados;</li>
+              <li>informação sobre a possibilidade de não fornecer consentimento e suas consequências, e <strong>revogação</strong> do consentimento;</li>
+              <li><strong>oposição</strong> a tratamento feito com base em outras hipóteses legais, em caso de descumprimento da LGPD;</li>
+              <li><strong>revisão</strong> de decisões tomadas unicamente com base em tratamento automatizado (art. 20).</li>
+            </ul>
+            <p><strong>Faça você mesmo, no painel:</strong> em <a href="/professores/painel.html">Meu painel</a> você corrige nome, foto e anúncio; em <a href="/professores/painel.html#conta">Meu painel → Conta</a> você <strong>baixa uma cópia dos seus dados</strong> (arquivo JSON) e <strong>exclui sua conta</strong>.</p>
+            <p>Para os demais pedidos, escreva para <a href="mailto:aulas@isidoropreparatorio.com.br">aulas@isidoropreparatorio.com.br</a> a partir do e-mail cadastrado. Poderemos pedir informações para confirmar sua identidade. Respondemos em até 15 (quinze) dias. Você também pode apresentar reclamação à ANPD (<a href="https://www.gov.br/anpd" rel="noopener" target="_blank">gov.br/anpd</a>).</p>
+
+            <h2 id="menores">9. Crianças e adolescentes</h2>
+            <p>O portal é destinado a maiores de 18 anos. <strong>Menores de 18 anos só podem usar o portal com autorização e acompanhamento do pai, mãe ou responsável legal</strong>, que deve realizar ou autorizar o cadastro e acompanhar as conversas e as aulas combinadas. Em conformidade com o art. 14 da LGPD, o tratamento de dados de crianças e adolescentes é feito no seu melhor interesse, e dados de crianças (menores de 12 anos) só podem ser tratados com o consentimento específico de um dos pais ou do responsável.</p>
+            <p>Professores precisam ter 18 anos ou mais. Se soubermos de uma conta criada por menor sem autorização do responsável, ou de um professor menor de idade, poderemos suspendê-la e excluir os dados. Use o botão “Denunciar” (motivo “menor de idade”) ou escreva para o encarregado.</p>
+
+            <h2 id="cookies">10. Cookies e armazenamento local</h2>
+            <p>O portal <strong>não usa cookies de publicidade nem ferramentas de análise ou rastreamento</strong>. Usamos apenas o armazenamento local do navegador (<em>localStorage</em>), de forma estritamente necessária:</p>
+            <ul>
+              <li><strong>Sessão de login</strong> (chave <code>sb-…-auth-token</code>): mantém você conectado e renova o acesso com segurança. É removida quando você clica em “Sair”.</li>
+              <li><strong>Verificação de links de e-mail</strong> (chave <code>sb-…-code-verifier</code>): código temporário que garante que o link de confirmação ou de nova senha seja aberto no mesmo navegador que o pediu.</li>
+            </ul>
+            <p>Sem esses dados não é possível entrar na conta. Você pode apagá-los nas configurações do navegador, o que encerra a sessão. Serviços de terceiros usados em páginas próprias deles (como a página de pagamento do Mercado Pago) podem usar cookies conforme as políticas desses serviços.</p>
+
+            <h2 id="seguranca">11. Segurança</h2>
+            <p>Adotamos medidas técnicas e administrativas para proteger seus dados, entre elas: conexão criptografada (HTTPS); senhas guardadas apenas em formato criptografado; controle de acesso por usuário diretamente no banco de dados (cada pessoa só lê e altera o que é seu); acesso administrativo restrito; limites de uso contra spam e abuso; e processamento de pagamentos por instituição especializada.</p>
+            <p>Nenhum sistema é totalmente imune a incidentes. Se ocorrer um incidente de segurança que possa causar risco ou dano relevante, comunicaremos você e a ANPD, conforme o art. 48 da LGPD. Ajude a proteger sua conta: use uma senha forte e exclusiva e não a compartilhe.</p>
+
+            <h2 id="automatizadas">12. Ordenação da busca</h2>
+            <p>A ordem dos professores na busca é definida automaticamente a partir de critérios objetivos: correspondência com o que foi buscado (matéria, cidade, modalidade e texto), plano contratado pelo professor, proximidade (mesma cidade, para aulas presenciais), avaliações recebidas e um rodízio diário para distribuir a visibilidade. Essa ordenação não produz efeitos jurídicos sobre você; ainda assim, você pode pedir explicações ou revisão pelo contato do encarregado.</p>
+
+            <h2 id="alteracoes">13. Alterações desta política</h2>
+            <p>Podemos atualizar esta Política para refletir mudanças no portal ou na legislação. A data da última atualização fica no topo da página. Mudanças relevantes serão avisadas no portal ou por e-mail antes de entrarem em vigor.</p>
+
+            <h2 id="contato">14. Contato e encarregado (DPO)</h2>
+            <ul>
+              <li><strong>Controlador:</strong> Samuel Isidoro dos Santos Júnior (Quanta Aulas) — CPF 080.930.309-48</li>
+              <li><strong>Endereço:</strong> Joinville/SC</li>
+              <li><strong>Encarregado (DPO):</strong> Samuel Isidoro dos Santos Júnior — <a href="mailto:aulas@isidoropreparatorio.com.br">aulas@isidoropreparatorio.com.br</a></li>
+            </ul>
+            <p>Veja também os <a href="/professores/termos.html">Termos de Uso</a>.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- @include professores/partials/footer.html -->
+
+  <script type="module" src="/professores/js/pages/privacidade.js"></script>
+</body>
+</html>
