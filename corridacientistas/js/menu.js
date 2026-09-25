@@ -148,7 +148,7 @@ export class Menu {
       (c) => `<button class="char-card" data-id="${c.id}" style="--c:${c.colors.ui}">
         <span class="flag">${FLAGS[c.country] || ''}</span>
         <div class="ph" style="--c:${c.colors.ui}">${c.name[0]}</div>
-        <span>${c.name}</span>
+        <span>${c.short || c.name}</span>
       </button>`,
     ).join('');
     this.grid.addEventListener('click', (e) => {
@@ -247,7 +247,7 @@ export class Menu {
       .join('');
     const winner = results[0].kart.character;
     const mine = player.character;
-    let html = `<b>Você sabia?</b> ${winner.fact}`;
+    let html = `<b>Você sabia? Sobre ${winner.name}, o vencedor:</b> ${winner.fact}`;
     if (mine.id !== winner.id) html += `<br><br><b>E sobre ${mine.name}:</b> ${mine.fact}`;
     $('results-fact').innerHTML = html;
     this.show('results');

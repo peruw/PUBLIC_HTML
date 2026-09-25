@@ -99,7 +99,7 @@ window.setView = (s, lat = 0, m = 'chase', opts = {}) => {
   }
   return true;
 };
-window.bus = bus; window.track = track; window.renderer = renderer; window.scene = scene; window.camera = camera; window.THREE = THREE;
+window.bus = bus; window.env = env; window.track = track; window.renderer = renderer; window.scene = scene; window.camera = camera; window.THREE = THREE;
 window.stats = () => {
   // conta também o passe de sombra (autoReset desligado durante a medição)
   renderer.info.autoReset = false;

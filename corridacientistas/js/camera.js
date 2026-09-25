@@ -33,12 +33,15 @@ function dampV(cur, target, vel, smooth, dt) {
   const omega = 2 / Math.max(1e-4, smooth);
   const x = omega * dt;
   const e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
-  for (const k of ['x', 'y', 'z']) {
-    const change = cur[k] - target[k];
-    const temp = (vel[k] + omega * change) * dt;
-    vel[k] = (vel[k] - omega * temp) * e;
-    cur[k] = target[k] + (change + temp) * e;
-  }
+  let c = cur.x - target.x, t = (vel.x + omega * c) * dt;
+  vel.x = (vel.x - omega * t) * e;
+  cur.x = target.x + (c + t) * e;
+  c = cur.y - target.y; t = (vel.y + omega * c) * dt;
+  vel.y = (vel.y - omega * t) * e;
+  cur.y = target.y + (c + t) * e;
+  c = cur.z - target.z; t = (vel.z + omega * c) * dt;
+  vel.z = (vel.z - omega * t) * e;
+  cur.z = target.z + (c + t) * e;
 }
 // Ruído suave barato (soma de senos) para o tremor
 const wob = (t, a, b, c) => Math.sin(t * a) * 0.5 + Math.sin(t * b + 1.3) * 0.3 + Math.sin(t * c + 2.1) * 0.2;
@@ -164,10 +167,11 @@ export class CameraRig {
     if (!boosting || this.topRef <= 0 || snap) this.topRef = Math.max(8, ms);
     const ratio = Math.min(1.3, Math.abs(kart.speed || 0) / this.topRef);
     const aspect = this.camera.aspect || 16 / 9;
-    const narrow = aspect < 1 ? 0.9 : 1;
-    const distT = (opts?.distance ?? this.distance) * narrow + Math.min(1, ratio) * 0.35;
+    // tela em pé: câmera um pouco mais perto, mais alta e olhando mais para baixo
+    const tall = aspect < 1 ? 1 - aspect : 0;
+    const distT = (opts?.distance ?? this.distance) * (1 - tall * 0.15) + Math.min(1, ratio) * 0.35;
     this.extraDist = snap ? distT : damp1(this.extraDist, distT, this.st, 'dist', 0.35, dt);
-    const h = opts?.height ?? this.height;
+    const h = (opts?.height ?? this.height) + tall * 1.4;
     const air = kart.onGround === false;
 
     if (lookBack) {
@@ -186,7 +190,7 @@ export class CameraRig {
       this.camY = snap ? yT : damp1(this.camY, yT, this.st, 'y', air ? 0.32 : 0.12, dt);
       _desired.y = this.camY;
       _look.copy(pos).addScaledVector(_f, this.lookAhead);
-      const lyT = pos.y + 1;
+      const lyT = pos.y + 1 - tall * 1.1;
       this.lookY = snap ? lyT : damp1(this.lookY, lyT, this.st, 'ly', air ? 0.25 : 0.08, dt);
       _look.y = this.lookY;
       this.pos.copy(_desired);
@@ -227,7 +231,9 @@ export class CameraRig {
     const r = o.radius ?? 5, h = o.height ?? 2;
     _desired.set(cx + Math.sin(this.orbitAngle) * r, cy + h, cz + Math.cos(this.orbitAngle) * r);
     _look.set(cx, cy + (o.lookHeight ?? 0.9), cz);
-    this._moveTo(_desired, _look, o.smooth ?? 0.4, dt);
+    // acompanha o alvo rigidamente (só o ângulo anda); suavização opcional
+    if (o.smooth) this._moveTo(_desired, _look, o.smooth, dt);
+    else { this.pos.copy(_desired); this.look.copy(_look); }
     this.roll = 0;
     return o.fov ?? 50;
   }
@@ -338,10 +344,10 @@ export class CameraRig {
     const cam = this.camera;
     const aspect = cam.aspect || 16 / 9;
     // em telas estreitas (celular em pé), garante um campo horizontal utilizável
-    if (aspect < 1.3) {
-      const hRef = 2 * Math.atan(Math.tan((fovT * DEG) / 2) * 1.3);
+    if (aspect < 1) {
+      const hRef = fovT * DEG * 0.9;
       const vNeed = (2 * Math.atan(Math.tan(hRef / 2) / aspect)) / DEG;
-      fovT = Math.min(112, Math.max(fovT, vNeed));
+      fovT = Math.min(100, Math.max(fovT, vNeed));
     }
     this.fov = this._snap ? fovT : damp1(this.fov, fovT, this.st, 'fov', 0.25, dt);
     cam.position.copy(this.pos);

@@ -283,7 +283,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const moundTop = meta.moundTop;
   const extent = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    if (FL[i] === 2) extent[i] = SPAN[i] + 8 + ((moundTop[i] || 10) + 3) / 2.4;
+    if (FL[i] === 2) extent[i] = SPAN[i] + (meta.moundPad || 7.5) + 0.5 + ((moundTop[i] || 10) + 3) / 2.4;
     else extent[i] = WD[i] + (FL[i] === 1 ? 2.5 : 0.8);
   }
   for (let i = 0; i < N; i++) {
@@ -392,12 +392,20 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const LO = new Float32Array(nx * nz).fill(-1e9);
   const HI = new Float32Array(nx * nz).fill(1e9);
   const LOWF = new Float32Array(nx * nz).fill(1e9);
+  const HOLE = new Uint8Array(nx * nz); // vértices dentro do túnel: triângulos removidos (o morro cobre)
+  const TD = new Float32Array(nx * nz).fill(1e9), TSP = new Float32Array(nx * nz), TYY = new Float32Array(nx * nz);
+  let maxSpan = 0;
+  for (let i = 0; i < N; i++) if (FL[i] === 2) maxSpan = Math.max(maxSpan, SPAN[i]);
+  const portalA = smp(meta.tunnelS[0]), portalB = smp(meta.tunnelS[1]);
+  const behindPortals = (x, z) =>
+    (x - portalA.pos.x) * portalA.tangent.x + (z - portalA.pos.z) * portalA.tangent.z > -0.4 &&
+    (x - portalB.pos.x) * portalB.tangent.x + (z - portalB.pos.z) * portalB.tangent.z < 0.4;
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) H[j * nx + i] = natural(xs[i], zs[j]);
   // crista natural sobre o túnel (o terreno encosta no morro que cobre o túnel)
   for (let s = 0; s < N; s++) {
     if (FL[s] !== 2) continue;
     const top = (moundTop[s] || 10) - 1.45;
-    const w0 = SPAN[s] + 7.5;
+    const w0 = SPAN[s] + (meta.moundPad || 7.5);
     const R = w0 + 48;
     const i0 = bsearch(xs, X[s] - R), i1 = bsearch(xs, X[s] + R) + 1;
     const j0 = bsearch(zs, Z[s] - R), j1 = bsearch(zs, Z[s] + R) + 1;
@@ -414,7 +422,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   }
   for (let s = 0; s < N; s++) {
     const zone = WD[s] + 6.5;
-    const R = FL[s] === 2 ? SPAN[s] + 2 : zone + 40;
+    const R = FL[s] === 2 ? maxSpan + 2 : zone + 40;
     const i0 = bsearch(xs, X[s] - R), i1 = bsearch(xs, X[s] + R) + 1;
     const j0 = bsearch(zs, Z[s] - R), j1 = bsearch(zs, Z[s] + R) + 1;
     for (let j = j0; j <= Math.min(j1, nz - 1); j++) {
@@ -428,7 +436,8 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
           continue;
         }
         if (FL[s] === 2) {
-          if (d < SPAN[s] + 1.2) LOWF[o] = Math.min(LOWF[o], Y[s] - 0.45);
+          // guarda a amostra de túnel mais próxima (perpendicular): o vão local decide
+          if (d < TD[o]) { TD[o] = d; TSP[o] = SPAN[s]; TYY[o] = Y[s]; }
           continue;
         }
         const e = Math.max(0, d - zone);
@@ -438,6 +447,10 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     }
   }
   for (let o = 0; o < H.length; o++) {
+    if (TD[o] < TSP[o] + 1.2) {
+      LOWF[o] = TYY[o] - 0.45;
+      if (behindPortals(xs[o % nx], zs[Math.floor(o / nx)])) HOLE[o] = 1;
+    }
     let h = H[o];
     if (LO[o] > HI[o]) h = HI[o];
     else h = clamp(h, LO[o], HI[o]);
@@ -486,6 +499,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const idx = [];
     for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
       const a = j * nx + i, b = a + 1, c2 = a + nx, d = c2 + 1;
+      if (HOLE[a] || HOLE[b] || HOLE[c2] || HOLE[d]) continue;
       idx.push(a, c2, b, b, c2, d);
     }
     const g = keep(new THREE.BufferGeometry());

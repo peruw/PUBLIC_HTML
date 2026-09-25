@@ -369,9 +369,13 @@ async function init() {
     get state() { return game.state; },
     startRace: (o = {}) => startRace({ character: 'newton', cc: '100cc', laps: 3, ...o }),
     enterTitle,
-    autopilot: (on = true) => (game.autopilot = on),
+    autopilot(on = true, skill) {
+      game.autopilot = on;
+      if (skill !== undefined && world.player) playerAI = new AIDriver(world.player, track, { skill });
+      return on;
+    },
     giveItem: (id) => world.player && items.giveItem(world.player, id),
-    items: ITEM_IDS,
+    itemIds: ITEM_IDS,
     skipToLastLap() {
       const L = track.length;
       const add = (world.totalLaps - 1) * L;

@@ -394,15 +394,15 @@ function buildAtlas(hi, aniso) {
   });
   put('ramp', 1912, 0, 128, 128, (gg, w, h) => {
     const gr = gg.createLinearGradient(0, 0, 0, h);
-    gr.addColorStop(0, '#1f7cff'); gr.addColorStop(1, '#0d3fb3');
+    gr.addColorStop(0, '#ffe14d'); gr.addColorStop(1, '#ff8a1f');
     gg.fillStyle = gr; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#ffe14d';
+    gg.fillStyle = '#1b1b1b';
     for (let j = 0; j < 2; j++) {
       const y = 10 + j * 58;
       gg.beginPath(); gg.moveTo(w / 2, y); gg.lineTo(w * 0.86, y + 30); gg.lineTo(w * 0.86, y + 44);
       gg.lineTo(w / 2, y + 16); gg.lineTo(w * 0.14, y + 44); gg.lineTo(w * 0.14, y + 30); gg.fill();
     }
-    gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, 6, h); gg.fillRect(w - 6, 0, 6, h);
+    gg.fillStyle = '#e3262f'; gg.fillRect(0, 0, 8, h); gg.fillRect(w - 8, 0, 8, h);
   });
   // seta de curva (aponta para a direita)
   put('arrow', 1648, 0, 128, 128, (gg, w, h) => {
@@ -1019,9 +1019,10 @@ export function buildTrack(scene, quality = {}) {
     }
     // perfil arredondado: topo cobre a faixa onde o terreno afunda até o chão do túnel
     const MOUND_K = [-1, -0.7, -0.4, 0, 0.4, 0.7, 1];
+    const moundPad = hi ? 7.5 : 11.5;
     const prof = (i, out) => {
       const top = moundTop[i];
-      const sp = SPAN[i] + 7.5;
+      const sp = SPAN[i] + moundPad;
       const w = sp + (top + 3) / 2.4;
       out.length = 0;
       out.push([-w, -3]);
@@ -1042,13 +1043,14 @@ export function buildTrack(scene, quality = {}) {
         for (const [j, [l, h]] of pairs) {
           va.set(X[j] + RX[j] * l, Y[j] + h, Z[j] + RZ[j] * l);
           const ny = skirt ? 0.4 : 1;
-          const nl = f === 0 ? -0.9 : f === nf - 1 ? 0.9 : (l / (SPAN[j] + 7.5)) * 0.25;
+          const nl = f === 0 ? -0.9 : f === nf - 1 ? 0.9 : (l / (SPAN[j] + moundPad)) * 0.25;
           gb.vert(va.x, va.y, va.z, RX[j] * nl, ny, RZ[j] * nl, cM, va.x * GUV, va.z * GUV);
         }
         gb.idx.push(v0, v0 + 1, v0 + 2, v0, v0 + 2, v0 + 3);
       }
     }
     group.userData.moundTop = moundTop;
+    group.userData.moundPad = moundPad;
   }
   mkMesh(gb.build(), matGround, { name: 'acostamento' });
 
@@ -1493,7 +1495,7 @@ export function buildTrack(scene, quality = {}) {
       const f = frame(s);
       const tp = tunnelProfile(s, WD[i]);
       const mt = group.userData.moundTop[Math.min(Math.max(i, Math.ceil(tunnelS[0] / ds) + 1), Math.floor(tunnelS[1] / ds))] || tp.top + 1;
-      const topW = tp.span + 8.5, botW = tp.span + 25;
+      const topW = tp.span + group.userData.moundPad + 1, botW = tp.span + group.userData.moundPad + 18;
       const Hh = mt + 1.8;
       const shape = new THREE.Shape();
       shape.moveTo(-botW, -3); shape.lineTo(botW, -3); shape.lineTo(botW, 1.5); shape.lineTo(topW + 4, Hh - 2.5);
@@ -1879,6 +1881,20 @@ export function buildTrack(scene, quality = {}) {
       b.idx.push(v2, v2 + 2, v2 + 1, v2, v2 + 3, v2 + 2);
     }
     mkMesh(b.build(), matAtlas, { cast: true, receive: true, name: 'rampas' });
+    // faixa luminosa na borda de saída das rampas
+    const gl = new Builder();
+    const cyan = col(0x7ef9ff);
+    for (const rp of ramps) {
+      const e = sample(rp.s + rp.length / 2 - 0.05);
+      const v0 = gl.count;
+      for (const [l, h] of [[-1, 0.02], [1, 0.02], [1, 0.14], [-1, 0.14]]) {
+        va.copy(e.pos).addScaledVector(e.right, rp.lateral + (l * rp.width) / 2);
+        va.y += RAMP_H + h - 0.12;
+        gl.vert(va.x, va.y, va.z, 0, 1, 0, cyan, 0, 0);
+      }
+      gl.idx.push(v0, v0 + 1, v0 + 2, v0, v0 + 2, v0 + 3, v0, v0 + 2, v0 + 1, v0, v0 + 3, v0 + 2);
+    }
+    mkMesh(gl.build(), matGlow, { receive: false, name: 'rampas-brilho' });
   }
 
   // ------------------------------------------------------------ arcos elétricos das bobinas
@@ -2086,6 +2102,7 @@ export function buildTrack(scene, quality = {}) {
       zones, zoneOf, bridgeS, tunnelS, crossing, ctrlS, waterY: WATER_Y,
       grassTexture: grass, headingAt, tunnelProfile,
       moundTop: group.userData.moundTop,
+      moundPad: group.userData.moundPad,
     },
     dispose() {
       offs.forEach((off) => off());

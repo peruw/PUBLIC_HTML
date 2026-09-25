@@ -8,10 +8,10 @@ import { statFactor } from './config.js';
 export const TUNING = {
   // velocidade (m/s) em 100cc com atributo 3; ±por ponto de atributo
   topSpeed: 24,
-  topSpeedPerStat: 1.3,
+  topSpeedPerStat: 0.5,
   // aceleração: a = accel0 * (1 - (v/vmax)²) + accelFloor → ~3 s até a máxima (atributo 3)
   accel0: 16.5,
-  accelPerFactor: 0.32, // ±32% com atributo 5/1
+  accelPerFactor: 0.45, // ±45% com atributo 5/1
   weightAccelPenalty: 0.07, // peso alto acelera um pouco mais devagar
   accelFloor: 0.7,
   brakeDecel: 34,

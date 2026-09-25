@@ -330,6 +330,7 @@ class Builder {
     this.outline = outline;
     this.ol = ol;
     this.olMin = olMin; // peças menores que isso (m) ficam sem contorno
+    this.dens = detail > 0 ? 1 : 0.72; // densidade de tufos (cabelo/barba)
     this.P = []; this.N = []; this.C = []; this.U = []; this.I = [];
     this.n = 0;
     this.base = new THREE.Matrix4();
@@ -409,7 +410,8 @@ class Builder {
     return this.add(geo, color, pos, rot, scl, opt);
   }
   box(color, pos, size, rad = 0.03, rot = null, opt) {
-    const k = rad < 0.012 ? 0 : rad < 0.06 || this.detail === 0 ? 1 : 2;
+    const lo = this.detail === 0;
+    const k = rad < (lo ? 0.05 : 0.012) ? 0 : rad < 0.06 || lo ? 1 : 2;
     return this.add(rboxG(size[0], size[1], size[2], k ? rad : 0, k), color, pos, rot, 1, opt);
   }
   // Cilindro de a (raio r0) até b (raio r1)
@@ -518,7 +520,7 @@ function beard(b, r, o) {
   const cols = o.colors;
   const pick = () => cols[Math.floor(r() * cols.length)];
   // mandíbula (costeletas até o queixo)
-  const n = o.jawN ?? 11;
+  const n = Math.max(5, Math.round((o.jawN ?? 11) * b.dens) | 1);
   for (let i = 0; i < n; i++) {
     const u = -1 + (2 * i) / (n - 1);
     const yaw = u * (o.jawYaw ?? 1.45);
@@ -532,12 +534,12 @@ function beard(b, r, o) {
     const t = rows === 1 ? 0 : k / (rows - 1);
     const y = o.top + (o.bottom - o.top) * t;
     const w = o.round ? o.width * Math.sqrt(Math.max(0.05, 1 - t * t * 0.85)) : o.width + (o.tipW - o.width) * t;
-    const cnt = Math.max(1, Math.round((2 * w) / (o.size * 1.1)) + 1);
+    const cnt = Math.max(1, Math.round(((2 * w) / (o.size * 1.1)) * b.dens) + 1);
     for (let i = 0; i < cnt; i++) {
       const u = cnt === 1 ? 0 : -1 + (2 * i) / (cnt - 1);
       const x = u * w + (r() - 0.5) * 0.02;
       const z = o.z - u * u * 0.09 + (o.zLean ?? 0) * t + (r() - 0.5) * 0.015;
-      const s = o.size * (0.85 + r() * 0.3) * (1 - t * (o.shrink ?? 0.25));
+      const s = (o.size / Math.sqrt(b.dens)) * (0.85 + r() * 0.3) * (1 - t * (o.shrink ?? 0.25));
       const wild = o.wild ?? 0;
       b.blob(pick(), [x, y + (r() - 0.5) * 0.03, z], [s, s * (1.15 + wild * 0.6), s * 0.85], [(r() - 0.5) * wild, 0, u * 0.3 * wild + (r() - 0.5) * wild], { ol: 0.011 });
     }
@@ -561,14 +563,15 @@ const HEADS = {
     for (const s of [1, -1]) b.blob(W, [s * 0.11, 0.2, 0.0], [0.17, 0.13, 0.22], [0.1, 0, -s * 0.45]);
     // cachos da peruca caindo até os ombros (fileiras desencontradas)
     const tone = [W2, W, W3, W];
+    const nc = b.dens < 1 ? 6 : 8;
     for (let k = 0; k < 4; k++) {
-      const n = k % 2 ? 8 : 9;
+      const n = k % 2 ? nc : nc + 1;
       for (let i = 0; i < n; i++) {
-        const u = (i + (k % 2 ? 0.5 : 0)) / 8;
+        const u = (i + (k % 2 ? 0.5 : 0)) / nc;
         const yaw = 1.12 + u * (TAU - 2.24) + (r() - 0.5) * 0.12;
         const rad = 0.27 + k * 0.036 + (r() - 0.5) * 0.015;
         const y = 0.09 - k * 0.13 + (r() - 0.5) * 0.03 - (Math.abs(Math.cos(yaw)) > 0.3 && Math.cos(yaw) > 0 ? 0.03 : 0);
-        const rr = 0.1 - k * 0.004 + (r() - 0.5) * 0.02;
+        const rr = (0.1 - k * 0.004 + (r() - 0.5) * 0.02) * (b.dens < 1 ? 1.15 : 1);
         b.blob(tone[(i + k * 3) % 4], [Math.sin(yaw) * rad, y, Math.cos(yaw) * rad - 0.03], [rr, rr * 1.12, rr], null, { ol: 0.011 });
       }
     }
@@ -605,10 +608,11 @@ const HEADS = {
     face(b, L, { ears: false, brow: H2, browW: 0.13, browH: 0.045, browTilt: 0.22, browLift: 0.012, mouth: 'none', nose: 0.062, noseSY: 1.1 });
     hairCap(b, H, 1.42, 0.62, 1.07);
     // mechas longas penduradas até os ombros, desgrenhadas e abrindo para fora
-    for (let i = 0; i < 16; i++) {
+    const ns = Math.round(8 * b.dens);
+    for (let i = 0; i < ns * 2; i++) {
       const s = i % 2 ? 1 : -1;
       const j = Math.floor(i / 2);
-      const yaw = s * (1.12 + j * 0.25 + (r() - 0.5) * 0.12);
+      const yaw = s * (1.12 + j * (2 / ns) + (r() - 0.5) * 0.12);
       const rad = 0.29 + r() * 0.04;
       const len = 0.21 + r() * 0.08;
       b.blob(cols[i % 4], [Math.sin(yaw) * rad, -0.07 - r() * 0.08, Math.cos(yaw) * rad - 0.03], [0.075, len, 0.08], [-0.15 * Math.cos(yaw), yaw, s * (0.18 + r() * 0.35)], { ol: 0.011 });
@@ -632,8 +636,9 @@ const HEADS = {
     ];
     let c = 0;
     for (const g of rings) {
-      for (let i = 0; i < g.n; i++) {
-        const u = g.from === 0 ? (i + 0.5) / g.n : i / (g.n - 1);
+      const gn = Math.max(3, Math.round(g.n * (0.3 + 0.7 * b.dens)));
+      for (let i = 0; i < gn; i++) {
+        const u = g.from === 0 ? (i + 0.5) / gn : i / (gn - 1);
         const yaw = g.from + (TAU - 2 * g.from) * u + (r() - 0.5) * 0.3;
         const p = g.p + (r() - 0.5) * 0.22;
         const dx = Math.sin(yaw) * Math.cos(p), dy = Math.sin(p) + 0.15, dz = Math.cos(yaw) * Math.cos(p);
@@ -651,7 +656,7 @@ const HEADS = {
   },
 
   galileu(b, L, r) {
-    const H = L.hair, HB = 0x8a7462, HG = mix(HB, 0xc4bcb0, 0.45), CAP = 0x1b1b20;
+    const H = L.hair, HB = 0x9c8b7a, HG = mix(HB, 0xc4bcb0, 0.45), CAP = 0x1b1b20;
     face(b, L, { brow: shade(H, 0.7), browW: 0.1, browTilt: 0.18, nose: 0.058, noseSY: 1.1, mouth: 'smile', lip: 0x7a2a2a, mouthP: -0.34 });
     // cabelo curto nas laterais e nuca
     hairCap(b, H, 1.85, 0.25, 1.05);
@@ -672,11 +677,12 @@ const HEADS = {
     // brilho da careca
     b.ell(mix(L.skin, 0xffffff, 0.55), hp(0.25, 0.95, -0.002), [0.07, 0.03, 0.045], hr(0.25, 0.95, 0.3), { ol: 0, seg: [8, 5] });
     // cabelo branco nas laterais e nuca
-    for (let i = 0; i < 11; i++) {
-      const yaw = 1.2 + i * ((TAU - 2.4) / 10);
-      const p = 0.12 + Math.sin((i / 10) * Math.PI) * 0.1;
-      b.blob(cols[i % 4], hp(yaw, p, 0.0), [0.09, 0.1, 0.08], hr(yaw, p), { ol: 0.011 });
-      b.blob(cols[(i + 1) % 4], hp(yaw, p - 0.3, -0.01), [0.085, 0.1, 0.08], hr(yaw, p - 0.3), { ol: 0.011 });
+    const nh = Math.round(10 * b.dens), hs = 1 / Math.sqrt(b.dens);
+    for (let i = 0; i <= nh; i++) {
+      const yaw = 1.2 + i * ((TAU - 2.4) / nh);
+      const p = 0.12 + Math.sin((i / nh) * Math.PI) * 0.1;
+      b.blob(cols[i % 4], hp(yaw, p, 0.0), [0.09 * hs, 0.1 * hs, 0.08], hr(yaw, p), { ol: 0.011 });
+      b.blob(cols[(i + 1) % 4], hp(yaw, p - 0.3, -0.01), [0.085 * hs, 0.1 * hs, 0.08], hr(yaw, p - 0.3), { ol: 0.011 });
     }
     // barba branca enorme e cheia
     beard(b, r, { colors: cols, jawN: 13, jawR: 0.105, jawDrop: 0.6, jawYaw: 1.5, rows: 4, top: -0.3, bottom: -0.66, width: 0.27, round: true, size: 0.12, z: 0.2, zLean: -0.03, wild: 0.2, shrink: 0.15 });
@@ -705,7 +711,7 @@ const HEADS = {
     hairCap(b, H, 1.5, 0.5, 1.06);
     // topete liso penteado para trás, com riscos de brilho
     b.ell(H, [0, 0.235, 0.05], [0.24, 0.1, 0.2], [0.35, 0, 0]);
-    for (const x of [-0.08, 0.0, 0.08]) b.ell(H2, [x, 0.31, -0.02], [0.012, 0.012, 0.14], [0.55, 0, 0], { ol: 0, seg: [6, 4] });
+    b.ell(H2, [0.07, 0.3, 0.07], [0.06, 0.012, 0.1], [0.5, 0.3, 0.2], { ol: 0, seg: [8, 5] });
     // bigode farto com pontas curvadas para cima
     mustache(b, H, { w: 0.095, h: 0.04, tilt: -0.12, p: -0.27, yaw: 0.13, lift: 0.02 });
     for (const s of [1, -1]) b.torus(H, hp(s * 0.4, -0.2, 0.02), hr(s * 0.4, -0.2, s * 0.9), 0.03, 0.014, Math.PI * 1.3, { ol: 0.005 });
@@ -784,15 +790,15 @@ const TORSOS = {
     b.box(0x2e86de, [0.12, 0.29, 0.2], [0.012, 0.05, 0.012], 0.004, [0.1, 0.2, 0], { ol: 0 });
   },
 };
-// Calça/sapato de cada um
-const LEGS = {
-  newton: [0x3b2618, 0x1f1510], curie: [0x1c1c22, 0x111111], mendeleev: [0x23253a, 0x151515], einstein: [0x4a4a52, 0x2a1f1a],
-  galileu: [0x1f1f1f, 0x151515], darwin: [0x2b2222, 0x1a1414], dumont: [0x2e3a4f, 0x1a1a1a], oswaldo: [0x2d3142, 0x151515],
+// Cor da calça de cada um
+const PANTS = {
+  newton: 0x3b2618, curie: 0x1c1c22, mendeleev: 0x23253a, einstein: 0x4a4a52,
+  galileu: 0x1f1f1f, darwin: 0x2b2222, dumont: 0x2e3a4f, oswaldo: 0x2d3142,
 };
-// Manga (cor) e punho
-const SLEEVES = {
-  newton: ['outfit', 0xf5f0e1], curie: ['outfit', 0x2a2a33], mendeleev: ['outfit', 0x8d99ae], einstein: ['outfit', 0x3d3d3d],
-  galileu: ['outfit', 0xf1ede4], darwin: ['outfit', 0xd9cbb0], dumont: ['outfit', 0xffffff], oswaldo: ['outfit', 0xdfe4ea],
+// Cor do punho da manga
+const CUFFS = {
+  newton: 0xf5f0e1, curie: 0x2a2a33, mendeleev: 0x8d99ae, einstein: 0x3d3d3d,
+  galileu: 0xf1ede4, darwin: 0xd9cbb0, dumont: 0xffffff, oswaldo: 0xdfe4ea,
 };
 
 // ---------------------------------------------------------------------------
@@ -862,12 +868,11 @@ function kartBody(b, C, num) {
 
 // Pernas do piloto (fixas no kart)
 function legs(b, id) {
-  const [pants, shoes] = LEGS[id];
+  const pants = PANTS[id];
   for (const s of [1, -1]) {
     // só a coxa aparece; canela e pé ficam sob o painel
     b.limb(pants, [s * 0.11, 0.38, -0.24], [s * 0.13, 0.52, 0.1], 0.075);
     b.limb(pants, [s * 0.13, 0.52, 0.1], [s * 0.13, 0.46, 0.24], 0.065, { ol: 0 });
-    void shoes;
   }
 }
 
@@ -908,7 +913,7 @@ function steeringGeo(C, L, detail) {
 // Braço: cápsula ao longo de +Z (ombro na origem), punho perto da ponta
 function armGeo(L, id, detail) {
   const b = new Builder({ detail, ol: 0.01 });
-  const [, cuff] = SLEEVES[id];
+  const cuff = CUFFS[id];
   b.limb(L.outfit, [0, 0, 0], [0, 0, ARM_LEN - 0.04], 0.066);
   b.cyl(cuff, [0, 0, ARM_LEN - 0.1], [0, 0, ARM_LEN - 0.04], 0.074, 0.074);
   return b.build();
@@ -956,7 +961,7 @@ const KART_EXTRAS = {
   },
   einstein(b) {
     for (const s of [1, -1]) b.decal(cellUV(1, 0, 4, 1), [s * 0.553, 0.33, -0.15], [0, s * Math.PI / 2, 0], 0.54, 0.135);
-    // quadro-negro? não: um pequeno átomo no painel
+    // átomo no painel
     b.decal(cellUV(EMBLEM.einstein, 2), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
   },
   galileu(b, C) {
@@ -1103,8 +1108,8 @@ function buildParts(id, detail) {
   return parts;
 }
 
-const _hand = new THREE.Vector3(), _sh = new THREE.Vector3(), _dir = new THREE.Vector3();
-const _mInv = new THREE.Matrix4(), _mS = new THREE.Matrix4(), _wq = new THREE.Quaternion(), _wq2 = new THREE.Quaternion();
+const _hand = new THREE.Vector3(), _dir = new THREE.Vector3();
+const _mInv = new THREE.Matrix4(), _mS = new THREE.Matrix4(), _wq = new THREE.Quaternion();
 const _wp = new THREE.Vector3(), _ws = new THREE.Vector3(), _wm = new THREE.Matrix4();
 const _qY = new THREE.Quaternion(), _qX = new THREE.Quaternion(), _qFlip = new THREE.Quaternion().setFromAxisAngle(Y_AXIS, Math.PI);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -1125,7 +1130,7 @@ export function createKartModel(characterId, { quality } = {}) {
     parent.add(m);
     return m;
   };
-  const body = mk(parts.body, group, true);
+  mk(parts.body, group, true);
 
   // rodas (1 draw call)
   const wheels = new THREE.InstancedMesh(parts.wheel, mat, 4);
@@ -1144,11 +1149,11 @@ export function createKartModel(characterId, { quality } = {}) {
   const lean = new THREE.Group();
   lean.position.copy(LEAN_POS);
   group.add(lean);
-  const torso = mk(parts.torso, lean, true);
+  mk(parts.torso, lean, true);
   const neck = new THREE.Group();
   neck.position.copy(NECK_POS);
   lean.add(neck);
-  const head = mk(parts.head, neck, true);
+  mk(parts.head, neck, true);
   const arms = [1, -1].map((s) => {
     const a = mk(parts.arm, lean, false);
     a.position.set(s * SHOULDER, 0.46, 0.0);
@@ -1277,7 +1282,15 @@ export function createKartModel(characterId, { quality } = {}) {
     extras: tri(parts.extGeo.propeller) + tri(parts.extGeo.finch) + tri(parts.extGeo.vial) + (glow ? 2 : 0),
   };
   stats.total = Object.values(stats).reduce((a, b) => a + b, 0);
-  return { group, update, stats };
+  // Pontos úteis para efeitos: pontas dos escapamentos (local) e o grupo da cabeça
+  const anchors = { exhausts: [new THREE.Vector3(0.3, 0.45, -0.95), new THREE.Vector3(-0.3, 0.45, -0.95)], head: neck };
+  // Geometrias/atlas são compartilhados (cache); só os materiais próprios são liberados
+  const dispose = () => {
+    if (vialMat) vialMat.dispose();
+    if (glow) glow.material.dispose();
+    wheels.dispose();
+  };
+  return { group, update, stats, anchors, dispose };
 }
 
 // ---------------------------------------------------------------------------
@@ -1370,4 +1383,3 @@ export function renderPortraits(renderer, size = 256) {
   _portraitCache.set(size, out);
   return out;
 }
-export const __dbg = { Builder, buildParts };

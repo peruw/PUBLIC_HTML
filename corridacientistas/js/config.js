@@ -110,6 +110,7 @@ export const CHARACTERS = [
   {
     id: 'dumont',
     name: 'Santos Dumont',
+    short: 'S. Dumont',
     fullName: 'Alberto Santos Dumont',
     years: '1873–1932',
     country: 'Brasil',
