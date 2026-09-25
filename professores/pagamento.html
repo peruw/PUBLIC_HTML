@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pagamento — Professores | Quanta Aulas</title>
+  <meta name="description" content="Status do pagamento do seu plano." />
+  <meta name="robots" content="noindex" />
+
+  <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
+  <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/professores/css/professores.css" />
+</head>
+
+<body>
+  <div class="bg-ambient"></div>
+  <div class="bg-grid"></div>
+
+  <!-- @include professores/partials/nav.html -->
+
+  <main id="app" class="pf-main" data-page="pagamento">
+    <section class="pf-page">
+      <div class="container">
+        <header class="pf-page-head">
+          <div class="eyebrow">Planos</div>
+          <h1 class="pf-title">Pagamento do plano</h1>
+        </header>
+
+        <!-- Conteúdo montado por /professores/js/pages/pagamento.js -->
+        <div id="pageBody" class="pf-page-body">
+          <p class="pf-loading" role="status">Verificando seu pagamento…</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- @include professores/partials/footer.html -->
+
+  <script type="module" src="/professores/js/pages/pagamento.js"></script>
+</body>
+</html>
