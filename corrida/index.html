@@ -76,7 +76,8 @@
 
   /* ===== HUD ===== */
   .hud {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+    /* acima das telas (z 5) para o logo continuar clicável no menu */
+    position: fixed; top: 0; left: 0; right: 0; z-index: 7;
     padding: max(10px, env(safe-area-inset-top)) 12px 0;
     display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
     pointer-events: none;
@@ -87,6 +88,7 @@
     font-family: var(--pixel); font-size: 10px; letter-spacing: 1px;
     text-shadow: 2px 2px 0 #000;
   }
+  body:has(#pauseScreen.show) .hud .stats { visibility: hidden; }
   .brand img { width: 26px; height: 26px; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 #000); }
   .stats { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .stats > * { flex-shrink: 0; }
@@ -562,7 +564,7 @@
     </div>
     <div class="rec">RECORDE <b id="bestStart">0</b> · XP <b id="xpStart">0</b> · SKINS <b id="skinCount">1/10</b></div>
     <!-- Versão do jogo: troque a cada publicação (o mesmo número vai no ?v= dos scripts abaixo) -->
-    <div class="ver">VERSÃO <span id="gameVersion">2026.09.25-5</span></div>
+    <div class="ver">VERSÃO <span id="gameVersion">2026.09.25-6</span></div>
   </div>
 </div>
 
@@ -650,13 +652,13 @@
 
 <noscript><p style="position:fixed;inset:auto 16px 16px;z-index:9">Ative o JavaScript para jogar.</p></noscript>
 
-<script src="js/themes.js?v=2026.09.25-5"></script>
-<script src="js/skins.js?v=2026.09.25-5"></script>
-<script src="js/creatures.js?v=2026.09.25-5"></script>
-<script src="js/music.js?v=2026.09.25-5"></script>
-<script src="js/fx2d.js?v=2026.09.25-5"></script>
-<script src="js/progress.js?v=2026.09.25-5"></script>
-<script src="js/online.js?v=2026.09.25-5"></script>
+<script src="js/themes.js?v=2026.09.25-6"></script>
+<script src="js/skins.js?v=2026.09.25-6"></script>
+<script src="js/creatures.js?v=2026.09.25-6"></script>
+<script src="js/music.js?v=2026.09.25-6"></script>
+<script src="js/fx2d.js?v=2026.09.25-6"></script>
+<script src="js/progress.js?v=2026.09.25-6"></script>
+<script src="js/online.js?v=2026.09.25-6"></script>
 <script>
 (() => {
   'use strict';
