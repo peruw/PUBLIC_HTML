@@ -19,6 +19,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@500;700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -33,6 +34,9 @@
     --brand-dark: #07412a;
     --gold: #ffd23f;
     --danger: #ff4d5e;
+    --rare: #4fc3ff;
+    --epic: #c07bff;
+    --legend: #ffb238;
     --pixel: 'Press Start 2P', ui-monospace, monospace;
     --pixel-text: 'Pixelify Sans', 'Press Start 2P', ui-monospace, monospace;
     --body: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -96,9 +100,9 @@
     font-family: var(--pixel); font-size: 10px;
   }
   .pbtn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
-  .pbtn:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .pbtn:focus-visible, .btn:focus-visible, .skin:focus-visible, .tab:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
-  /* Pergunta */
+  /* Pergunta + opções (sempre legíveis, na ordem das pistas) */
   .question {
     position: fixed; left: 50%; z-index: 2;
     top: calc(max(10px, env(safe-area-inset-top)) + 54px);
@@ -110,7 +114,7 @@
   .question.show { opacity: 1; }
   .q-inner {
     position: relative;
-    padding: 13px 16px 8px;
+    padding: 13px 14px 8px;
     background: rgba(4, 16, 11, 0.9);
     border: 3px solid var(--brand);
     box-shadow: 4px 4px 0 #000, 0 0 24px rgba(31,214,133,0.35);
@@ -121,12 +125,23 @@
     font-family: var(--pixel-text); font-weight: 700; font-size: 12px; line-height: 1; letter-spacing: 1px;
     color: #03140c; background: var(--brand); box-shadow: 2px 2px 0 #000;
   }
+  .q-row { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .q-text {
     font-family: var(--pixel); white-space: nowrap;
     font-size: clamp(14px, min(4.4vw, 4.8vh), 26px);
     text-shadow: 3px 3px 0 #000;
   }
   .q-text .qm { color: var(--gold); }
+  .q-opts { display: flex; gap: 6px; justify-content: center; }
+  .q-opts span {
+    min-width: 2.9em; padding: 6px 6px 5px;
+    font-family: var(--pixel); font-size: clamp(11px, min(3.2vw, 3.6vh), 17px); line-height: 1;
+    background: #000; color: var(--ink);
+    border: 2px solid var(--brand-dark);
+  }
+  .q-opts span.here { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 12px rgba(255,210,63,0.45); }
+  .q-opts span.ok { background: var(--brand); border-color: var(--brand-hi); color: #03140c; }
+  .q-opts span.bad { background: var(--danger); border-color: #ffc2c8; color: #fff; }
   .q-bar { height: 5px; margin-top: 8px; background: #000; border: 1px solid var(--brand-dark); }
   .q-bar i { display: block; height: 100%; width: 100%; background: var(--brand); transform-origin: left; }
   .q-bar i.late { background: var(--gold); }
@@ -150,13 +165,66 @@
   .segs i.on.max { background: var(--danger); border-color: #ffc2c8; }
   .speed.bump .segs { animation: bump .3s steps(2); }
   @keyframes bump { 0% { transform: translateY(-4px); } 100% { transform: none; } }
-  .combo {
-    font-family: var(--pixel); font-size: 11px; color: var(--gold);
-    text-shadow: 2px 2px 0 #000; text-align: right; line-height: 1.6;
-    opacity: 0; transition: opacity .2s;
+  .score { transition: transform .08s; }
+  .score.pulse { animation: spulse .25s steps(3); }
+  @keyframes spulse { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  .mult { color: var(--gold); display: none; }
+  .mult.show { display: block; }
+
+  /* medidor de combo: cresce, muda de cor e pega fogo */
+  .combo-meter {
+    position: fixed; right: max(14px, env(safe-area-inset-right)); top: 50%; z-index: 3;
+    transform: translateY(-50%); pointer-events: none; text-align: center;
+    opacity: 0; transition: opacity .15s;
+    --c: var(--ink);
   }
-  .combo.show { opacity: 1; }
-  .combo small { display: block; font-size: 8px; color: var(--ink-dim); }
+  .combo-meter.show { opacity: 1; }
+  .cm-label { font-family: var(--pixel); font-size: 10px; color: var(--c); text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }
+  .cm-num {
+    display: inline-block; margin: 6px 0 4px;
+    font-family: var(--pixel); line-height: 1; color: var(--c);
+    font-size: calc(var(--s, 1) * clamp(30px, 7vmin, 54px));
+    text-shadow: 4px 4px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+  }
+  .cm-num.punch { animation: punch .28s steps(4); }
+  @keyframes punch { 0% { transform: scale(1.9) rotate(-8deg); } 50% { transform: scale(0.9) rotate(3deg); } 100% { transform: scale(1); } }
+  .cm-mult { font-family: var(--pixel); font-size: 13px; color: var(--c); text-shadow: 2px 2px 0 #000; }
+  .cm-bar { width: 64px; height: 6px; margin: 6px auto 0; background: #000; border: 1px solid rgba(255,255,255,0.3); }
+  .cm-bar i { display: block; height: 100%; width: 0; background: var(--c); transition: width .15s steps(3); }
+  .combo-meter.t1 { --c: #7dffc0; }
+  .combo-meter.t2 { --c: #ffd23f; }
+  .combo-meter.t3 { --c: #ff9a2e; }
+  .combo-meter.t4 { --c: #ff4d5e; }
+  .combo-meter.t5 { --c: #ff4df0; animation: rainbow 0.6s steps(6) infinite; }
+  @keyframes rainbow { to { filter: hue-rotate(360deg); } }
+  .combo-meter.fever .cm-label::after { content: ' · FEBRE'; color: #ff9a2e; }
+
+  /* palavras de elogio */
+  .praise {
+    position: absolute; left: 50%; transform: translate(-50%, -50%);
+    font-family: var(--pixel-text); font-weight: 700; white-space: nowrap; text-align: center;
+    text-shadow: 4px 4px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+    animation: praise .9s steps(9) forwards;
+  }
+  .praise small { display: block; font-size: 0.45em; letter-spacing: 2px; color: #fff; }
+  @keyframes praise {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(2.4) rotate(-6deg); }
+    18% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(2deg); }
+    75% { opacity: 1; transform: translate(-50%, -60%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -85%) scale(0.9); }
+  }
+  .broken { animation: broken 1.2s steps(10) forwards; }
+  @keyframes broken {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+    15% { transform: translate(-48%, -50%) scale(1) rotate(-3deg); }
+    30% { transform: translate(-52%, -50%) rotate(3deg); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -20%) rotate(8deg); }
+  }
+  .fever-edge { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .3s;
+    box-shadow: inset 0 0 60px 10px rgba(255,120,30,0.55), inset 0 -40px 80px -20px rgba(255,60,30,0.6); }
+  .fever-edge.on { opacity: 1; animation: feverpulse .5s steps(2) infinite; }
+  @keyframes feverpulse { 50% { box-shadow: inset 0 0 80px 16px rgba(255,200,40,0.55), inset 0 -60px 90px -20px rgba(255,90,20,0.7); } }
 
   /* textos que saltam */
   #fx { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
@@ -167,14 +235,26 @@
     animation: rise 1s steps(10) forwards;
   }
   .pop.accent { font-family: var(--pixel-text); font-weight: 700; }
-  .pop.big { font-family: var(--pixel-text); font-weight: 700; animation: zoom 1.4s steps(12) forwards; }
+  .pop.big { font-family: var(--pixel-text); font-weight: 700; line-height: 1.05; animation: zoom 1.8s steps(14) forwards; }
+  .pop.big small { display: block; font-size: 0.42em; letter-spacing: 2px; margin-top: 6px; color: var(--ink); }
   @keyframes rise { 0% { opacity: 1; margin-top: 0; } 70% { opacity: 1; } 100% { opacity: 0; margin-top: -70px; } }
   @keyframes zoom {
     0% { opacity: 0; transform: translate(-50%, -50%) scale(2.2); }
-    15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    80% { opacity: 1; }
+    12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    82% { opacity: 1; }
     100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
   }
+  .toast {
+    position: fixed; left: 50%; z-index: 4; pointer-events: none;
+    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 44px);
+    transform: translate(-50%, 20px); opacity: 0;
+    padding: 10px 14px 9px; max-width: calc(100% - 32px);
+    font-family: var(--pixel-text); font-weight: 700; font-size: 15px; text-align: center;
+    background: rgba(4,16,11,0.94); border: 3px solid var(--gold); color: var(--gold);
+    box-shadow: 4px 4px 0 #000; transition: opacity .2s steps(3), transform .2s steps(3);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast small { display: block; color: var(--ink); font-size: 12px; margin-top: 2px; }
 
   /* ===== Telas ===== */
   .overlay {
@@ -185,25 +265,26 @@
   }
   .overlay.show { display: flex; }
   .card {
-    width: 100%; max-width: 420px; max-height: 100%; overflow: auto;
-    padding: 26px 22px 22px;
+    width: 100%; max-width: 440px; max-height: 100%; overflow: auto;
+    padding: 24px 22px 20px;
     background: var(--panel);
     border: 4px solid var(--brand);
     box-shadow: 8px 8px 0 #000, 0 0 60px rgba(31,214,133,0.25);
     clip-path: polygon(0 8px, 8px 8px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px));
     text-align: center;
+    touch-action: pan-y;
   }
-  .card .logo { width: 52px; height: 52px; filter: drop-shadow(3px 3px 0 #000); }
-  .tag { font-family: var(--pixel-text); font-weight: 700; font-size: 13px; letter-spacing: 2px; color: var(--brand); margin: 12px 0 14px; }
+  .card .logo { width: 48px; height: 48px; filter: drop-shadow(3px 3px 0 #000); }
+  .tag { font-family: var(--pixel-text); font-weight: 700; font-size: 13px; letter-spacing: 2px; color: var(--brand); margin: 10px 0 12px; }
   .title {
-    font-family: var(--pixel); margin: 0 0 14px; line-height: 1.25;
+    font-family: var(--pixel); margin: 0 0 12px; line-height: 1.25;
     font-size: clamp(24px, 8vw, 34px); font-weight: 400;
     color: var(--ink);
     text-shadow: 4px 4px 0 var(--brand-deep), 8px 8px 0 #000;
   }
   .title span { color: var(--brand); text-shadow: 4px 4px 0 var(--brand-dark), 8px 8px 0 #000; }
-  .card p { margin: 0 0 16px; color: var(--ink-dim); font-size: 15px; line-height: 1.5; text-wrap: balance; }
-  .keys { display: grid; gap: 8px; margin: 0 0 18px; text-align: left; }
+  .card p { margin: 0 0 14px; color: var(--ink-dim); font-size: 15px; line-height: 1.5; text-wrap: balance; }
+  .keys { display: grid; gap: 8px; margin: 0 0 16px; text-align: left; }
   .keys div { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-dim); line-height: 1.4; }
   .kc {
     flex: none; min-width: 44px; text-align: center;
@@ -221,33 +302,133 @@
   }
   .btn:hover { filter: brightness(1.08); }
   .btn:active { transform: translateY(4px); box-shadow: inset -4px -4px 0 var(--brand-deep), inset 4px 4px 0 var(--brand-hi), 0 2px 0 #000; }
+  .btn:disabled { cursor: default; filter: grayscale(0.6); }
   .btn.alt {
-    margin-top: 12px; font-size: 10px; color: var(--ink); background: var(--panel-2);
+    font-size: 10px; color: var(--ink); background: var(--panel-2); padding: 13px 10px 11px;
     box-shadow: inset -3px -3px 0 #061a11, inset 3px 3px 0 #1b4a35, 0 5px 0 #000;
   }
+  .btn.google { font-family: var(--pixel-text); font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+  .btn.google svg { width: 18px; height: 18px; flex: none; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
   .blink { animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0.25; } }
-  .rec { font-family: var(--pixel); font-size: 9px; color: var(--ink-dim); margin-top: 16px; }
+  .rec { font-family: var(--pixel); font-size: 9px; color: var(--ink-dim); margin-top: 16px; line-height: 1.8; }
   .rec b { color: var(--gold); font-weight: 400; }
-  .results { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 16px; }
+  .link { background: none; border: 0; padding: 0; color: var(--brand); font: inherit; text-decoration: underline; cursor: pointer; }
+  a.link { display: inline-block; margin-top: 14px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; }
+
+  .account {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin: 0 0 14px; padding: 10px 12px; text-align: left;
+    background: var(--panel-2); border: 2px solid var(--brand-dark);
+    font-size: 13px; color: var(--ink-dim); line-height: 1.4;
+  }
+  .account b { color: var(--ink); font-family: var(--pixel-text); font-size: 16px; font-weight: 700; }
+  .account .acts { display: flex; gap: 12px; flex: none; font-size: 13px; }
+  .login-box { margin: 0 0 14px; }
+  .login-box small { display: block; margin-top: 10px; color: var(--ink-dim); font-size: 13px; line-height: 1.4; }
+
+  .results { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 14px; }
   .results div { background: var(--panel-2); border: 2px solid var(--brand-dark); padding: 12px 4px 10px; }
-  .results b { display: block; font-family: var(--pixel); font-weight: 400; font-size: 18px; color: var(--ink); margin-bottom: 8px; }
-  .results small { font-family: var(--pixel-text); font-weight: 700; font-size: 12px; color: var(--ink-dim); letter-spacing: 1px; }
+  .results b { display: block; font-family: var(--pixel); font-weight: 400; font-size: clamp(12px, 3.6vw, 17px); color: var(--ink); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+  .results small { font-family: var(--pixel-text); font-weight: 700; font-size: 11px; color: var(--ink-dim); letter-spacing: 1px; }
   .newrec { font-family: var(--pixel); font-size: 10px; color: var(--gold); margin: -4px 0 14px; display: none; }
   .newrec.show { display: block; }
   .tip { font-size: 14px !important; }
   #loading { font-family: var(--pixel-text); font-weight: 700; font-size: 14px; color: var(--brand); }
 
+  /* XP e próxima skin */
+  .xp { text-align: left; margin: 0 0 14px; }
+  .xp-line { display: flex; justify-content: space-between; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; color: var(--ink-dim); margin-bottom: 6px; }
+  .xp-line b { color: var(--gold); }
+  .xp-bar { height: 12px; background: #000; border: 2px solid var(--brand-dark); }
+  .xp-bar i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--gold) 0 8px, #ffb238 8px 10px); transition: width .8s steps(16); }
+  .xp-next { margin-top: 6px; font-size: 13px; color: var(--ink-dim); }
+  .xp-next b { color: var(--ink); }
+  .unlocked { display: none; margin: 0 0 14px; padding: 10px; border: 3px dashed var(--gold); color: var(--gold); font-family: var(--pixel-text); font-weight: 700; font-size: 16px; }
+  .unlocked.show { display: block; }
+  .online-line { min-height: 1.4em; margin: 0 0 12px; font-size: 14px; color: var(--ink-dim); }
+  .online-line b { color: var(--gold); }
+
+  /* Armário de skins (bandeja inferior; o corredor gira em cima) */
+  .overlay.sheet { align-items: flex-end; padding: 0; background: linear-gradient(180deg, transparent 30%, rgba(4,16,11,0.6)); }
+  .sheet .card {
+    max-width: 720px; max-height: 58%; clip-path: none;
+    border-width: 4px 0 0; box-shadow: 0 -8px 0 #000;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .sheet-head .tag { margin: 0; }
+  .sheet-head .pbtn { position: static; }
+  .skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+  .skin {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 92px;
+    padding: 10px 10px 9px; text-align: left; cursor: pointer;
+    background: var(--panel-2); color: var(--ink);
+    border: 2px solid var(--brand-dark); box-shadow: 3px 3px 0 #000;
+    font-family: var(--body);
+  }
+  .skin .sw { display: flex; gap: 3px; }
+  .skin .sw i { width: 12px; height: 12px; border: 1px solid #000; }
+  .skin b { font-family: var(--pixel-text); font-size: 15px; font-weight: 700; }
+  .skin small { font-family: var(--pixel-text); font-weight: 700; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+  .skin .req { font-size: 12px; color: var(--ink-dim); line-height: 1.3; }
+  .skin .mini { width: 100%; height: 5px; background: #000; margin-top: auto; }
+  .skin .mini i { display: block; height: 100%; background: var(--gold); }
+  .skin.r-rara small { color: var(--rare); }
+  .skin.r-epica small { color: var(--epic); }
+  .skin.r-lendaria small { color: var(--legend); }
+  .skin.r-comum small { color: var(--ink-dim); }
+  .skin.locked { opacity: 0.72; cursor: default; }
+  .skin.locked b::before { content: '🔒 '; font-size: 12px; }
+  .skin.on { border-color: var(--gold); box-shadow: 3px 3px 0 #000, 0 0 0 2px var(--gold) inset; }
+  .skin.previewing:not(.on) { border-color: var(--brand); }
+
+  /* Ranking */
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    padding: 10px 6px 9px; cursor: pointer; font-family: var(--pixel); font-size: 10px;
+    background: var(--panel-2); color: var(--ink-dim); border: 2px solid var(--brand-dark);
+  }
+  .tab.on { background: var(--brand); color: #03140c; border-color: var(--brand-hi); }
+  .board { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; text-align: left; min-height: 120px; }
+  .board li {
+    display: grid; grid-template-columns: 2.6em 1fr auto; gap: 8px; align-items: center;
+    padding: 8px 10px 7px; background: var(--panel-2); border: 2px solid transparent;
+  }
+  .board li.me { border-color: var(--gold); }
+  .board li.gap { background: none; padding: 0; text-align: center; color: var(--ink-dim); display: block; }
+  .board .pos { font-family: var(--pixel); font-size: 11px; color: var(--ink-dim); }
+  .board li:nth-child(1) .pos { color: var(--gold); }
+  .board li:nth-child(2) .pos { color: #d7e3ea; }
+  .board li:nth-child(3) .pos { color: #e0995a; }
+  .board .nm { font-family: var(--pixel-text); font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .board .nm small { display: block; font-family: var(--body); font-weight: 500; font-size: 11px; color: var(--ink-dim); }
+  .board .sc { font-family: var(--pixel); font-size: 12px; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .board-msg { padding: 18px 8px; color: var(--ink-dim); font-size: 14px; text-align: center; }
+
+  /* Apelido */
+  .field {
+    width: 100%; padding: 14px 12px 12px; margin: 4px 0 8px;
+    font-family: var(--pixel-text); font-weight: 700; font-size: 20px; text-align: center;
+    color: var(--ink); background: #000; border: 3px solid var(--brand-deep); outline: none;
+    user-select: text; -webkit-user-select: text;
+  }
+  .field:focus { border-color: var(--gold); }
+  .err { min-height: 1.3em; margin: 0 0 10px; color: var(--danger); font-size: 14px; }
+
   @media (max-height: 520px) {
     .question { top: calc(max(10px, env(safe-area-inset-top)) + 48px); }
     .q-inner { padding: 11px 12px 6px; }
-    .card { padding: 16px 18px; }
+    .q-row { flex-direction: row; gap: 12px; }
+    .card { padding: 14px 18px; }
     .card .logo, .keys { display: none; }
-    .tag { margin: 0 0 10px; }
-    .title { font-size: 22px; margin-bottom: 10px; }
+    .tag { margin: 0 0 8px; }
+    .title { font-size: 22px; margin-bottom: 8px; }
+    .sheet .card { max-height: 64%; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .blink, .pop, .pop.big, .question.bounce .q-inner { animation-duration: 0s; }
+    .blink, .pop, .pop.big, .question.bounce .q-inner, .cm-num.punch, .combo-meter.t5, .fever-edge.on, .score.pulse { animation-duration: 0s; }
   }
 </style>
 </head>
@@ -256,6 +437,14 @@
 <div class="crt"></div>
 <div id="flash"></div>
 <div id="fx"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="fever-edge" id="feverEdge"></div>
+<div class="combo-meter" id="comboMeter" aria-live="off">
+  <div class="cm-label">COMBO</div>
+  <div class="cm-num" id="cmNum">0</div>
+  <div class="cm-mult" id="cmMult">x1</div>
+  <div class="cm-bar"><i id="cmBar"></i></div>
+</div>
 
 <div class="hud">
   <a class="brand" href="/" title="Voltar ao site Quanta Aulas">
@@ -263,6 +452,7 @@
     <span>QUANTA</span>
   </a>
   <div class="stats">
+    <div class="box mult" id="hudMult">x1</div>
     <div class="box score" id="hudScore">0<b>PTS</b></div>
     <div class="box hearts" id="hudLives"></div>
     <button class="pbtn" id="btnSound" type="button" aria-label="Ligar ou desligar o som">♪</button>
@@ -273,7 +463,10 @@
 <div class="question" id="question">
   <div class="q-inner">
     <div class="q-level" id="qLevel">NÍVEL 1</div>
-    <div class="q-text" id="qText">0 + 0 = ?</div>
+    <div class="q-row">
+      <div class="q-text" id="qText">0 + 0 = ?</div>
+      <div class="q-opts" id="qOpts" aria-label="Respostas, da esquerda para a direita"><span>0</span><span>0</span></div>
+    </div>
     <div class="q-bar"><i id="qBar"></i></div>
   </div>
 </div>
@@ -283,7 +476,6 @@
     <div class="lbl">VEL <b id="speedTxt">x1.0</b></div>
     <div class="segs" id="segs"></div>
   </div>
-  <div class="combo" id="combo"></div>
 </div>
 
 <!-- Início -->
@@ -296,10 +488,15 @@
     <div class="keys">
       <div><span class="kc">◄ ►</span> Setas ou A/D. No celular, toque no lado ou deslize.</div>
       <div><span class="kc">♥ x3</span> Portal errado tira uma vida.</div>
-      <div><span class="kc">x5</span> Acertos seguidos multiplicam os pontos.</div>
+      <div><span class="kc">★</span> Seus pontos somam XP e liberam skins novas.</div>
     </div>
+    <div class="account-slot"></div>
     <button class="btn" id="btnStart" type="button" disabled><span id="loading">CARREGANDO...</span></button>
-    <div class="rec">RECORDE <b id="bestStart">0</b></div>
+    <div class="row2">
+      <button class="btn alt" type="button" data-open="locker">SKINS</button>
+      <button class="btn alt" type="button" data-open="rank">RANKING</button>
+    </div>
+    <div class="rec">RECORDE <b id="bestStart">0</b> · XP <b id="xpStart">0</b> · SKINS <b id="skinCount">1/10</b></div>
   </div>
 </div>
 
@@ -309,39 +506,101 @@
     <div class="tag">JOGO PAUSADO</div>
     <h1 class="title">PAUSA</h1>
     <button class="btn" id="btnResume" type="button">► CONTINUAR</button>
-    <a class="btn alt" href="/">VOLTAR AO SITE</a>
+    <a class="link" href="/">Voltar ao site</a>
   </div>
 </div>
 
 <!-- Fim -->
 <div class="overlay" id="overScreen">
   <div class="card">
-    <div class="tag">FIM DE CORRIDA</div>
+    <div class="tag" id="overTag">FIM DE CORRIDA</div>
     <h1 class="title" id="overTitle">GAME<br><span>OVER</span></h1>
     <div class="newrec blink" id="newRecord">★ NOVO RECORDE ★</div>
     <div class="results">
       <div><b id="rScore">0</b><small>PONTOS</small></div>
       <div><b id="rHits">0</b><small>ACERTOS</small></div>
-      <div><b id="rSpeed">x1.0</b><small>VEL MÁX</small></div>
+      <div><b id="rCombo">0</b><small>COMBO</small></div>
+      <div><b id="rLevel">1</b><small>NÍVEL</small></div>
     </div>
-    <p class="tip" id="overTip"></p>
+    <div class="unlocked" id="unlocked"></div>
+    <div class="xp">
+      <div class="xp-line"><span>+<b id="xpGain">0</b> XP</span><span>TOTAL <b id="xpTotal">0</b></span></div>
+      <div class="xp-bar"><i id="xpBar"></i></div>
+      <div class="xp-next" id="xpNext"></div>
+    </div>
+    <div class="online-line" id="onlineLine"></div>
     <button class="btn" id="btnRetry" type="button">► JOGAR DE NOVO</button>
-    <a class="btn alt" href="/">VOLTAR AO SITE</a>
-    <div class="rec">RECORDE <b id="bestOver">0</b></div>
+    <div class="row2">
+      <button class="btn alt" type="button" data-open="locker">SKINS</button>
+      <button class="btn alt" type="button" data-open="rank">RANKING</button>
+    </div>
+    <p class="tip" id="overTip" style="margin:16px 0 0"></p>
+    <a class="link" href="/">Voltar ao site</a>
+  </div>
+</div>
+
+<!-- Skins -->
+<div class="overlay sheet" id="lockerScreen">
+  <div class="card">
+    <div class="sheet-head">
+      <div class="tag">SKINS · <span id="lockerCount">1/10</span></div>
+      <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
+    </div>
+    <div class="skins" id="skinGrid"></div>
+  </div>
+</div>
+
+<!-- Ranking -->
+<div class="overlay" id="rankScreen">
+  <div class="card">
+    <div class="sheet-head">
+      <div class="tag">RANKING</div>
+      <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab on" type="button" role="tab" data-period="week" aria-selected="true">SEMANA</button>
+      <button class="tab" type="button" role="tab" data-period="all" aria-selected="false">GERAL</button>
+    </div>
+    <ol class="board" id="board"></ol>
+    <div class="account-slot"></div>
+  </div>
+</div>
+
+<!-- Apelido -->
+<div class="overlay" id="nickScreen">
+  <div class="card">
+    <div class="tag">SEU NOME NO RANKING</div>
+    <p>Escolha um apelido. É ele que aparece para os outros jogadores, nunca seu nome ou e-mail.</p>
+    <form id="nickForm" autocomplete="off">
+      <label for="nickInput" class="tag" style="display:block;margin:0 0 4px;color:var(--ink-dim)">APELIDO (3 A 16 LETRAS)</label>
+      <input class="field" id="nickInput" name="nick" maxlength="16" minlength="3" required spellcheck="false">
+      <div class="err" id="nickErr"></div>
+      <button class="btn" type="submit" id="nickSave">SALVAR</button>
+    </form>
+    <button class="link" type="button" data-close style="margin-top:14px">Agora não</button>
   </div>
 </div>
 
 <noscript><p style="position:fixed;inset:auto 16px 16px;z-index:9">Ative o JavaScript para jogar.</p></noscript>
 
+<script src="js/themes.js"></script>
+<script src="js/skins.js"></script>
+<script src="js/creatures.js"></script>
+<script src="js/music.js"></script>
+<script src="js/fx2d.js"></script>
+<script src="js/progress.js"></script>
+<script src="js/online.js"></script>
 <script>
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  if (!window.THREE) {
+  const $$ = (sel) => [...document.querySelectorAll(sel)];
+  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES) {
     $('loading').textContent = 'ERRO AO CARREGAR. RECARREGUE A PÁGINA.';
     return;
   }
   const T = window.THREE;
+  const P = QC.Progress;
 
   // ================= Configuração =================
   const CFG = {
@@ -355,14 +614,15 @@
     rowLen: 4, rows: 36,
   };
   const C = {
-    fog: 0x061a11, brand: 0x1fd685, brandHi: 0x7dffc0, brandDeep: 0x0f7a4c, dark: 0x07412a,
-    gold: 0xffd23f, danger: 0xff4d5e, skin: 0xf2c29b, white: 0xeafff3,
+    brand: 0x1fd685, brandHi: 0x7dffc0, gold: 0xffd23f, danger: 0xff4d5e,
   };
 
   const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const fmt = (n) => Math.round(n).toLocaleString('pt-BR');
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -372,6 +632,7 @@
   const ROAD = 8.4;
   const laneXs = (n) => Array.from({ length: n }, (_, i) => -ROAD / 2 + (ROAD / n) * (i + 0.5));
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const embedded = (() => { try { return window.top !== window.self; } catch (e) { return true; } })();
 
   // ================= Contas =================
   function makeQuestion(level, n) {
@@ -414,6 +675,7 @@
   }
 
   // ================= Texturas em pixel =================
+  // As texturas do cenário são desenhadas em tons de cinza; a cor vem do tema (material.color).
   function canvasTex(w, h, draw, repeat) {
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
@@ -423,93 +685,82 @@
     if (repeat) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
     return t;
   }
-  const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 
-  function tileTex(base, edge) {
+  function tileTex() {
     return canvasTex(16, 16, (g) => {
-      g.fillStyle = base; g.fillRect(0, 0, 16, 16);
-      for (let i = 0; i < 18; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.05)'; g.fillRect(rand(1, 14), rand(1, 14), 1, 1); }
-      g.fillStyle = edge; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16);
-      g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, 15, 16, 1); g.fillRect(15, 0, 1, 16);
+      g.fillStyle = '#7a7a7a'; g.fillRect(0, 0, 16, 16);
+      for (let i = 0; i < 18; i++) { g.fillStyle = Math.random() < 0.5 ? '#5e5e5e' : '#8e8e8e'; g.fillRect(rand(1, 14), rand(1, 14), 1, 1); }
+      g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16);
+      g.fillStyle = '#3a3a3a'; g.fillRect(0, 15, 16, 1); g.fillRect(15, 0, 1, 16);
     }, [2, 1]);
   }
 
   function windowsTex() {
     return canvasTex(8, 16, (g) => {
-      g.fillStyle = '#081d14'; g.fillRect(0, 0, 8, 16);
+      g.fillStyle = '#1c1c1c'; g.fillRect(0, 0, 8, 16);
       for (let y = 1; y < 16; y += 2) for (let x = 1; x < 8; x += 2) {
         const r = Math.random();
-        g.fillStyle = r < 0.12 ? '#7dffc0' : r < 0.3 ? '#1fd685' : r < 0.45 ? '#0f5a3a' : '#0b2519';
+        g.fillStyle = r < 0.12 ? '#ffffff' : r < 0.3 ? '#b4b4b4' : r < 0.45 ? '#4a4a4a' : '#2a2a2a';
         g.fillRect(x, y, 1, 1);
-      }
-    });
-  }
-
-  function targetTex() { // alvo da Quanta, 16x16
-    return canvasTex(16, 16, (g) => {
-      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-        const d = Math.hypot(x - 7.5, y - 7.5);
-        if (d > 7.6) continue;
-        const ring = d < 1.8 || (d > 3.2 && d < 4.8) || (d > 6.2);
-        g.fillStyle = ring ? '#ffffff' : '#1fd685';
-        g.fillRect(x, y, 1, 1);
-      }
-    });
-  }
-
-  function skyTex() {
-    return canvasTex(256, 116, (g, w, h) => {
-      const gr = g.createLinearGradient(0, 0, 0, h);
-      gr.addColorStop(0, '#010604'); gr.addColorStop(0.55, '#04130c'); gr.addColorStop(1, hex(C.fog));
-      g.fillStyle = gr; g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 90; i++) { g.fillStyle = Math.random() < 0.2 ? '#7dffc0' : 'rgba(234,255,243,0.6)'; g.fillRect(rand(0, w), rand(0, 70), 1, 1); }
-      // sol-alvo (logo da Quanta) com fendas estilo synthwave
-      const cx = 128, cy = 102, R = 22;
-      for (let y = cy - R; y < h; y++) for (let x = cx - R; x <= cx + R; x++) {
-        const d = Math.hypot(x - cx, y - cy);
-        if (d > R) continue;
-        const ring = d < 3 || (d > 6.5 && d < 10) || (d > 13.5 && d < 17) || d > 19.5;
-        if (!ring) continue;
-        const k = y - (cy - 8);
-        if (k > 0 && (k % 4) < Math.min(3, 1 + k / 6)) continue;
-        const t = (y - (cy - R)) / (2 * R);
-        g.fillStyle = t < 0.25 ? '#c6ffe2' : t < 0.45 ? '#7dffc0' : t < 0.65 ? '#1fd685' : '#0f7a4c';
-        g.fillRect(x, y, 1, 1);
-      }
-      // silhueta da cidade
-      let x = 0;
-      while (x < w) {
-        const bw = rand(4, 12), bh = rand(3, 16);
-        g.fillStyle = '#04120c'; g.fillRect(x, h - bh, bw, bh);
-        for (let i = 0; i < bw * bh / 10; i++) { g.fillStyle = 'rgba(31,214,133,0.5)'; g.fillRect(x + rand(1, bw - 2), h - bh + rand(1, Math.max(1, bh - 2)), 1, 1); }
-        x += bw + rand(0, 3);
       }
     });
   }
 
   function gridTex() {
     return canvasTex(16, 16, (g) => {
-      g.fillStyle = '#030d08'; g.fillRect(0, 0, 16, 16);
-      g.fillStyle = '#0d4a30'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16);
+      g.fillStyle = '#0c0c0c'; g.fillRect(0, 0, 16, 16);
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, 16, 1); g.fillRect(0, 0, 1, 16);
     }, [60, 60]);
+  }
+
+  // céu com o sol-alvo (logo da Quanta) nas cores da fase
+  const skyCanvas = document.createElement('canvas'); skyCanvas.width = 256; skyCanvas.height = 116;
+  const skyStars = Array.from({ length: 90 }, () => [rand(0, 255), rand(0, 70), Math.random() < 0.2]);
+  const skyCity = (() => {
+    const out = []; let x = 0;
+    while (x < 256) { const bw = rand(4, 12), bh = rand(3, 16); const lit = []; for (let i = 0; i < bw * bh / 10; i++) lit.push([x + rand(1, bw - 2), rand(1, Math.max(1, bh - 2))]); out.push({ x, bw, bh, lit }); x += bw + rand(0, 3); }
+    return out;
+  })();
+  function drawSky(th) {
+    const g = skyCanvas.getContext('2d'), w = 256, h = 116;
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, th.skyTop); gr.addColorStop(0.55, th.skyMid); gr.addColorStop(1, '#' + th.fog.toString(16).padStart(6, '0'));
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (const [x, y, hi] of skyStars) { g.fillStyle = hi ? th.stars : 'rgba(255,255,255,0.55)'; g.fillRect(x, y, 1, 1); }
+    const cx = 128, cy = 102, R = 22;
+    for (let y = cy - R; y < h; y++) for (let x = cx - R; x <= cx + R; x++) {
+      const d = Math.hypot(x - cx, y - cy);
+      if (d > R) continue;
+      const ring = d < 3 || (d > 6.5 && d < 10) || (d > 13.5 && d < 17) || d > 19.5;
+      if (!ring) continue;
+      const k = y - (cy - 8);
+      if (k > 0 && (k % 4) < Math.min(3, 1 + k / 6)) continue;
+      const t = (y - (cy - R)) / (2 * R);
+      g.fillStyle = th.sun[t < 0.25 ? 0 : t < 0.45 ? 1 : t < 0.65 ? 2 : 3];
+      g.fillRect(x, y, 1, 1);
+    }
+    for (const b of skyCity) {
+      g.fillStyle = th.city; g.fillRect(b.x, h - b.bh, b.bw, b.bh);
+      g.fillStyle = th.cityLit; for (const [lx, ly] of b.lit) g.fillRect(lx, h - b.bh + ly, 1, 1);
+    }
   }
 
   function panelTex(num, state, pw, len) {
     const col = state === 'bad' ? '#ff4d5e' : state === 'good' ? '#7dffc0' : '#1fd685';
-    const fill = state === 'bad' ? 'rgba(255,77,94,0.45)' : state === 'good' ? 'rgba(125,255,192,0.4)' : 'rgba(31,214,133,0.22)';
+    const fill = state === 'bad' ? 'rgba(255,77,94,0.5)' : state === 'good' ? 'rgba(125,255,192,0.45)' : 'rgba(4,16,11,0.55)';
     return canvasTex(Math.round(128 * pw / 3.6), 138, (g, w, h) => {
       g.fillStyle = fill; g.fillRect(4, 4, w - 8, h - 8);
-      // brilho diagonal
-      g.fillStyle = 'rgba(255,255,255,0.08)';
+      g.fillStyle = 'rgba(31,214,133,0.18)';
       for (let i = 0; i < Math.min(34, w - 20); i++) g.fillRect(10 + i, 8 + i * 2, 6, 2);
       g.fillStyle = col;
       g.fillRect(4, 0, w - 8, 4); g.fillRect(4, h - 4, w - 8, 4); g.fillRect(0, 4, 4, h - 8); g.fillRect(w - 4, 4, 4, h - 8);
       g.fillRect(4, 4, 4, 4); g.fillRect(w - 8, 4, 4, 4); g.fillRect(4, h - 8, 4, 4); g.fillRect(w - 8, h - 8, 4, 4);
       const s = String(num);
-      const fs = [40, 32, 24, 16, 8].find((f) => f * len <= w - 10); // mesmo tamanho em todos os portais
+      const fs = [48, 40, 32, 24, 16, 8].find((f) => f * len <= w - 10); // mesmo tamanho em todos os portais
       g.font = `${fs}px 'Press Start 2P', monospace`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = '#000'; g.fillText(s, w / 2 + 3, h / 2 + 5);
+      g.fillStyle = '#000';
+      for (const [ox, oy] of [[-3, 0], [3, 0], [0, -3], [0, 5], [3, 5]]) g.fillText(s, w / 2 + ox, h / 2 + 2 + oy);
       g.fillStyle = '#ffffff'; g.fillText(s, w / 2, h / 2 + 2);
     });
   }
@@ -532,7 +783,7 @@
     return canvasTex(24, 24, (g, w, h) => {
       g.font = `800 20px 'Plus Jakarta Sans', sans-serif`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = '#1fd685'; g.fillText(ch, w / 2, h / 2 + 1);
+      g.fillStyle = '#ffffff'; g.fillText(ch, w / 2, h / 2 + 1);
     });
   }
 
@@ -542,12 +793,12 @@
   renderer.setPixelRatio(1);
   stage.appendChild(renderer.domElement);
   const scene = new T.Scene();
-  scene.background = new T.Color(C.fog);
-  scene.fog = new T.Fog(C.fog, 34, 128);
+  scene.background = new T.Color(0x061a11);
+  scene.fog = new T.Fog(0x061a11, 34, 128);
   const camera = new T.PerspectiveCamera(62, 1, 0.1, 500);
-  const CAM = { x: 0, y: 5.2, z: 8.6, lookY: 1.2, lookZ: -14, baseFov: 62 };
+  const CAM = { x: 0, y: 5.2, z: 8.6, lookZ: -14, baseFov: 62 };
 
-  scene.add(new T.HemisphereLight(0xd8ffe9, 0x0a2a1b, 0.95));
+  const hemi = new T.HemisphereLight(0xd8ffe9, 0x0a2a1b, 0.95); scene.add(hemi);
   const sun = new T.DirectionalLight(0xffffff, 0.75); sun.position.set(-6, 12, 8); scene.add(sun);
 
   let W = 0, H = 0, PX = 3, qBottom = 0;
@@ -564,37 +815,47 @@
   }
   window.addEventListener('resize', resize);
 
+  // cores que mudam com a fase: cada entrada liga uma cor da cena a uma chave do tema
+  const tints = [];
+  const tint = (color, key) => { tints.push({ c: color, key, from: new T.Color(), to: new T.Color() }); return color; };
+  tint(scene.background, 'fog'); tint(scene.fog.color, 'fog');
+  tint(hemi.color, 'hemiSky'); tint(hemi.groundColor, 'hemiGround');
+
   // céu
-  const sky = new T.Mesh(new T.PlaneGeometry(720, 326), new T.MeshBasicMaterial({ map: skyTex(), fog: false }));
+  const skyTexture = new T.CanvasTexture(skyCanvas);
+  skyTexture.magFilter = skyTexture.minFilter = T.NearestFilter; skyTexture.generateMipmaps = false;
+  const sky = new T.Mesh(new T.PlaneGeometry(720, 326), new T.MeshBasicMaterial({ map: skyTexture, fog: false }));
   sky.position.set(0, 160, -250); scene.add(sky);
 
   // chão digital lá embaixo
   const grid = gridTex();
-  const ground = new T.Mesh(new T.PlaneGeometry(960, 960), new T.MeshBasicMaterial({ map: grid }));
+  const groundMat = new T.MeshBasicMaterial({ map: grid }); tint(groundMat.color, 'grid');
+  const ground = new T.Mesh(new T.PlaneGeometry(960, 960), groundMat);
   ground.rotation.x = -Math.PI / 2; ground.position.set(0, -10, -200); scene.add(ground);
 
   // pista
   const moving = []; // objetos que andam com o mundo
   const trackSpan = CFG.rows * CFG.rowLen;
-  const sideMat = new T.MeshLambertMaterial({ color: 0x0a261a });
+  const sideMat = new T.MeshLambertMaterial(); tint(sideMat.color, 'side');
+  const topA = new T.MeshLambertMaterial({ map: tileTex() }); tint(topA.color, 'tileA');
+  const topB = new T.MeshLambertMaterial({ map: tileTex() }); tint(topB.color, 'tileB');
   const tileMats = [
-    [sideMat, sideMat, new T.MeshLambertMaterial({ map: tileTex('#123a2a', '#1f6b4a') }), sideMat, sideMat, sideMat],
-    [sideMat, sideMat, new T.MeshLambertMaterial({ map: tileTex('#0e2f22', '#1a5a3f') }), sideMat, sideMat, sideMat],
+    [sideMat, sideMat, topA, sideMat, sideMat, sideMat],
+    [sideMat, sideMat, topB, sideMat, sideMat, sideMat],
   ];
   const rowGeo = new T.BoxGeometry(8.4, 0.8, CFG.rowLen);
   const dashGeo = new T.BoxGeometry(0.16, 0.04, 1.8);
-  const dashMat = new T.MeshBasicMaterial({ color: 0x9fc2b0 });
+  const dashMat = new T.MeshBasicMaterial(); tint(dashMat.color, 'dash');
   const postGeo = new T.BoxGeometry(0.4, 0.7, 0.4);
-  const postMat = new T.MeshLambertMaterial({ color: 0x0b2a1c });
   const capGeo = new T.BoxGeometry(0.46, 0.16, 0.46);
-  const capMat = new T.MeshBasicMaterial({ color: C.brand });
+  const capMat = new T.MeshBasicMaterial(); tint(capMat.color, 'rail');
   const rowDashes = [];
   for (let i = 0; i < CFG.rows; i++) {
     const row = new T.Group();
     const slab = new T.Mesh(rowGeo, tileMats[i % 2]); slab.position.y = -0.4; row.add(slab);
     if (i % 2 === 0) for (let k = 0; k < 3; k++) { const d = new T.Mesh(dashGeo, dashMat); d.position.y = 0.02; row.add(d); rowDashes.push(d); }
     for (const sx of [-4.4, 4.4]) {
-      const p = new T.Mesh(postGeo, postMat); p.position.set(sx, 0.35, 0); row.add(p);
+      const p = new T.Mesh(postGeo, sideMat); p.position.set(sx, 0.35, 0); row.add(p);
       const cp = new T.Mesh(capGeo, capMat); cp.position.set(sx, 0.76, 0); row.add(cp);
     }
     row.position.z = 12 - i * CFG.rowLen;
@@ -616,14 +877,15 @@
   // prédios da cidade digital
   const bldGeo = new T.BoxGeometry(1, 1, 1);
   const bldTexs = [windowsTex(), windowsTex(), windowsTex()];
+  const roofMat = new T.MeshBasicMaterial(); tint(roofMat.color, 'roof');
   const cityZone = 170;
   for (let i = 0; i < 34; i++) {
     const side = i % 2 ? 1 : -1;
     const w = rnd(2, 4.5), h = rnd(4, 22), d = rnd(2, 4.5);
     const tex = bldTexs[i % 3].clone(); tex.needsUpdate = true;
     tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(Math.round(w), Math.round(h / 2));
-    const wm = new T.MeshLambertMaterial({ map: tex });
-    const m = new T.Mesh(bldGeo, [wm, wm, new T.MeshBasicMaterial({ color: 0x0f5a3a }), sideMat, wm, sideMat]);
+    const wm = new T.MeshLambertMaterial({ map: tex }); tint(wm.color, 'windows');
+    const m = new T.Mesh(bldGeo, [wm, wm, roofMat, sideMat, wm, sideMat]);
     m.scale.set(w, h, d);
     m.position.set(side * rnd(10, 28), -10 + h / 2 + rnd(0, 6), 14 - Math.random() * cityZone);
     scene.add(m); moving.push({ obj: m, span: cityZone, limit: 16 });
@@ -633,7 +895,8 @@
   const floaty = [];
   ['π', 'Σ', '√', '∞', '÷', '×', '+', '=', '%', 'Δ', '∫', '7', '3', '9'].forEach((ch) => {
     for (let k = 0; k < 2; k++) {
-      const sp = new T.Sprite(new T.SpriteMaterial({ map: glyphTex(ch), transparent: true, depthWrite: false }));
+      const mat = new T.SpriteMaterial({ map: glyphTex(ch), transparent: true, depthWrite: false }); tint(mat.color, 'glyph');
+      const sp = new T.Sprite(mat);
       const s = rnd(1.4, 3);
       sp.scale.set(s, s, 1);
       sp.position.set((Math.random() < 0.5 ? -1 : 1) * rnd(6.5, 16), rnd(3, 12), 14 - Math.random() * 150);
@@ -644,7 +907,7 @@
 
   // linhas de velocidade
   const streakGeo = new T.BoxGeometry(0.05, 0.05, 4);
-  const streakMat = new T.MeshBasicMaterial({ color: 0xc6ffe2, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false });
+  const streakMat = new T.MeshBasicMaterial({ transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false }); tint(streakMat.color, 'streak');
   const streaks = [];
   for (let i = 0; i < 40; i++) {
     const s = new T.Mesh(streakGeo, streakMat);
@@ -653,38 +916,40 @@
     scene.add(s); streaks.push(s);
   }
 
-  // ================= Corredor (voxel) =================
-  function box(w, h, d, color, x, y, z, parent) {
-    const m = new T.Mesh(new T.BoxGeometry(w, h, d), Array.isArray(color) ? color : new T.MeshLambertMaterial({ color }));
-    m.position.set(x, y, z); parent.add(m); return m;
+  // criaturas malucas de cada fase (módulo opcional)
+  const creatures = QC.Creatures ? QC.Creatures.create(T, scene) : null;
+  // efeitos de tela: chamas, fogos, confete (módulo opcional)
+  const fx = QC.FX2D ? QC.FX2D.create() : null;
+  const fxCall = (fn, ...args) => { if (fx) { try { fx[fn](...args); } catch (e) {} } };
+
+  // ================= Fases =================
+  let themeIdx = -1, tintT = 1;
+  function applyTheme(level, instant) {
+    const info = QC.themeForLevel(level);
+    const th = info.theme;
+    for (const x of tints) {
+      x.from.copy(x.c); x.to.setHex(th[x.key]);
+      if (instant) x.c.copy(x.to);
+    }
+    tintT = instant ? 1 : 0;
+    drawSky(th); skyTexture.needsUpdate = true;
+    if (creatures) creatures.setTypes(th.creatures, info.intensity);
+    themeIdx = info.index;
+    return info;
   }
-  const runner = new T.Group(); scene.add(runner);
-  const body = new T.Group(); runner.add(body);
-  const legs = [], arms = [];
-  for (const s of [-1, 1]) {
-    const hip = new T.Group(); hip.position.set(s * 0.22, 1.02, 0); body.add(hip);
-    box(0.34, 0.62, 0.36, 0x0b5a38, 0, -0.3, 0, hip);        // bermuda
-    box(0.3, 0.36, 0.32, C.skin, 0, -0.78, 0, hip);          // canela
-    box(0.38, 0.2, 0.52, C.white, 0, -1.0, -0.06, hip);      // tênis
-    box(0.4, 0.06, 0.54, C.brand, 0, -1.1, -0.06, hip);      // sola verde
-    legs.push(hip);
-    const sh = new T.Group(); sh.position.set(s * 0.58, 1.92, 0); body.add(sh);
-    box(0.28, 0.42, 0.3, C.brand, 0, -0.18, 0, sh);
-    box(0.24, 0.4, 0.26, C.skin, 0, -0.58, 0, sh);
-    arms.push(sh);
-  }
-  const shirtMat = new T.MeshLambertMaterial({ color: C.brand });
-  const backMat = new T.MeshLambertMaterial({ map: targetTex() });
-  box(0.9, 1.0, 0.52, [shirtMat, shirtMat, shirtMat, shirtMat, backMat, shirtMat], 0, 1.5, 0, body);
-  const head = new T.Group(); head.position.set(0, 2.36, 0); body.add(head);
-  box(0.66, 0.62, 0.62, C.skin, 0, 0, 0, head);
-  box(0.7, 0.36, 0.66, 0x2a1a10, 0, 0.12, 0.04, head);        // cabelo (nuca)
-  box(0.72, 0.2, 0.7, C.brandDeep, 0, 0.34, 0, head);          // boné
-  box(0.46, 0.08, 0.34, C.brandDeep, 0, 0.26, 0.48, head);     // aba virada para trás
-  box(0.16, 0.16, 0.06, C.white, 0, 0.3, 0.36, head);          // botão do boné
+
+  // ================= Corredor (skins) =================
+  let R = null; // { group, body, legs, arms, head, update, dispose }
   const shadow = new T.Mesh(new T.CircleGeometry(0.7, 12), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false }));
-  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; runner.add(shadow);
-  body.position.y = 0.12;
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; scene.add(shadow);
+  let runnerSkin = null;
+  function useSkin(id) {
+    if (runnerSkin === id && R) return;
+    if (R) { scene.remove(R.group); try { R.dispose(); } catch (e) {} }
+    R = QC.Skins.build(T, id);
+    runnerSkin = id;
+    scene.add(R.group);
+  }
 
   // ================= Partículas (cubinhos) =================
   const partGeo = new T.BoxGeometry(0.22, 0.22, 0.22);
@@ -705,7 +970,7 @@
 
   // ================= Portais =================
   const postGateGeo = new T.BoxGeometry(0.55, 5.3, 0.55);
-  const postGateMat = new T.MeshLambertMaterial({ color: 0x0c2d20 });
+  const postGateMat = new T.MeshLambertMaterial(); tint(postGateMat.color, 'gate');
   const innerPostGeo = new T.BoxGeometry(0.3, 5.3, 0.4);
   const beamGeo = new T.BoxGeometry(9.4, 1.18, 0.6);
   function makeGate(q, answers, xs) {
@@ -720,12 +985,13 @@
     const panelGeo = new T.PlaneGeometry(pw, 3.9);
     const padGeo = new T.BoxGeometry(pw, 0.06, 1.2);
     const btex = bannerTex(`${q.text} = ?`);
-    const bfront = new T.MeshBasicMaterial({ map: btex });
+    // portais e placa ignoram a neblina: continuam nítidos mesmo longe
+    const bfront = new T.MeshBasicMaterial({ map: btex, fog: false });
     const beam = new T.Mesh(beamGeo, [postGateMat, postGateMat, postGateMat, postGateMat, bfront, postGateMat]);
     beam.position.set(0, 5.95, 0); g.add(beam);
     const pads = [];
     const panels = xs.map((lx, i) => {
-      const mat = new T.MeshBasicMaterial({ map: panelTex(answers[i], 'idle', pw, len), transparent: true, side: T.DoubleSide, depthWrite: false });
+      const mat = new T.MeshBasicMaterial({ map: panelTex(answers[i], 'idle', pw, len), transparent: true, side: T.DoubleSide, depthWrite: false, fog: false });
       const m = new T.Mesh(panelGeo, mat); m.position.set(lx, 2.3, 0); g.add(m);
       const pad = new T.Mesh(padGeo, new T.MeshBasicMaterial({ color: C.brand, transparent: true, opacity: 0.35 }));
       pad.position.set(lx, 0.04, 0.2); g.add(pad); pads.push(pad);
@@ -751,17 +1017,17 @@
   }
 
   // ================= Som =================
-  let actx = null, noiseBuf = null;
+  let actx = null;
   let soundOn = store.get('quanta-corrida-sound', true);
+  let music = null;
   function audio() {
     if (!actx) {
-      try {
-        actx = new (window.AudioContext || window.webkitAudioContext)();
-        noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.1), actx.sampleRate);
-        const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      } catch (e) { actx = null; }
+      try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
     }
     if (actx && actx.state === 'suspended') actx.resume();
+    if (actx && !music && QC.Music) {
+      try { music = QC.Music.create(actx); music.setMuted(!soundOn); } catch (e) { music = null; }
+    }
     return actx;
   }
   function tone(freq, dur, type, vol, at) {
@@ -772,46 +1038,52 @@
     g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
     o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
   }
-  function hat(at, vol) {
-    if (!soundOn || !actx) return;
-    const s = actx.createBufferSource(); s.buffer = noiseBuf;
-    const f = actx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
-    const g = actx.createGain(); g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.0008, at + 0.05);
-    s.connect(f).connect(g).connect(actx.destination); s.start(at); s.stop(at + 0.06);
-  }
-  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
   const sfx = {
-    good() { if (!actx) return; const t = actx.currentTime; tone(988, 0.08, 'square', 0.07, t); tone(1319, 0.14, 'square', 0.07, t + 0.07); },
+    // cada acerto seguido toca uma nota mais aguda (escala pentatônica)
+    good(combo) {
+      if (!actx) return;
+      const steps = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];
+      const f = 523.25 * Math.pow(2, steps[Math.min(combo - 1, steps.length - 1)] / 12);
+      const t = actx.currentTime;
+      tone(f, 0.09, 'square', 0.06, t); tone(f * 1.5, 0.16, 'square', 0.05, t + 0.06);
+      if (combo >= 10) tone(f * 2, 0.2, 'triangle', 0.05, t + 0.1);
+    },
+    milestone(combo) {
+      if (!actx) return;
+      const t = actx.currentTime, base = combo >= 15 ? 659 : 523;
+      [0, 4, 7, 12, 16, 19, 24].forEach((st, i) => tone(base * Math.pow(2, st / 12), 0.12, 'square', 0.05, t + i * 0.05));
+    },
+    broken() {
+      if (!actx) return;
+      const t = actx.currentTime;
+      [0, -3, -7, -12].forEach((st, i) => tone(392 * Math.pow(2, st / 12), 0.16, 'sawtooth', 0.05, t + i * 0.09));
+    },
     bad() { if (!actx) return; const t = actx.currentTime; tone(196, 0.25, 'sawtooth', 0.09, t); tone(98, 0.35, 'square', 0.07, t + 0.06); },
     move() { if (actx) tone(520, 0.04, 'square', 0.03); },
-    level() { if (!actx) return; const t = actx.currentTime; [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.12, 'square', 0.06, t + i * 0.07)); },
   };
-  // trilha chiptune; o andamento acompanha a velocidade
-  const BASS = [45, 45, 57, 45, 45, 57, 45, 55, 41, 41, 53, 41, 43, 43, 55, 47];
-  const LEAD = [69, 0, 72, 0, 76, 0, 72, 74, 65, 0, 69, 0, 71, 0, 67, 0];
-  const music = { step: 0, next: 0 };
-  function musicTick() {
-    if (!actx) return;
-    if (!soundOn || S.mode !== 'play') { music.next = actx.currentTime + 0.05; return; }
-    const st = 60 / (128 + (S.speed - CFG.startSpeed) * 1.6) / 2;
-    if (music.next < actx.currentTime) music.next = actx.currentTime + 0.05;
-    while (music.next < actx.currentTime + 0.15) {
-      const i = music.step % 16, bar = Math.floor(music.step / 16) % 4;
-      tone(mtof(BASS[i] + (bar === 3 ? 2 : 0)), st * 0.9, 'triangle', 0.09, music.next);
-      if (i % 2 === 1) hat(music.next, 0.025);
-      if (bar >= 2 && LEAD[i]) tone(mtof(LEAD[i] + 12), st * 0.8, 'square', 0.018, music.next);
-      music.next += st; music.step++;
-    }
-  }
-  setInterval(musicTick, 50);
+  const stinger = (kind) => { if (music && soundOn) { try { music.stinger(kind); } catch (e) {} } };
 
   // ================= Estado =================
   const S = {
-    mode: 'menu', score: 0, lives: CFG.lives, hits: 0, combo: 0, level: 1,
+    mode: 'menu', score: 0, lives: CFG.lives, hits: 0, combo: 0, maxCombo: 0, level: 1,
     speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, x: -2.1, horizon: 0,
     gate: null, gap: 0, t: 0, phase: 0, shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0,
+    playMs: 0, locker: 0, lockerOn: false, preview: null, shown: 0, fever: false,
   };
-  let best = store.get('quanta-corrida-best', 0);
+  // pontuação: 10 por acerto (20 se respondeu rápido) x multiplicador do combo (até x10) x2 na febre
+  const multFor = (combo) => Math.min(10, 1 + Math.floor(combo / 3));
+  const FEVER_AT = 15;
+  const PRAISE = [
+    [1, ['BOA!', 'ISSO!', 'CERTO!']],
+    [3, ['ÓTIMO!', 'MANDOU BEM!', 'SHOW!']],
+    [5, ['INCRÍVEL!', 'QUE FERA!', 'VOANDO!']],
+    [10, ['IMPARÁVEL!', 'ARRASOU!', 'MONSTRO!']],
+    [15, ['EM CHAMAS!', 'FEBRE!', 'INSANO!']],
+    [20, ['GÊNIO!', 'SURREAL!', 'LENDA!']],
+    [30, ['LENDÁRIO!', 'DIVINO!', 'QUANTA MASTER!']],
+  ];
+  const tierOf = (combo) => (combo >= 30 ? 5 : combo >= 20 ? 4 : combo >= 15 ? 3 : combo >= 10 ? 2 : combo >= 5 ? 1 : 0);
+  const TIER_COLORS = ['#ffffff', '#7dffc0', '#ffd23f', '#ff9a2e', '#ff4d5e', '#ff4df0'];
 
   const segsEl = $('segs');
   for (let i = 0; i < 12; i++) segsEl.appendChild(document.createElement('i'));
@@ -822,44 +1094,112 @@
     px.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'X') r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }));
     return `<svg viewBox="0 0 7 6" shape-rendering="crispEdges" fill="${filled ? '#ff4d5e' : '#2a3a33'}">${r}</svg>`;
   }
+  function paintScore() { $('hudScore').innerHTML = `${fmt(S.shown)}<b> PTS</b>`; }
   function updateHud() {
-    $('hudScore').innerHTML = `${S.score}<b> PTS</b>`;
+    paintScore();
     let h = ''; for (let i = 0; i < CFG.lives; i++) h += heart(i < S.lives); $('hudLives').innerHTML = h;
     $('speedTxt').textContent = 'x' + (S.speed / CFG.startSpeed).toFixed(1);
     const on = Math.round((S.speed - CFG.startSpeed) / (CFG.maxSpeed - CFG.startSpeed) * 11) + 1;
     [...segsEl.children].forEach((el, i) => { el.className = i < on ? (i >= 10 ? 'on max' : i >= 7 ? 'on hot' : 'on') : ''; });
-    const mult = Math.min(1 + Math.floor(S.combo / 3), 5);
-    const cb = $('combo');
-    cb.innerHTML = `${S.combo} SEGUIDAS<small>PONTOS x${mult}</small>`;
-    cb.classList.toggle('show', S.combo >= 2);
+    const mult = multFor(S.combo) * (S.fever ? 2 : 1);
+    const hm = $('hudMult');
+    hm.textContent = 'x' + mult;
+    hm.classList.toggle('show', mult > 1 && S.mode === 'play');
   }
-  function popText(text, color, top, big, accent) {
+
+  // medidor de combo à direita
+  function paintCombo(punch) {
+    const m = $('comboMeter'), num = $('cmNum');
+    const tier = tierOf(S.combo);
+    m.className = 'combo-meter' + (S.combo >= 1 && S.mode === 'play' ? ' show' : '') + (tier ? ' t' + tier : '') + (S.fever ? ' fever' : '');
+    num.textContent = S.combo;
+    num.style.setProperty('--s', (1 + tier * 0.14).toFixed(2));
+    $('cmMult').textContent = 'x' + multFor(S.combo) * (S.fever ? 2 : 1);
+    $('cmBar').style.width = multFor(S.combo) >= 10 ? '100%' : Math.round((S.combo % 3) / 3 * 100) + '%';
+    if (punch) { num.classList.remove('punch'); void num.offsetWidth; num.classList.add('punch'); }
+    // fogo no número e no placar conforme a sequência cresce
+    const heat = [0, 0.3, 0.55, 0.8, 1, 1][tier];
+    fxCall('flames', num, S.mode === 'play' ? heat : 0);
+    fxCall('flames', $('hudScore'), S.mode === 'play' ? Math.max(0, heat - 0.25) : 0);
+    fxCall('edge', S.fever && S.mode === 'play' ? 0.8 : 0);
+    $('feverEdge').classList.toggle('on', S.fever && S.mode === 'play');
+  }
+  const projTmp = new T.Vector3();
+  function toScreen(x, y, z) {
+    projTmp.set(x, y, z).project(camera);
+    return { x: (projTmp.x + 1) / 2 * W, y: (1 - projTmp.y) / 2 * H };
+  }
+  function praise(combo, quick) {
+    let words = PRAISE[0][1];
+    for (const [min, w] of PRAISE) if (combo >= min) words = w;
+    const el = document.createElement('div');
+    el.className = 'praise';
+    const tier = tierOf(combo);
+    el.style.color = TIER_COLORS[tier];
+    el.style.top = '36%';
+    el.style.fontSize = `calc(${(1 + tier * 0.18).toFixed(2)} * clamp(26px, 7vmin, 46px))`;
+    el.innerHTML = `${esc(pick(words))}${quick ? '<small>RESPOSTA RÁPIDA +10</small>' : ''}`;
+    $('fx').appendChild(el);
+    setTimeout(() => el.remove(), 950);
+  }
+  function popText(html, color, top, big, accent) {
     const el = document.createElement('div');
     el.className = 'pop' + (big ? ' big' : '') + (accent ? ' accent' : '');
-    el.textContent = text; el.style.color = color; el.style.top = top;
+    el.innerHTML = html; el.style.color = color; el.style.top = top;
     el.style.fontSize = big ? 'clamp(30px, 8vw, 56px)' : 'clamp(14px, 3.6vw, 22px)';
     $('fx').appendChild(el);
-    setTimeout(() => el.remove(), big ? 1500 : 1100);
+    setTimeout(() => el.remove(), big ? 1900 : 1100);
   }
   function flash(color, strength) {
     const f = $('flash');
     f.style.transition = 'none'; f.style.background = color; f.style.opacity = strength;
-    requestAnimationFrame(() => { f.style.transition = 'opacity .35s steps(4)'; f.style.opacity = 0; });
+    requestAnimationFrame(() => { f.style.transition = 'opacity .45s steps(5)'; f.style.opacity = 0; });
+  }
+  let toastTimer = 0;
+  const toastQueue = [];
+  function toast(html) {
+    toastQueue.push(html);
+    if (toastQueue.length === 1) showToast();
+  }
+  function showToast() {
+    const el = $('toast');
+    el.innerHTML = toastQueue[0]; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      el.classList.remove('show');
+      setTimeout(() => { toastQueue.shift(); if (toastQueue.length) showToast(); }, 250);
+    }, 2600);
+  }
+
+  // opções da pergunta na ordem das pistas; a da pista atual fica destacada
+  function paintOptions(result) {
+    const g = S.gate;
+    if (!g) return;
+    const spans = $('qOpts').children;
+    for (let i = 0; i < spans.length; i++) {
+      let cls = i === S.lane ? 'here' : '';
+      if (result) cls = i === g.correct ? 'ok' : i === g.chosen ? 'bad' : '';
+      spans[i].className = cls;
+    }
   }
 
   // ================= Controles =================
   function setLane(i) {
     if (S.mode !== 'play') return;
     i = clamp(i, 0, S.lanes.length - 1);
-    if (i !== S.lane) sfx.move();
-    S.lane = i;
+    if (i !== S.lane) {
+      sfx.move(); S.lane = i;
+      if (S.gate && S.gate.state === 'coming') { S.gate.decidedFrac = S.gate.frac; paintOptions(); }
+    }
   }
   window.addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     const k = e.key.toLowerCase();
     if (k === 'arrowleft' || k === 'a') { setLane(S.lane - 1); e.preventDefault(); }
     else if (k === 'arrowright' || k === 'd') { setLane(S.lane + 1); e.preventDefault(); }
-    else if (k === 'p' || k === 'escape') togglePause();
-    else if ((k === 'enter' || k === ' ') && (S.mode === 'menu' || S.mode === 'over') && ready) { startGame(); e.preventDefault(); }
+    else if (k === 'p') togglePause();
+    else if (k === 'escape') { if (openPanel) closePanel(); else togglePause(); }
+    else if ((k === 'enter' || k === ' ') && !openPanel && (S.mode === 'menu' || S.mode === 'over') && ready) { startGame(); e.preventDefault(); }
   });
   let tx0 = null, swiped = false;
   const cv = renderer.domElement;
@@ -874,16 +1214,23 @@
   // ================= Fluxo =================
   function startGame() {
     audio();
+    closePanel();
     if (S.gate) { removeGate(S.gate); S.gate = null; }
     Object.assign(S, {
-      mode: 'play', score: 0, lives: CFG.lives, hits: 0, combo: 0, level: 1,
+      mode: 'play', score: 0, lives: CFG.lives, hits: 0, combo: 0, maxCombo: 0, level: 1,
       speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, gap: 0.8,
-      shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0,
+      shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0, playMs: 0, preview: null, shown: 0, fever: false,
     });
+    fxCall('clear');
+    useSkin(P.data.skin);
     setTrackLanes(2);
+    if (themeIdx !== 0) applyTheme(1, false);
+    if (creatures) creatures.clear();
+    if (music) { try { music.resume(); music.play(0); } catch (e) {} }
     ['startScreen', 'overScreen', 'pauseScreen'].forEach((id) => $(id).classList.remove('show'));
     $('question').classList.remove('show');
     updateHud();
+    paintCombo(false);
   }
 
   function spawnGate() {
@@ -894,52 +1241,114 @@
       let bestI = 0;
       S.lanes.forEach((x, i) => { if (Math.abs(x - S.x) < Math.abs(S.lanes[bestI] - S.x)) bestI = i; });
       S.lane = bestI;
-      setTimeout(() => popText(`AGORA SÃO ${n} PORTAIS!`, '#ffd23f', '56%', false, true), 500);
+      setTimeout(() => popText(`AGORA SÃO ${n} PORTAIS!`, '#ffd23f', '64%', false, true), 400);
     }
     const q = makeQuestion(S.level, n);
     const answers = shuffle([q.ans, ...q.wrong]);
     const correct = answers.indexOf(q.ans);
-    S.gate = { q, answers, correct, state: 'coming', timer: 0, z: CFG.spawnZ, obj: makeGate(q, answers, S.lanes) };
-    $('qText').innerHTML = `${q.text} = <span class="qm">?</span>`;
+    S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: 1, obj: makeGate(q, answers, S.lanes) };
+    $('qText').innerHTML = `${esc(q.text)} = <span class="qm">?</span>`;
+    $('qOpts').innerHTML = answers.map((a) => `<span>${a}</span>`).join('');
     $('qLevel').textContent = `NÍVEL ${S.level}`;
+    paintOptions();
     const qe = $('question');
     qe.classList.remove('bounce'); void qe.offsetWidth; qe.classList.add('show', 'bounce');
     measureQuestion();
   }
 
+  function liveStats() {
+    return { score: S.score, hits: S.hits, maxCombo: S.maxCombo, maxLevel: S.level, maxSpeed: S.maxSpeedSeen / CFG.startSpeed };
+  }
+  function announceUnlocks(ids) {
+    ids.forEach((id) => {
+      const sk = QC.Skins.get(id);
+      toast(`★ NOVA SKIN DESBLOQUEADA ★<small>${esc(sk.name)}: equipe no menu Skins</small>`);
+    });
+    if (ids.length) stinger('unlock');
+  }
+
+  function levelUp() {
+    S.level++;
+    const info = applyTheme(S.level, false);
+    flash('rgba(255,255,255,0.9)', 0.55);
+    if (creatures) creatures.celebrate();
+    if (music) { try { music.play(info.index); } catch (e) {} }
+    stinger('levelup');
+    setTimeout(() => popText(`NÍVEL ${S.level}!<small>${esc(info.theme.name.toUpperCase())}</small>`, '#ffd23f', '44%', true), 150);
+  }
+
   function resolveGate(g) {
+    g.chosen = S.lane;
     const lx = S.lanes[S.lane];
     if (S.lane === g.correct) {
       g.state = 'pass';
       g.obj.panels[S.lane].visible = false;
       burst(lx, 2.3, g.z, 'good', 34, 1.6);
-      S.hits++; S.combo++;
-      const mult = Math.min(1 + Math.floor(S.combo / 3), 5);
-      S.score += 10 * mult;
+      S.hits++; S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
+      const quick = g.decidedFrac >= 0.5;
+      const startFever = !S.fever && S.combo >= FEVER_AT;
+      if (startFever) S.fever = true;
+      const mult = multFor(S.combo) * (S.fever ? 2 : 1);
+      const pts = (quick ? 20 : 10) * mult;
+      S.score += pts;
       S.speed = Math.min(CFG.maxSpeed, S.speed + CFG.speedStep);
       S.maxSpeedSeen = Math.max(S.maxSpeedSeen, S.speed);
-      S.fovKick = 7; S.jumpV = 7;
-      flash('rgba(31,214,133,0.9)', 0.18);
-      popText(mult > 1 ? `+${10 * mult} x${mult}` : '+10', '#7dffc0', '58%');
+      S.fovKick = 7 + Math.min(8, S.combo * 0.4); S.jumpV = 7;
+      flash(TIER_COLORS[tierOf(S.combo)], 0.14 + tierOf(S.combo) * 0.04);
+      const rp = toScreen(S.x, 2.2, 0);
+      popText(`+${pts}${mult > 1 ? ` <span style="color:#ffd23f">x${mult}</span>` : ''}`, '#7dffc0', `${Math.round(rp.y / H * 100) - 6}%`);
+      praise(S.combo, quick);
+      fxCall('sparks', rp.x, rp.y, TIER_COLORS[tierOf(S.combo)], 16 + S.combo * 2);
+      const sc = $('hudScore');
+      if (fx) {
+        fxCall('fly', rp.x, rp.y, sc, Math.min(24, 5 + S.combo), TIER_COLORS[tierOf(S.combo)], () => { sc.classList.remove('pulse'); void sc.offsetWidth; sc.classList.add('pulse'); });
+      } else { sc.classList.remove('pulse'); void sc.offsetWidth; sc.classList.add('pulse'); }
       const sp = $('speed'); sp.classList.remove('bump'); void sp.offsetWidth; sp.classList.add('bump');
-      sfx.good();
-      if (S.hits % CFG.hitsPerLevel === 0) {
-        S.level++;
-        setTimeout(() => { popText(`NÍVEL ${S.level}!`, '#ffd23f', '42%', true); sfx.level(); }, 250);
+      sfx.good(S.combo);
+      if (S.combo % 5 === 0) {
+        // marco de combo: fogos, onda de choque e carimbo gigante
+        const cm = $('cmNum').getBoundingClientRect();
+        fxCall('fireworks', Math.min(10, 2 + S.combo / 5));
+        fxCall('shockwave', cm.left + cm.width / 2, cm.top + cm.height / 2, TIER_COLORS[tierOf(S.combo)]);
+        if (S.combo >= 20) fxCall('confetti', 60);
+        sfx.milestone(S.combo);
+        if (!startFever) setTimeout(() => popText(`COMBO ${S.combo}!`, TIER_COLORS[tierOf(S.combo)], '50%', true), 120);
       }
+      if (startFever) {
+        setTimeout(() => popText('MODO FEBRE!<small>PONTOS EM DOBRO ATÉ ERRAR</small>', '#ff9a2e', '50%', true), 120);
+        stinger('record');
+      }
+      paintCombo(true);
+      if (S.hits % CFG.hitsPerLevel === 0) levelUp();
+      announceUnlocks(P.checkUnlocks(liveStats()));
     } else {
       g.state = 'crash';
       setPanel(g, S.lane, 'bad');
       setPanel(g, g.correct, 'good');
       burst(lx, 2.3, g.z + 0.3, 'bad', 26, 1.4);
-      S.lives--; S.combo = 0;
-      S.shake = reduceMotion ? 0 : 0.45; S.stumble = 0.9;
+      const lost = S.combo;
+      S.lives--; S.combo = 0; S.fever = false;
+      S.shake = reduceMotion ? 0 : 0.45 + Math.min(0.4, lost * 0.02); S.stumble = 0.9;
+      if (lost >= 3) {
+        // perder a sequência dói: texto rachando e onda vermelha
+        const el = document.createElement('div');
+        el.className = 'pop broken'; el.style.color = '#ff4d5e'; el.style.top = '40%';
+        el.style.fontSize = 'clamp(20px, 5.5vw, 34px)';
+        el.innerHTML = `COMBO PERDIDO<br><span style="color:#fff">x${lost}</span>`;
+        $('fx').appendChild(el); setTimeout(() => el.remove(), 1250);
+        const cm = $('cmNum').getBoundingClientRect();
+        fxCall('shockwave', cm.left + cm.width / 2, cm.top + cm.height / 2, '#ff4d5e');
+        setTimeout(() => sfx.broken(), 200);
+      }
+      paintCombo(false);
       flash('rgba(255,77,94,0.9)', 0.35);
       popText(`ERA ${g.q.ans}`, '#ff4d5e', '52%');
       sfx.bad();
       if (navigator.vibrate) { try { navigator.vibrate(140); } catch (e) {} }
     }
-    $('question').classList.remove('show');
+    paintOptions(true);
+    const qe = $('question');
+    setTimeout(() => { if (S.gate === g || !S.gate) qe.classList.remove('show'); }, 450);
     updateHud();
   }
 
@@ -953,29 +1362,277 @@
   ];
   function gameOver() {
     S.mode = 'over';
-    const rec = S.score > best;
-    if (rec) { best = S.score; store.set('quanta-corrida-best', best); }
-    $('rScore').textContent = S.score; $('rHits').textContent = S.hits;
-    $('rSpeed').textContent = 'x' + (S.maxSpeedSeen / CFG.startSpeed).toFixed(1);
-    $('bestOver').textContent = best; $('bestStart').textContent = best;
-    $('newRecord').classList.toggle('show', rec && S.score > 0);
+    if (music) { try { music.stop(); } catch (e) {} }
+    const run = {
+      score: S.score, hits: S.hits, maxLevel: S.level, maxCombo: S.maxCombo,
+      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin,
+    };
+    const res = P.applyRun(run);
+    stinger(res.record ? 'record' : 'gameover');
+
+    countUp($('rScore'), S.score, 900); countUp($('rHits'), S.hits, 700); countUp($('rCombo'), S.maxCombo, 700);
+    $('rLevel').textContent = S.level;
+    S.fever = false; paintCombo(false);
+    if (res.record) setTimeout(() => { fxCall('fireworks', 8); fxCall('confetti', 90); }, 400);
+    $('newRecord').classList.toggle('show', res.record);
+    $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
     $('overTip').textContent = pick(TIPS);
+    countUp($('xpGain'), res.xpGained, 900);
+    countUp($('xpTotal'), P.data.xp, 1100, P.data.xp - res.xpGained);
+    const un = $('unlocked');
+    const all = res.newSkins.concat(sessionUnlocks.splice(0));
+    un.classList.toggle('show', all.length > 0);
+    un.textContent = all.length ? `★ Skin nova: ${[...new Set(all)].map((id) => QC.Skins.get(id).name).join(', ')}!` : '';
+    paintNextUnlock();
     $('overScreen').classList.add('show');
     $('question').classList.remove('show');
-    $('combo').classList.remove('show');
+    $('hudMult').classList.remove('show');
+    refreshMenus();
+    submitOnline(run);
+    if (S.gate) { removeGate(S.gate); S.gate = null; }
   }
+  const sessionUnlocks = [];
+  // números que sobem rolando
+  function countUp(el, to, ms, from) {
+    const a = from || 0, t0 = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / ms);
+      el.textContent = fmt(a + (to - a) * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  function paintNextUnlock() {
+    const nx = P.nextUnlock();
+    const bar = $('xpBar'), txt = $('xpNext');
+    if (!nx) { bar.style.width = '100%'; txt.innerHTML = 'Você liberou <b>todas as skins</b>!'; return; }
+    bar.style.width = '0';
+    requestAnimationFrame(() => { bar.style.width = Math.round(nx.pct * 100) + '%'; });
+    const u = nx.skin.unlock;
+    txt.innerHTML = u.type === 'xp'
+      ? `Faltam <b>${fmt(u.value - nx.current)}</b> pontos para <b>${esc(nx.skin.name)}</b>`
+      : `Próxima: <b>${esc(nx.skin.name)}</b> · ${esc(u.label)}`;
+  }
+
   function togglePause() {
-    if (S.mode === 'play') { S.mode = 'pause'; $('pauseScreen').classList.add('show'); }
-    else if (S.mode === 'pause') { S.mode = 'play'; $('pauseScreen').classList.remove('show'); }
+    if (S.mode === 'play') {
+      S.mode = 'pause'; $('pauseScreen').classList.add('show');
+      if (music) { try { music.pause(); } catch (e) {} }
+      paintCombo(false);
+    } else if (S.mode === 'pause') {
+      S.mode = 'play'; $('pauseScreen').classList.remove('show');
+      if (music) { try { music.resume(); } catch (e) {} }
+      paintCombo(false);
+    }
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') togglePause(); });
 
+  // ================= Telas: skins, ranking, apelido =================
+  let openPanel = null;
+  function openScreen(id) {
+    closePanel();
+    openPanel = id;
+    $(id).classList.add('show');
+    if (id === 'lockerScreen') { S.lockerOn = true; S.preview = null; renderLocker(); }
+    if (id === 'rankScreen') loadBoard(boardPeriod);
+    if (id === 'nickScreen') {
+      const inp = $('nickInput');
+      inp.value = cloud.nickname || (QC.Online && QC.Online.user ? QC.Online.user.firstName : '') || '';
+      $('nickErr').textContent = '';
+      setTimeout(() => inp.focus(), 50);
+    }
+  }
+  function closePanel() {
+    if (!openPanel) return;
+    $(openPanel).classList.remove('show');
+    if (openPanel === 'lockerScreen') { S.lockerOn = false; S.preview = null; useSkin(P.data.skin); }
+    openPanel = null;
+  }
+  $$('[data-open]').forEach((b) => b.addEventListener('click', () => openScreen(b.dataset.open === 'locker' ? 'lockerScreen' : 'rankScreen')));
+  $$('[data-close]').forEach((b) => b.addEventListener('click', closePanel));
+  ['lockerScreen', 'rankScreen', 'nickScreen'].forEach((id) => $(id).addEventListener('click', (e) => { if (e.target.id === id) closePanel(); }));
+
+  const RARITY = { 'comum': 'comum', 'rara': 'rara', 'épica': 'epica', 'lendária': 'lendaria' };
+  function renderLocker() {
+    const list = QC.Skins.list;
+    $('lockerCount').textContent = `${P.data.skins.filter((id) => QC.Skins.list.some((s) => s.id === id)).length}/${list.length}`;
+    $('skinGrid').innerHTML = list.map((sk) => {
+      const open = P.isUnlocked(sk.id);
+      const u = sk.unlock || {};
+      const cur = P.metric(u.type);
+      const pct = open ? 1 : clamp(cur / (u.value || 1), 0, 1);
+      const on = P.data.skin === sk.id;
+      const sw = (sk.swatch || []).slice(0, 4).map((c) => `<i style="background:${esc(c)}"></i>`).join('');
+      const req = open ? (on ? 'Equipada' : 'Toque para equipar') : `${esc(u.label || '')}${u.type === 'xp' ? ` · ${fmt(cur)}/${fmt(u.value)}` : ''}`;
+      return `<button type="button" class="skin r-${RARITY[sk.rarity] || 'comum'}${open ? '' : ' locked'}${on ? ' on' : ''}${S.preview === sk.id ? ' previewing' : ''}" data-skin="${esc(sk.id)}" aria-pressed="${on}">
+        ${sw ? `<span class="sw">${sw}</span>` : ''}<b>${esc(sk.name)}</b><small>${esc(sk.rarity)}</small><span class="req">${req}</span>
+        ${open ? '' : `<span class="mini"><i style="width:${Math.round(pct * 100)}%"></i></span>`}</button>`;
+    }).join('');
+  }
+  $('skinGrid').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-skin]');
+    if (!b) return;
+    const id = b.dataset.skin;
+    S.preview = id;
+    useSkin(id); // mostra no corredor, mesmo bloqueada
+    if (P.select(id)) { pushProgressSoon(); refreshMenus(); }
+    renderLocker();
+  });
+
+  let boardPeriod = 'week';
+  $$('.tab').forEach((t) => t.addEventListener('click', () => {
+    boardPeriod = t.dataset.period;
+    $$('.tab').forEach((x) => { x.classList.toggle('on', x === t); x.setAttribute('aria-selected', String(x === t)); });
+    loadBoard(boardPeriod);
+  }));
+  let boardReq = 0;
+  async function loadBoard(period) {
+    const el = $('board');
+    const req = ++boardReq;
+    if (!onlineReady) {
+      el.innerHTML = `<li class="board-msg">${embedded ? 'O ranking funciona no site: quantaaulas.com/corrida' : 'Sem conexão com o ranking agora. Tente de novo daqui a pouco.'}</li>`;
+      return;
+    }
+    el.innerHTML = '<li class="board-msg">Carregando...</li>';
+    const rows = await QC.Online.leaderboard(period, 20);
+    if (req !== boardReq) return;
+    if (!rows) { el.innerHTML = `<li class="board-msg">${embedded ? 'O ranking funciona no site: quantaaulas.com/corrida' : 'Não foi possível carregar o ranking. Tente de novo.'}</li>`; return; }
+    if (!rows.length) { el.innerHTML = `<li class="board-msg">Ninguém pontuou ${period === 'week' ? 'nesta semana' : 'ainda'}. O primeiro lugar pode ser seu!</li>`; return; }
+    let html = '', prev = 0;
+    rows.forEach((r) => {
+      if (prev && r.rank > prev + 1 && r.is_me) html += '<li class="gap">···</li>';
+      const sk = QC.Skins.get(r.skin);
+      html += `<li class="${r.is_me ? 'me' : ''}"><span class="pos">#${r.rank}</span><span class="nm">${esc(r.nickname)}<small>${esc(sk.name)}</small></span><span class="sc">${fmt(r.score)}</span></li>`;
+      prev = r.rank;
+    });
+    el.innerHTML = html;
+  }
+
+  // ================= Conta e nuvem =================
+  let onlineReady = false;
+  const cloud = { revision: 0, nickname: '', synced: false };
+  const GOOGLE_SVG = '<svg viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>';
+
+  function accountHtml() {
+    const u = onlineReady && QC.Online.user;
+    if (u) {
+      return `<div class="account"><span>Jogando como<br><b>${esc(cloud.nickname || u.firstName || 'Jogador')}</b></span>
+        <span class="acts"><button class="link" type="button" data-act="nick">Apelido</button><button class="link" type="button" data-act="out">Sair</button></span></div>`;
+    }
+    if (embedded || !onlineReady) {
+      return `<div class="account"><span>Seu progresso fica salvo neste aparelho.${embedded ? ' Para entrar no ranking, jogue em <b style="font-size:13px">quantaaulas.com/corrida</b>.' : ''}</span></div>`;
+    }
+    return `<div class="login-box"><button class="btn alt google" type="button" data-act="in">${GOOGLE_SVG} Entrar com Google</button>
+      <small>Guarde suas skins em qualquer aparelho e apareça no ranking.</small></div>`;
+  }
+  function refreshMenus() {
+    $$('.account-slot').forEach((el) => { el.innerHTML = accountHtml(); });
+    $('bestStart').textContent = fmt(P.data.bestScore);
+    $('xpStart').textContent = fmt(P.data.xp);
+    const total = QC.Skins.list.length;
+    $('skinCount').textContent = `${P.data.skins.filter((id) => QC.Skins.list.some((s) => s.id === id)).length}/${total}`;
+  }
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const act = b.dataset.act;
+    if (act === 'in') { b.disabled = true; const r = await QC.Online.signIn(); if (r && r.error) { b.disabled = false; toast('Não foi possível abrir o login do Google.<small>Tente de novo.</small>'); } }
+    else if (act === 'out') { await QC.Online.signOut(); cloud.nickname = ''; cloud.revision = 0; cloud.synced = false; refreshMenus(); }
+    else if (act === 'nick') openScreen('nickScreen');
+  });
+
+  $('nickForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const val = $('nickInput').value.trim();
+    const err = $('nickErr');
+    if (val.length < 3) { err.textContent = 'Use pelo menos 3 letras.'; return; }
+    $('nickSave').disabled = true; err.textContent = '';
+    const r = await QC.Online.setNickname(val);
+    $('nickSave').disabled = false;
+    if (r && r.ok) {
+      cloud.nickname = r.nickname; closePanel(); refreshMenus();
+      toast(`Apelido salvo: ${esc(r.nickname)}`);
+      if (pendingRun) { const run = pendingRun; pendingRun = null; submitOnline(run); }
+    } else {
+      err.textContent = {
+        taken: 'Esse apelido já está em uso. Tente outro.',
+        blocked: 'Esse apelido não é permitido. Escolha outro.',
+        invalid: 'Use de 3 a 16 letras, números, espaço ou _.',
+      }[r && r.error] || 'Sem conexão. Tente de novo.';
+    }
+  });
+
+  // puxa o progresso da nuvem e mescla com o deste aparelho
+  async function syncFromCloud() {
+    if (!onlineReady || !QC.Online.user) return;
+    const me = await QC.Online.getMe();
+    if (!me) return;
+    cloud.revision = me.revision || 0;
+    cloud.nickname = me.nickname || '';
+    cloud.synced = true;
+    const before = new Set(P.data.skins);
+    P.merge(Object.assign({}, me.progress || {}, { bestScore: Math.max((me.progress && me.progress.bestScore) || 0, me.best_score || 0) }));
+    sessionUnlocks.push(...P.data.skins.filter((id) => !before.has(id) && QC.Skins.list.some((s) => s.id === id)));
+    if (S.mode !== 'play') useSkin(P.data.skin);
+    refreshMenus();
+    await pushProgress();
+    if (!cloud.nickname && S.mode !== 'play') openScreen('nickScreen');
+  }
+
+  let pushing = false, pushAgain = false, pushTimer = 0;
+  function pushProgressSoon() { clearTimeout(pushTimer); pushTimer = setTimeout(pushProgress, 800); }
+  async function pushProgress() {
+    if (!onlineReady || !QC.Online.user || !cloud.synced) return;
+    if (pushing) { pushAgain = true; return; }
+    pushing = true;
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const r = await QC.Online.saveProgress(P.data, cloud.revision);
+        if (r && r.ok) { cloud.revision = r.revision; break; }
+        if (r && r.conflict) {
+          const me = await QC.Online.getMe();
+          if (!me) break;
+          cloud.revision = me.revision; P.merge(me.progress || {});
+          continue;
+        }
+        break;
+      }
+    } finally {
+      pushing = false;
+      if (pushAgain) { pushAgain = false; pushProgressSoon(); }
+    }
+  }
+
+  let pendingRun = null;
+  async function submitOnline(run) {
+    const line = $('onlineLine');
+    if (!onlineReady || embedded) { line.textContent = ''; return; }
+    if (!QC.Online.user) { line.innerHTML = 'Entre com Google no menu inicial para aparecer no ranking.'; return; }
+    await pushProgress();
+    if (run.score <= 0) { line.textContent = ''; return; }
+    if (!cloud.nickname) {
+      pendingRun = run;
+      line.innerHTML = '<button class="link" type="button" data-act="nick">Escolha um apelido</button> para aparecer no ranking.';
+      return;
+    }
+    line.textContent = 'Enviando para o ranking...';
+    const r = await QC.Online.submitRun(run);
+    if (r && r.ok) {
+      line.innerHTML = `Ranking da semana: <b>#${r.rank_week}</b> · Geral: <b>#${r.rank_all}</b>`;
+    } else {
+      line.textContent = r && r.error === 'too_fast' ? 'Corrida muito rápida para o ranking.' : 'Não deu para enviar ao ranking agora.';
+    }
+  }
+
   // ================= Loop =================
+  const lookTmp = new T.Vector3();
   function update(dt) {
     S.t += dt;
     const playing = S.mode === 'play';
-    const frozen = S.mode === 'pause' || S.mode === 'over';
-    let v = S.mode === 'menu' ? 11 : frozen ? 0 : S.speed;
+    const frozen = S.mode === 'pause';
+    if (playing) S.playMs += dt * 1000;
+    let v = playing ? S.speed : frozen ? 0 : 11;
     if (S.stumble > 0) v *= 0.12;
     const dz = v * dt;
 
@@ -985,10 +1642,26 @@
     }
     for (const sp of floaty) sp.position.y = sp.userData.base + Math.sin(S.t * 1.5 + sp.userData.ph) * 0.4;
     grid.offset.y += dz / 16;
+    if (creatures && !frozen) creatures.update(dt, dz, S.t);
 
-    // linhas de velocidade: mais visíveis quanto mais rápido
+    // transição de cores da fase
+    if (tintT < 1) {
+      tintT = Math.min(1, tintT + dt / 1.4);
+      const k = tintT * tintT * (3 - 2 * tintT);
+      for (const x of tints) x.c.lerpColors(x.from, x.to, k);
+    }
+
+    // placar sobe rolando até o valor real
+    if (S.shown !== S.score) {
+      S.shown = S.shown < S.score ? Math.min(S.score, Math.ceil(S.shown + Math.max(1, (S.score - S.shown) * Math.min(1, dt * 7)))) : S.score;
+      paintScore();
+    }
+
+    // linhas de velocidade: mais visíveis quanto mais rápido; arco-íris na febre
     const sf = clamp((S.speed - CFG.startSpeed) / (CFG.maxSpeed - CFG.startSpeed), 0, 1);
-    streakMat.opacity = playing ? 0.12 + sf * 0.55 : 0.06;
+    streakMat.opacity = playing ? 0.12 + sf * 0.55 + (S.fever ? 0.25 : 0) : 0.06;
+    if (S.fever && playing) streakMat.color.setHSL((S.t * 1.5) % 1, 1, 0.6);
+    else if (tintT >= 1 && themeIdx >= 0) streakMat.color.setHex(QC.THEMES[themeIdx].streak);
     for (const s of streaks) {
       s.position.z += dz * 1.6;
       s.scale.z = 1 + sf * 2.5;
@@ -997,18 +1670,25 @@
 
     // corredor
     if (!frozen) S.phase += dt * (4 + v * 0.42);
-    const lx = S.mode === 'menu' ? Math.sin(S.t * 0.7) * 1.2 : S.lanes[S.lane];
+    const lx = playing ? S.lanes[S.lane] : S.lockerOn ? 0 : Math.sin(S.t * 0.7) * 1.2;
     S.x += (lx - S.x) * (1 - Math.pow(0.00002, dt));
-    runner.position.x = S.x;
     const sw = Math.sin(S.phase);
-    legs[0].rotation.x = sw * 0.95; legs[1].rotation.x = -sw * 0.95;
-    arms[0].rotation.x = -sw * 0.85; arms[1].rotation.x = sw * 0.85;
+    if (R) {
+      R.group.position.x = S.x;
+      R.legs[0].rotation.x = sw * 0.95; R.legs[1].rotation.x = -sw * 0.95;
+      R.arms[0].rotation.x = -sw * 0.85; R.arms[1].rotation.x = sw * 0.85;
+      R.body.position.y = 0.12 + Math.abs(Math.cos(S.phase)) * 0.14 + S.jump;
+      R.body.rotation.z = (S.x - lx) * 0.18;
+      R.body.rotation.x = S.stumble > 0 ? -0.35 : -0.12 - sf * 0.1;
+      R.group.position.z = S.stumble > 0 ? Math.sin(S.stumble * Math.PI) * 1.2 : 0;
+      R.body.visible = !(S.stumble > 0 && Math.floor(S.t * 16) % 2 === 0);
+      // no armário, o corredor gira como numa vitrine
+      S.locker += ((S.lockerOn ? 1 : 0) - S.locker) * Math.min(1, dt * 5);
+      R.group.rotation.y = S.lockerOn ? S.t * 1.1 : R.group.rotation.y * (1 - Math.min(1, dt * 8));
+      if (R.update) R.update(dt, S.t, playing ? S.speed / CFG.startSpeed : 1);
+    }
     S.jumpV -= 26 * dt; S.jump = Math.max(0, S.jump + S.jumpV * dt); if (S.jump === 0) S.jumpV = 0;
-    body.position.y = 0.12 + Math.abs(Math.cos(S.phase)) * 0.14 + S.jump;
-    body.rotation.z = (S.x - lx) * 0.18;
-    body.rotation.x = S.stumble > 0 ? -0.35 : -0.12 - sf * 0.1;
-    runner.position.z = S.stumble > 0 ? Math.sin(S.stumble * Math.PI) * 1.2 : 0;
-    body.visible = !(S.stumble > 0 && Math.floor(S.t * 16) % 2 === 0);
+    shadow.position.x = S.x;
     shadow.scale.setScalar(1 - S.jump * 0.25);
     S.stumble = Math.max(0, S.stumble - dt);
 
@@ -1026,14 +1706,31 @@
     S.shake = Math.max(0, S.shake - dt);
     S.fovKick *= Math.pow(0.02, dt);
     const shk = S.shake * 1.2;
-    camera.position.set(CAM.x + S.x * 0.25 + rnd(-shk, shk), CAM.y + rnd(-shk, shk) * 0.6, CAM.z);
-    const fov = CAM.baseFov + sf * 10 + S.fovKick;
+    const lk = S.locker;
+    const fov = CAM.baseFov + (playing ? sf * 10 : 0) + S.fovKick - lk * 12;
     if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
-    // inclina a câmera para o horizonte (de onde vêm os portais) ficar abaixo da pergunta
-    const hy = clamp(Math.max(H * 0.33, qBottom + 16), 0, H * 0.46);
-    S.horizon = S.horizon ? S.horizon + (hy - S.horizon) * Math.min(1, dt * 6) : hy;
-    const tanP = (1 - 2 * S.horizon / H) * Math.tan(camera.fov * Math.PI / 360);
-    camera.lookAt(S.x * 0.35, camera.position.y - tanP * (CAM.z - CAM.lookZ), CAM.lookZ);
+    camera.position.set(
+      CAM.x + S.x * 0.25 + rnd(-shk, shk),
+      CAM.y + rnd(-shk, shk) * 0.6 - lk * 2.3,
+      CAM.z - lk * 3.6);
+    if (lk > 0.001) {
+      // vitrine: corredor na metade de cima da tela, acima da bandeja de skins
+      lookTmp.set(S.x * 0.35 * (1 - lk), 1.2 - lk * 1.9, CAM.lookZ * (1 - lk) + lk * 0);
+      camera.lookAt(lookTmp);
+    } else {
+      // inclina a câmera para o horizonte (de onde vêm os portais) ficar abaixo da pergunta
+      const hy = clamp(Math.max(H * 0.33, qBottom + 16), 0, H * 0.46);
+      S.horizon = S.horizon ? S.horizon + (hy - S.horizon) * Math.min(1, dt * 6) : hy;
+      const tanP = (1 - 2 * S.horizon / H) * Math.tan(camera.fov * Math.PI / 360);
+      camera.lookAt(S.x * 0.35, camera.position.y - tanP * (CAM.z - CAM.lookZ), CAM.lookZ);
+    }
+
+    if (music && playing) {
+      try {
+        music.setSpeed(S.speed / CFG.startSpeed);
+        music.setIntensity(S.fever ? 1 : clamp(S.combo / 12 + (S.level - 1) * 0.06, 0, 1));
+      } catch (e) {}
+    }
 
     if (!playing) return;
 
@@ -1046,6 +1743,7 @@
     if (g.state === 'coming') {
       g.z += dz; g.obj.group.position.z = g.z;
       const frac = clamp((CFG.resolveZ - g.z) / (CFG.resolveZ - CFG.spawnZ), 0, 1);
+      g.frac = frac;
       const bar = $('qBar');
       bar.style.transform = `scaleX(${frac})`;
       bar.className = frac < 0.22 ? 'later' : frac < 0.45 ? 'late' : '';
@@ -1078,13 +1776,30 @@
   $('btnPause').addEventListener('click', togglePause);
   const sb = $('btnSound');
   const paintSound = () => { sb.textContent = soundOn ? '♪' : '×'; sb.setAttribute('aria-pressed', String(soundOn)); };
-  sb.addEventListener('click', () => { soundOn = !soundOn; store.set('quanta-corrida-sound', soundOn); if (soundOn) audio(); paintSound(); });
+  sb.addEventListener('click', () => {
+    soundOn = !soundOn; store.set('quanta-corrida-sound', soundOn);
+    if (soundOn) audio();
+    if (music) { try { music.setMuted(!soundOn); } catch (e) {} }
+    paintSound();
+  });
   paintSound();
-  $('bestStart').textContent = best;
 
   resize();
+  applyTheme(1, true);
+  useSkin(P.data.skin);
+  refreshMenus();
   updateHud();
   requestAnimationFrame(frame);
+
+  // login/ranking: só no site (não funciona dentro de prévias incorporadas)
+  if (QC.Online) {
+    QC.Online.onChange(() => { cloud.synced = false; refreshMenus(); syncFromCloud(); });
+    QC.Online.init().then((ok) => {
+      onlineReady = ok;
+      refreshMenus();
+      if (ok && QC.Online.user) syncFromCloud();
+    });
+  }
 
   // espera a fonte pixelada para desenhar os números nos portais
   const fontsReady = document.fonts && document.fonts.load

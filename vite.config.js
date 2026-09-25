@@ -53,6 +53,7 @@ export default defineConfig({
       'script.js',
       'assets',
       'questoes/questoes.json',
+      'corrida/js',
       'robots.txt',
       '.htaccess',
     ]),
