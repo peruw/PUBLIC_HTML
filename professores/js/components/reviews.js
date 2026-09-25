@@ -18,7 +18,7 @@ import { h, starsEl } from '../ui.js';
 export function mountReviews(container, { tutorId, ratingAvg = 0, ratingCount = 0 } = {}) {
   if (!container) return;
   container.replaceChildren(
-    h('div', { class: 'pf-reviews', dataset: { tutorId } },
+    h('div', { class: 'pf-stack', dataset: { tutorId } },
       h('h2', { class: 'pf-section-title' }, 'Avaliações'),
       starsEl(ratingAvg, { count: ratingCount }),
       h('p', { class: 'pf-muted' }, 'As avaliações detalhadas estarão disponíveis em breve.')));

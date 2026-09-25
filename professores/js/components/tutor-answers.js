@@ -15,6 +15,6 @@ import { h } from '../ui.js';
 export function mountTutorAnswers(container, { tutorId } = {}) {
   if (!container) return;
   container.replaceChildren(
-    h('div', { class: 'pf-tutor-answers', dataset: { tutorId } },
+    h('div', { class: 'pf-stack', dataset: { tutorId } },
       h('p', { class: 'pf-muted' }, 'Respostas no tira-dúvidas em breve.')));
 }

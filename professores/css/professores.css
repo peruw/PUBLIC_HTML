@@ -12,7 +12,7 @@
    Chips/selos .. .pf-chips .pf-chip(.is-active | [aria-pressed=true]) .pf-badge(--premium|--pro|--ok|--warn|--muted)
                   .pf-count (badge numérico)
    Avaliação .... .pf-rating .pf-stars .pf-stars-fill .pf-rating-num .pf-rating-count .pf-rating--none
-   Avatar ....... .pf-avatar .pf-avatar--initials
+   Avatar ....... .pf-avatar .pf-avatar--initials (tamanho vem de avatarEl() via style)
    Card prof. ... .pf-results .pf-tutor-card(.is-premium) .pf-tutor-avatar .pf-tutor-main .pf-tutor-name
                   .pf-tutor-headline .pf-tutor-meta .pf-tutor-subjects .pf-tutor-side .pf-tutor-price
    Filtros ...... .pf-filters .pf-filters-title .pf-results-head .pf-results-title .pf-pagination
@@ -61,16 +61,7 @@
   margin-left: 8px;
 }
 .pf-auth-slot:empty { display: none; }
-.pf-auth-link {
-  background: none;
-  border: 0;
-  font-family: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-/* Itens do slot (nomes usados por auth.js: pf-nav-msg, pf-nav-user, pf-nav-sair, pf-nav-cta) */
+/* Itens do slot (auth.js: pf-nav-msg, pf-nav-user, pf-nav-sair, pf-nav-cta, pf-mobile-btn) */
 .pf-auth-slot button.nav-link,
 .pf-nav-sair {
   background: none;
@@ -79,21 +70,16 @@
   cursor: pointer;
 }
 .pf-nav-msg { display: inline-flex; align-items: center; gap: 6px; }
-.pf-auth-cta,
 .pf-nav-cta { margin-left: 4px; padding: 10px 16px; font-size: 13px; }
-.pf-user-chip,
 .pf-nav-user {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.pf-user-chip .pf-avatar,
 .pf-nav-user .pf-avatar { flex: none; }
-.pf-user-name,
 .pf-nav-user-name { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pf-auth-slot-mobile { display: contents; }
-.pf-mobile-signout,
 .pf-mobile-btn {
   background: none;
   border: 0;
@@ -106,7 +92,6 @@
   padding: 14px 0;
   cursor: pointer;
 }
-.pf-mobile-signout:hover,
 .pf-mobile-btn:hover { color: var(--brand); }
 .mobile-panel [data-unread-link] { display: flex; align-items: center; gap: 8px; }
 
@@ -158,6 +143,7 @@
   margin-bottom: 16px;
 }
 .pf-loading { color: var(--ink-mute); font-family: var(--mono); font-size: 13px; }
+.pf-page-body { min-width: 0; }
 
 .pf-stack { display: flex; flex-direction: column; gap: 16px; }
 .pf-grid-2 {
@@ -277,6 +263,7 @@
 .pf-textarea:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .pf-hint { font-size: 13px; color: var(--ink-mute); }
+.pf-hint:empty { display: none; } /* status vazio não ocupa espaço (alinha os campos) */
 .pf-error { font-size: 13px; color: #fca5a5; }
 .pf-field.is-invalid :is(input, select, textarea),
 .pf-field [aria-invalid="true"] { border-color: #ef4444; }
@@ -413,6 +400,7 @@
   overflow: hidden;
   user-select: none;
 }
+.pf-avatar--initials { line-height: 1; letter-spacing: 0.02em; }
 
 /* ---------- Hero da busca ---------- */
 .pf-hero { padding: 56px 0 40px; }
@@ -429,7 +417,7 @@
 .pf-search {
   margin-top: 32px;
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.9fr) minmax(0, 2fr) auto;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 2.2fr) auto;
   gap: 12px;
   align-items: end;
   padding: 16px;
@@ -438,6 +426,8 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card), 0 0 60px -30px var(--brand-glow);
 }
+.pf-search-q, .pf-search-modo, .pf-search-local { min-width: 0; }
+.pf-search .pf-city-picker { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
 .pf-search-btn { height: 46px; justify-content: center; }
 @media (max-width: 1100px) {
   .pf-search { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -446,6 +436,7 @@
 @media (max-width: 560px) {
   .pf-search { grid-template-columns: minmax(0, 1fr); padding: 14px; }
   .pf-search-btn { width: 100%; }
+  .pf-search .pf-city-picker { grid-template-columns: minmax(0, 1fr); }
 }
 .pf-hero-chips { margin-top: 20px; }
 
@@ -482,6 +473,7 @@
 .pf-results-title { font-size: 22px; }
 .pf-results-head .pf-field-inline { margin-left: auto; }
 .pf-results-head .pf-select { width: auto; padding-top: 8px; padding-bottom: 8px; font-size: 14px; }
+.pf-results-col { min-width: 0; }
 .pf-results { display: flex; flex-direction: column; gap: 14px; }
 
 /* ---------- Card do professor ---------- */
@@ -591,6 +583,7 @@
 }
 .pf-step-num { font-family: var(--mono); font-size: 12px; color: var(--brand); letter-spacing: 0.14em; }
 @media (max-width: 900px) { .pf-steps { grid-template-columns: 1fr; } }
+.pf-cta { margin-top: 8px; }
 
 /* ---------- Modal ---------- */
 .pf-modal {
@@ -862,6 +855,8 @@
 
 /* ---------- Rodapé ---------- */
 .pf-footer { margin-top: 64px; }
+/* styles.css põe .footer-col a { display:block }: mantém logo + selo lado a lado */
+.pf-footer .footer-col a.nav-logo { display: flex; width: fit-content; }
 @media (max-width: 420px) {
   .pf-footer .footer-grid { grid-template-columns: 1fr; gap: 28px; }
   .pf-footer .footer-bottom { flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -871,7 +866,8 @@
 @media (max-width: 420px) {
   .pf-page { padding-top: 36px; }
   .pf-hero { padding-top: 36px; }
-  .nav-logo .tag { letter-spacing: 0.08em; }
+  .nav .nav-inner { gap: 12px; }
+  .nav-logo .tag { letter-spacing: 0.08em; white-space: nowrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -16,3 +16,9 @@
     Require env allow_bot
   </RequireAny>
 </IfModule>
+
+# Portal de professores: /professores/p/<slug> serve o perfil (o JS lê o slug da URL)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^professores/p/([a-z0-9-]+)/?$ professores/perfil.html [L]
+</IfModule>

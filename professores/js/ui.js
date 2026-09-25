@@ -112,22 +112,21 @@ export function timeAgo(iso) {
 const DEC1 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /**
- * Estrelas de avaliação. starsEl(4.5, { count: 12 }) -> ★★★★½ 4,5 (12)
+ * Estrelas de avaliação. starsEl(4.5, { count: 12 }) -> ★★★★★ 4,5 (12)
  * aria-label "Nota 4,5 de 5" (+ ", 12 avaliações"). count === 0 -> "Sem avaliações".
  * @returns {HTMLElement}
  */
 export function starsEl(rating, { count } = {}) {
-  if (count === 0) return h('span', { class: 'pf-stars pf-stars-none' }, 'Sem avaliações');
+  if (count === 0) return h('span', { class: 'pf-rating pf-rating--none' }, 'Sem avaliações');
   const r = Math.max(0, Math.min(5, Number(rating) || 0));
   const nota = DEC1.format(r);
   let label = `Nota ${nota} de 5`;
   if (count != null) label += `, ${count} ${count === 1 ? 'avaliação' : 'avaliações'}`;
-  return h('span', { class: 'pf-stars', role: 'img', 'aria-label': label },
-    h('span', { class: 'pf-stars-track', 'aria-hidden': 'true' },
-      h('span', { class: 'pf-stars-bg' }, '★★★★★'),
-      h('span', { class: 'pf-stars-fg', style: { width: `${(r / 5) * 100}%` } }, '★★★★★')),
-    h('span', { class: 'pf-stars-num', 'aria-hidden': 'true' }, nota),
-    count != null ? h('span', { class: 'pf-stars-count', 'aria-hidden': 'true' }, `(${count})`) : null);
+  return h('span', { class: 'pf-rating', role: 'img', 'aria-label': label },
+    h('span', { class: 'pf-stars', 'aria-hidden': 'true' }, '★★★★★',
+      h('span', { class: 'pf-stars-fill', style: { width: `${(r / 5) * 100}%` } }, '★★★★★')),
+    h('span', { class: 'pf-rating-num', 'aria-hidden': 'true' }, nota),
+    count != null ? h('span', { class: 'pf-rating-count', 'aria-hidden': 'true' }, `(${count})`) : null);
 }
 
 function initials(name) {
@@ -144,11 +143,11 @@ function initials(name) {
  */
 export function avatarEl(path, name = '', size = 48) {
   const dim = { width: `${size}px`, height: `${size}px`, fontSize: `${Math.round(size * 0.38)}px` };
-  const fallback = () => h('span', { class: 'avatar pf-avatar', role: 'img', 'aria-label': name || 'Usuário', style: dim }, initials(name));
+  const fallback = () => h('span', { class: 'pf-avatar pf-avatar--initials', role: 'img', 'aria-label': name || 'Usuário', style: dim }, initials(name));
   const url = avatarPublicUrl(path);
   if (!url) return fallback();
   const img = h('img', {
-    class: 'avatar pf-avatar', src: url, alt: name ? `Foto de ${name}` : 'Foto', width: size, height: size,
+    class: 'pf-avatar', src: url, alt: name ? `Foto de ${name}` : 'Foto', width: size, height: size,
     loading: 'lazy', decoding: 'async', style: dim,
   });
   img.addEventListener('error', () => img.replaceWith(fallback()), { once: true });
@@ -157,8 +156,8 @@ export function avatarEl(path, name = '', size = 48) {
 
 /** Selo do plano: premium -> "Destaque", profissional -> "Profissional", básico -> null. */
 export function planBadge(plan) {
-  if (plan === 'premium') return h('span', { class: 'pf-badge pf-badge-premium', title: 'Professor em destaque' }, '★ Destaque');
-  if (plan === 'profissional') return h('span', { class: 'pf-badge pf-badge-pro' }, 'Profissional');
+  if (plan === 'premium') return h('span', { class: 'pf-badge pf-badge--premium', title: 'Professor em destaque' }, '★ Destaque');
+  if (plan === 'profissional') return h('span', { class: 'pf-badge pf-badge--pro' }, 'Profissional');
   return null;
 }
 
@@ -173,17 +172,21 @@ function toastRegion() {
   return region;
 }
 
-/** Aviso flutuante. type: 'info' | 'ok' | 'erro'. */
+/** Aviso flutuante. type: 'info' | 'ok' | 'erro'. @returns {HTMLElement} */
 export function toast(msg, type = 'info') {
+  const kind = ['info', 'ok', 'erro'].includes(type) ? type : 'info';
   const region = toastRegion();
-  const item = h('div', { class: ['pf-toast', `pf-toast-${type}`], role: type === 'erro' ? 'alert' : 'status' }, String(msg ?? ''));
+  let timer;
   const close = () => {
+    clearTimeout(timer);
     item.classList.add('is-leaving');
     setTimeout(() => item.remove(), 200);
   };
-  item.addEventListener('click', close);
+  const item = h('div', { class: ['pf-toast', `pf-toast--${kind}`], role: kind === 'erro' ? 'alert' : 'status' },
+    h('span', { class: 'pf-toast-msg' }, String(msg ?? '')),
+    h('button', { type: 'button', class: 'pf-toast-close', 'aria-label': 'Fechar aviso', onClick: close }, '×'));
   region.appendChild(item);
-  setTimeout(close, type === 'erro' ? 7000 : 4500);
+  timer = setTimeout(close, kind === 'erro' ? 7000 : 4500);
   return item;
 }
 
@@ -223,17 +226,18 @@ let modalSeq = 0;
 
 /**
  * Modal acessível (<dialog>). Esc, botão × e clique fora fecham.
+ * size: 'lg' para um modal mais largo.
  * actions: [{ label, primary, danger, onClick }] — onClick({ close, button, event }).
  *   Sem onClick: fecha. Com onClick: fecha ao terminar, exceto se retornar false.
  *   Se lançar erro: mostra toast com errorMsg() e mantém aberto.
  * @returns {{ close: () => void, el: HTMLDialogElement }}
  */
-export function modal({ title = '', content = null, actions = [], onClose } = {}) {
+export function modal({ title = '', content = null, actions = [], onClose, size } = {}) {
   const id = `pfModal${++modalSeq}`;
   const opener = document.activeElement;
   let closed = false;
 
-  const dlg = h('dialog', { class: 'pf-modal', 'aria-labelledby': `${id}-t` });
+  const dlg = h('dialog', { class: ['pf-modal', size === 'lg' ? 'pf-modal--lg' : null], 'aria-labelledby': `${id}-t` });
   const close = () => {
     if (closed) return;
     closed = true;
@@ -265,13 +269,12 @@ export function modal({ title = '', content = null, actions = [], onClose } = {}
     return btn;
   });
 
-  dlg.append(
+  dlg.append(h('div', { class: 'pf-modal-inner' },
     h('div', { class: 'pf-modal-head' },
       h('h2', { class: 'pf-modal-title', id: `${id}-t` }, title),
       h('button', { type: 'button', class: 'pf-modal-close', 'aria-label': 'Fechar', onClick: close }, '×')),
     h('div', { class: 'pf-modal-body' }, content),
-    buttons.length ? h('div', { class: 'pf-modal-actions' }, buttons) : null,
-  );
+    buttons.length ? h('div', { class: 'pf-modal-actions' }, buttons) : null));
 
   // Esc (cancel) e clique no fundo
   dlg.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
@@ -299,19 +302,19 @@ export function emptyState(text, action) {
   if (action instanceof Node) act = action;
   else if (action && action.href) act = h('a', { class: 'btn btn-ghost btn-sm', href: action.href }, action.label);
   else if (action && action.onClick) act = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onClick: action.onClick }, action.label);
-  return h('div', { class: 'pf-empty' }, h('p', {}, text), act);
+  return h('div', { class: 'pf-empty' }, h('p', { class: 'pf-empty-text' }, text), act);
 }
 
 /** n cards "fantasma" enquanto carrega. @returns {HTMLElement} */
 export function skeletonCards(n = 3) {
   const cards = Array.from({ length: n }, () =>
-    h('div', { class: 'pf-card pf-skeleton' },
-      h('span', { class: 'pf-skel pf-skel-circle' }),
+    h('div', { class: 'pf-skeleton-card' },
+      h('span', { class: 'pf-skel pf-skel-avatar' }),
       h('div', { class: 'pf-skel-lines' },
         h('span', { class: 'pf-skel pf-skel-line', style: { width: '45%' } }),
         h('span', { class: 'pf-skel pf-skel-line', style: { width: '80%' } }),
         h('span', { class: 'pf-skel pf-skel-line', style: { width: '60%' } }))));
-  return h('div', { class: 'pf-skeleton-list', 'aria-hidden': 'true' }, cards);
+  return h('div', { class: 'pf-skeletons', 'aria-hidden': 'true' }, cards);
 }
 
 // Mensagens do Supabase Auth -> PT (por código ou trecho da mensagem)
@@ -378,7 +381,7 @@ export function errorMsg(err) {
 
 /** Aviso "Portal em configuração" (quando config.js ainda tem placeholders). */
 export function notConfiguredNotice(container) {
-  const box = h('div', { class: 'pf-notice', role: 'status' },
+  const box = h('div', { class: 'pf-notice pf-notice--warn', role: 'status' },
     h('h2', { class: 'pf-notice-title' }, 'Portal em configuração'),
     h('p', {}, 'O portal de professores está sendo configurado. Volte em breve!'),
     h('a', { class: 'btn btn-ghost btn-sm', href: '/' }, 'Ir para o Quanta Aulas'));

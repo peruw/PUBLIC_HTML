@@ -32,26 +32,28 @@ export async function getUser() {
 }
 
 async function fetchProfile(user) {
-  // Duas consultas em paralelo (evita ambiguidade de embed no PostgREST)
-  const [prof, tutor] = await Promise.all([
-    sb.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-    sb.from('tutor_profiles').select('*').eq('user_id', user.id).maybeSingle(),
-  ]);
-  if (prof.error) throw prof.error;
-  if (!prof.data) return null;
-  // Erro ao ler tutor_profiles não impede o perfil básico
-  const tutorRow = tutor.error ? null : (tutor.data ?? null);
+  // tutor_profiles.user_id é PK e FK -> profiles: embed 1:1 (objeto ou null)
+  const { data, error } = await sb
+    .from('profiles')
+    .select('*, tutor_profiles(*)')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const raw = data.tutor_profiles;
+  const tutorRow = Array.isArray(raw) ? (raw[0] ?? null) : (raw ?? null);
   return {
-    ...prof.data,
+    ...data,
     email: user.email ?? null,
     tutor_profiles: tutorRow,
-    tutor: prof.data.role === 'tutor' ? tutorRow : null,
+    tutor: data.role === 'tutor' ? tutorRow : null,
   };
 }
 
 /**
- * Perfil do usuário logado: linha de `profiles` + `email` + `tutor` (linha de
- * `tutor_profiles` se role = 'tutor', senão null). Cache em memória; { force: true } recarrega.
+ * Perfil do usuário logado: linha de `profiles` (select '*, tutor_profiles(*)') + `email`
+ * + `tutor` (linha de tutor_profiles se role = 'tutor', senão null).
+ * Cache em memória; { force: true } recarrega.
  * @returns {Promise<object|null>} null se não houver sessão
  */
 export async function getProfile({ force = false } = {}) {
@@ -128,6 +130,7 @@ let authListener = null;
 function stopUnreadPolling() {
   if (unreadTimer) clearInterval(unreadTimer);
   unreadTimer = null;
+  setUnreadBadges(0);
 }
 
 function setUnreadBadges(n) {
@@ -138,6 +141,12 @@ function setUnreadBadges(n) {
   document.querySelectorAll('[data-unread-link]').forEach((a) => {
     a.setAttribute('aria-label', n > 0 ? `Mensagens (${n} não lidas)` : 'Mensagens');
   });
+  // Ponto no botão do menu mobile
+  const toggle = document.getElementById('menuToggle');
+  if (toggle) {
+    if (n > 0) toggle.dataset.unread = '1';
+    else delete toggle.dataset.unread;
+  }
 }
 
 /** Atualiza o badge de mensagens não lidas (erros são ignorados). */
@@ -180,7 +189,7 @@ function loggedOutItems(mobile) {
 
 function loggedInItems(profile, mobile) {
   const name = profile?.full_name || '';
-  const badge = () => h('span', { class: 'pf-badge-count', 'data-unread-badge': '', hidden: true, 'aria-hidden': 'true' }, '0');
+  const badge = () => h('span', { class: 'pf-count', 'data-unread-badge': '', hidden: true, 'aria-hidden': 'true' }, '0');
   const onSair = async () => {
     await signOut();
     location.href = '/professores/';

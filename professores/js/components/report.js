@@ -17,7 +17,7 @@ import { h, toast } from '../ui.js';
 export function reportButton({ type, id, label = 'Denunciar' } = {}) {
   return h('button', {
     type: 'button',
-    class: 'pf-link-btn pf-report-btn',
+    class: 'pf-link-btn',
     dataset: { reportType: type, reportId: id },
     onClick: () => toast('Denúncias estarão disponíveis em breve.'),
   }, label);

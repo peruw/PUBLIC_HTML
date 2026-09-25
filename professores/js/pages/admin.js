@@ -1,19 +1,20 @@
 /* ============================================
-   Página: admin
-   // STUB do scaffold — implementação real: agente "moderacao".
+   Página: Moderação (dono: moderacao)
+   STUB do scaffold — a implementação real substitui este arquivo.
    ============================================ */
 
-import { initChrome, notConfiguredNotice, emptyState } from '../ui.js';
+import { initChrome, emptyState, notConfiguredNotice } from '../ui.js';
 import { isConfigured } from '../config.js';
 
 function main() {
   initChrome();
   const body = document.getElementById('pageBody');
+  if (!body) return;
   if (!isConfigured) {
     notConfiguredNotice(body);
     return;
   }
-  body.replaceChildren(emptyState('Página em construção.', { label: 'Buscar professores', href: '/professores/' }));
+  body.replaceChildren(emptyState('Esta página está em construção.', { label: 'Buscar professores', href: '/professores/' }));
 }
 
 main();

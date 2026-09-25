@@ -98,7 +98,7 @@ export function cityPicker({ uf = '', cityId = null, onChange, names = {}, requi
   const citySel = h('select', { id: `${id}-city`, name: names.city ?? 'cidade', class: 'pf-select', required, disabled: true },
     h('option', { value: '' }, cityPlaceholder));
 
-  const status = h('span', { class: 'pf-help', role: 'status', 'aria-live': 'polite' });
+  const status = h('span', { class: 'pf-hint', role: 'status', 'aria-live': 'polite' });
 
   const el = h('div', { class: 'pf-city-picker' },
     h('div', { class: 'pf-field' }, h('label', { class: 'pf-label', for: ufSel.id }, 'Estado'), ufSel),
