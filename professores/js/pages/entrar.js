@@ -46,10 +46,11 @@ function safeNext(raw) {
 
 const nextPath = safeNext(params.get('next'));
 
-// Base dos links de e-mail: o endereço oficial do site (dev/testes em localhost usam a origem local).
-// O Supabase só aceita redirect para o host do Site URL ou para URLs da lista de Redirect URLs.
+// Base dos links de e-mail: o mesmo endereço em que a pessoa está (quantaaulas.com, o domínio
+// temporário da Hostinger ou localhost). O Supabase só aceita redirect para o host do Site URL ou
+// para URLs da lista de Redirect URLs; fora dela, o link cai no Site URL.
 function siteBase() {
-  return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? location.origin : SITE_URL;
+  return /^https?:$/.test(location.protocol) ? location.origin : SITE_URL;
 }
 
 /**

@@ -10,9 +10,9 @@ afterEach(() => {
 });
 
 describe('allowedOrigins', () => {
-  test('sem env: domínio de produção', () => {
+  test('sem env: domínios de produção (inclui o endereço da Hostinger)', () => {
     delete process.env.ALLOWED_ORIGINS;
-    assert.deepEqual(allowedOrigins(), ['https://quantaaulas.com', 'https://www.quantaaulas.com']);
+    assert.deepEqual(allowedOrigins(), ['https://quantaaulas.com', 'https://www.quantaaulas.com', 'https://quantaaulas-com-359870.hostingersite.com']);
   });
 
   test('CSV com espaços, barra final e maiúsculas', () => {
@@ -22,7 +22,7 @@ describe('allowedOrigins', () => {
 
   test('curinga "*" é ignorado', () => {
     process.env.ALLOWED_ORIGINS = '*';
-    assert.deepEqual(allowedOrigins(), ['https://quantaaulas.com', 'https://www.quantaaulas.com']);
+    assert.deepEqual(allowedOrigins(), ['https://quantaaulas.com', 'https://www.quantaaulas.com', 'https://quantaaulas-com-359870.hostingersite.com']);
     process.env.ALLOWED_ORIGINS = '*,http://localhost:5173';
     assert.deepEqual(allowedOrigins(), ['http://localhost:5173']);
     assert.equal(isAllowedOrigin('https://evil.example'), false);

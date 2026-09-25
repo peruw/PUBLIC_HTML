@@ -3,7 +3,12 @@
 // recebem Access-Control-Allow-Origin; as demais são bloqueadas pelo navegador.
 // Sem imports: também roda no Node (testes).
 
-const DEFAULT_ORIGINS = ['https://quantaaulas.com', 'https://www.quantaaulas.com'];
+// quantaaulas-com-359870.hostingersite.com: endereço em que a Hostinger publica o site do GitHub
+const DEFAULT_ORIGINS = [
+  'https://quantaaulas.com',
+  'https://www.quantaaulas.com',
+  'https://quantaaulas-com-359870.hostingersite.com',
+];
 
 // Deno.env em produção; process.env quando testado no Node
 function env(name: string): string | undefined {

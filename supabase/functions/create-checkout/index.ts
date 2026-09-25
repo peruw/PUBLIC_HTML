@@ -1,7 +1,7 @@
 // Cria o checkout (Mercado Pago Checkout Pro) de um plano para o professor logado.
 // Corpo: { plan: 'profissional' | 'premium', months: 1 | 3 | 12 }. Resposta: { init_point, payment_id }.
 // O valor NUNCA vem do cliente: sai de public.plan_price. O plano só é concedido pelo mp-webhook.
-import { handleOptions, jsonResponse } from '../_shared/cors.ts';
+import { handleOptions, isAllowedOrigin, jsonResponse } from '../_shared/cors.ts';
 import { adminClient, getCaller } from '../_shared/supabase.ts';
 import { isDowngrade, isValidMonths, isValidPlan, planName, planTitle } from '../_shared/mp.ts';
 
@@ -85,7 +85,11 @@ Deno.serve(async (req) => {
     if (insErr) throw insErr;
 
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '');
-    const siteUrl = (Deno.env.get('SITE_URL') ?? 'https://quantaaulas.com').replace(/\/+$/, '');
+    // Volta do Mercado Pago para o endereço que iniciou a compra (se for uma origem permitida)
+    const origin = req.headers.get('Origin');
+    const siteUrl = (isAllowedOrigin(origin) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(origin ?? '')
+      ? origin!
+      : (Deno.env.get('SITE_URL') ?? 'https://quantaaulas.com')).replace(/\/+$/, '');
     const backUrl = `${siteUrl}/professores/pagamento.html`;
     const preference: Record<string, unknown> = {
       items: [{
