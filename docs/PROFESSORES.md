@@ -402,16 +402,15 @@ Hostinger executar PHP, a fase opcional `perfil.php` + `sitemap.php` resolve iss
 - [ ] CNPJ (ou MEI com atividade compatível) para vender planos; conta do Mercado Pago no CNPJ.
 - [ ] Emissão de **NFS-e** para cada plano vendido (prefeitura ou emissor integrado).
 - [ ] Revisão jurídica de `privacidade.html` e `termos.html` (são minutas; há um aviso em comentário HTML).
-- [ ] Preencher os marcadores destacados em amarelo: `[CNPJ/CPF DO CONTROLADOR]`, `[ENDEREÇO]`,
-      `[E-MAIL DO ENCARREGADO/DPO]`, `[NOME DO ENCARREGADO]`, `[E-MAIL DE CONTATO]`,
-      `[CIDADE/UF DO FORO]`, `[PROVEDOR DE E-MAIL]`.
+- [x] Dados do controlador preenchidos nos termos e na privacidade (ver "Dados do responsável" abaixo).
+- [ ] Endereço físico completo (o Decreto 7.962/2013 pede endereço físico para venda pela internet; hoje consta só Joinville/SC).
 - [ ] **LGPD:** nomear o encarregado (DPO) e publicar o contato; registro das operações de tratamento;
       conferir bases legais e prazos de retenção; canal para pedidos de titulares (exportar/excluir já existem no painel).
 - [ ] Direito de arrependimento (CDC art. 49, 7 dias): processo de estorno no painel do MP definido.
 
 **Supabase**
 
-- [ ] Migrações 0001–0007 aplicadas; Security Advisor revisado.
+- [x] Migrações 0001–0008 aplicadas; Security Advisor revisado.
 - [ ] Site URL e Redirect URLs (3.3); Confirm email ON; regras de senha (3.4).
 - [ ] SMTP próprio com SPF/DKIM/DMARC; templates em PT; teste de cadastro e de "esqueci a senha" num e-mail externo.
 - [ ] Edge Functions publicadas; todos os segredos definidos; `MP_SANDBOX=false` com o token de produção.
@@ -428,3 +427,18 @@ Hostinger executar PHP, a fase opcional `perfil.php` + `sitemap.php` resolve iss
 - [ ] Redirecionamento `www` → sem `www` no `.htaccess` (3.3).
 - [ ] Preços dos planos revisados (6).
 - [ ] Links "Professores" do site principal funcionando no celular e no desktop.
+
+---
+
+## Dados do responsável
+
+Usados nos Termos de Uso e na Política de Privacidade (controlador, encarregado/DPO, foro e atendimento).
+
+| Campo | Valor |
+|---|---|
+| Nome | Samuel Isidoro dos Santos Júnior |
+| CPF | 080.930.309-48 |
+| Cidade/UF (sede e foro) | Joinville/SC |
+| E-mail de contato e do encarregado (DPO) | aulas@isidoropreparatorio.com.br |
+| Projeto Supabase | `quanta-professores` (ref `cmwfclgizvjtwpfyaucp`, região sa-east-1) |
+

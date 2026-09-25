@@ -709,8 +709,8 @@ test.describe('painel', () => {
 
 test.describe('termos e privacidade', () => {
   for (const [path, must] of [
-    ['/professores/privacidade.html', ['Lei 13.709/2018', 'art. 33', 'Mercado Pago', '6 (seis) meses', '5 (cinco) anos', 'art. 18', 'art. 14', '[CNPJ/CPF DO CONTROLADOR]', '[E-MAIL DO ENCARREGADO/DPO]', '[ENDEREÇO]']],
-    ['/professores/termos.html', ['não intermediamos o pagamento das aulas', 'art. 49', '7 (sete) dias', 'não garantem número de alunos', 'contatos externos', 'foro']],
+    ['/professores/privacidade.html', ['Lei 13.709/2018', 'art. 33', 'Mercado Pago', '6 (seis) meses', '5 (cinco) anos', 'art. 18', 'art. 14', 'Samuel Isidoro dos Santos Júnior', '080.930.309-48', 'aulas@isidoropreparatorio.com.br', 'Joinville/SC']],
+    ['/professores/termos.html', ['não intermediamos o pagamento das aulas', 'art. 49', '7 (sete) dias', 'não garantem número de alunos', 'contatos externos', 'foro', 'Samuel Isidoro dos Santos Júnior', '080.930.309-48', 'aulas@isidoropreparatorio.com.br', 'Joinville/SC']],
   ]) {
     test(`conteúdo completo: ${path}`, async ({ page }) => {
       const errors = trackErrors(page);
@@ -718,6 +718,8 @@ test.describe('termos e privacidade', () => {
       await page.goto(path);
       const text = await page.locator('main').innerText();
       for (const s of must) expect(text).toContain(s);
+      // Nenhum marcador [ ... ] pendente
+      await expect(page.locator('mark.pf-placeholder')).toHaveCount(0);
       // Minuta só como comentário HTML (não aparece na tela)
       expect(await page.content()).toContain('MINUTA');
       await expect(page.getByText('MINUTA', { exact: false })).toHaveCount(0);
