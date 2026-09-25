@@ -78,6 +78,15 @@ window.setView = (s, lat = 0, m = 'chase', opts = {}) => {
     camera.position.set(cx, opts.h ?? 620, cz + (opts.tilt ?? 1));
     camera.lookAt(cx, 0, cz);
   }
+  if (m === 'crane') {
+    // como o plano "grua" da demo: 22 m à frente, fora do asfalto, 12 m de altura, olhando o kart
+    const a = track.sample(s + 22);
+    camera.position.copy(a.pos).addScaledVector(a.right, lat * (a.halfWidth + 4)); camera.position.y += opts.h ?? 12;
+    const b = track.sample(s);
+    look.copy(b.pos); look.y += 0.8;
+    camera.fov = 50; camera.updateProjectionMatrix();
+    camera.lookAt(look);
+  }
   if (m === 'free') {
     camera.position.set(opts.px, opts.py, opts.pz);
     camera.lookAt(opts.lx, opts.ly, opts.lz);
@@ -88,7 +97,13 @@ window.setView = (s, lat = 0, m = 'chase', opts = {}) => {
     if (b) {
       b.updateMatrixWorld();
       const p = new THREE.Vector3().setFromMatrixPosition(b.matrixWorld);
-      camera.position.set(p.x + (opts.dx ?? 40), p.y + (opts.dy ?? -10), p.z + (opts.dz ?? 40));
+      if (opts.side) {
+        // relativo ao dirigível: side = distância pelo lado (+x local), fwd = deslocamento para a frente
+        const ax = new THREE.Vector3().setFromMatrixColumn(b.matrixWorld, 0).setY(0).normalize();
+        const az = new THREE.Vector3().setFromMatrixColumn(b.matrixWorld, 2).setY(0).normalize();
+        camera.position.copy(p).addScaledVector(ax, opts.side).addScaledVector(az, opts.fwd ?? 0);
+        camera.position.y += opts.dy ?? -6;
+      } else camera.position.set(p.x + (opts.dx ?? 40), p.y + (opts.dy ?? -10), p.z + (opts.dz ?? 40));
       camera.lookAt(p);
     }
   }
@@ -139,6 +154,18 @@ window.stats = () => {
     only = { calls: withAds.calls - without.calls, tris: withAds.tris - without.tris };
   }
   renderer.render(scene, camera);
+  // passe principal: malhas dos anúncios dentro do frustum da câmera; o resto é o passe de sombra
+  let main = 0;
+  if (ads) {
+    camera.updateMatrixWorld();
+    const fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    ads.group.traverse((o) => {
+      if (!o.isMesh || !o.visible) return;
+      const sp = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld);
+      if (fr.intersectsSphere(sp)) main++;
+    });
+    if (only) { only.mainPass = main; only.shadowPass = only.calls - main; }
+  }
   return { all: withAds, ads: only, tex: renderer.info.memory.textures, geos: renderer.info.memory.geometries };
 };
 // Inventário dos anúncios (independente da câmera)
@@ -166,6 +193,18 @@ window.showAtlas = (on = true) => {
     c.getContext('2d').drawImage(img, 0, 0);
   }
   return on;
+};
+// recorte do atlas em tamanho real (ou escala), no canto superior esquerdo
+window.atlasCrop = (x, y, w, h, scale = 1, name = 'atlas') => {
+  const c = document.getElementById('atlas');
+  const src = ads && ads.debug && ads.debug.canvases[name];
+  if (!src) return 'sem ' + name;
+  c.style.display = 'block'; c.style.left = '0'; c.style.right = 'auto'; c.style.maxWidth = 'none'; c.style.maxHeight = 'none';
+  c.width = w * scale; c.height = h * scale;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, c.width, c.height);
+  g.drawImage(src, x, y, w, h, 0, 0, w * scale, h * scale);
+  return `${src.width}x${src.height}`;
 };
 window.showCanvas = (name) => {
   const c = document.getElementById('atlas');
@@ -247,7 +286,8 @@ window.checkOverlaps = (opts = {}) => {
         if (x0 > o.c.x + o.r || x1 < o.c.x - o.r || z0 > o.c.z + o.r || z1 < o.c.z - o.r) continue;
         if (triObb(_tri, o)) {
           const k = `${o.tag} × ${name}`;
-          const h = hits.get(k) || { n: 0, at: `(${o.c.x.toFixed(1)}, ${o.c.y.toFixed(1)}, ${o.c.z.toFixed(1)})` };
+          const f = (v) => `(${v.x.toFixed(1)},${v.y.toFixed(1)},${v.z.toFixed(1)})`;
+          const h = hits.get(k) || { n: 0, at: `(${o.c.x.toFixed(1)}, ${o.c.y.toFixed(1)}, ${o.c.z.toFixed(1)}) tri ${f(_tri[0])} ${f(_tri[1])} ${f(_tri[2])}` };
           h.n++;
           hits.set(k, h);
         }
@@ -308,15 +348,21 @@ window.checkCorridor = () => {
   });
   return { verts: n, bad, worst };
 };
-// Pés no chão: nenhum pé flutuando (fundo do pé acima do terreno)
+// Pés no chão: nenhum pé flutuando. Chão visível = terreno do ambiente ou a borda inclinada de grama
+// da pista logo atrás do muro (de Y - 0,02 em wallDist + 0,55 até Y - 0,9 em wallDist + 7), recalculada aqui.
 window.checkGround = () => {
   if (!ads || !ads.debug || !env) return 'sem dados';
-  let bad = 0, worst = '';
+  let bad = 0, worst = '', deepest = 0;
+  const v = new THREE.Vector3();
   for (const f of ads.debug.feet) {
-    const g = env.groundAt(f.x, f.z);
+    let g = env.groundAt(f.x, f.z);
+    const r = track.project(v.set(f.x, f.y + 0.5, f.z)); // altura do pé: evita o trecho de baixo no cruzamento
+    const e = Math.abs(r.lateral) - r.wallDist;
+    if (e >= 0.55 && e <= 7) g = Math.max(g, r.groundY - 0.02 - 0.88 * (e - 0.55) / 6.45);
+    deepest = Math.max(deepest, g - f.y);
     if (f.y > g + 0.02) { bad++; if (bad < 10) worst += ` [${f.tag} (${f.x.toFixed(1)},${f.z.toFixed(1)}) pé=${f.y.toFixed(2)} chão=${g.toFixed(2)}]`; }
   }
-  return { feet: ads.debug.feet.length, floating: bad, worst };
+  return { feet: ads.debug.feet.length, floating: bad, maxBuried: +deepest.toFixed(2), worst };
 };
 // Marcadores de s a cada 50 m (vista de cima)
 window.marks = (every = 50) => {
