@@ -803,8 +803,8 @@ function build(scene, track, quality, env, opts, hold) {
     lamp: col(0xfff3cf), catwalk: col(0x39443f), green: col(BRAND.deep),
   };
   // lugares escolhidos na página dev/ads.html (debug.sight e capturas da câmera de perseguição)
-  const B4 = [770, 28, 690, 4.4]; // outdoor b4: s, lateral, s para onde olha, altura livre
-  const RUNOFF = { hairpin: 982, lab: 158 }; // início das faixas pintadas nas áreas de escape
+  const B4 = [1100, 28, 1020, 4.4]; // outdoor b4: s, lateral, s para onde olha, altura livre
+  const ROAD_PAINT = [10, 20, 7.5]; // marca pintada no asfalto à frente do grid: s inicial, comprimento, meia largura
 
   // ------------------------------------------------------------ placas de beira de pista
   const BOARD_H = 1.1, BOARD_Y = 1.0, BOARD_T = 0.12;
@@ -1453,9 +1453,10 @@ function build(scene, track, quality, env, opts, hold) {
   lap('faixas+malhas');
 
   // ------------------------------------------------------------ tinta no chão (não é sólida: pode ficar dentro do corredor)
-  // Logo no jardim da universidade (visto do alto: grua do título, vistas aéreas); faixas nos acostamentos
-  // da reta de largada; e, para quem corre, faixas na área de escape por fora do grampo e da curva do
-  // Laboratório, lidas de frente durante a frenagem (texto correndo ao longo da curva, topo para fora).
+  // Logo no jardim da universidade e faixas nos acostamentos da reta de largada: vistos do alto (grua do
+  // título, vistas aéreas); da câmera do kart (2,3 m) a grama em volta fica escondida ou rasante demais.
+  // Para quem corre: a marca pintada no asfalto logo depois da linha de chegada, de frente para o grid
+  // (vista durante a contagem e a cada volta), alongada no sentido da pista como as pinturas de solo.
   part('tinta', () => {
     const b = new Geo(atlas.white);
     const white = col(0xffffff), mint = col(0x2ee89a);
@@ -1480,36 +1481,24 @@ function build(scene, track, quality, env, opts, hold) {
       return [x, terrainY(x, z) + 0.04, z];
     }, 0, V0, 1, 1, white);
     solid('gramado-logo', new THREE.Vector3(cx, terrainY(cx, cz) + 0.15, cz), new THREE.Vector3(1, 0, 0), UP, new THREE.Vector3(0, 0, 1), S / 2, 0.1, S / 2);
-    // faixa no acostamento a partir de sA, lado side, entre halfWidth + inner e wallDist - 0,45;
-    // comprimento real (medido na linha do meio da faixa) = 3,9 × largura, como a arte.
-    // Lado esquerdo lê no sentido da corrida; o direito, ao contrário (sempre da esquerda para a direita
-    // de quem olha da pista), com o topo das letras para fora.
-    const strip = (sA, side, inner, color, segs) => {
-      const r0 = track.sample(sA);
-      const width = r0.wallDist - 0.45 - (r0.halfWidth + inner);
-      const want = width * 3.9, latM = r0.halfWidth + inner + width / 2;
-      let len = 0, sB = sA;
-      const pa = r0.pos.clone().addScaledVector(r0.right, side * latM), pb = new THREE.Vector3();
-      while (len < want && sB < sA + 60) {
-        sB += 0.25;
-        const r = track.sample(sB);
-        pb.copy(r.pos).addScaledVector(r.right, side * latM);
-        len += Math.hypot(pb.x - pa.x, pb.z - pa.z);
-        pa.copy(pb);
-      }
-      const span = sB - sA;
-      patch(segs, 1, (u, v) => {
-        const s = side < 0 ? sA + u * span : sA + span - u * span;
+    // acostamentos (grama entre a pista e o muro), dos dois lados: topo das letras para fora
+    const s0 = 34, span = 15.6;
+    for (const side of [-1, 1]) {
+      patch(8, 1, (u, v) => {
+        // lado esquerdo lê no sentido da corrida; o direito, ao contrário
+        const s = side < 0 ? s0 + u * span : s0 + span - u * span;
         const r = track.sample(s);
-        const lat = side * lerp(r.halfWidth + inner, r.wallDist - 0.45, v);
+        const lat = side * lerp(r.halfWidth + 0.55, r.wallDist - 0.45, v);
         return [r.pos.x + r.right.x * lat, r.pos.y + 0.02, r.pos.z + r.right.z * lat];
-      }, 0.01, 0.005, 0.99, V0 - 0.005, color);
-    };
-    for (const side of [-1, 1]) strip(34, side, 0.55, white, 8);
-    // escape do grampo (areia: tinta verde-menta) e da curva do Laboratório (grama: branca);
-    // por dentro das zebras (1,4 m) quando houver
-    strip(RUNOFF.hairpin, 1, 1.85, mint, 16);
-    strip(RUNOFF.lab, -1, 0.55, white, 12);
+      }, 0.01, 0.005, 0.99, V0 - 0.005, white);
+    }
+    // asfalto: lê da esquerda para a direita de quem vem do grid, topo das letras para a frente
+    const [rs, rl, rw] = ROAD_PAINT;
+    patch(4, 6, (u, v) => {
+      const r = track.sample(rs + v * rl);
+      const lat = lerp(-rw, rw, u);
+      return [r.pos.x + r.right.x * lat, r.pos.y + 0.02, r.pos.z + r.right.z * lat];
+    }, 0.01, 0.005, 0.99, V0 - 0.005, mint);
     const geo = b.build();
     geo.deleteAttribute('glow');
     // tinta: textura pré-multiplicada (sem franja escura nos mipmaps) e mistura "one, 1 - alfa"
