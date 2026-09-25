@@ -42,7 +42,7 @@
         </p>
 
         <!-- Sem JS, o formulário funciona via GET (?q=&modo=&materia=...) -->
-        <form id="buscaForm" class="pf-search" role="search" action="/professores/" method="get">
+        <form id="buscaForm" class="pf-search" role="search" action="/professores/" method="get" novalidate>
           <div class="pf-field pf-search-q">
             <label class="pf-label" for="fQ">O que você quer aprender?</label>
             <input id="fQ" name="q" type="search" class="pf-input" maxlength="80" autocomplete="off"
@@ -65,6 +65,7 @@
         </form>
 
         <nav class="pf-chips pf-hero-chips" id="atalhosMaterias" aria-label="Matérias populares">
+          <span class="pf-hero-chips-label">Populares:</span>
           <a class="pf-chip" href="/professores/?materia=matematica">Matemática</a>
           <a class="pf-chip" href="/professores/?materia=ingles">Inglês</a>
           <a class="pf-chip" href="/professores/?materia=fisica">Física</a>
@@ -107,7 +108,7 @@
 
         <div class="pf-results-col">
           <div class="pf-results-head">
-            <h2 id="resultadosTitulo" class="pf-results-title">Professores</h2>
+            <h2 id="resultadosTitulo" class="pf-results-title" tabindex="-1">Professores</h2>
             <p id="resultCount" class="pf-muted" role="status" aria-live="polite"></p>
             <div class="pf-field pf-field-inline">
               <label class="pf-label pf-label-sm" for="fOrdem">Ordenar por</label>
@@ -119,8 +120,11 @@
               </select>
             </div>
           </div>
-          <!-- Cards montados por /professores/js/pages/busca.js -->
-          <div id="resultados" class="pf-results" aria-busy="false"></div>
+          <!-- Filtros ativos (chips removíveis) e cards: montados por /professores/js/pages/busca.js -->
+          <div id="filtrosAtivos" class="pf-active-filters" hidden></div>
+          <div id="resultados" class="pf-results" aria-busy="false">
+            <noscript><p class="pf-muted">Ative o JavaScript para ver os professores.</p></noscript>
+          </div>
           <nav id="paginacao" class="pf-pagination" aria-label="Paginação"></nav>
         </div>
       </div>
