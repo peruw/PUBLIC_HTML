@@ -392,15 +392,18 @@
       rocket: () => frames('rocket', ART.rocket),
       bird: (v) => frames('bird-' + v, ART.bird, PALS[v]),
       duck: () => frames('duck', ART.duck, PALS.duck),
+      // luz aditiva: verde-limão saturado + miolo e bordas claras (antes somava cinza no céu roxo)
       beam: (i) => proc('beam' + i, 16, 32, (g, w, h) => {
         for (let y = 0; y < h; y++) {
           const hw = 1.5 + 6.5 * (y / (h - 1));
-          const x0 = Math.round(8 - hw), x1 = Math.round(8 + hw);
+          const x0 = Math.round(8 - hw), x1 = Math.round(8 + hw), cw = Math.max(1, Math.round(hw * 0.5));
           const k = 1 - y / h;
-          const ring = (y + i * 3) % 9 === 0 ? 0.3 : 0; // anéis descendo
-          g.fillStyle = `rgba(210,255,150,${(0.12 + 0.55 * k + ring).toFixed(2)})`;
+          const ring = (y + i * 3) % 8 < 2 ? 0.3 : 0; // anéis descendo
+          g.fillStyle = `rgba(120,255,90,${Math.min(1, 0.3 + 0.55 * k + ring).toFixed(2)})`;
           g.fillRect(x0, y, x1 - x0, 1);
-          g.fillStyle = `rgba(255,255,220,${(0.35 + 0.6 * k).toFixed(2)})`;
+          g.fillStyle = `rgba(235,255,170,${(0.25 + 0.5 * k).toFixed(2)})`;
+          g.fillRect(8 - cw, y, cw * 2, 1);
+          g.fillStyle = `rgba(255,255,220,${(0.6 + 0.4 * k).toFixed(2)})`;
           g.fillRect(x0, y, 1, 1); g.fillRect(x1 - 1, y, 1, 1);
         }
       }),
@@ -496,7 +499,9 @@
         blending: additive ? T.AdditiveBlending : T.NormalBlending,
       });
       const pts = new T.Points(geo, mat);
-      pts.frustumCulled = false; pts.renderOrder = additive ? 3 : 2;
+      // desenhadas ANTES dos transparentes do jogo: os painéis dos portais (sem depthWrite)
+      // ficam sempre por cima de qualquer partícula que esteja atrás deles
+      pts.frustumCulled = false; pts.renderOrder = additive ? -1 : -2;
       root.add(pts);
       const S = { pts, geo, mat, aPos, aCol, aSiz, aShp, pos, col, siz, shp, cap, n: 0 };
       for (const f of P_FIELDS) S[f] = new Float32Array(cap);
@@ -532,8 +537,8 @@
       ripple: { life: [0.6, 0.9], size: 0.55, grow: 0.4, colors: [0xffffff, 0x8ff3ff], a: 0.9, drag: 2 },
       starHead: { glow: 1, life: [0.05, 0.08], size: 1.5, c0: 0xffffff },
       starTrail: { glow: 1, life: [0.25, 0.4], size: 0.8, grow: 0.2, c0: 0xffffff, c1: 0x6ab8ff, fp: 1 },
-      cometTail: { glow: 1, life: [1.4, 2.0], size: 3.2, sizeJ: 0.25, grow: 0.35, c0: 0x9fe8ff, c1: 0x5a2aff, a: 0.75, fp: 1, drag: 0.4, spread: 0.7 },
-      cometCore: { glow: 1, life: [0.5, 0.8], size: 1.8, grow: 0.5, c0: 0xffffff, c1: 0x9fe8ff, a: 0.9, fp: 1.5 },
+      cometTail: { glow: 1, life: [1.4, 2.0], size: 3.2, sizeJ: 0.25, grow: 0.35, c0: 0x7fd8ff, c1: 0x5a2aff, a: 0.5, fp: 1, drag: 0.4, spread: 0.7 },
+      cometCore: { glow: 1, life: [0.5, 0.8], size: 1.8, grow: 0.5, c0: 0xffffff, c1: 0x9fe8ff, a: 0.75, fp: 1.5 },
       dragonFire: { glow: 1, life: [0.35, 0.55], size: 1.0, grow: 2.2, c0: 0xffe070, c1: 0xff2a0a, a: 0.85, spread: 2, drag: 3 },
       beamDot: { glow: 1, life: [0.8, 1.2], size: 0.5, colors: [0xffffff, 0xd8ffa0], a: 0.9, fp: 3 },
       sparkle: { glow: 1, life: [0.5, 0.9], size: 1.1, shape: 4, colors: [0xffffff, 0xffd23f, 0xff8fd0, 0x8ff3ff], grav: 4, drag: 2 },
@@ -576,8 +581,8 @@
           P.y[i] += P.vy[i] * dt;
           P.z[i] += P.vz[i] * dt + dz * P.an[i];
           const x = P.x[i], y = P.y[i], z = P.z[i];
-          // nunca na frente da pista (corredor livre para os portais)
-          dead = z > 12 || z < -140 || (z > -72 && y < 8.8 && x > -6.2 && x < 6.2);
+          // nunca na faixa da pista, em toda a profundidade (os portais nascem em z=-100)
+          dead = z > 12 || z < -140 || (y < 8.8 && x > -6.2 && x < 6.2);
         }
         if (dead) {
           const last = --P.n;
@@ -687,7 +692,7 @@
         c.side = sideFor(cele, k);
         c.z = cele ? rnd(-52, -75) : rnd(-65, -110);
         const hw = halfW(c.z), top = topY(c.z);
-        c.x = c.side * rnd(9, Math.max(10, hw * 0.75));
+        c.x = c.side * rnd(9, Math.max(10, hw * (cele ? 0.45 : 0.75))); // comemoração: perto do centro
         c.y = cele ? top - rnd(1, 4) - k * 2.5 : top + 4;
         const sp = rnd(13, 19), ang = rnd(0.95, 1.3);
         c.vx = c.side * Math.cos(ang) * sp; c.vy = -Math.sin(ang) * sp; c.vz = -rnd(0, 5);
@@ -725,8 +730,9 @@
         c.x = -c.dir * rnd(0.1, 0.9) * hw;
         c.y = rnd(Math.max(14, top * 0.5), Math.max(15, top - 3));
         const sp = hw * rnd(0.9, 1.3);
-        c.vx = c.dir * sp; c.vy = -sp * rnd(0.1, 0.28);
         c.life = cele ? rnd(0.9, 1.2) : rnd(0.6, 0.9);
+        // em tela larga a queda ficava enorme: nunca desce abaixo de y=12 (horizonte/portais)
+        c.vx = c.dir * sp; c.vy = -Math.min(sp * rnd(0.1, 0.28), (c.y - 12) / (c.life + 0.4));
         c.age = cele ? -k * 0.25 : 0; // uma atrás da outra
       },
       step(c, dt) {
@@ -749,7 +755,7 @@
       start(c, cele, k) {
         c.side = sideFor(cele, k);
         c.dur = rnd(2.4, 3.0); c.apex = rnd(3, 7);
-        c.x0 = c.side * rnd(11.8, 13.5); c.x1 = c.x0 + c.side * rnd(9, 12);
+        c.x0 = c.side * rnd(12.6, 14); c.x1 = c.x0 + c.side * rnd(7.5, 10.5);
         c.vz = -Math.min(curSpeed * 0.45, 14);
         c.z = cele ? rnd(-40, -52) - k * 8 : -48 - (curSpeed + c.vz) * c.dur * 0.5;
         c.s = cele ? 0.14 : 0; c.out = false;
@@ -774,7 +780,7 @@
       cap: 2, cele: 2, every: [4, 8],
       make() {
         const c = inst(); c.fish = [];
-        for (let i = 0; i < 7; i++) { const s = spr(c, TEX.fish('fishOrange').r[0], 3, 1.67, true); s.userData = { d: 0, dx: 0, dz: 0, ap: 0, len: 0, st: 0, tex: null }; c.fish.push(s); }
+        for (let i = 0; i < 7; i++) { const s = spr(c, TEX.fish('fishOrange').r[0], 4.2, 2.33, true); s.userData = { d: 0, dx: 0, dz: 0, ap: 0, len: 0, st: 0, tex: null }; c.fish.push(s); }
         return c;
       },
       start(c, cele, k) {
@@ -882,7 +888,7 @@
           const on = Math.min(1, c.pt / 0.25);
           c.beam.visible = true;
           c.beam.scale.set(7.5 * on, c.beamLen, 1);
-          c.beam.material.opacity = 0.8 + Math.sin(t * 23) * 0.12;
+          c.beam.material.opacity = 0.88 + Math.sin(t * 23) * 0.12;
           setMap(c.beam, TEX.beam(Math.floor(c.age * 12) % 3));
           c.acc += dt * 14 * on;
           while (c.acc >= 1) { c.acc--; emit(FX.beamDot, c.x + rnd(-2.6, 2.6), rnd(-2, c.hy - 4), c.z + 0.2, 0, rnd(3, 6), 0, c.anchor); }
@@ -909,7 +915,7 @@
           if (c.y > topY(c.z) + 5 || Math.abs(c.x) > halfW(c.z) + 8) return false;
         }
         c.g.position.set(c.x, c.y + bob, c.z);
-        return c.age < 15;
+        return c.age < 15 && c.z < 6;
       },
     };
 
@@ -937,7 +943,7 @@
         while (c.acc >= 1) { c.acc--; emit(FX.flame, nx, ny, c.z + 0.1, 0, -rnd(6, 10), 0, c.anchor); }
         c.acc2 += dt * 26;
         while (c.acc2 >= 1) { c.acc2--; emit(FX.rsmoke, nx, ny - 1, c.z - 0.2, 0, rnd(-1, 0.3), 0, c.anchor); }
-        return c.y < topY(c.z) + 7 && c.age < 9;
+        return c.y < topY(c.z) + 7 && c.age < 9 && c.z < 6;
       },
     };
 
@@ -1033,23 +1039,25 @@
     // ---------- pato de borracha gigante ----------
     DEF.duck = {
       cap: 1, cele: 2, every: [9, 15],
-      make() { const c = inst(); c.sp = spr(c, TEX.duck().r[0], 20, 15.8, true); return c; },
+      // gigante, mas longe o bastante para caber na tela do celular em pé (e não virar só um borrão entre os prédios)
+      make() { const c = inst(); c.sp = spr(c, TEX.duck().r[0], 18, 14.25, true); return c; },
       start(c, cele, k) {
         c.side = sideFor(cele, k);
-        c.x = c.side * clamp(rnd(19, 23), 16.5, Math.max(16.5, halfW(-40) * 0.9));
+        c.x = c.side * clamp(rnd(16.5, 19.5), 16.5, Math.max(16.5, halfW(-55) - 9));
         c.vz = -Math.min(curSpeed * 0.35, 10);
-        c.z = cele ? rnd(-30, -38) - k * 14 : -118;
+        c.z = cele ? rnd(-54, -62) - k * 12 : -112;
         c.sp.material.map = TEX.duck()[c.side > 0 ? 'l' : 'r'][0]; // olha para a pista
       },
       step(c, dt, dz) {
         c.z += c.vz * dt + dz;
-        c.g.position.set(c.x, -10 + 7.9 - 2.2 + Math.sin(c.age * 2.4) * 0.4, c.z);
+        // linha d'água em y=-10: a base do pato fica um pouco submersa
+        c.g.position.set(c.x, -11.4 + 7.12 + Math.sin(c.age * 2.4) * 0.35, c.z);
         c.sp.material.rotation = Math.sin(c.age * 1.9) * 0.08;
         c.acc += dt * 16;
         while (c.acc >= 1) {
           c.acc--;
           const sx = coin();
-          emit(FX.ripple, c.x + sx * rnd(6, 10), -9.7, c.z + rnd(-1, 1), sx * rnd(1.5, 3), 0, rnd(-0.8, 0.8), 1);
+          emit(FX.ripple, c.x + sx * rnd(6.5, 10), -9.7, c.z + rnd(-1, 1), sx * rnd(1.5, 3), 0, rnd(-0.8, 0.8), 1);
         }
         return c.z < 6;
       },
@@ -1062,9 +1070,12 @@
       start(c, cele) {
         c.dir = coin(); c.z = rnd(-105, -118);
         const hw = halfW(c.z), top = topY(c.z);
-        c.y = clamp(rnd(top * 0.3, top * 0.42), 14, 60);
-        c.x = cele ? -c.dir * rnd(0.45, 0.7) * hw : -c.dir * (hw + 4);
-        c.vx = c.dir * 2 * (hw + 4) / rnd(7, 9); c.vy = -rnd(0.4, 1.2);
+        c.y = clamp(rnd(top * 0.3, top * 0.42), 16, 60);
+        const a = cele ? rnd(0.45, 0.7) * hw : hw + 4;
+        c.x = -c.dir * a;
+        c.vx = c.dir * 2 * (hw + 4) / rnd(7, 9);
+        // desce devagar, mas a cauda nunca chega perto do horizonte (tela larga = travessia longa)
+        c.vy = -Math.min(rnd(0.4, 1.2), (c.y - 15) * Math.abs(c.vx) / (hw + 8 + a));
       },
       step(c, dt) {
         c.x += c.vx * dt; c.y += c.vy * dt;
@@ -1104,17 +1115,18 @@
         rate: 24, burst: 70,
         spawn(cele) {
           const z = cele ? rnd(-75, -20) : rnd(-115, -12);
-          const hw = Math.min(halfW(z), 45);
+          const hw = Math.min(halfW(z), 45), top = topY(z);
+          const y = cele ? rnd(6, top) : rnd(2, top + 1);
           let x = rnd(-hw, hw);
-          if (z > -74 && Math.abs(x) < 7) x = (x < 0 ? -1 : 1) * rnd(7, Math.max(8, hw));
-          const top = topY(z);
-          emit(FX.snow, x, cele ? rnd(6, top) : rnd(2, top + 1), z, rnd(-0.5, 0.5), -rnd(1.5, 3.2), 0, 1);
+          // sobre a pista só nasce no alto (o que desce até a faixa dos portais some)
+          if (Math.abs(x) < 7 && y < 12) x = (x < 0 ? -1 : 1) * rnd(7, Math.max(8, hw));
+          emit(FX.snow, x, y, z, rnd(-0.5, 0.5), -rnd(1.5, 3.2), 0, 1);
         },
       },
     };
 
     // ---------- estado ----------
-    let types = [], inten = 0.5, rate = 1.3, paused = false;
+    let types = [], inten = 0.5, rate = 1.3, paused = false, disposed = false;
     const timers = {}, accs = {}, counts = {};
     const active = [], pools = {};
     TYPES.forEach((id) => { counts[id] = 0; timers[id] = 1; accs[id] = 0; });
@@ -1153,17 +1165,19 @@
     let clock = 0;
     const api = {
       setTypes(ids, intensity) {
-        const next = (ids || []).filter((id) => DEF[id] || AMB[id]);
+        const list = Array.isArray(ids) ? ids : ids ? [ids] : [];
+        const next = list.filter((id, i) => (DEF[id] || AMB[id]) && list.indexOf(id) === i);
         for (const id of next) if (types.indexOf(id) < 0) { timers[id] = rnd(0.3, 2); accs[id] = 0; }
         types = next;
-        inten = clamp(typeof intensity === 'number' ? intensity : 0.5, 0, 1);
+        inten = clamp(typeof intensity === 'number' && !isNaN(intensity) ? intensity : 0.5, 0, 1);
         rate = 0.6 + 1.4 * inten;
       },
       update(dt, dz, t) {
-        if (paused || !(dt > 0)) return;
+        if (paused || disposed || !(dt > 0)) return;
         dt = Math.min(dt, 0.1); dz = dz || 0;
-        clock = typeof t === 'number' ? t : clock + dt;
-        curSpeed += (dz / dt - curSpeed) * Math.min(1, dt * 4);
+        clock = typeof t === 'number' && !isNaN(t) ? t : clock + dt;
+        // velocidade estimada só serve para posicionar baleia/peixes/pato: limitada contra picos de dz
+        curSpeed += (clamp(dz / dt, 0, 60) - curSpeed) * Math.min(1, dt * 4);
         for (const id of types) {
           const amb = AMB[id];
           if (amb) {
@@ -1187,6 +1201,7 @@
         stepSys(glow, dt, dz);
       },
       celebrate() {
+        if (disposed) return;
         const list = types.slice().sort(() => Math.random() - 0.5);
         if (!list.length) { fireworks(); return; }
         for (const id of list) if (AMB[id]) for (let k = 0; k < AMB[id].burst; k++) AMB[id].spawn(true);
@@ -1213,7 +1228,9 @@
       },
       setPaused(p) { paused = !!p; },
       dispose() {
+        if (disposed) return;
         api.clear();
+        disposed = true; types = [];
         scene.remove(root);
         norm.geo.dispose(); norm.mat.dispose(); glow.geo.dispose(); glow.mat.dispose();
       },
