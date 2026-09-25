@@ -1,5 +1,12 @@
 /* Corrida Quanta: trilha sonora sintetizada (Web Audio puro, sem arquivos).
-   Uma música por fase; o andamento acompanha a velocidade do corredor. */
+   Uma música por fase; o andamento acompanha a velocidade do corredor.
+
+   const music = QC.Music.create(actx);   // master -> compressor -> actx.destination
+   music.play(i)          troca na próxima barra (virada + crossfade); mesmo índice = nada muda
+   music.setSpeed(m)      1.0 .. 2.9 -> andamento = bpm * (1 + (m - 1) * 0.35), suave, passo a passo
+   music.setIntensity(x)  0..1: chimbal dobrado, contracanto, palmas/chocalho e melodia oitavada
+   music.setMuted(b) / pause() / resume() / stop() / stinger('levelup'|'unlock'|'gameover'|'record')
+   music.current          índice tocando (-1 parado) */
 (() => {
   'use strict';
   const QC = window.QC = window.QC || {};
@@ -30,7 +37,8 @@
   //   pad: x = toca o acorde
   //   bateria: X forte, x normal, + fantasma, o/O chimbal aberto, 1-3 tons
   // `lv` equilibra a mistura (multiplica o volume de cada grupo de instrumentos).
-  // Cada seção tem 4 compassos; `form` define a ordem (>= 16 compassos antes de repetir).
+  // Cada seção tem 4 compassos: ch = 4 acordes ('F,G' divide o compasso), dr = bateria de cada compasso,
+  // x = prato na entrada, base = herda de outra seção. `form` define a ordem (>= 16 compassos antes de repetir).
   const DEFS = [
     { // 0 ─ chiptune alegre em Dó maior
       id: 'cidade', name: 'Cidade Quanta', bpm: 128,
@@ -528,7 +536,7 @@
     this.ctx = ctx;
     this.rnd = rng(0x51A7E);
     this.solo = solo || null;
-    this.count = 0;
+    this.count = 0; this.hits = 0;
     this.waves = {}; this.curves = {};
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -12; comp.knee.value = 10; comp.ratio.value = 4;
@@ -589,7 +597,8 @@
     }
     return b;
   }
-  const done = (src, nodes) => { src.onended = () => { for (const n of nodes) n.disconnect(); }; };
+  // ao terminar, solta os nós para o coletor de lixo (no render offline o grafo inteiro é descartado)
+  const done = (E, src, nodes) => { if (!E.offline) src.onended = () => { for (const n of nodes) n.disconnect(); }; };
   function ramp(param, v, t, tc) { param.cancelScheduledValues(t); param.setTargetAtTime(v, t, tc); }
 
   // ================= Instrumentos =================
@@ -644,7 +653,7 @@
     }
     for (const o of srcs) { o.start(t); o.stop(stop); }
     g.connect(out);
-    done(srcs[0], srcs.concat(nodes));
+    done(E, srcs[0], srcs.concat(nodes));
     E.count++;
   }
   // oscilador com queda de altura (bumbo, tons, corpo da caixa)
@@ -659,7 +668,7 @@
     g.gain.setTargetAtTime(0, t + 0.01, dec / 4);
     o.connect(g); g.connect(out);
     o.start(t); o.stop(t + dec + 0.06);
-    done(o, [o, g]);
+    done(E, o, [o, g]);
     E.count++;
   }
   // rajada de ruído filtrado (chimbal, caixa, clique, prato)
@@ -670,7 +679,7 @@
     g.gain.setValueAtTime(peak, t);
     g.gain.setTargetAtTime(0, t + 0.001, dec / 4);
     s.connect(f); f.connect(g); g.connect(out);
-    done(s, [s, f, g]);
+    done(E, s, [s, f, g]);
     E.count++;
   }
   const kick = (E, out, t, v, k) => {
@@ -695,7 +704,7 @@
     gg.setValueAtTime(pk, t + 0.033);
     gg.setTargetAtTime(0, t + 0.034, c.dec / 4);
     s.connect(f); f.connect(g); g.connect(out);
-    done(s, [s, f, g]);
+    done(E, s, [s, f, g]);
     E.count++;
   }
   // ruído que sobe até a troca de música
@@ -708,7 +717,7 @@
     g.gain.exponentialRampToValueAtTime(0.09, t + len);
     g.gain.linearRampToValueAtTime(0, t + len + 0.04);
     s.connect(f); f.connect(g); g.connect(out);
-    done(s, [s, f, g]);
+    done(E, s, [s, f, g]);
     E.count++;
   }
 
@@ -767,6 +776,7 @@
     this.offline = !!opts.offline;
     this.vol = opts.volume == null ? VOLUME : opts.volume;
     this.E = new Engine(ctx, opts.out || ctx.destination, this.vol, opts.solo);
+    this.E.offline = this.offline;
     this.idx = -1; this.song = null; this.pending = -1; this.bus = null;
     this.pos = 0; this.next = 0; this.fCur = 1; this.fTarget = 1; this.intensity = 0;
     this.muted = false; this.mutedAt = 0; this.paused = false; this.rose = false; this.timer = null;
@@ -857,7 +867,11 @@
     if (this.pending >= 0 && this.pos % 16 === 0) this.swap(t);
     this.fCur += (this.fTarget - this.fCur) * 0.18; // andamento desliza até o alvo, passo a passo
     const sd = 15 / (this.song.bpm * this.fCur);    // duração da semicolcheia
-    if (!silent && this.bus && !(this.muted && t > this.mutedAt + 0.25)) this.render(t, sd);
+    if (!silent && this.bus && !(this.muted && t > this.mutedAt + 0.25)) {
+      const c0 = this.E.count;
+      this.render(t, sd);
+      if (this.E.count > c0) this.E.hits++; // passos que soaram (estatística de teste)
+    }
     this.pos++;
     this.next = t + sd;
   };
@@ -950,7 +964,7 @@
       while (k < script.length && script[k][0] <= now) { const [, m, ...args] = script[k++]; p[m](...args); }
       p.tick(now);
     }
-    QC.Music._lastStats = { notes: p.E.count, steps: p.pos, current: p.idx };
+    QC.Music._lastStats = { notes: p.E.count, onsetSteps: p.E.hits, steps: p.pos, current: p.idx };
     return new Promise((resolve, reject) => {
       ctx.oncomplete = (ev) => resolve(ev.renderedBuffer);
       const r = ctx.startRendering();

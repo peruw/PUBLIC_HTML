@@ -8,7 +8,12 @@
 
   const TAU = Math.PI * 2;
   const MAX_PARTS = 900;
+  const SOFT_PARTS = 620;     // enfeites (brasas, rastros) param aqui: sobra espaço para as explosões
+  const MAX_CONF = 320;
   const MAX_COINS = 120;
+  const MAX_ROCKETS = 24;     // no ar + na fila
+  const MAX_WAVES = 36;
+  const MAX_FLAMES = 24;
   const STEP = 1 / 60;        // passo fixo do fogo em grade
   const RM = 0.4;             // quantidade com movimento reduzido
   const K_CONF = 1, K_EMBER = 2, K_CRACK = 3;
@@ -73,6 +78,8 @@
   FIRE_R.glow = 'rgba(255,120,30,0.35)';
   const EMBER_R = ['#fff6c8', '#ffe066', '#ffc233', '#ff9a1f', '#ff6a14', '#e8401a', '#b82a12'];
   EMBER_R.glow = 'rgba(255,150,40,0.4)';
+  const SMOKE_R = ['#8a7a70', '#6e5f58', '#56494a', '#443a3c', 'rgba(52,44,46,0.7)', 'rgba(40,34,36,0.45)'];
+  SMOKE_R.glow = 'rgba(0,0,0,0)';
   const FLASH_R = ['#ffffff', '#ffffff', '#fff6c8', '#ffe066'];
   FLASH_R.glow = 'rgba(255,255,220,0.4)';
 
@@ -128,6 +135,7 @@
     this.src = new Float32Array(w);
     this.seed = ((Math.random() * 0x7fffffff) | 0) || 1;
     this.hot = 0;
+    this.top = 0;   // linhas acima desta estão apagadas (pula no passo e no desenho)
     this.mx0 = this.mx1 = this.my0 = this.my1 = 0; // máscara: nunca pinta por cima do elemento
     const cv = document.createElement('canvas');
     const up = this.mode === 'up';
@@ -143,8 +151,9 @@
     for (let x = 0; x < w; x++) heat[base + x] = src[x];
     const dk = (decay * 2) / 65536;
     const tl = (85 + lean * 256) | 0, tr = tl + ((85 - lean * 256) | 0);
-    let s = this.seed, hot = 0;
-    for (let y = 1; y < h; y++) {
+    const y0 = Math.max(1, this.top);
+    let s = this.seed, hot = 0, top = h - 1;
+    for (let y = y0; y < h; y++) {
       const row = y * w;
       for (let x = 0; x < w; x++) {
         const i = row + x;
@@ -156,26 +165,32 @@
         if (nx < 0 || nx >= w) continue;
         const nv = v - ((((s >>> 8) & 65535) * dk) | 0);
         heat[i - w + nx - x] = nv;
-        if (nv > 0) hot += nv;
+        if (nv > 0) { hot += nv; if (y <= top) top = y - 1; }
       }
     }
+    // apaga restos acima do novo topo (mantém a invariante)
+    if (top > y0 - 1) heat.fill(0, (y0 - 1) * w, top * w);
     this.seed = s || 1;
     this.hot = hot;
+    this.top = top;
   };
   Grid.prototype.render = function (lut) {
-    const w = this.w, h = this.h, heat = this.heat, px = this.px;
+    const w = this.w, h = this.h, heat = this.heat, px = this.px, top = this.top;
     if (this.mode === 'up') {
-      for (let i = 0, n = w * h; i < n; i++) px[i] = lut[heat[i]];
+      px.fill(0, 0, top * w);
+      for (let i = top * w, n = w * h; i < n; i++) px[i] = lut[heat[i]];
       const x0 = Math.max(0, this.mx0), x1 = Math.min(w, this.mx1);
       const y0 = Math.max(0, this.my0), y1 = Math.min(h, this.my1);
       if (x1 > x0) for (let y = y0; y < y1; y++) px.fill(0, y * w + x0, y * w + x1);
     } else if (this.mode === 'left') {
-      for (let y = 0; y < h; y++) {
+      px.fill(0);
+      for (let y = top; y < h; y++) {
         const row = y * w, col = h - 1 - y;
         for (let x = 0; x < w; x++) px[x * h + col] = lut[heat[row + x]];
       }
     } else {
-      for (let y = 0; y < h; y++) {
+      px.fill(0);
+      for (let y = top; y < h; y++) {
         const row = y * w;
         for (let x = 0; x < w; x++) px[x * h + y] = lut[heat[row + x]];
       }
@@ -205,12 +220,16 @@
     cv.style.cssText = 'position:fixed;inset:0;display:block;pointer-events:none;z-index:4;visibility:hidden;';
     cv.style.imageRendering = 'pixelated';
     if (cv.style.imageRendering !== 'pixelated') cv.style.imageRendering = 'crisp-edges';
-    (document.body || document.documentElement).appendChild(cv);
+    // primeiro filho do body: com z-index igual (4, ex.: toasts) o resto da página fica por cima
+    const host = document.body || document.documentElement;
+    host.insertBefore(cv, host.firstChild);
     const ctx = cv.getContext('2d');
 
     let S = 3, W = 1, H = 1, cssW = 0, cssH = 0, dpr = 0, sized = false;
     let raf = 0, last = 0, clock = 0, fireAcc = 0, frames = 0, parity = 0;
     let dead = false, shown = false, q = 1, workEma = 0, updEma = 0, drawEma = 0;
+    let queued = 0, conf = 0, awake = 0, pollT = 0;
+    const due = [];   // callbacks de chegada: rodam no fim do quadro (podem chamar a API)
     const mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     let reduced = !!(mq && mq.matches);
     const onMq = () => { reduced = !!mq.matches; };
@@ -281,8 +300,9 @@
     // ---------- partículas ----------
     const mult = () => q * (reduced ? RM : 1);
     const amount = (n) => Math.max(0, Math.min(MAX_PARTS - parts.length, Math.round(n * mult())));
-    function spawn(x, y, vx, vy, life, rp) {
-      if (parts.length >= MAX_PARTS) return null;
+    // lo = enfeite (brasa, rastro, lambida): cede lugar às explosões quando a tela enche
+    function spawn(x, y, vx, vy, life, rp, lo) {
+      if (parts.length >= (lo ? SOFT_PARTS : MAX_PARTS)) return null;
       const p = pool.pop() || {};
       p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.life = life; p.ramp = rp;
       p.age = 0; p.g = 0; p.drag = 0; p.size = 1; p.shrink = false; p.c0 = 0; p.tw = false; p.trail = 0; p.glow = 0;
@@ -305,19 +325,22 @@
     function crackle(p) {
       const n = 2 + ((Math.random() * 2) | 0);
       for (let i = 0; i < n; i++) {
-        const c = spawn(p.x, p.y, rand(-45, 45), rand(-45, 45), rand(0.1, 0.2), FLASH_R);
+        const c = spawn(p.x, p.y, rand(-45, 45), rand(-45, 45), rand(0.1, 0.2), FLASH_R, true);
         if (c) { c.drag = 3; c.glow = 1; }
       }
     }
+    // anéis demais custam caro (varredura por linha): o mais velho sai
     function mkWave(x, y, r0, r1, th, life, rp, delay) {
+      if (waves.length >= MAX_WAVES) waves.shift();
       waves.push({ x, y, r0, r1, th, life, rp, age: -(delay || 0), star: false });
     }
     // brilho em cruz no centro de uma explosão (encolhe)
     function mkStar(x, y, len, life, rp) {
+      if (waves.length >= MAX_WAVES) waves.shift();
       waves.push({ x, y, r0: len, r1: 0, th: 0, life, rp, age: 0, star: true });
     }
     function ember(x, y, vx, vy, life, rp) {
-      const p = spawn(x, y, vx, vy, life, rp);
+      const p = spawn(x, y, vx, vy, life, rp, true);
       if (p) { p.kind = K_EMBER; p.a = rand(8, 20); p.b = rand(4, 9); p.ph = rand(0, TAU); p.tw = true; p.g = -10; p.size = Math.random() < 0.25 ? 2 : 1; p.shrink = true; }
       return p;
     }
@@ -344,6 +367,7 @@
           if (p.y > H + 6 || (p.y < -4 && p.vy < 0) || p.x < -12 || p.x > W + 12) gone = true;
         }
         if (gone) {
+          if (p.kind === K_CONF) conf--;
           const lp = parts.pop();
           if (lp !== p) parts[i] = lp;
           pool.push(p);
@@ -450,7 +474,7 @@
         r.acc += dt * 110 * mult();
         while (r.acc >= 1) {
           r.acc--;
-          const p = spawn(r.x + rand(-0.5, 0.5), r.y + rand(0, 2), rand(-7, 7), rand(8, 30), rand(0.2, 0.45), EMBER_R);
+          const p = spawn(r.x + rand(-0.5, 0.5), r.y + rand(0, 2), rand(-7, 7), rand(8, 30), rand(0.2, 0.45), EMBER_R, true);
           if (p) { p.g = 30; p.tw = true; }
         }
         if (r.t >= 1) { rockets.splice(i, 1); explode(r); }
@@ -465,8 +489,8 @@
     }
     function explode(r) {
       const x = r.x, y = r.y, A = ramp(r.cA), B = ramp(r.cB);
-      const spd = clamp(Math.min(W, H) * 0.42, 60, 150) * rand(0.85, 1.15);
-      const n = amount(60 + W * 0.07);
+      const spd = clamp(Math.min(W, H) * 0.5, 70, 170) * rand(0.85, 1.15);
+      const n = amount(70 + W * 0.08);
       mkWave(x, y, 1, 4, 0, 0.12, FLASH_R);
       mkStar(x, y, 14, 0.26, FLASH_R);
       mkWave(x, y, 2, spd * 0.42, 1, 0.3, A);
@@ -510,8 +534,13 @@
     function arrive(grp) {
       if (grp.fired) return;
       grp.fired = true;
-      if (grp.cb) {
-        try { grp.cb(); } catch (e) { setTimeout(() => { throw e; }); }
+      if (grp.cb) due.push(grp.cb);
+    }
+    // fora dos laços de atualização: o callback pode chamar clear()/fly()/destroy() à vontade
+    function runDue() {
+      const list = due.splice(0);
+      for (const cb of list) {
+        try { cb(); } catch (e) { setTimeout(() => { throw e; }); }
       }
     }
     function updCoins(dt) {
@@ -523,7 +552,8 @@
         aim(c);
         if (u >= 1) {
           coins.splice(i, 1);
-          mkWave(c.tx, c.ty, 1, 5, 1, 0.2, c.rp);
+          // brilho curtinho: não pode esconder os dígitos do placar
+          mkStar(c.tx, c.ty, 4, 0.12, FLASH_R);
           for (let j = 0; j < 4; j++) {
             const a = rand(0, TAU), v = rand(25, 60);
             const p = spawn(c.tx, c.ty, Math.cos(a) * v, Math.sin(a) * v, rand(0.18, 0.32), c.rp);
@@ -565,14 +595,17 @@
     function updFlame(f, dt, steps) {
       const el = f.el;
       if (!el.isConnected) { flames.delete(el); return; }
-      f.cur += (f.target - f.cur) * Math.min(1, dt * (f.target > f.cur ? 7 : 2.5));
+      // acende rápido; apaga mais rápido ainda (errou = o fogo morre em ~0,5 s)
+      if (f.target >= f.cur) f.cur += (f.target - f.cur) * Math.min(1, dt * 7);
+      else f.cur = Math.max(f.target, f.cur - dt * (1 + (f.cur - f.target) * 2.5));
       if (f.target === 0 && f.cur < 0.02) f.cur = 0;
       const r = rectOf(el);
-      const ok = r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < cssH && r.right > 0 && r.left < cssW;
+      const ok = visible(r);
       const I = ok ? f.cur : 0;
       const ew = Math.max(2, Math.round(r.width / S)), eh = Math.max(1, Math.round(r.height / S));
       const ex = Math.round(r.left / S), ey = Math.round(r.top / S);
-      const maxH = Math.round(clamp(ew * 0.8 + 8, 12, Math.max(12, Math.min(46, H * 0.3))));
+      // número estreito e alto (um dígito) também ganha chama visível
+      const maxH = Math.round(clamp(Math.max(ew * 0.8, eh * 1.1) + 8, 12, Math.max(12, Math.min(54, H * 0.32))));
       const pad = clamp(Math.round(ew * 0.15), 3, 10);
       const gw = ew + pad * 2, gh = Math.ceil(maxH * 1.3) + 2;
       if (!f.grid || f.grid.w !== gw || f.grid.h !== gh) f.grid = regrid(f.grid, gw, gh, 'up');
@@ -580,9 +613,12 @@
       // sem espaço acima (ex.: placar colado no topo) a fonte desce e o fogo sai "de trás" do elemento
       const off = clamp(Math.round(maxH * 0.7 - ey), 0, eh);
       f.gx = ex - pad; f.gy = ey + off - (gh - 1);
-      g.mx0 = pad; g.mx1 = pad + ew; g.my0 = ey - f.gy; g.my1 = ey + eh - f.gy;
+      // máscara = área do conteúdo (+1 px de folga): a moldura da caixa pode queimar, o texto nunca
+      const ins = f.ins, mi = (k, n) => (ins ? Math.max(0, Math.round(ins[k] * n) - 1) : 0);
+      g.mx0 = pad + mi(3, ew); g.mx1 = pad + ew - mi(1, ew);
+      g.my0 = ey - f.gy + mi(0, eh); g.my1 = ey + eh - f.gy - mi(2, eh);
       f.ex = ex; f.ey = ey; f.ew = ew; f.eh = eh; f.I = I;
-      const tH = Math.max(3, maxH * (0.14 + 0.86 * Math.pow(I, 1.2)));
+      const tH = Math.max(3, maxH * (0.2 + 0.8 * Math.pow(I, 1.15)));
       if (steps) {
         const hm = I > 0.004 ? 255 * (0.74 + 0.26 * I) : 0;
         const src = g.src;
@@ -592,19 +628,23 @@
           const ix = x - pad;
           let tp = 1;
           if (ix < 0 || ix >= ew) { const d = ix < 0 ? -ix : ix - ew + 1; tp = 1 - d / (pad + 1); tp = tp > 0 ? tp * tp : 0; }
-          const nz = 0.55 + 0.3 * Math.sin(x * k1 + t * 4.2) + 0.25 * Math.sin(x * k2 - t * 6.1);
-          let lv = tp * clamp(nz, 0.15, 1);
+          const nz = 0.64 + 0.28 * Math.sin(x * k1 + t * 4.2) + 0.2 * Math.sin(x * k2 - t * 6.1);
+          let lv = tp * clamp(nz, 0.3, 1);
           if (Math.random() < 0.06) lv *= 0.3;
           src[x] = hm * lv;
         }
-        const dec = hm / (tH + off * 0.9), lean = 0.07 * Math.sin(t * 1.7);
+        // sem fonte o calor ainda precisa decair, senão o resto do fogo sobe inteiro como uma faixa
+        const dec = (hm || 190) / (tH + off * 0.9), lean = 0.07 * Math.sin(t * 1.7);
         for (let s = 0; s < steps; s++) g.step(dec, lean);
         g.render(f.lut);
       }
       if (I <= 0.01) {
-        if (f.target === 0 && f.cur === 0 && !g.hot) flames.delete(el);
+        if (f.target === 0 && (f.cur === 0 || !ok) && !g.hot) flames.delete(el);
+        else if (ok || g.hot) awake++;
+        // elemento escondido/fora da tela e fogo já frio: dormente (não segura o laço)
         return;
       }
+      awake++;
       const m = mult();
       // brasas soltas (fora do retângulo do elemento)
       f.ea += dt * (4 + 22 * I * I) * Math.sqrt(ew / 30) * m;
@@ -625,9 +665,22 @@
           const sd = (f.side ^= 1);
           const lx = sd ? ex + ew + rand(0, 1) : ex - 1 - rand(0, 1);
           const ly = ey + (off > 0 ? rand(0.1, 1) : rand(0, 0.55)) * eh;
-          const p = spawn(lx, ly, (sd ? 1 : -1) * rand(0, 7), -rand(25, 55), rand(0.16, 0.34) * (0.7 + 0.5 * I), f.fr);
+          const p = spawn(lx, ly, (sd ? 1 : -1) * rand(0, 7), -rand(25, 55), rand(0.16, 0.34) * (0.7 + 0.5 * I), f.fr, true);
           if (p) { p.size = I > 0.55 ? 2 : 1; p.shrink = true; p.c0 = 1; p.g = -40; p.drag = 1.2; }
         }
+      }
+    }
+    function snuff(f) {
+      const n = amount(8 + f.ew * 0.35 * f.I);
+      for (let i = 0; i < n; i++) {
+        const p = spawn(f.ex + rand(0, f.ew), f.ey - rand(0, 4), rand(-14, 14), -rand(18, 50), rand(0.5, 0.9), SMOKE_R);
+        if (!p) break;
+        p.size = Math.random() < 0.5 ? 3 : 2; p.shrink = true; p.drag = 2; p.g = -12; p.tw = true;
+      }
+      for (let i = 0, m = amount(6 + 10 * f.I); i < m; i++) {
+        const p = spawn(f.ex + rand(0, f.ew), f.ey, rand(-50, 50), -rand(40, 110), rand(0.35, 0.7), f.er);
+        if (!p) break;
+        p.g = 90; p.drag = 1.5; p.trail = 1; p.glow = 0.4;
       }
     }
     function drawFlame(f) {
@@ -636,7 +689,7 @@
       // contorno em brasa: o elemento parece "quente"
       const I = f.I;
       if (I > 0.3 && f.boxy) {
-        const a = Math.round(clamp(0.2 + I * (0.35 + 0.35 * Math.random()), 0, 0.9) * 10) / 10;
+        const a = Math.round(clamp(0.2 + I * (0.35 + (reduced ? 0.2 : 0.35 * Math.random())), 0, 0.9) * 10) / 10;
         if (a > 0) {
           ctx.fillStyle = rgba(f.color ? rgbOf(f.color) : I > 0.7 ? [255, 200, 70] : [255, 140, 30], a);
           const x = f.ex - 1, y = f.ey - 1, w = f.ew + 2, h = f.eh + 2;
@@ -650,7 +703,8 @@
     function updEdge(dt, steps) {
       const e = edge;
       if (e.target === 0 && e.cur === 0 && !e.bottom) return;
-      e.cur += (e.target - e.cur) * Math.min(1, dt * (e.target > e.cur ? 3 : 1.6));
+      if (e.target >= e.cur) e.cur += (e.target - e.cur) * Math.min(1, dt * 3);
+      else e.cur = Math.max(e.target, e.cur - dt * (0.8 + (e.cur - e.target) * 2));
       if (e.target === 0 && e.cur < 0.01) e.cur = 0;
       e.pulse = reduced ? 1 : 0.8 + 0.2 * Math.sin(clock * TAU * 2.1);
       if (reduced) { e.bottom = e.left = e.right = null; return; }
@@ -667,8 +721,9 @@
           l[x] = hm * along * (0.5 + 0.5 * wave(x * 0.5 + 7, clock)) * (Math.random() < 0.05 ? 0.3 : 1);
           rr[x] = hm * along * (0.5 + 0.5 * wave(x * 0.5 + 91, clock)) * (Math.random() < 0.05 ? 0.3 : 1);
         }
-        const decB = hm / Math.max(3, bh * 0.78 * (0.3 + 0.7 * I) * e.pulse);
-        const decS = hm / Math.max(2, sd * 0.72 * (0.3 + 0.7 * I) * e.pulse);
+        const hd = hm || 190;
+        const decB = hd / Math.max(3, bh * 0.78 * (0.3 + 0.7 * I) * e.pulse);
+        const decS = hd / Math.max(2, sd * 0.72 * (0.3 + 0.7 * I) * e.pulse);
         for (let s = 0; s < steps; s++) { e.bottom.step(decB, 0); e.left.step(decS, 0.14); e.right.step(decS, 0.14); }
         e.bottom.render(e.lut); e.left.render(e.lut); e.right.render(e.lut);
       }
@@ -692,9 +747,9 @@
           ctx.fillStyle = rgba(c, Math.round(a0 * 40) / 40);
           ctx.fillRect(0, H - (i + 1) * bw, W, bw);
           // laterais em degraus: mais forte embaixo
-          for (let j = 0; j < 4; j++) {
-            const y0 = Math.round((H * j) / 4), y1 = Math.round((H * (j + 1)) / 4);
-            ctx.globalAlpha = (j + 1) / 4;
+          for (let j = 0; j < 8; j++) {
+            const y0 = Math.round((H * j) / 8), y1 = Math.round((H * (j + 1)) / 8);
+            ctx.globalAlpha = (j + 1) / 8;
             ctx.fillRect(i * bw, y0, bw, y1 - y0);
             ctx.fillRect(W - (i + 1) * bw, y0, bw, y1 - y0);
           }
@@ -717,6 +772,7 @@
       while (fireAcc >= STEP && steps < 3) { fireAcc -= STEP; steps++; }
       if (fireAcc > STEP) fireAcc = STEP;
       updEdge(dt, steps);
+      awake = 0;
       flames.forEach((f) => updFlame(f, dt, steps));
       updRockets(dt);
       updCoins(dt);
@@ -737,7 +793,7 @@
       flush(main);
     }
     function busy() {
-      if (parts.length || rockets.length || coins.length || waves.length || sched.length || flames.size) return true;
+      if (parts.length || rockets.length || coins.length || waves.length || sched.length || awake || due.length) return true;
       return edge.target > 0 || edge.cur > 0 || !!edge.bottom;
     }
     function frame(ts) {
@@ -759,11 +815,15 @@
       workEma += (t2 - t0 - workEma) * 0.1;
       if (workEma > 6) q = Math.max(0.35, q - 0.02);
       else if (workEma < 3) q = Math.min(1, q + 0.004);
+      if (due.length) runDue();
+      // o callback pode ter chamado destroy() ou já religado o laço (wake): nunca dois RAFs
+      if (dead || raf) return;
       if (busy()) raf = requestAnimationFrame(frame);
       else sleep();
     }
     function wake() {
       if (dead || raf) return;
+      if (pollT) { clearTimeout(pollT); pollT = 0; }
       if (!shown) { cv.style.visibility = 'visible'; shown = true; }
       last = 0;
       raf = requestAnimationFrame(frame);
@@ -773,28 +833,58 @@
       cv.style.visibility = 'hidden';
       shown = false;
       last = 0;
+      // só sobrou fogo pedido em elemento escondido: confere de vez em quando, sem RAF
+      if (flames.size && !pollT && !dead) pollT = setTimeout(poll, 250);
+    }
+    function visible(r) {
+      return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < cssH && r.right > 0 && r.left < cssW;
+    }
+    function poll() {
+      pollT = 0;
+      if (dead || raf) return;
+      measure();
+      let any = false;
+      for (const [el, f] of [...flames]) {
+        if (!el.isConnected || !f.target) flames.delete(el);
+        else if (visible(el.getBoundingClientRect())) any = true;
+      }
+      if (any) wake();
+      else if (flames.size) pollT = setTimeout(poll, 250);
     }
 
     // ---------- API ----------
     function flamesApi(el, intensity, color) {
-      if (dead || !el || !el.getBoundingClientRect) return fx;
-      const I = clamp(+intensity || 0, 0, 1);
+      if (dead || !el || el.nodeType !== 1) return fx;
+      let I = clamp(+intensity || 0, 0, 1);
+      if (I < 0.01) I = 0;
       let f = flames.get(el);
       if (!f) {
         if (I <= 0) return fx;
+        // muitos elementos ao mesmo tempo: o pedido mais antigo cede a vez
+        if (flames.size >= MAX_FLAMES) flames.delete(flames.keys().next().value);
         // contorno em brasa só em "caixas" (borda ou fundo); em texto solto ficaria um retângulo estranho
         const cs = getComputedStyle(el), bg = cs.backgroundColor || '';
         const boxy = parseFloat(cs.borderTopWidth) > 0 || !(bg === 'transparent' || /,\s*0\)$/.test(bg));
-        f = { el, boxy, target: 0, cur: 0, I: 0, grid: null, color: undefined, lut: FIRE_LUT, fr: FIRE_R, er: EMBER_R, ea: 0, la: 0, side: 0, sx: rand(0, 100), gx: 0, gy: 0, ex: 0, ey: 0, ew: 0, eh: 0 };
+        // borda + padding em fração do tamanho (vale mesmo com o elemento escalado por transform)
+        const w0 = el.offsetWidth || 0, h0 = el.offsetHeight || 0;
+        const pv = (a, b) => (parseFloat(cs[a]) || 0) + (parseFloat(cs[b]) || 0);
+        const ins = w0 > 0 && h0 > 0 ? [pv('borderTopWidth', 'paddingTop') / h0, pv('borderRightWidth', 'paddingRight') / w0,
+          pv('borderBottomWidth', 'paddingBottom') / h0, pv('borderLeftWidth', 'paddingLeft') / w0].map((v) => clamp(v, 0, 0.4)) : null;
+        f = { el, boxy, ins, target: 0, cur: 0, I: 0, grid: null, color: undefined, lut: FIRE_LUT, fr: FIRE_R, er: EMBER_R, ea: 0, la: 0, side: 0, sx: rand(0, 100), gx: 0, gy: 0, ex: 0, ey: 0, ew: 0, eh: 0 };
         flames.set(el, f);
       }
+      // apagou com o fogo alto (errou): baforada de fumaça e brasas
+      if (!I && f.target > 0.2 && f.I > 0.2) snuff(f);
+      let changed = f.target !== I;
       f.target = I;
       const c = color || null;
       if (c !== f.color) {
+        changed = true;
         f.color = c; f.lut = lutFor(c);
         f.fr = c ? fireRamp(c) : FIRE_R; f.er = c ? ramp(c) : EMBER_R;
       }
-      wake();
+      // mesmo valor de novo (jogo chamando todo quadro): nada a fazer; elemento escondido fica com o poll
+      if (changed) wake();
       return fx;
     }
     function fireworks(count, opts) {
@@ -802,8 +892,10 @@
       measure();
       let n = clamp(Math.round(count == null ? 3 : +count || 0), 0, 24);
       if (reduced) n = Math.ceil(n * 0.5);
-      if (!n) return fx;
-      const cols = opts && Array.isArray(opts.colors) && opts.colors.length ? opts.colors : FW_COLORS;
+      n = Math.min(n, MAX_ROCKETS - rockets.length - queued);
+      if (n <= 0) return fx;
+      const given = opts && Array.isArray(opts.colors) ? opts.colors.filter((c) => typeof c === 'string' && c) : [];
+      const cols = given.length ? given : FW_COLORS;
       const slots = [];
       for (let i = 0; i < n; i++) slots.push(i);
       for (let i = n - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const t = slots[i]; slots[i] = slots[j]; slots[j] = t; }
@@ -814,7 +906,8 @@
         let cB = pick(cols);
         for (let k = 0; k < 4 && cB === cA && cols.length > 1; k++) cB = pick(cols);
         const type = i === 0 ? 'peony' : pick(FW_TYPES);
-        sched.push({ at: clock + (n > 1 ? (i / (n - 1)) * 0.8 : 0) + rand(0, 0.08), fn: () => launch(tx, ty, cA, cB, type) });
+        queued++;
+        sched.push({ at: clock + (n > 1 ? (i / (n - 1)) * 0.8 : 0) + rand(0, 0.08), fn: () => { queued--; launch(tx, ty, cA, cB, type); } });
       }
       wake();
       return fx;
@@ -822,13 +915,14 @@
     function confetti(count) {
       if (dead) return fx;
       measure();
-      const n = amount(count == null ? 60 : +count || 0);
+      const n = Math.min(MAX_CONF - conf, amount(count == null ? 60 : +count || 0));
       for (let i = 0; i < n; i++) {
         const p = spawn(rand(0, W), -rand(1, H * 0.3), rand(-18, 18), H * rand(0.3, 0.6), 9, ramp(pick(CONF_COLORS)));
         if (!p) break;
+        conf++;
         p.kind = K_CONF; p.a = rand(2, 4.5); p.b = H * rand(0.17, 0.26); p.c = rand(8, 22); p.d = rand(7, 15); p.ph = rand(0, TAU);
       }
-      if (n) wake();
+      if (n > 0) wake();
       return fx;
     }
     function sparks(x, y, color, count) {
@@ -852,8 +946,9 @@
       measure();
       const want = clamp(Math.round(count == null ? 12 : +count || 0), 0, 60);
       const grp = { cb: typeof onArrive === 'function' ? onArrive : null, fired: false };
-      const m = want ? Math.max(1, Math.min(MAX_COINS - coins.length, Math.round(want * (reduced ? 0.5 : 1)))) : 0;
-      if (!m) { sched.push({ at: clock, fn: () => arrive(grp) }); wake(); return fx; }
+      const m = want ? Math.min(MAX_COINS - coins.length, Math.max(1, Math.round(want * (reduced ? 0.5 : 1)))) : 0;
+      // sem moedas (count 0 ou limite cheio): o callback chega mesmo assim, no tempo de um voo
+      if (m <= 0) { sched.push({ at: clock + (want ? 0.55 : 0), fn: () => arrive(grp) }); wake(); return fx; }
       const rp = ramp(color || '#ffd23f');
       const sx = x / S, sy = y / S, big = S < 2.5 ? 1.2 : 1;
       for (let i = 0; i < m; i++) {
@@ -895,8 +990,10 @@
     }
     function clear() {
       for (const p of parts) pool.push(p);
-      parts.length = 0; rockets.length = 0; coins.length = 0; waves.length = 0; sched.length = 0;
+      parts.length = 0; rockets.length = 0; coins.length = 0; waves.length = 0; sched.length = 0; due.length = 0;
+      queued = 0; conf = 0; awake = 0;
       flames.clear();
+      if (pollT) { clearTimeout(pollT); pollT = 0; }
       edge.target = edge.cur = 0;
       edge.bottom = edge.left = edge.right = null;
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
@@ -913,7 +1010,7 @@
     }
     // diagnóstico (testes / console)
     function stats() {
-      return { running: !!raf, frames, parts: parts.length, coins: coins.length, flames: flames.size, edge: edge.cur, work: workEma, update: updEma, draw: drawEma, quality: q, scale: S, w: W, h: H, reduced };
+      return { running: !!raf, polling: !!pollT, frames, parts: parts.length, coins: coins.length, rockets: rockets.length + queued, waves: waves.length, sched: sched.length, flames: flames.size, edge: edge.cur, work: workEma, update: updEma, draw: drawEma, quality: q, scale: S, w: W, h: H, reduced };
     }
 
     const fx = { flames: flamesApi, fireworks, confetti, sparks, fly, edge: edgeApi, shockwave, clear, destroy, stats, canvas: cv };
