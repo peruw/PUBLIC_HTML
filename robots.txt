@@ -1,5 +1,10 @@
 User-agent: *
 Allow: /
+Disallow: /professores/painel.html
+Disallow: /professores/mensagens.html
+Disallow: /professores/entrar.html
+Disallow: /professores/pagamento.html
+Disallow: /professores/admin.html
 
 User-agent: facebookexternalhit
 Allow: /
