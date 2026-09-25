@@ -201,7 +201,6 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   scene.add(group);
   const disposables = [];
   const keep = (...a) => { disposables.push(...a); return a[0]; };
-  const UP = new THREE.Vector3(0, 1, 0);
   // track.sample devolve objeto reutilizado: copia para poder guardar
   const smp = (sv) => {
     const r = track.sample(sv);
@@ -275,7 +274,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   }
   const CX = (minX + maxX) / 2, CZ = (minZ + maxZ) / 2;
   const FM = 110; // margem do campo
-  const FC = 2; // célula
+  const FC = hi ? 2 : 2.5; // célula
   const fx0 = minX - FM, fz0 = minZ - FM;
   const fnx = Math.ceil((maxX - minX + 2 * FM) / FC) + 1, fnz = Math.ceil((maxZ - minZ + 2 * FM) / FC) + 1;
   const field = new Float32Array(fnx * fnz).fill(999);
@@ -287,7 +286,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     else extent[i] = WD[i] + (FL[i] === 1 ? 2.5 : 0.8);
   }
   for (let i = 0; i < N; i++) {
-    const R = extent[i] + 40;
+    const R = extent[i] + 24;
     const i0 = Math.max(0, Math.floor((X[i] - R - fx0) / FC)), i1 = Math.min(fnx - 1, Math.ceil((X[i] + R - fx0) / FC));
     const j0 = Math.max(0, Math.floor((Z[i] - R - fz0) / FC)), j1 = Math.min(fnz - 1, Math.ceil((Z[i] + R - fz0) / FC));
     for (let j = j0; j <= j1; j++) {
@@ -337,7 +336,8 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     return Math.hypot(dx, dz);
   };
   const natural = (x, z) => {
-    let h = (vnoise(x / 95 + 3, z / 95 + 1) - 0.5) * 5 + (vnoise(x / 33 + 9, z / 33 + 4) - 0.5) * 1.6;
+    let h = (vnoise(x / 95 + 3, z / 95 + 1) - 0.4) * 5 + (vnoise(x / 33 + 9, z / 33 + 4) - 0.5) * 1.6;
+    h = Math.max(h, -0.8);
     const d = outside(x, z);
     h += smooth01(d / 280) * (22 + 60 * vnoise(x / 170 + 11, z / 170 + 5)) + smooth01((d - 250) / 400) * 40;
     // morro do observatório
@@ -376,12 +376,10 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const zs = axis(CZ - TERR, CZ + TERR, minZ - 75, maxZ + 75);
   const nx = xs.length, nz = zs.length;
   // Marcos precisam de chão plano: definidos antes do relevo
-  const sStart = smp(20);
   const campus = { x: 30, z: -64, y: 0 };
   flats.push([campus.x, campus.z + 6, 58, -0.35]);
   flats.push([30, 36, 62, -0.35]);
   flats.push([obsPos.x, obsPos.z, 22, sSum.pos.y + 0.6]);
-  void sStart;
 
   const bsearch = (arr, v) => {
     let a = 0, b = arr.length - 1;
@@ -391,15 +389,17 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const H = new Float32Array(nx * nz);
   const LO = new Float32Array(nx * nz).fill(-1e9);
   const HI = new Float32Array(nx * nz).fill(1e9);
-  const LOWF = new Float32Array(nx * nz).fill(1e9);
-  const HOLE = new Uint8Array(nx * nz); // vértices dentro do túnel: triângulos removidos (o morro cobre)
+  // Túnel: o terreno passa POR CIMA do arco; só perto das bocas os triângulos são removidos
+  // (a fachada e o morro cobrem). Guarda a amostra de túnel mais próxima de cada vértice.
+  const HOLE = new Uint8Array(nx * nz);
   const TD = new Float32Array(nx * nz).fill(1e9), TSP = new Float32Array(nx * nz), TYY = new Float32Array(nx * nz);
+  const TRF = new Float32Array(nx * nz), TMT = new Float32Array(nx * nz);
+  const PAD = meta.moundPad || 7.5;
   let maxSpan = 0;
   for (let i = 0; i < N; i++) if (FL[i] === 2) maxSpan = Math.max(maxSpan, SPAN[i]);
   const portalA = smp(meta.tunnelS[0]), portalB = smp(meta.tunnelS[1]);
-  const behindPortals = (x, z) =>
-    (x - portalA.pos.x) * portalA.tangent.x + (z - portalA.pos.z) * portalA.tangent.z > -0.4 &&
-    (x - portalB.pos.x) * portalB.tangent.x + (z - portalB.pos.z) * portalB.tangent.z < 0.4;
+  const alongA = (x, z) => (x - portalA.pos.x) * portalA.tangent.x + (z - portalA.pos.z) * portalA.tangent.z;
+  const alongB = (x, z) => (x - portalB.pos.x) * portalB.tangent.x + (z - portalB.pos.z) * portalB.tangent.z;
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) H[j * nx + i] = natural(xs[i], zs[j]);
   // crista natural sobre o túnel (o terreno encosta no morro que cobre o túnel)
   for (let s = 0; s < N; s++) {
@@ -422,7 +422,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   }
   for (let s = 0; s < N; s++) {
     const zone = WD[s] + 6.5;
-    const R = FL[s] === 2 ? maxSpan + 2 : zone + 40;
+    const R = FL[s] === 2 ? maxSpan + PAD + 22 : zone + 40;
     const i0 = bsearch(xs, X[s] - R), i1 = bsearch(xs, X[s] + R) + 1;
     const j0 = bsearch(zs, Z[s] - R), j1 = bsearch(zs, Z[s] + R) + 1;
     for (let j = j0; j <= Math.min(j1, nz - 1); j++) {
@@ -437,7 +437,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
         }
         if (FL[s] === 2) {
           // guarda a amostra de túnel mais próxima (perpendicular): o vão local decide
-          if (d < TD[o]) { TD[o] = d; TSP[o] = SPAN[s]; TYY[o] = Y[s]; }
+          if (d < TD[o]) { TD[o] = d; TSP[o] = SPAN[s]; TYY[o] = Y[s]; TRF[o] = meta.ROOF[s]; TMT[o] = moundTop[s] || 10; }
           continue;
         }
         const e = Math.max(0, d - zone);
@@ -447,23 +447,38 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     }
   }
   for (let o = 0; o < H.length; o++) {
-    if (TD[o] < TSP[o] + 1.2) {
-      LOWF[o] = TYY[o] - 0.45;
-      if (behindPortals(xs[o % nx], zs[Math.floor(o / nx)])) HOLE[o] = 1;
-    }
     let h = H[o];
     if (LO[o] > HI[o]) h = HI[o];
     else h = clamp(h, LO[o], HI[o]);
-    if (h > LOWF[o]) h = LOWF[o];
+    if (TD[o] < TSP[o] + PAD + 20) {
+      const x = xs[o % nx], z = zs[(o / nx) | 0];
+      const a = alongA(x, z), b = alongB(x, z);
+      if (a > 0.3 && b < -0.3) {
+        const inner = Math.min(a, -b); // distância para dentro a partir da boca mais próxima
+        if (inner < fine * 1.1 + 0.4) {
+          // faixa escondida atrás da fachada: chão baixo, sem rampa de terreno na frente da boca
+          if (TD[o] < TSP[o] + 1.2) HOLE[o] = 1;
+          else h = Math.min(h, TYY[o] - 0.35);
+        } else if (TD[o] < TSP[o] + PAD + 2) {
+          h = Math.max(h, TMT[o] - 1.45); // encosta do morro
+          if (TD[o] < TSP[o] + 1.2) {
+            h = Math.max(h, TYY[o] + TRF[o] + 0.2); // acima do arco
+            if (inner < 14) HOLE[o] = 1; // perto das bocas: removido
+          }
+        }
+      }
+    }
     H[o] = h;
   }
-  // altura do terreno em qualquer ponto (bilinear na grade)
+  // altura do terreno em qualquer ponto (bilinear na grade); nos recortes das bocas do túnel vale o chão do túnel
+  const GH = H.slice();
+  for (let o = 0; o < GH.length; o++) if (HOLE[o]) GH[o] = TYY[o] - 0.45;
   const groundAt = (x, z) => {
     if (x <= xs[0] || x >= xs[nx - 1] || z <= zs[0] || z >= zs[nz - 1]) return natural(x, z);
     const i = bsearch(xs, x), j = bsearch(zs, z);
     const u = (x - xs[i]) / (xs[i + 1] - xs[i]), v = (z - zs[j]) / (zs[j + 1] - zs[j]);
     const o = j * nx + i;
-    return lerp(lerp(H[o], H[o + 1], u), lerp(H[o + nx], H[o + nx + 1], u), v);
+    return lerp(lerp(GH[o], GH[o + 1], u), lerp(GH[o + nx], GH[o + nx + 1], u), v);
   };
 
   const grassTex = meta.grassTexture;
@@ -717,7 +732,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   // ------------------------------------------------------------ universidade (Campus da Ciência)
   {
     const cx = campus.x, cz = campus.z, y0 = groundAt(cx, cz + 10);
-    const cream = col(0xf3ead7), stone = col(0xe4d8bd), roof = col(0xb9c2cc), dome = col(0x5fb3a1), gold = col(0xd9b34a), step = col(0xd8d2c4), dark = col(0x3c4a66);
+    const cream = col(0xf3ead7), stone = col(0xe4d8bd), roof = col(0xb9c2cc), dome = col(0x5fb3a1), gold = col(0xd9b34a), step = col(0xd8d2c4);
     const W = 96, D = 24, Hb = 15;
     const fz = cz + D / 2; // fachada (lado da pista, +z)
     addS(G.box, cx, y0 - 1 + Hb / 2, cz, W, Hb + 2, D, cream);
@@ -939,7 +954,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   });
   // tripé com bico de Bunsen perto de um frasco grande
   const glassMesh = glass.count ? new THREE.Mesh(keep(glass.build(false)), keep(new THREE.MeshLambertMaterial({
-    vertexColors: true, transparent: true, opacity: 0.33, depthWrite: false, side: THREE.DoubleSide, emissive: 0x335566, emissiveIntensity: 0.25,
+    vertexColors: true, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide, emissive: 0x6688aa, emissiveIntensity: 0.35,
   }))) : null;
   const liquidMesh = liquid.count ? new THREE.Mesh(keep(liquid.build(false)), keep(new THREE.MeshLambertMaterial({
     vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.0, transparent: true, opacity: 0.88,
@@ -1186,7 +1201,6 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   }
 
   // ------------------------------------------------------------ outros adereços científicos
-  const spin = []; // {mesh|index, ...}
   {
     // Foguete na plataforma (no meio do campo interno)
     const rx = 70, rz = 150;
@@ -1259,6 +1273,99 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       }
       addS(G.sph, x + 1.2, y + 0.25, z + 2.5, 0.3, 0.3, 0.3, col(0xe3262f));
       reserve(x, z, 5);
+    }
+  }
+
+  // Microscópio gigante (homenagem a Oswaldo Cruz) no campo interno do Laboratório
+  {
+    const sm = smp(meta.ctrlS[4] + 40);
+    const p = sm.pos.clone().addScaledVector(sm.right, sm.wallDist + 22);
+    if (clearance(p.x, p.z) > 8 && !isReserved(p.x, p.z, 6)) {
+      const y = groundAt(p.x, p.z);
+      const ry = Math.atan2(-sm.right.x, -sm.right.z);
+      const place = (geo, lx, ly, lz, sx, sy, sz, c, rx = 0) => {
+        const cx = p.x + Math.cos(ry) * lx + Math.sin(ry) * lz;
+        const cz = p.z - Math.sin(ry) * lx + Math.cos(ry) * lz;
+        st.add(geo, mat4(cx, y + ly, cz, rx, ry, 0, sx, sy, sz), c, null, AW);
+      };
+      const white = col(0xf4f6fa), blue = col(0x1d4fd8), dark = col(0x2b2d3a), metal = col(0xbfc6cc);
+      place(G.box, 0, 0.6, 0, 7, 1.2, 5, white);
+      place(G.box, 0, 4.5, -1.6, 1.4, 7.5, 1.4, blue);
+      place(G.box, 0, 3.4, 0.6, 4.2, 0.35, 3.2, dark);
+      place(G.cyl, 0, 7.4, 0.7, 0.75, 4.2, 0.75, white, -0.35);
+      place(G.cyl, 0, 9.6, -0.1, 0.55, 1.6, 0.55, dark, -0.35);
+      place(G.cyl, 0, 5.2, 1.25, 0.35, 1.2, 0.35, metal);
+      place(G.cyl, 0.5, 5.3, 1.0, 0.25, 1.0, 0.25, metal);
+      place(G.cyl, 0, 1.8, 0.5, 1.0, 0.25, 1.0, metal);
+      place(G.cyl, 1.2, 3.0, -1.6, 0.6, 0.35, 0.6, dark, Math.PI / 2);
+      reserve(p.x, p.z, 7);
+    }
+  }
+  // Pêndulo de Newton gigante (as esferas das pontas balançam)
+  let cradle = null;
+  {
+    const sm = smp(track.length - 70);
+    const p = sm.pos.clone().addScaledVector(sm.right, sm.wallDist + 16);
+    if (clearance(p.x, p.z) > 7 && !isReserved(p.x, p.z, 6)) {
+      const y = groundAt(p.x, p.z);
+      const ry = Math.atan2(sm.tangent.x, sm.tangent.z);
+      const ax = new THREE.Vector3(Math.cos(ry), 0, -Math.sin(ry)); // eixo das esferas (perpendicular ao rumo)
+      const H = 7, W = 5.2, Dp = 2.4, R = 0.62;
+      const frameCol = col(0x2b2d3a), steel = col(0xdfe6ee);
+      addS(G.box, p.x, y + 0.25, p.z, W + 2, 0.5, Dp + 1.6, col(0x5518b8), ry);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        const q = p.clone().addScaledVector(ax, sx * (W / 2 + 0.4));
+        q.x += Math.sin(ry) * sz * Dp / 2; q.z += Math.cos(ry) * sz * Dp / 2;
+        addS(G.cyl, q.x, y + H / 2, q.z, 0.12, H, 0.12, frameCol);
+      }
+      for (const sz of [-1, 1]) {
+        const q = p.clone(); q.x += Math.sin(ry) * sz * Dp / 2; q.z += Math.cos(ry) * sz * Dp / 2;
+        addS(G.box, q.x, y + H, q.z, 0.2, 0.2, W + 1, frameCol, ry + Math.PI / 2);
+      }
+      // 3 esferas do meio (paradas) + fios
+      const ballY = y + 2.2;
+      for (let k = -1; k <= 1; k++) {
+        const q = p.clone().addScaledVector(ax, k * R * 2);
+        addS(G.sph, q.x, ballY, q.z, R, R, R, steel);
+        for (const sz of [-1, 1]) {
+          const tx = q.x + Math.sin(ry) * sz * Dp / 2, tz = q.z + Math.cos(ry) * sz * Dp / 2;
+          const mx = (q.x + tx) / 2, mz = (q.z + tz) / 2;
+          const len = Math.hypot(H - 2.2, Dp / 2);
+          st.add(G.cyl6, mat4(mx, (ballY + y + H) / 2, mz, sz * Math.atan2(Dp / 2, H - 2.2), ry, 0, 0.03, len, 0.03), col(0x888888), null, AW);
+        }
+      }
+      // esferas das pontas: pivô no topo, balançam alternadamente
+      const ends = [];
+      const ballGeo = keep(new THREE.SphereGeometry(R, hi ? 18 : 10, hi ? 12 : 7));
+      const wireGeo = keep(new THREE.CylinderGeometry(0.03, 0.03, H - 2.2, 5, 1));
+      wireGeo.translate(0, -(H - 2.2) / 2, 0);
+      const ballMat = keep(new THREE.MeshLambertMaterial({ color: 0xdfe6ee, emissive: 0x222222 }));
+      const wireMat = keep(new THREE.MeshLambertMaterial({ color: 0x888888 }));
+      for (const sgn of [-1, 1]) {
+        const pivot = new THREE.Group();
+        const q = p.clone().addScaledVector(ax, sgn * R * 4);
+        pivot.position.set(q.x, y + H, q.z);
+        pivot.rotation.y = ry;
+        const inner = new THREE.Group();
+        pivot.add(inner);
+        const ball = new THREE.Mesh(ballGeo, ballMat);
+        ball.position.y = -(H - 2.2);
+        ball.castShadow = true;
+        inner.add(ball, new THREE.Mesh(wireGeo, wireMat));
+        group.add(pivot);
+        ends.push({ inner, sgn });
+      }
+      cradle = ends;
+      animated.push((dt, t) => {
+        const ph = (t * 1.3) % 2;
+        for (let k = 0; k < cradle.length; k++) {
+          const e = cradle[k];
+          const mine = e.sgn < 0 ? ph < 1 : ph >= 1;
+          const a = mine ? Math.sin((ph % 1) * Math.PI) * 0.7 : 0;
+          e.inner.rotation.z = e.sgn * a;
+        }
+      });
+      reserve(p.x, p.z, 6);
     }
   }
 

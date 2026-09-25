@@ -111,7 +111,6 @@ class Builder {
   }
 }
 
-const _box = { a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), d: new THREE.Vector3() };
 // Caixa orientada (eixos unitários ax, ay, az; meias-medidas). A face +az pode receber uma região do atlas.
 function addBox(b, c, ax, ay, az, hx, hy, hz, col, white, front, frontCol, skipBottom) {
   const faces = [
@@ -333,7 +332,6 @@ function buildAtlas(hi, aniso) {
   const g = c.getContext('2d');
   g.scale(k, k);
   const regions = {};
-  const PAD = 12;
   const put = (name, x, y, w, h, draw) => {
     g.save(); g.translate(x, y);
     g.beginPath(); g.rect(0, 0, w, h); g.clip();
@@ -546,7 +544,6 @@ function planetTextures(hi) {
 // ---------------------------------------------------------------------------
 export function buildTrack(scene, quality = {}) {
   const hi = quality.id !== 'baixa';
-  const scenery = quality.scenery ?? (hi ? 1 : 0.45);
   const rand = mulberry(20260925);
   const group = new THREE.Group();
   group.name = 'pista';
@@ -744,34 +741,79 @@ export function buildTrack(scene, quality = {}) {
     return lerp(K[i], K[(i + 1) % N], fi - Math.floor(fi));
   }
 
-  // ------------------------------------------------------------ trajetória ideal (elástico)
+  // ------------------------------------------------------------ trajetória ideal
+  // Por curva: fora na entrada, ápice por dentro, fora na saída; retas ligam as curvas.
   {
-    const step = 2;
-    const M = Math.floor(N / step);
-    const lat = new Float32Array(M);
-    const kk = 7;
-    for (let it = 0; it < 600; it++) {
-      for (let j = 0; j < M; j++) {
-        const a = (j - kk + M) % M, b = (j + kk) % M;
-        const ia = a * step, ib = b * step, ij = j * step;
-        const ax = X[ia] + RX[ia] * lat[a], az = Z[ia] + RZ[ia] * lat[a];
-        const bx = X[ib] + RX[ib] * lat[b], bz = Z[ib] + RZ[ib] * lat[b];
-        const mx = (ax + bx) / 2 - X[ij], mz = (az + bz) / 2 - Z[ij];
-        const lim = HW[ij] - 2.2;
-        const t = clamp(mx * RX[ij] + mz * RZ[ij], -lim, lim);
-        lat[j] += (t - lat[j]) * 0.7;
+    const KC = new Float32Array(N);
+    for (let i = 0; i < N; i++) KC[i] = -wrapAngle(HEAD[idx(i + 10)] - HEAD[idx(i - 10)]) / (20 * ds);
+    const TH = 1 / 160;
+    const corners = [];
+    // começa num ponto de reta para não cortar uma curva ao meio
+    let startI = 0;
+    for (let i = 0; i < N; i++) if (Math.abs(KC[i]) < TH * 0.5) { startI = i; break; }
+    let cur = null;
+    for (let k = 0; k <= N; k++) {
+      const i = idx(startI + k);
+      const kk = KC[i];
+      const on = Math.abs(kk) > TH;
+      const sg = Math.sign(kk);
+      if (on && cur && sg === cur.sign) {
+        cur.end = startI + k; cur.turn += kk * ds;
+        if (Math.abs(kk) > cur.peak) { cur.peak = Math.abs(kk); cur.apex = startI + k; }
+      } else {
+        if (cur) { corners.push(cur); cur = null; }
+        if (on) cur = { sign: sg, start: startI + k, end: startI + k, apex: startI + k, peak: Math.abs(kk), turn: kk * ds };
+      }
+    }
+    if (cur) corners.push(cur);
+    // pontos-chave (índice contínuo, lateral)
+    const keys = [];
+    corners.forEach((c) => {
+      const ang = Math.abs(c.turn);
+      if (ang < 0.25) return; // curvas suaves não mudam a trajetória
+      const apexI = Math.round((c.apex + (c.start + c.end) / 2) / 2);
+      const L = clamp(22 + 38 * ang, 26, 90) / ds;
+      const hw = (i) => HW[idx(Math.round(i))] - 2.4;
+      keys.push({ i: apexI - L, lat: -c.sign * hw(apexI - L), kind: 'in' });
+      keys.push({ i: apexI, lat: c.sign * hw(apexI), kind: 'apex' });
+      keys.push({ i: apexI + L * 1.15, lat: -c.sign * hw(apexI + L * 1.15), kind: 'out' });
+    });
+    keys.sort((a, b) => a.i - b.i);
+    // saída de uma curva depois da entrada da próxima: liga ápice a ápice
+    for (let changed = true; changed;) {
+      changed = false;
+      for (let k = 0; k < keys.length - 1; k++) {
+        if (keys[k + 1].i - keys[k].i < 12 / ds && keys[k].kind !== 'apex' && keys[k + 1].kind !== 'apex') {
+          const m = { i: (keys[k].i + keys[k + 1].i) / 2, lat: (keys[k].lat + keys[k + 1].lat) / 2, kind: 'mid' };
+          keys.splice(k, 2, m); changed = true; break;
+        }
+        if (keys[k].kind === 'out' && keys[k + 1].kind === 'in' && keys[k + 1].i < keys[k].i) { keys.splice(k, 2); changed = true; break; }
+      }
+      for (let k = 0; k < keys.length - 1; k++) {
+        if (keys[k + 1].i < keys[k].i + 4) {
+          if (keys[k].kind === 'apex') keys.splice(k + 1, 1); else keys.splice(k, 1);
+          changed = true; break;
+        }
       }
     }
     const raw = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
-      const fj = i / step;
-      const j = Math.floor(fj) % M;
-      raw[i] = lerp(lat[j], lat[(j + 1) % M], fj - Math.floor(fj));
+    if (keys.length < 2) raw.fill(0);
+    else {
+      const K2 = keys.length;
+      for (let k = 0; k < K2; k++) {
+        const a = keys[k], b = keys[(k + 1) % K2];
+        let bi = b.i;
+        if (bi <= a.i) bi += N;
+        for (let i = Math.ceil(a.i); i < bi; i++) {
+          const t = (i - a.i) / (bi - a.i);
+          raw[idx(i)] = lerp(a.lat, b.lat, t * t * (3 - 2 * t));
+        }
+      }
     }
     for (let i = 0; i < N; i++) {
       let acc = 0;
-      for (let k = -4; k <= 4; k++) acc += raw[idx(i + k)];
-      RL[i] = clamp(acc / 9, -(HW[i] - 2), HW[i] - 2);
+      for (let k = -6; k <= 6; k++) acc += raw[idx(i + k)];
+      RL[i] = clamp(acc / 13, -(HW[i] - 2), HW[i] - 2);
     }
   }
   function racingLine(s) {
@@ -909,7 +951,7 @@ export function buildTrack(scene, quality = {}) {
   };
 
   const P = (i, lat, dy, out) => out.set(X[i] + RX[i] * lat, Y[i] + dy, Z[i] + RZ[i] * lat);
-  const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3(), vd = new THREE.Vector3();
+  const va = new THREE.Vector3(), vb = new THREE.Vector3();
   const shade = new THREE.Color();
 
   // Fator de escurecimento dentro do túnel (suave nas bocas)
@@ -990,11 +1032,11 @@ export function buildTrack(scene, quality = {}) {
         else gb.idx.push(a, a + 1, a + 3, a, a + 3, a + 2);
       }
       // borda externa inclinada (fora da mureta), exceto ponte e túnel
-      for (let r = 0; r < N; r++) {
-        const i = r, n = (r + 1) % N;
+      const VSTEP = hi ? 1 : 3;
+      for (let r = 0; r < N; r += VSTEP) {
+        const i = r, n = (r + VSTEP) % N;
         if (FL[i] || FL[n]) continue;
         const c0 = shoulderColor(i, cA).clone().lerp(C.grassDark, 0.3);
-        const w0 = WD[i] + 0.55, w1 = WD[i] + 7;
         const v0 = gb.count;
         for (const j of [i, n]) {
           P(j, side * (WD[j] + 0.55), -0.02, va);
@@ -1002,7 +1044,6 @@ export function buildTrack(scene, quality = {}) {
           gb.vert(va.x, va.y, va.z, 0, 1, 0, c0, va.x * GUV, va.z * GUV);
           gb.vert(vb.x, vb.y, vb.z, 0, 1, 0, cB.copy(C.grassDark), vb.x * GUV, vb.z * GUV);
         }
-        void w0; void w1;
         if (side < 0) gb.idx.push(v0 + 1, v0, v0 + 2, v0 + 1, v0 + 2, v0 + 3);
         else gb.idx.push(v0, v0 + 1, v0 + 3, v0, v0 + 3, v0 + 2);
       }
@@ -1051,6 +1092,25 @@ export function buildTrack(scene, quality = {}) {
     }
     group.userData.moundTop = moundTop;
     group.userData.moundPad = moundPad;
+    const cAp = C.grass.clone().lerp(C.grassDark, 0.4);
+    for (const [sa, sb2] of [[tunnelS[0] - 16, tunnelS[0] + 1.5], [tunnelS[1] - 1.5, tunnelS[1] + 16]]) {
+      const v0 = gb.count;
+      let rows = 0;
+      for (let ss = sa; ss <= sb2 + 1e-6; ss += 1.5) {
+        const smp = sample(ss);
+        const L = SPAN[Math.round(clamp(ss, tunnelS[0], tunnelS[1]) / ds) % N] + moundPad + 14;
+        for (const e of [-1, 1]) {
+          va.copy(smp.pos).addScaledVector(smp.right, e * L);
+          va.y -= 0.3;
+          gb.vert(va.x, va.y, va.z, 0, 1, 0, cAp, va.x * GUV, va.z * GUV);
+        }
+        rows++;
+      }
+      for (let r = 0; r < rows - 1; r++) {
+        const a = v0 + r * 2;
+        gb.idx.push(a, a + 1, a + 3, a, a + 3, a + 2);
+      }
+    }
   }
   mkMesh(gb.build(), matGround, { name: 'acostamento' });
 
@@ -1135,12 +1195,13 @@ export function buildTrack(scene, quality = {}) {
     const top = new THREE.Color(), cMain = new THREE.Color();
     for (const side of [-1, 1]) {
       const tflag = tireSide[side < 0 ? 0 : 1];
-      for (let i = 0; i < N; i += 2) {
-        const n = idx(i + 2);
+      const WSTEP = hi ? 2 : 4;
+      for (let i = 0; i < N; i += WSTEP) {
+        const n = idx(i + WSTEP);
         const s = i * ds;
         if (FL[i] === 1 || FL[n] === 1) continue; // ponte tem guarda-corpo
         if (tflag[i] && tflag[n]) {
-          for (let t = 0; t < 2; t += 0.86) tireSpots.push([i * ds + t, side]);
+          for (let t = 0; t < WSTEP * ds - 0.1; t += 0.86) tireSpots.push([i * ds + t, side]);
           continue;
         }
         const tun = FL[i] === 2 || FL[n] === 2;
@@ -1152,9 +1213,13 @@ export function buildTrack(scene, quality = {}) {
         const H = tun ? 0.9 : 1.05, T = 0.5, B = tun ? -0.1 : -1.4;
         const band = tun ? H : H - 0.22;
         // faces: interna (baixo), interna (faixa), topo, externa
-        const faces = [
-          [[WD[i], 0 + B * 0 - 0.05], [WD[i], band], [WD[n], band], [WD[n], -0.05], -1, cMain],
+        const faces = hi ? [
+          [[WD[i], -0.05], [WD[i], band], [WD[n], band], [WD[n], -0.05], -1, cMain],
           [[WD[i], band], [WD[i], H], [WD[n], H], [WD[n], band], -1, tun ? cMain : top],
+          [[WD[i], H], [WD[i] + T, H], [WD[n] + T, H], [WD[n], H], 0, top],
+          [[WD[i] + T, H], [WD[i] + T, B], [WD[n] + T, B], [WD[n] + T, H], 1, cMain],
+        ] : [
+          [[WD[i], -0.05], [WD[i], H], [WD[n], H], [WD[n], -0.05], -1, cMain],
           [[WD[i], H], [WD[i] + T, H], [WD[n] + T, H], [WD[n], H], 0, top],
           [[WD[i] + T, H], [WD[i] + T, B], [WD[n] + T, B], [WD[n] + T, H], 1, cMain],
         ];
@@ -1382,7 +1447,6 @@ export function buildTrack(scene, quality = {}) {
     lamps.frustumCulled = false;
     group.add(lamps);
     startLights.mesh = lamps;
-    void heading;
   }
   const lampOff = col(0x3a1010), lampRed = col(0xff2020), lampGreen = col(0x30ff5a);
   const setLights = (n) => {
@@ -1401,6 +1465,35 @@ export function buildTrack(scene, quality = {}) {
     bus.on('race:countdown', ({ n }) => setLights(4 - n)),
     bus.on('race:go', () => { setLights(4); startLights.timer = 3; }),
   ];
+
+  // ------------------------------------------------------------ bandeirolas sobre a reta de largada (vão livre > 7 m)
+  {
+    const cols = [col(0xe3262f), col(0xffd23f), col(0x1d7bd8), col(0x2fbf71), col(0xff7b29), col(0x8a3cff), col(0xffffff)];
+    for (const s0 of [32, 58, 84, -44]) {
+      const f = frame(s0);
+      const span = f.wd + 1.6;
+      for (const side of [-1, 1]) {
+        const p = f.pos.clone().addScaledVector(f.right, side * span);
+        p.y += 5.2;
+        place(GEO.cylLow, p, 0, { x: 0.12, y: 10.4, z: 0.12 }, col(0xf2f2f2));
+        const tip = p.clone(); tip.y += 5.3;
+        place(GEO.sphere, tip, 0, 0.25, col(0xe3262f));
+      }
+      const nFl = Math.round(span * 2 / 1.1);
+      for (let k = 0; k < nFl; k++) {
+        const t0 = k / nFl, t1 = (k + 0.7) / nFl;
+        const sag = (t) => 10.1 - 1.8 * Math.sin(Math.PI * t);
+        const a = f.pos.clone().addScaledVector(f.right, lerp(-span, span, t0)); a.y += sag(t0);
+        const b2 = f.pos.clone().addScaledVector(f.right, lerp(-span, span, t1)); b2.y += sag(t1);
+        const c = a.clone().lerp(b2, 0.5); c.y -= 0.85;
+        const cc = cols[k % cols.length];
+        const v0 = sb.count;
+        for (const v of [a, b2, c]) sb.vert(v.x, v.y, v.z, f.fwd.x, 0, f.fwd.z, cc, WHITE[0], WHITE[1]);
+        for (const v of [a, b2, c]) sb.vert(v.x, v.y, v.z, -f.fwd.x, 0, -f.fwd.z, cc, WHITE[0], WHITE[1]);
+        sb.idx.push(v0, v0 + 1, v0 + 2, v0 + 3, v0 + 5, v0 + 4);
+      }
+    }
+  }
 
   // ------------------------------------------------------------ pórticos temáticos e placas
   gantry(ctrlS[2] + 16, 'lab', { colPost: col(0xefe9ff), colFrame: col(0x5518b8) });
@@ -1489,7 +1582,7 @@ export function buildTrack(scene, quality = {}) {
 
   // ------------------------------------------------------------ túnel: bocas (fachadas trapezoidais)
   {
-    const cStone = col(0x6d6a8e), cStoneD = col(0x4a4768), cGlow = col(0x7ef9ff);
+    const cStone = col(0x6d6a8e), cStoneD = col(0x4a4768);
     for (const [s, dir] of [[tunnelS[0], 1], [tunnelS[1], -1]]) {
       const i = Math.round(s / ds);
       const f = frame(s);
@@ -1529,7 +1622,6 @@ export function buildTrack(scene, quality = {}) {
       const sideAx = dir > 0 ? f.right.clone() : f.right.clone().negate();
       const signC = faceP.clone(); signC.y += tp.wallH + tp.rise + 1.6;
       addBox(sb, signC, sideAx, UP, back, Math.min(9, topW), 1.1, 0.25, cStoneD, WHITE, REG.tunel, C.white);
-      void cGlow;
     }
   }
 
@@ -1634,7 +1726,7 @@ export function buildTrack(scene, quality = {}) {
   {
     const i0 = Math.ceil(tunnelS[0] / ds), i1 = Math.floor(tunnelS[1] / ds);
     const cyan = col(0x39f3ff), mag = col(0xff4fd8), gold = col(0xffd23f);
-    const strip = (latFn, h0, h1, color, faceIn) => {
+    const strip = (latFn, h0, h1, color) => {
       for (let i = i0; i < i1; i++) {
         const n = i + 1;
         const v0 = glowB.count;
@@ -1644,7 +1736,6 @@ export function buildTrack(scene, quality = {}) {
           glowB.vert(va.x, va.y, va.z, 0, 1, 0, color, 0, 0);
         }
         glowB.idx.push(v0, v0 + 1, v0 + 2, v0, v0 + 2, v0 + 3, v0, v0 + 2, v0 + 1, v0, v0 + 3, v0 + 2);
-        void faceIn;
       }
     };
     // topo das muretas (linha ciano) e faixas na base do arco
@@ -1757,7 +1848,6 @@ export function buildTrack(scene, quality = {}) {
     };
     const addPlanet = (rect, s, side, radius, h, tilt, spin) => {
       const i = Math.round(s / ds);
-      const tp = tunnelProfile(s, WD[i]);
       const l = side * (WD[i] + 4.6);
       const m = new THREE.Mesh(sphereGeo(rect), pmat);
       m.position.set(X[i] + RX[i] * l, Y[i] + h, Z[i] + RZ[i] * l);
@@ -1766,7 +1856,6 @@ export function buildTrack(scene, quality = {}) {
       m.userData.spin = spin;
       group.add(m);
       planets.push(m);
-      void tp;
       return m;
     };
     const sA = (bayA[0] + bayA[1]) / 2, sB = (bayB[0] + bayB[1]) / 2;
@@ -2002,14 +2091,15 @@ export function buildTrack(scene, quality = {}) {
     // círculo sobre a reta de Tesla com um looping por volta
     const sMid = lerp(tunnelS[1], ctrlS[28], 0.55);
     const f = frame(sMid);
-    const center = f.pos.clone().addScaledVector(f.right, 38);
-    const R = 62, alt = f.pos.y + 30, loopR = 13, speed = 17;
+    const center = f.pos.clone().addScaledVector(f.right, -32);
+    const R = 58, alt = f.pos.y + 19, loopR = 11, speed = 16;
     const circ = TAU * R;
     const loopLen = TAU * loopR;
     const loopAt = circ * 0.35;
     return { center, R, alt, loopR, speed, circ, loopLen, loopAt, total: circ + loopLen, d: 0 };
   })();
   const fl = { p: new THREE.Vector3(), p2: new THREE.Vector3(), fwd: new THREE.Vector3(), up: new THREE.Vector3(), x: new THREE.Vector3(), mat: new THREE.Matrix4() };
+  const flInfo = { cx: 0, sz: 0 };
   function flightPos(d, out) {
     const F = flight;
     d = ((d % F.total) + F.total) % F.total;
@@ -2026,12 +2116,13 @@ export function buildTrack(scene, quality = {}) {
     // tangente do círculo (sentido de avanço)
     const tx = -sz, tz = cx;
     out.set(F.center.x + cx * F.R + tx * lx, F.alt + ly + Math.sin(ang * 2) * 2, F.center.z + sz * F.R + tz * lx);
-    return { inLoop: ly > 0 || (d >= F.loopAt && d < F.loopAt + F.loopLen), tau: ly, cx, sz };
+    flInfo.cx = cx; flInfo.sz = sz;
+    return flInfo;
   }
   function updatePlane(dt) {
     flight.d += flight.speed * dt;
-    const info = flightPos(flight.d, fl.p);
     flightPos(flight.d + 0.6, fl.p2);
+    const info = flightPos(flight.d, fl.p);
     fl.fwd.subVectors(fl.p2, fl.p).normalize();
     const F = flight;
     const dd = ((flight.d % F.total) + F.total) % F.total;
@@ -2065,7 +2156,8 @@ export function buildTrack(scene, quality = {}) {
       arcGlow.material.size = 7 + Math.random() * 4;
     }
     updatePlane(dt);
-    for (const p of planets) {
+    for (let k = 0; k < planets.length; k++) {
+      const p = planets[k];
       p.rotation.y += dt * p.userData.spin;
       const o = p.userData.orbit;
       if (o) {
@@ -2118,67 +2210,82 @@ export function buildTrack(scene, quality = {}) {
 // 14-bis: caixa-canard na frente, asas em células de pipa, motor e hélice empurrando atrás.
 function buildBiplane(hi, material, WHITE) {
   const b = new Builder();
-  const fabric = col(0xf6ead0), bamboo = col(0x9b6a3a), dark = col(0x3a3a3a), metal = col(0x9aa0a8);
+  const fabric = col(0xf6ead0), fabric2 = col(0xeadbb8), bamboo = col(0x9b6a3a), dark = col(0x3a3a3a), metal = col(0x9aa0a8);
   const m = new THREE.Matrix4();
   const bx = new THREE.BoxGeometry(1, 1, 1);
-  const cyl = new THREE.CylinderGeometry(1, 1, 1, 8, 1);
+  const cyl = new THREE.CylinderGeometry(1, 1, 1, hi ? 6 : 4, 1);
+  const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
   const addB = (x, y, z, sx, sy, sz, c, rx = 0, ry = 0, rz = 0) => {
-    m.compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
+    m.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz)), _s.set(sx, sy, sz));
     b.geo(bx, m, c, null, WHITE);
   };
-  const addRod = (a, c2, r, c) => {
-    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...c2);
-    const mid = A.clone().add(B).multiplyScalar(0.5);
-    const dir = B.clone().sub(A);
-    const len = dir.length();
-    const qq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
-    m.compose(mid, qq, new THREE.Vector3(r, len, r));
+  const A = new THREE.Vector3(), B2 = new THREE.Vector3(), D = new THREE.Vector3(), Yv = new THREE.Vector3(0, 1, 0);
+  const rod = (a, c2, r, c) => {
+    A.set(a[0], a[1], a[2]); B2.set(c2[0], c2[1], c2[2]);
+    D.subVectors(B2, A);
+    const len = D.length();
+    _q.setFromUnitVectors(Yv, D.normalize());
+    m.compose(_p.addVectors(A, B2).multiplyScalar(0.5), _q, _s.set(r, len, r));
     b.geo(cyl, m, c, null, WHITE);
   };
-  // asas principais (atrás): duas superfícies com diedro, divididas em células
-  const span = 5.8, chord = 2.4, gap = 1.9, dihedral = 0.17;
+  // asas principais (atrás): duas superfícies com diedro, divididas em 3 células de cada lado
+  const span = 5.9, chord = 2.3, gap = 1.9, dih = 0.16, wz = -1.2;
+  const yAt = (x) => Math.abs(x) * dih;
   for (const side of [-1, 1]) {
     for (const lvl of [0, 1]) {
-      const y = lvl * gap;
-      const cx = side * (span / 2 + 0.4);
-      addB(cx, y + Math.abs(cx) * dihedral, -1.2, span, 0.06, chord, fabric, 0, 0, -side * dihedral);
+      const cx = side * (0.35 + span / 2);
+      addB(cx, lvl * gap + yAt(cx), wz, span, 0.05, chord, lvl ? fabric : fabric2, 0, 0, -side * dih);
+      // longarina do bordo de ataque
+      rod([side * 0.35, lvl * gap + yAt(0.35), wz + chord / 2], [side * (0.35 + span), lvl * gap + yAt(0.35 + span), wz + chord / 2], 0.05, bamboo);
     }
-    // painéis verticais das células (raiz, meio, ponta)
-    for (const f of [0.08, 0.5, 0.95]) {
-      const x = side * (0.4 + f * span);
-      addB(x, gap / 2 + Math.abs(x) * dihedral, -1.2, 0.05, gap, chord, fabric);
+    for (const f of [0, 1 / 3, 2 / 3, 1]) {
+      const x = side * (0.35 + f * span);
+      addB(x, gap / 2 + yAt(x), wz, 0.04, gap, chord, fabric);
     }
   }
-  // corpo: longarinas até a caixa-canard na frente
-  addRod([0, 0.6, -2.2], [0, 0.9, 6.2], 0.07, bamboo);
-  addRod([0, 1.5, -2.2], [0, 1.2, 6.2], 0.07, bamboo);
-  addRod([0.25, 0.6, -2.2], [0, 0.9, 6.2], 0.05, bamboo);
-  addRod([-0.25, 0.6, -2.2], [0, 0.9, 6.2], 0.05, bamboo);
-  addB(0, 1.05, 2.2, 0.4, 0.9, 5.5, fabric);
+  // fuselagem: treliça de bambu até a caixa-canard
+  const zc = 6.6;
+  const tail = [[0.28, 0.45], [-0.28, 0.45], [0.28, 1.45], [-0.28, 1.45]];
+  const head = [[0.14, 0.75], [-0.14, 0.75], [0.14, 1.15], [-0.14, 1.15]];
+  for (let k = 0; k < 4; k++) rod([tail[k][0], tail[k][1], -2.2], [head[k][0], head[k][1], zc - 0.9], 0.045, bamboo);
+  for (let t = 0.15; t < 0.95; t += 0.2) {
+    const z = lerp(-2.2, zc - 0.9, t);
+    const w = lerp(0.28, 0.14, t), y0 = lerp(0.45, 0.75, t), y1 = lerp(1.45, 1.15, t);
+    rod([-w, y0, z], [w, y0, z], 0.03, bamboo);
+    rod([-w, y1, z], [w, y1, z], 0.03, bamboo);
+    rod([w, y0, z], [w, y1, z], 0.03, bamboo);
+    rod([-w, y0, z], [-w, y1, z], 0.03, bamboo);
+  }
+  // pano cobrindo a parte da frente da fuselagem
+  addB(0, 0.95, 3.6, 0.3, 0.42, 3.4, fabric2);
   // caixa-canard (pipa de caixa)
-  const cz = 6.8;
-  addB(0, 2.0, cz, 2.2, 0.05, 1.8, fabric);
-  addB(0, 0.3, cz, 2.2, 0.05, 1.8, fabric);
-  addB(-1.1, 1.15, cz, 0.05, 1.7, 1.8, fabric);
-  addB(1.1, 1.15, cz, 0.05, 1.7, 1.8, fabric);
-  // motor e piloto (cesto na frente das asas)
-  addB(0, 1.0, -2.3, 0.7, 0.6, 0.9, dark);
-  addB(0, 0.3, 0.6, 0.8, 0.7, 0.8, bamboo);
-  m.compose(new THREE.Vector3(0, 1.05, 0.6), new THREE.Quaternion(), new THREE.Vector3(0.25, 0.25, 0.25));
+  const cw = 1.0, ch = 0.8, cd = 0.85;
+  addB(0, 0.95 + ch, zc, cw * 2, 0.04, cd * 2, fabric);
+  addB(0, 0.95 - ch, zc, cw * 2, 0.04, cd * 2, fabric);
+  addB(-cw, 0.95, zc, 0.04, ch * 2, cd * 2, fabric);
+  addB(cw, 0.95, zc, 0.04, ch * 2, cd * 2, fabric);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) rod([sx * cw, 0.95 + sy * ch, zc - cd], [sx * cw, 0.95 + sy * ch, zc + cd], 0.03, bamboo);
+  // motor, hélice atrás; cesto do piloto à frente das asas
+  addB(0, 1.0, -2.4, 0.6, 0.55, 0.8, dark);
+  addB(0, 1.0, -2.0, 0.35, 0.3, 0.25, metal);
+  addB(0, 0.45, 0.4, 0.75, 0.6, 0.75, bamboo);
+  m.compose(_p.set(0, 1.12, 0.4), _q.identity(), _s.set(0.22, 0.24, 0.22));
   b.geo(new THREE.SphereGeometry(1, 8, 6), m, col(0xe8b98f), null, WHITE);
-  addB(0, 0.75, 0.6, 0.35, 0.5, 0.25, col(0x2e3a4f));
-  addB(0, 1.28, 0.6, 0.5, 0.06, 0.5, col(0xf1e3b8));
-  addB(0, 1.38, 0.6, 0.3, 0.16, 0.3, col(0xf1e3b8));
-  // rodas
+  addB(0, 0.82, 0.4, 0.34, 0.45, 0.24, col(0x2e3a4f));
+  addB(0, 1.3, 0.4, 0.46, 0.05, 0.46, col(0xf1e3b8));
+  addB(0, 1.4, 0.4, 0.28, 0.16, 0.28, col(0xf1e3b8));
+  addB(0, 1.34, 0.4, 0.3, 0.04, 0.3, col(0x3a2a1a));
+  // trem de pouso
   for (const side of [-1, 1]) {
-    addRod([side * 0.8, -0.1, -0.8], [side * 0.8, 0.5, -1.2], 0.05, metal);
-    m.compose(new THREE.Vector3(side * 0.8, -0.3, -0.8), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2)), new THREE.Vector3(0.35, 0.1, 0.35));
+    rod([side * 0.7, -0.35, -0.7], [side * 0.5, 0.02, -1.0], 0.04, metal);
+    rod([side * 0.7, -0.35, -0.7], [side * 0.4, 0.02, -0.2], 0.04, metal);
+    m.compose(_p.set(side * 0.72, -0.4, -0.7), _q.setFromEuler(_e.set(0, 0, Math.PI / 2)), _s.set(0.34, 0.08, 0.34));
     b.geo(cyl, m, dark, null, WHITE);
   }
   // escoras entre as asas
-  for (const side of [-1, 1]) for (const f of [0.3, 0.75]) {
-    const x = side * (0.4 + f * span);
-    addRod([x, Math.abs(x) * dihedral, -0.3], [x, gap + Math.abs(x) * dihedral, -0.3], 0.03, bamboo);
+  for (const side of [-1, 1]) for (const f of [1 / 3, 2 / 3]) {
+    const x = side * (0.35 + f * span);
+    rod([x, yAt(x), wz - chord / 2 + 0.1], [x, gap + yAt(x), wz + chord / 2 - 0.1], 0.025, bamboo);
   }
   const geo = b.build();
   const group = new THREE.Group();
@@ -2188,16 +2295,15 @@ function buildBiplane(hi, material, WHITE) {
   group.add(body);
   // hélice (duas pás) atrás do motor
   const pb = new Builder();
-  m.compose(new THREE.Vector3(0, 0, 0), new THREE.Quaternion(), new THREE.Vector3(2.6, 0.22, 0.06));
+  m.compose(_p.set(0, 0, 0), _q.identity(), _s.set(2.5, 0.2, 0.05));
   pb.geo(bx, m, col(0x8b4a22), null, WHITE);
-  m.compose(new THREE.Vector3(0, 0, 0), new THREE.Quaternion(), new THREE.Vector3(0.2, 0.2, 0.2));
+  m.compose(_p.set(0, 0, 0), _q.setFromEuler(_e.set(Math.PI / 2, 0, 0)), _s.set(0.14, 0.2, 0.14));
   pb.geo(cyl, m, dark, null, WHITE);
   const pgeo = pb.build();
   const prop = new THREE.Mesh(pgeo, material);
-  prop.position.set(0, 1.0, -2.85);
+  prop.position.set(0, 1.0, -2.9);
   group.add(prop);
   group.scale.setScalar(1.25);
   const disposables = [geo, pgeo, bx, cyl];
-  void hi;
   return { group, prop, disposables };
 }

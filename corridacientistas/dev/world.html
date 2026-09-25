@@ -63,6 +63,16 @@ if (params.get('kart') !== '0') {
   scene.add(boxes);
 }
 
+// Sobreposição de depuração: trajetória ideal (amarelo), aceleradores (ciano), rampas (laranja), caixas (rosa)
+if (params.get('rl') === '1') {
+  const pts = [];
+  for (let s = 0; s <= track.length; s += 2) { const p = track.sample(s); const l = track.racingLine(s); pts.push(p.pos.clone().addScaledVector(p.right, l).add(new THREE.Vector3(0, 0.6, 0))); }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffff00, depthTest: false }));
+  line.renderOrder = 99; scene.add(line);
+  const mk = (arr, color, h) => arr.forEach((o) => { const p = track.sample(o.s); const m = new THREE.Mesh(new THREE.BoxGeometry(o.width || 2, h, o.length || 2), new THREE.MeshBasicMaterial({ color, depthTest: false })); m.position.copy(p.pos).addScaledVector(p.right, o.lateral || 0); m.position.y += 1; m.rotation.y = Math.atan2(p.tangent.x, p.tangent.z); m.renderOrder = 100; scene.add(m); });
+  mk(track.boostPads, 0x00ffff, 1); mk(track.ramps, 0xff8800, 1);
+  track.itemBoxSlots.forEach((b) => { const m = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), new THREE.MeshBasicMaterial({ color: 0xff44cc, depthTest: false })); m.position.copy(b.pos); m.renderOrder = 100; scene.add(m); });
+}
 // Câmera
 let mode = params.get('view') || 'chase';
 let camS = parseFloat(params.get('s') || '-12');
@@ -169,6 +179,7 @@ window.checkProject = () => {
 
 setView(camS, camLat, mode);
 const hud = document.getElementById('hud');
+if (params.get('hud') === '0') hud.style.display = 'none';
 const clock = new THREE.Clock();
 let frames = 0;
 function frame() {
