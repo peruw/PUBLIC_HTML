@@ -197,6 +197,7 @@ attribute vec3 iDir;
 attribute vec4 iCol;
 attribute vec4 iPar; // tamanho, rotação, forma, núcleo branco
 varying vec2 vUv;
+varying float vQ;
 varying vec4 vCol;
 varying float vHot;
 #include <fog_pars_vertex>
@@ -227,29 +228,37 @@ void main() {
     if (abs(shape - 4.0) < 0.5) c.y *= abs(cos(r * 1.7)) * 0.85 + 0.15; // confete "virando"
     float cs = cos(r);
     float sn = sin(r);
-    mvPosition.xy += vec2(cs * c.x - sn * c.y, sn * c.x + cs * c.y) * size;
-    // puxa o sprite para a câmera (mesmo tamanho na tela) para não ser cortado pelo chão
-    float zo = iPar.x < 0.0 ? 0.0 : min(size * 0.45, max(0.0, -mvPosition.z - 0.6));
+    vec2 off = vec2(cs * c.x - sn * c.y, sn * c.x + cs * c.y) * size;
+    mvPosition.xy += off;
+    // puxa o sprite para a câmera (mesmo tamanho na tela) para não ser cortado pelo chão.
+    // Tamanho negativo: só a metade de baixo vem para a frente (o centro fica atrás de malhas).
+    // Tamanho e núcleo negativos: sem deslocamento nenhum.
+    float zo = iPar.x < 0.0 ? (iPar.w < 0.0 ? 0.0 : max(0.0, -off.y)) : size * 0.45;
+    zo = min(zo, max(0.0, -mvPosition.z - 0.6));
     float zn = mvPosition.z + zo;
     mvPosition.xy *= zn / mvPosition.z;
     mvPosition.z = zn;
   }
   vec2 cell = vec2(mod(shape, 4.0), floor(shape / 4.0 + 0.01));
-  vUv = (cell + vec2(position.x + 0.5, 0.5 - position.y) * 0.97 + 0.015) / vec2(4.0, 2.0);
+  vec2 uv = (cell + vec2(position.x + 0.5, 0.5 - position.y) * 0.97 + 0.015) / vec2(4.0, 2.0);
   vCol = iCol;
   vHot = iPar.w;
   gl_Position = projectionMatrix * mvPosition;
+  // uv afim na tela (vértices com profundidades diferentes não distorcem a textura)
+  vUv = uv * gl_Position.w;
+  vQ = gl_Position.w;
   #include <fog_vertex>
 }`;
 
 const SPRITE_FS = /* glsl */ `
 uniform sampler2D uMap;
 varying vec2 vUv;
+varying float vQ;
 varying vec4 vCol;
 varying float vHot;
 #include <fog_pars_fragment>
 void main() {
-  vec4 t = texture2D(uMap, vUv);
+  vec4 t = texture2D(uMap, vUv / vQ);
   float a = vCol.a * t.a;
   if (a < 0.004) discard;
   vec3 col = mix(vCol.rgb, vec3(1.0), clamp(t.a * t.a * t.a * vHot, 0.0, 1.0));
@@ -288,7 +297,8 @@ export class SpriteBatch {
     this.aDir = dynAttr(g, 'iDir', 3, max);
     this.aCol = dynAttr(g, 'iCol', 4, max);
     this.aPar = dynAttr(g, 'iPar', 4, max);
-    this._ranges = [this.aPos, this.aDir, this.aCol, this.aPar].map(() => ({ start: 0, count: 0 }));
+    this._attrs = [this.aPos, this.aDir, this.aCol, this.aPar];
+    this._ranges = this._attrs.map(() => ({ start: 0, count: 0 }));
     g.instanceCount = 0;
     this.geometry = g;
     const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uMap: { value: null } }]);
@@ -333,7 +343,7 @@ export class SpriteBatch {
     this.geometry.instanceCount = n;
     this.mesh.visible = n > 0;
     if (!n) return;
-    const attrs = [this.aPos, this.aDir, this.aCol, this.aPar];
+    const attrs = this._attrs;
     for (let k = 0; k < 4; k++) {
       const a = attrs[k];
       const r = this._ranges[k];
@@ -1321,29 +1331,9 @@ export class Effects {
         }
         break;
       }
-      case 'trail': {
-        // rastro entre opts.from e pos
-        const from = opts.from || pos;
-        const dist = from.distanceTo(pos);
-        const spacing = opts.spacing ?? 0.45;
-        const n = Math.min(10, Math.max(1, Math.ceil(dist / spacing)));
-        const life = opts.life ?? 0.3;
-        const size = opts.size ?? 0.5;
-        const c0 = opts.color ?? 0xffffff;
-        const c1 = opts.color2 ?? c0;
-        for (let i = 0; i < n; i++) {
-          const f = (i + 1) / n;
-          e.reset().col(c0, c1);
-          e.x = from.x + (pos.x - from.x) * f + rand(-0.06, 0.06);
-          e.y = from.y + (pos.y - from.y) * f + rand(-0.06, 0.06);
-          e.z = from.z + (pos.z - from.z) * f + rand(-0.06, 0.06);
-          e.life = life * rand(0.8, 1.1); e.s0 = size; e.s1 = size * 0.3; e.hot = opts.hot ?? 0.4;
-          e.a = opts.alpha ?? 0.8;
-          e.vel(rand(-0.3, 0.3), rand(-0.1, 0.4), rand(-0.3, 0.3));
-          this.add.spawn(e);
-        }
+      case 'trail':
+        this.trail(opts.from || pos, pos, opts.color ?? 0xffffff, opts.color2, opts.size, opts.life, opts.spacing, opts.alpha, opts.hot);
         break;
-      }
       case 'glow': {
         e.reset().at(pos).col(opts.color ?? 0xffffff);
         e.life = opts.life ?? 0.2; e.s0 = opts.size ?? 1.5; e.s1 = opts.size1 ?? e.s0 * 1.4;
@@ -1353,6 +1343,23 @@ export class Effects {
       }
       default:
         break;
+    }
+  }
+
+  // Rastro de brilhos entre dois pontos (sem objeto de opções: usado todo quadro pelos projéteis).
+  trail(from, to, color = 0xffffff, color2, size = 0.5, life = 0.3, spacing = 0.45, alpha = 0.8, hot = 0.4) {
+    const e = this._e;
+    const dist = from.distanceTo(to);
+    const n = Math.min(10, Math.max(1, Math.ceil(dist / spacing)));
+    for (let i = 0; i < n; i++) {
+      const f = (i + 1) / n;
+      e.reset().col(color, color2 ?? color);
+      e.x = from.x + (to.x - from.x) * f + rand(-0.06, 0.06);
+      e.y = from.y + (to.y - from.y) * f + rand(-0.06, 0.06);
+      e.z = from.z + (to.z - from.z) * f + rand(-0.06, 0.06);
+      e.life = life * rand(0.8, 1.1); e.s0 = size; e.s1 = size * 0.3; e.hot = hot; e.a = alpha;
+      e.vel(rand(-0.3, 0.3), rand(-0.1, 0.4), rand(-0.3, 0.3));
+      this.add.spawn(e);
     }
   }
 
@@ -1498,8 +1505,8 @@ export class Effects {
             if (vel) { e.vx += vel.x * 0.9; e.vy += vel.y * 0.9; e.vz += vel.z * 0.9; }
             e.c0.copy(PAL.flameHot).lerp(st.tint, 0.4);
             e.c1.copy(st.tint).multiplyScalar(0.75); e.useC1 = true;
-            e.life = rand(0.12, 0.24); e.s0 = rand(0.35, 0.5) * sc; e.s1 = 0.1 * sc;
-            e.drag = 2; e.hot = 0.25; e.a = 0.75; e.shape = SHAPE.GLOW;
+            e.life = rand(0.12, 0.24); e.s0 = rand(0.3, 0.44) * sc; e.s1 = 0.1 * sc;
+            e.drag = 2; e.hot = 0.2; e.a = 0.55; e.shape = SHAPE.GLOW;
             this.add.spawn(e);
           }
           // brilho quente na saída
@@ -1726,7 +1733,7 @@ export class Effects {
 
   // Raio da Bobina de Tesla em cada adversário atingido.
   _lightning(by) {
-    this.flash(0xd0b8ff, 0.35, 0.55);
+    this.flash(0xd0b8ff, 0.35, 0.45);
     const karts = this.world?.karts;
     if (!karts) return;
     for (const k of karts) {

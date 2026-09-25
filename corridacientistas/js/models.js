@@ -334,8 +334,8 @@ class Builder {
     this.n = 0;
     this.base = new THREE.Matrix4();
   }
-  setBase(x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
-    this.base.compose(_p.set(x, y, z), _q.setFromEuler(_eu.set(rx, ry, rz)), _sc.set(1, 1, 1));
+  setBase(x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, s = 1) {
+    this.base.compose(_p.set(x, y, z), _q.setFromEuler(_eu.set(rx, ry, rz)), _sc.set(s, s, s));
     return this;
   }
   seg(r) {
@@ -559,23 +559,23 @@ const HEADS = {
     hairCap(b, W, 1.42, 0.62, 1.08);
     // topo repartido ao meio
     for (const s of [1, -1]) b.blob(W, [s * 0.11, 0.2, 0.0], [0.17, 0.13, 0.22], [0.1, 0, -s * 0.45]);
-    // cachos da peruca caindo até os ombros
-    const cols = [1.15, 1.62, 2.12, 2.62];
-    for (const s of [1, -1]) {
-      cols.forEach((yaw, ci) => {
-        for (let k = 0; k < 4; k++) {
-          const rad = 0.275 + k * 0.035;
-          const y = 0.08 - k * 0.135 - (ci === 0 ? 0.03 : 0);
-          const rr = 0.105 - k * 0.004 + (r() - 0.5) * 0.012;
-          b.blob((k + ci) % 3 === 0 ? W2 : (k + ci) % 3 === 1 ? W : W3, [s * Math.sin(yaw) * rad, y, Math.cos(yaw) * rad - 0.03], rr, null, { ol: 0.011 });
-        }
-      });
+    // cachos da peruca caindo até os ombros (fileiras desencontradas)
+    const tone = [W2, W, W3, W];
+    for (let k = 0; k < 4; k++) {
+      const n = k % 2 ? 8 : 9;
+      for (let i = 0; i < n; i++) {
+        const u = (i + (k % 2 ? 0.5 : 0)) / 8;
+        const yaw = 1.12 + u * (TAU - 2.24) + (r() - 0.5) * 0.12;
+        const rad = 0.27 + k * 0.036 + (r() - 0.5) * 0.015;
+        const y = 0.09 - k * 0.13 + (r() - 0.5) * 0.03 - (Math.abs(Math.cos(yaw)) > 0.3 && Math.cos(yaw) > 0 ? 0.03 : 0);
+        const rr = 0.1 - k * 0.004 + (r() - 0.5) * 0.02;
+        b.blob(tone[(i + k * 3) % 4], [Math.sin(yaw) * rad, y, Math.cos(yaw) * rad - 0.03], [rr, rr * 1.12, rr], null, { ol: 0.011 });
+      }
     }
-    for (let k = 0; k < 4; k++) b.blob(k % 2 ? W : W2, [0, 0.08 - k * 0.135, -0.3 - k * 0.035], 0.105 - k * 0.004, null, { ol: 0.011 });
     // cachinhos no alto da nuca
-    for (let i = 0; i < 5; i++) {
-      const yaw = Math.PI + (i - 2) * 0.55;
-      b.blob(i % 2 ? W2 : W, [Math.sin(yaw) * 0.25, 0.2, Math.cos(yaw) * 0.25 - 0.02], 0.09, null, { ol: 0.011 });
+    for (let i = 0; i < 6; i++) {
+      const yaw = Math.PI + (i - 2.5) * 0.5;
+      b.blob(i % 2 ? W2 : W, [Math.sin(yaw) * 0.24, 0.21 + (r() - 0.5) * 0.03, Math.cos(yaw) * 0.24 - 0.02], 0.085, null, { ol: 0.011 });
     }
   },
 
@@ -661,8 +661,8 @@ const HEADS = {
     // barba pontuda: casca lisa na mandíbula + ponta
     const [cw, ch] = b.detail > 0 ? [22, 8] : [14, 5];
     b.add(jawShellG(-0.5, -0.02, -1.3, cw, ch), HB, [0, 0, 0], null, [HR * 1.06, HR * 1.05, HR * 1.1], { ol: 0.01 });
-    b.cone(HB, [0, -0.25, 0.19], [0, -0.55, 0.27], 0.11, 8, { ol: 0.01 });
-    b.blob(HG, [0.045, -0.34, 0.25], [0.025, 0.08, 0.02], [0.3, 0, 0.25], { ol: 0 });
+    b.cone(HB, [0, -0.24, 0.2], [0, -0.48, 0.28], 0.105, 8, { ol: 0.01 });
+    b.blob(HG, [0.04, -0.32, 0.25], [0.022, 0.06, 0.02], [0.3, 0, 0.25], { ol: 0 });
     mustache(b, HB, { w: 0.08, h: 0.036, tilt: 0.5, p: -0.24, yaw: 0.12 });
   },
 
@@ -829,17 +829,22 @@ function kartBody(b, C, num) {
   b.box(A, [0, 0.56, 0.43], [0.64, 0.05, 0.2], 0.02, [0.25, 0, 0], { ol: 0.008 });
   b.cyl(DARK, [0, 0.54, 0.4], [SW_POS.x, SW_POS.y, SW_POS.z], 0.028);
   // laterais (pontões)
+  const numZ = C.id === 'einstein' ? 0.23 : 0.14;
   for (const s of [1, -1]) {
     b.box(K, [s * 0.44, 0.33, -0.06], [0.22, 0.3, 0.86], 0.06);
     b.box(A, [s * 0.44, 0.49, -0.06], [0.2, 0.04, 0.8], 0.02, null, { ol: 0.008 });
-    b.decal(numUV, [s * 0.553, 0.33, 0.14], [0, s * Math.PI / 2, 0], 0.2, 0.2, true);
+    b.decal(numUV, [s * 0.553, 0.33, numZ], [0, s * Math.PI / 2, 0], 0.2, 0.2, true);
   }
   // traseira + banco
   b.box(K, [0, 0.35, -0.62], [0.84, 0.28, 0.46], 0.1);
   b.box(SEAT, [0, 0.31, -0.33], [0.46, 0.09, 0.38], 0.04, null, { ol: 0 });
   b.box(SEAT, [0, 0.64, -0.53], [0.52, 0.52, 0.1], 0.05, [-0.2, 0, 0]);
   b.box(A, [0, 0.9, -0.58], [0.5, 0.06, 0.1], 0.03, [-0.2, 0, 0], { ol: 0.008 });
-  b.decal(numUV, [0, 0.66, -0.59], [-0.2, Math.PI, 0], 0.24, 0.24, true);
+  // encosto: emblema do cientista (a câmera de perseguição vê)
+  const back = [0, 0.747, -0.607], backR = [-0.2, Math.PI, 0];
+  if (C.id === 'einstein') b.decal(cellUV(1, 0, 4, 1), back, backR, 0.46, 0.115);
+  else if (C.id === 'dumont') b.decal(cellUV(5, 0, 2, 1), back, backR, 0.34, 0.17);
+  else b.decal(cellUV(EMBLEM[C.id] ?? 0, 2), back, backR, 0.23, 0.23, true);
   b.decal(numUV, [0, 0.458, 0.62], [-Math.PI / 2 + 0.07, 0, 0], 0.2, 0.2, true);
   // motor e escapamentos (pontas em (±0.3, 0.45, -0.95))
   b.box(METAL, [0, 0.55, -0.76], [0.44, 0.2, 0.28], 0.05);
@@ -950,7 +955,7 @@ const KART_EXTRAS = {
     b.decal(cellUV(EMBLEM.mendeleev, 2), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
   },
   einstein(b) {
-    for (const s of [1, -1]) b.decal(cellUV(1, 0, 4, 1), [s * 0.553, 0.36, -0.22], [0, s * Math.PI / 2, 0], 0.4, 0.1);
+    for (const s of [1, -1]) b.decal(cellUV(1, 0, 4, 1), [s * 0.553, 0.33, -0.15], [0, s * Math.PI / 2, 0], 0.54, 0.135);
     // quadro-negro? não: um pequeno átomo no painel
     b.decal(cellUV(EMBLEM.einstein, 2), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
   },
@@ -972,34 +977,35 @@ const KART_EXTRAS = {
   darwin(b, C, ext) {
     // galhinho-poleiro e corpo do tentilhão (a cabeça é separada)
     const TW = 0x6b4a2b;
-    b.cyl(TW, [0.33, 0.48, -0.66], [0.34, 0.72, -0.66], 0.022, 0.018, 6);
-    b.cyl(TW, [0.24, 0.72, -0.66], [0.44, 0.74, -0.64], 0.017, 0.015, 6);
-    b.ell(0x3a9d4e, [0.43, 0.76, -0.64], [0.03, 0.012, 0.02], [0, 0, 0.6], { ol: 0 });
-    b.setBase(0.34, 0.8, -0.66, 0, 0.9, 0);
+    b.cyl(TW, [0.33, 0.48, -0.66], [0.34, 0.7, -0.66], 0.024, 0.02, 6);
+    b.cyl(TW, [0.22, 0.7, -0.66], [0.46, 0.72, -0.64], 0.018, 0.016, 6);
+    b.ell(0x3a9d4e, [0.45, 0.745, -0.64], [0.035, 0.014, 0.022], [0, 0, 0.6], { ol: 0 });
+    b.setBase(0.34, 0.795, -0.66, 0, 0.9, 0, 1.3);
     b.ell(0x7a5a3c, [0, 0, 0], [0.07, 0.075, 0.095], [-0.45, 0, 0]);
     b.ell(0xd9b98a, [0, -0.02, 0.035], [0.05, 0.055, 0.055], [-0.4, 0, 0], { ol: 0 });
     for (const s of [1, -1]) b.ell(0x5a4330, [s * 0.055, 0.005, -0.015], [0.022, 0.05, 0.08], [-0.5, 0, 0], { ol: 0.006 });
     b.box(0x4a3626, [0, -0.04, -0.12], [0.06, 0.015, 0.1], 0.006, [0.6, 0, 0], { ol: 0.006 });
     for (const s of [1, -1]) b.cyl(0x8a6a4a, [s * 0.02, -0.06, 0.0], [s * 0.02, -0.075, 0.01], 0.008, 0.008, 4, { ol: 0 });
     b.setBase();
-    ext.finch = { pos: [0.34 + 0.05 * Math.sin(0.9), 0.845, -0.66 + 0.05 * Math.cos(0.9)], yaw: 0.9 };
+    ext.finch = { pos: [0.34 + 0.065 * Math.sin(0.9), 0.858, -0.66 + 0.065 * Math.cos(0.9)], yaw: 0.9, s: 1.3 };
     emblemSides(b, C, cellUV(EMBLEM.darwin, 2));
   },
   dumont(b, C, ext) {
-    // asinhas em caixa (pipa de Hargrave, como no 14-bis)
-    const FAB = 0xf6eedb, WOOD = 0x6b4a2b;
+    // asinhas em caixa (pipa de Hargrave, como no 14-bis): duas células abertas por lado,
+    // com o diedro (inclinação para cima) característico do avião
+    const FAB = 0xf7efd9, WOOD = 0x6b4a2b;
     for (const s of [1, -1]) {
-      const x0 = s * 0.52, x1 = s * 0.86, zc = -0.2, y0 = 0.56, y1 = 0.84;
-      const xm = (x0 + x1) / 2, w = Math.abs(x1 - x0);
-      b.box(FAB, [xm, y1, zc], [w, 0.018, 0.4], 0.008);
-      b.box(FAB, [xm, y0, zc], [w, 0.018, 0.4], 0.008);
-      b.box(FAB, [x1, (y0 + y1) / 2, zc], [0.018, y1 - y0, 0.4], 0.008);
-      b.box(FAB, [xm, (y0 + y1) / 2, zc], [0.014, y1 - y0, 0.4], 0.006, null, { ol: 0.006 });
-      for (const zz of [zc - 0.2, zc + 0.2]) {
-        b.cyl(WOOD, [x1, y0, zz], [x1, y1, zz], 0.012, 0.012, 5, { ol: 0 });
-        b.cyl(WOOD, [x0, y1, zz], [x1, y1, zz], 0.012, 0.012, 5, { ol: 0 });
+      b.setBase(s * 0.5, 0.56, -0.16, 0, 0, s * 0.2);
+      const w = 0.46, h = 0.2, d = 0.34, xm = s * w / 2;
+      b.box(FAB, [xm, h, 0], [w, 0.014, d], 0, null, { ol: 0.008 });
+      b.box(FAB, [xm, 0, 0], [w, 0.014, d], 0, null, { ol: 0.008 });
+      for (const xx of [s * 0.015, s * w * 0.5, s * w]) b.box(FAB, [xx, h / 2, 0], [0.012, h, d], 0, null, { ol: 0.006 });
+      for (const zz of [-d / 2, d / 2]) {
+        for (const yy of [0, h]) b.cyl(WOOD, [0, yy, zz], [s * w, yy, zz], 0.011, 0.011, 5, { ol: 0 });
+        b.cyl(WOOD, [s * w, 0, zz], [s * w, h, zz], 0.011, 0.011, 5, { ol: 0 });
       }
-      b.cyl(WOOD, [s * 0.45, 0.47, zc], [x0, y0, zc], 0.018, 0.018, 5);
+      b.setBase();
+      b.cyl(WOOD, [s * 0.45, 0.47, -0.16], [s * 0.52, 0.57, -0.16], 0.018, 0.018, 5);
     }
     // mastro da hélice
     b.cyl(WOOD, [0, 0.64, -0.8], [0, 0.86, -0.93], 0.03, 0.025);
@@ -1009,7 +1015,7 @@ const KART_EXTRAS = {
   oswaldo(b, C) {
     // microscópio preto e latão
     const BL = 0x1d1f24, BR = 0xc9a54a;
-    b.setBase(0.3, 0.49, -0.66, 0, 0.5, 0);
+    b.setBase(0.3, 0.49, -0.66, 0, 0.5, 0, 1.3);
     b.box(BL, [0, 0.02, 0], [0.18, 0.04, 0.22], 0.015);
     b.cyl(BL, [0, 0.03, -0.07], [0, 0.2, -0.07], 0.03, 0.028);
     b.torus(BL, [0, 0.24, -0.02], [0, Math.PI / 2, 0], 0.07, 0.025, Math.PI * 1.1);
@@ -1160,6 +1166,7 @@ export function createKartModel(characterId, { quality } = {}) {
     finch = mk(parts.extGeo.finch, group, false);
     finch.position.fromArray(parts.ext.finch.pos);
     finch.rotation.y = parts.ext.finch.yaw;
+    finch.scale.setScalar(parts.ext.finch.s || 1);
   }
   if (parts.extGeo.vial) {
     vialMat = new THREE.MeshBasicMaterial({ color: 0x7dff5a });
@@ -1281,11 +1288,11 @@ export function renderPortraits(renderer, size = 256) {
   if (_portraitCache.has(size)) return _portraitCache.get(size);
   const sh = shared();
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a93a8, 1.5));
-  const key = new THREE.DirectionalLight(0xffffff, 2.2);
-  key.position.set(2, 3, 4);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x7a8398, 1.05));
+  const key = new THREE.DirectionalLight(0xfff6ea, 2.0);
+  key.position.set(2.5, 3, 4);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0xfff0dd, 1.2);
+  const rim = new THREE.DirectionalLight(0xdde8ff, 1.3);
   rim.position.set(-3, 2, -3);
   scene.add(rim);
   const cam = new THREE.PerspectiveCamera(24, 1, 0.1, 20);
@@ -1326,12 +1333,12 @@ export function renderPortraits(renderer, size = 256) {
       bust.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(neck);
       const top = Math.min(box.max.y, 1.5) + 0.03;
-      const bottom = 0.28;
+      const bottom = 0.4;
       const cy = (top + bottom) / 2;
       const h = top - bottom;
       const halfW = Math.max(box.max.x, -box.min.x, 0.36);
-      const extent = Math.max(h / 2, halfW * 1.08);
-      const dist = extent / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) + 0.3;
+      const extent = Math.max(h / 2, halfW * 0.98);
+      const dist = extent / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) + 0.25;
       const yaw = 0.5;
       cam.position.set(Math.sin(yaw) * dist, cy + 0.12, Math.cos(yaw) * dist + 0.03);
       cam.lookAt(0, cy, 0.03);

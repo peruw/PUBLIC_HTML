@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste: itens na pista real</title>
+<style>
+  body { margin: 0; background: #000; overflow: hidden; }
+  #hud { position: fixed; left: 8px; top: 8px; color: #fff; font: 12px/1.35 monospace; background: rgba(0,0,0,.45); padding: 6px 8px; border-radius: 6px; white-space: pre; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+// Integração: pista, ambiente, karts, IA, corrida e câmera reais + itens e efeitos.
+import * as THREE from '../js/three.js';
+import { CHARACTERS, CLASSES, QUALITY, ITEM_IDS } from '../js/config.js';
+import { bus } from '../js/events.js';
+import { buildTrack } from '../js/track.js';
+import { buildEnvironment } from '../js/environment.js';
+import { Kart, updateKarts } from '../js/kart.js';
+import { AIDriver } from '../js/ai.js';
+import { ItemSystem } from '../js/items.js';
+import { Effects } from '../js/effects.js';
+import { createKartModel } from '../js/models.js';
+import { CameraRig } from '../js/camera.js';
+import { RaceManager } from '../js/race.js';
+
+const params = new URLSearchParams(location.search);
+const quality = QUALITY[params.get('q') || 'alta'];
+const renderer = new THREE.WebGLRenderer({ antialias: quality.antialias });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, quality.pixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = quality.shadows;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, quality.drawDistance + 400);
+const track = buildTrack(scene, quality);
+const env = buildEnvironment(scene, track, quality, renderer);
+const effects = new Effects({ scene, bus, quality });
+const items = new ItemSystem({ scene, track, bus, effects, quality });
+const counts = {};
+const origEmit = bus.emit.bind(bus);
+bus.emit = (n, d) => { counts[n] = (counts[n] || 0) + 1; origEmit(n, d); };
+
+const karts = CHARACTERS.map((character, index) => {
+  const kart = new Kart({ character, isPlayer: index === 0, model: createKartModel(character.id, { quality }), bus, index });
+  scene.add(kart.object3d);
+  return kart;
+});
+const player = karts[0];
+karts.forEach((k, i) => k.placeAt(track.gridSlots[(i + 5) % 8]));
+const world = { scene, camera, renderer, track, karts, player, items, effects, bus, time: 0, phase: 'countdown', quality, cc: CLASSES['100cc'], totalLaps: 3 };
+const drivers = new Map(karts.map((k) => [k, new AIDriver(k, track, { skill: 0.8 })]));
+const race = new RaceManager({ bus });
+race.start(karts, { laps: 3, player, track, cc: world.cc });
+items.reset(karts);
+effects.reset();
+const rig = new CameraRig(camera);
+rig.follow(player);
+rig.setMode('chase');
+rig.snap();
+
+const STEP = 1 / 60;
+let paused = false;
+let aiItems = params.get('aiitems') !== '0';
+function simulate(h) {
+  for (const [k, ai] of drivers) {
+    ai.update(h, world);
+    if (!aiItems && k !== player) k.controls.useItem = false;
+  }
+  updateKarts(world.karts, h, world);
+  items.update(h, world);
+  race.update(h, world);
+  world.time = race.time;
+  world.phase = race.phase === 'countdown' ? 'countdown' : race.phase === 'finished' ? 'finished' : 'racing';
+}
+function frameFx(dt) {
+  effects.update(dt, world);
+  env.update?.(dt, world.time, camera);
+  track.update?.(dt, world.time);
+  rig.update(dt, world, { lookBack: false });
+}
+const clock = new THREE.Clock();
+let acc = 0;
+const hud = document.getElementById('hud');
+let fcount = 0;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (!paused) {
+    acc += dt;
+    let n = 0;
+    while (acc >= STEP && n < 5) { simulate(STEP); acc -= STEP; n++; }
+    if (n === 5) acc = 0;
+    frameFx(dt);
+  }
+  renderer.render(scene, camera);
+  if (fcount++ % 15 === 0) {
+    hud.textContent = `${race.phase} t=${world.time.toFixed(1)}  jogador: ${player.place}º item=${player.item || (player.roulette ? '[' + player.roulette.showing + ']' : '-')}\n` +
+      `perigos ${items.hazards.length}  partículas ${effects.add.n}+${effects.alpha.n}  draw calls ${renderer.info.render.calls}  tris ${renderer.info.render.triangles}`;
+  }
+});
+
+window.test = {
+  world, items, effects, karts, player, track, counts, race, rig, THREE,
+  pause(b = true) { paused = b; return b; },
+  // avança simulação e efeitos em passos fixos (determinístico)
+  step(sec) { const n = Math.round(sec / STEP); for (let i = 0; i < n; i++) { simulate(STEP); frameFx(STEP); } return n; },
+  use(id, i = 0) { if (id) items.giveItem(karts[i], id); karts[i].controls.useItem = true; },
+  give(id, i = 0) { items.giveItem(karts[i], id); },
+  aiItems(b) { aiItems = b; },
+  state(i = 0) { const k = karts[i]; return { place: k.place, item: k.item, spin: +k.spinTime.toFixed(2), tumble: +k.tumbleTime.toFixed(2), shrink: +k.shrinkTime.toFixed(2), star: +k.starTime.toFixed(2), boost: +k.boostTime.toFixed(2), s: +k.s.toFixed(1), lat: +k.lateral.toFixed(1) }; },
+  drawInfo() {
+    let meshes = 0;
+    const count = (root) => { let n = 0; root.traverseVisible((o) => { if (o.isMesh || o.isPoints || o.isLine) n++; }); return n; };
+    return { itemsVisible: count(items.root), effectsVisible: count(effects.root), calls: renderer.info.render.calls, tris: renderer.info.render.triangles };
+  },
+};
+window.ready = true;
+</script>
+</body>
+</html>

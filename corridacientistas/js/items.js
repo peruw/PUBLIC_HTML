@@ -34,6 +34,7 @@ const _m = new THREE.Matrix4();
 const _s = new THREE.Vector3();
 const _col = new THREE.Color();
 const _v2d = new THREE.Vector2();
+const OPT_SMOKE_S = { scale: 0.35 }; // opções reutilizadas (sem alocar por quadro)
 
 // ---------------------------------------------------------------------------
 // Geometrias procedurais
@@ -238,8 +239,8 @@ void main() {
   vec3 rainbow = hue(fract(h));
   vec3 L = normalize(vec3(0.35, 0.85, 0.4));
   float spec = pow(max(dot(reflect(-v, n), L), 0.0), 28.0);
-  vec3 col = mix(vec3(0.9, 0.95, 1.0), rainbow, 0.9) * (0.4 + fr * 0.9 + edge * 1.4) + spec;
-  float alpha = 0.12 + fr * 0.5 + edge * 0.62 + spec * 0.6;
+  vec3 col = mix(vec3(0.9, 0.95, 1.0), rainbow, 0.9) * (0.5 + fr * 0.9 + edge * 1.4) + spec;
+  float alpha = 0.2 + fr * 0.5 + edge * 0.65 + spec * 0.6;
   if (uBack > 0.5) { alpha *= 0.5; col *= 0.8; }
   gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.95));
   #include <fog_fragment>
@@ -410,13 +411,13 @@ export class ItemSystem {
     for (let i = 0; i < MAX_ELETRON; i++) this.projs.push(mk('eletron'));
     this.alfaMesh = this._instanced(
       nucleusGeometry(0.2, 0.3, 12),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.1, emissive: 0x6a3a00 }),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.1, emissive: 0x3a1400 }),
       MAX_ALFA,
     );
-    this.eCore = this._instanced(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0x8fdcff }), MAX_ELETRON);
+    this.eCore = this._instanced(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0x46b8ff }), MAX_ELETRON);
     this.eRing = this._instanced(
       new THREE.TorusGeometry(0.62, 0.035, 6, 40),
-      new THREE.MeshBasicMaterial({ color: 0x5fd4ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: 0x2f95ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }),
       MAX_ELETRON * 2, 12,
     );
   }
@@ -424,7 +425,7 @@ export class ItemSystem {
   _buildHoles() {
     this.holes = [];
     const coreGeo = new THREE.SphereGeometry(0.6, 24, 16);
-    const coreMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const coreMat = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
     const diskGeo = new THREE.RingGeometry(0.72, 2.3, 64, 1);
     const n = this.lowQ ? 40 : 80;
     const seeds = new Float32Array(n * 4);
@@ -616,6 +617,9 @@ export class ItemSystem {
       if (sc > 0) {
         const pulse = 1 + Math.sin(t * 5 + b.phase) * 0.12;
         this.glows.push(_v.x, _v.y, _v.z, 0, 0, 0, 1, 0.55, 0.35, 0.85, 1.05 * sc * pulse, 0, SHAPE.GLOW, 0.8);
+        // halo arco-íris atrás da caixa (destaca a caixa no cenário)
+        _col.setHSL((t * 0.25 + b.phase * 0.13) % 1, 1, 0.55);
+        this.glows.push(_v.x, _v.y, _v.z, 0, 0, 0, _col.r, _col.g, _col.b, 0.42, -3.0 * sc, 0, SHAPE.GLOW, 0);
       }
       // coleta
       if (b.alive && b.pop > 0.25) {
@@ -631,7 +635,8 @@ export class ItemSystem {
         }
       }
     }
-    for (const m of [this.boxBack, this.boxFront, this.boxNucleus]) { m.count = n; m.visible = visible > 0; }
+    this.boxBack.count = this.boxFront.count = this.boxNucleus.count = n;
+    this.boxBack.visible = this.boxFront.visible = this.boxNucleus.visible = visible > 0;
     this.boxOrbits.count = n * 3;
     this.boxElectrons.count = n * 3;
     this.boxOrbits.visible = this.boxElectrons.visible = visible > 0;
@@ -784,11 +789,11 @@ export class ItemSystem {
       r.flame.scale.set(0.15, 0.15, (ending ? 0.4 : 1.25) * fl);
       if (fx) {
         this._rocketNozzle(r, _v);
-        if (!ending) fx.burst('trail', _v, { from: r.prev, color: 0xffb640, color2: 0xff3000, size: 0.75, life: 0.18, spacing: 0.3, hot: 0.4, alpha: 0.7 });
+        if (!ending) fx.trail(r.prev, _v, 0xffb640, 0xff3000, 0.75, 0.18, 0.3, 0.7, 0.4);
         r.smoke += dt;
         if (r.smoke > 0.06) {
           r.smoke = 0;
-          fx.burst('smoke', _v, { scale: 0.35 });
+          fx.burst('smoke', _v, OPT_SMOKE_S);
         }
         r.prev.copy(_v);
       }
@@ -1087,8 +1092,8 @@ export class ItemSystem {
         _m.compose(p.pos, _q, _s);
         this.alfaMesh.setMatrixAt(na++, _m);
         const f = 0.9 + 0.1 * Math.sin(t * 40 + p.spin);
-        this.glows.push(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 1, 0.55, 0.05, 0.8, 2.8 * f * pop, 0, SHAPE.GLOW, 0.5);
-        fx?.burst('trail', p.pos, { from: p.prev, color: 0xffc23a, color2: 0xff4a00, size: 0.75, life: 0.24, spacing: 0.3, alpha: 0.55, hot: 0.25 });
+        this.glows.push(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 1, 0.5, 0.04, 0.85, -3.0 * f * pop, 0, SHAPE.GLOW, 0.35);
+        fx?.trail(p.prev, p.pos, 0xffc23a, 0xff4a00, 0.75, 0.24, 0.3, 0.55, 0.25);
       } else {
         _s.setScalar(pop);
         _q.identity();
@@ -1102,9 +1107,9 @@ export class ItemSystem {
         }
         ne++;
         const f = 0.85 + 0.15 * Math.sin(t * 33 + p.spin);
-        this.glows.push(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.06, 0.4, 1, 0.75, 2.8 * f * pop, 0, SHAPE.GLOW, 0.45);
-        this.glows.push(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.15, 0.55, 1, 0.45, 2.1 * pop, t * 4, SHAPE.RING, 0);
-        fx?.burst('trail', p.pos, { from: p.prev, color: 0x5cc8ff, color2: 0x1d4dff, size: 0.7, life: 0.26, spacing: 0.3, alpha: 0.55, hot: 0.25 });
+        this.glows.push(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.05, 0.35, 1, 0.8, -3.0 * f * pop, 0, SHAPE.GLOW, 0.2);
+        this.glows.push(p.pos.x, p.pos.y, p.pos.z, 0, 0, 0, 0.1, 0.45, 1, 0.45, -2.2 * pop, t * 4, SHAPE.RING, 0);
+        fx?.trail(p.prev, p.pos, 0x5cc8ff, 0x1d4dff, 0.7, 0.26, 0.3, 0.55, 0.25);
       }
     }
     this.alfaMesh.count = na;
@@ -1196,10 +1201,10 @@ export class ItemSystem {
       } else if (h.phase === 'hover') {
         h.t += dt;
         const f = Math.min(1, h.t / 0.7);
-        _v.copy(tg.position).addScaledVector(UP, 4 - 1.3 * f);
+        _v.copy(tg.position).addScaledVector(UP, 4.4 - 0.9 * f);
         h.pos.lerp(_v, 1 - Math.exp(-14 * dt));
         h.heading = tg.heading || h.heading;
-        h.scale = 1 + 1.2 * (f * f * (3 - 2 * f));
+        h.scale = 1 + 0.9 * (f * f * (3 - 2 * f));
         if (h.t >= 0.7) {
           h.phase = 'implode';
           h.t = 0;
@@ -1207,10 +1212,10 @@ export class ItemSystem {
         }
       } else {
         h.t += dt;
-        _v.copy(tg.position).addScaledVector(UP, 2.7);
-        h.pos.lerp(_v, 1 - Math.exp(-14 * dt));
+        _v.copy(tg.position).addScaledVector(UP, 2.6);
+        h.pos.lerp(_v, 1 - Math.exp(-20 * dt));
         const f = Math.min(1, h.t / 0.2);
-        h.scale = 2.2 * (1 - f) * (1 - f) + 0.01;
+        h.scale = 1.9 * (1 - f) * (1 - f) + 0.01;
         if (f >= 1) {
           this._holeBoom(h, karts);
           continue;
@@ -1228,8 +1233,8 @@ export class ItemSystem {
       const s = h.scale;
       const pulse = 1 + 0.08 * Math.sin(this.time * 12);
       // halo roxo atrás da esfera (sem deslocamento: a esfera preta o encobre) + anel de fótons
-      this.glows.push(h.pos.x, h.pos.y, h.pos.z, 0, 0, 0, 0.22, 0.03, 0.6, 0.35, -3.4 * s * pulse, 0, SHAPE.GLOW, 0);
-      this.glows.push(h.pos.x, h.pos.y, h.pos.z, 0, 0, 0, 1, 0.42, 0.08, 0.8, -1.6 * s, this.time * 2, SHAPE.RING, 0.15);
+      this.glows.push(h.pos.x, h.pos.y, h.pos.z, 0, 0, 0, 0.22, 0.03, 0.6, 0.35, -3.4 * s * pulse, 0, SHAPE.GLOW, -1);
+      this.glows.push(h.pos.x, h.pos.y, h.pos.z, 0, 0, 0, 1, 0.42, 0.08, 0.8, -1.6 * s, this.time * 2, SHAPE.RING, -1);
       if (h.age > 20) this._holeBoom(h, karts);
     }
   }

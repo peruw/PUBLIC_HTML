@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arte: áudio</title>
+<style>
+  body { font: 15px system-ui, sans-serif; background: #1c2233; color: #eee; padding: 16px; }
+  button { margin: 3px; padding: 8px 12px; border-radius: 8px; border: 0; background: #3a4a6a; color: #fff; cursor: pointer; }
+  button:hover { background: #4f6390; }
+  h2 { font-size: 16px; margin: 14px 0 6px; }
+  #log { white-space: pre-wrap; font: 12px monospace; opacity: .8; }
+  input[type=range] { width: 240px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<h1>Sons da Corrida dos Cientistas</h1>
+<p>Clique em qualquer botão para liberar o áudio.</p>
+<h2>Músicas</h2><div id="music"></div>
+<h2>Efeitos</h2><div id="sfx"></div>
+<h2>Motor</h2>
+<div>velocidade <input id="spd" type="range" min="0" max="35" value="0"> acelerador <input id="thr" type="range" min="0" max="1" step="0.05" value="0">
+<br><label><input id="drift" type="checkbox"> derrapando</label> nível <input id="lvl" type="range" min="0" max="3" value="0">
+<label><input id="off" type="checkbox"> acostamento</label> <label><input id="boost" type="checkbox"> turbo</label>
+<label><input id="rou" type="checkbox"> roleta</label> <button id="eng">motor liga/desliga</button></div>
+<h2>Eventos do bus</h2><div id="ev"></div>
+<pre id="log"></pre>
+<script type="module">
+import { AudioSystem } from '../js/audio.js';
+import { EventBus } from '../js/events.js';
+
+const bus = new EventBus();
+const audio = new AudioSystem({ bus });
+const SFX = ['countdown', 'go', 'pickup', 'roulette', 'itemGet', 'boost', 'hit', 'throw', 'drop', 'explosion', 'lightning', 'blackhole', 'lap', 'finalLap', 'finish', 'menuMove', 'menuSelect', 'trick', 'bump', 'wall', 'driftLevel', 'hop', 'land'];
+const log = (s) => (document.getElementById('log').textContent += s + '\n');
+const btn = (parent, label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = () => { audio.unlock(); fn(); }; document.getElementById(parent).appendChild(b); };
+for (const m of ['menu', 'race', 'results', null]) btn('music', m ?? 'parar', () => audio.playMusic(m));
+btn('music', 'volta final', () => audio.setFinalLap(true));
+btn('music', 'mudo', () => audio.setMuted(!audio.muted));
+btn('music', 'pausa', () => audio.pauseAll(!audio.paused));
+for (const s of SFX) btn('sfx', s, () => audio.sfx(s));
+
+// Mundo falso com um jogador
+const player = { isPlayer: true, position: { x: 0, y: 0, z: 0 }, speed: 0, maxSpeed: 26, controls: { throttle: 0 }, drifting: false, driftLevel: 0, onGround: true,
+  offroad: false, boostTime: 0, starTime: 0, frozen: false, roulette: null };
+const other = { isPlayer: false, position: { x: 10, y: 0, z: 5 } };
+const camera = { position: { x: 0, y: 2, z: -6 }, matrixWorld: { elements: [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 2, -6, 1] } };
+const world = { player, camera, phase: 'racing', totalLaps: 3, karts: [player, other] };
+let engineOn = false;
+btn('eng', 'x', () => {});
+document.getElementById('eng').onclick = () => { audio.unlock(); engineOn = !engineOn; };
+const $ = (id) => document.getElementById(id);
+function frame() {
+  player.speed = +$('spd').value;
+  player.controls.throttle = +$('thr').value;
+  player.drifting = $('drift').checked;
+  player.driftLevel = +$('lvl').value;
+  player.offroad = $('off').checked;
+  player.boostTime = $('boost').checked ? 1 : 0;
+  player.roulette = $('rou').checked ? { time: 1, showing: ['foguete', 'maca', 'alfa'][Math.floor(performance.now() / 70) % 3] } : null;
+  if (engineOn) audio.update(1 / 60, world);
+  requestAnimationFrame(frame);
+}
+frame();
+const EV = [
+  ['race:countdown', { n: 3 }], ['race:go', {}], ['race:lap', { kart: player, lap: 2 }], ['race:finalLap', { kart: player }],
+  ['race:finish', { kart: player, place: 1, time: 90 }], ['item:pickup', { kart: player }], ['item:got', { kart: player, item: 'alfa' }],
+  ['item:use', { kart: other, item: 'maca' }], ['item:use', { kart: player, item: 'alfa' }], ['item:use', { kart: player, item: 'buraco' }],
+  ['item:explode', { pos: { x: 3, y: 0, z: 4 }, item: 'eletron' }], ['item:lightning', { by: other }], ['item:blackhole', { target: other, pos: other.position }],
+  ['kart:hit', { kart: player, type: 'spin' }], ['kart:hit', { kart: other, type: 'tumble' }], ['kart:boost', { kart: player, source: 'drift' }],
+  ['kart:bump', { a: player, b: other, strength: 4 }], ['kart:wall', { kart: player, strength: 6 }], ['kart:trick', { kart: player }],
+  ['kart:driftLevel', { kart: player, level: 2 }], ['kart:hop', { kart: player }], ['kart:land', { kart: player, airTime: 0.8 }],
+];
+for (const [name, data] of EV) btn('ev', name + (data.item ? ` (${data.item})` : ''), () => { audio.update(0, world); bus.emit(name, data); });
+
+// Teste automático (headless): toca tudo e conta nós/erros
+window.audioTest = async () => {
+  const errors = [];
+  const origErr = console.error;
+  console.error = (...a) => { errors.push(a.join(' ')); origErr(...a); };
+  const ok = audio.unlock();
+  await new Promise((r) => setTimeout(r, 200));
+  const st = audio.ctx.state;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (const s of SFX) { try { audio.sfx(s); } catch (e) { errors.push(`${s}: ${e.message}`); } await wait(60); }
+  for (const m of ['menu', 'race', 'results']) { audio.playMusic(m); await wait(900); }
+  audio.playMusic('race');
+  audio.setFinalLap(true);
+  await wait(400);
+  engineOn = true;
+  for (const v of [0, 8, 20, 30]) { $('spd').value = v; $('thr').value = 1; await wait(120); }
+  $('drift').checked = true; $('lvl').value = 3; $('off').checked = true; $('boost').checked = true; $('rou').checked = true;
+  await wait(400);
+  for (const [name, data] of EV) { try { audio.update(0, world); bus.emit(name, data); } catch (e) { errors.push(`${name}: ${e.message}`); } await wait(40); }
+  audio.pauseAll(true); await wait(150); audio.pauseAll(false);
+  audio.setMuted(true); audio.setMuted(false);
+  engineOn = false;
+  await wait(400);
+  audio.playMusic(null);
+  console.error = origErr;
+  return { unlocked: ok, state: st, time: +audio.ctx.currentTime.toFixed(2), errors, music: audio.musicName, finalLap: audio.finalLap };
+};
+// Renderização offline: mede nível (RMS), pico e NaN de cada efeito e de cada música
+window.offlineCheck = async () => {
+  const SR = 22050;
+  const mk = (secs) => {
+    const oc = new OfflineAudioContext(2, Math.ceil(SR * secs), SR);
+    let now = 0;
+    Object.defineProperty(oc, 'state', { get: () => 'running' });
+    Object.defineProperty(oc, 'currentTime', { get: () => now });
+    const a = new AudioSystem({});
+    a.ctx = oc;
+    a._build();
+    return { oc, a, setNow: (t) => (now = t) };
+  };
+  const stats = (buf, t0 = 0, t1 = buf.duration) => {
+    let sum = 0, peak = 0, nan = 0, n = 0;
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = Math.floor(t0 * SR); i < Math.min(d.length, Math.floor(t1 * SR)); i++) {
+        const v = d[i];
+        if (!Number.isFinite(v)) { nan++; continue; }
+        sum += v * v; n++; if (Math.abs(v) > peak) peak = Math.abs(v);
+      }
+    }
+    return { rms: +Math.sqrt(sum / Math.max(1, n)).toFixed(3), peak: +peak.toFixed(3), nan };
+  };
+  const realST = window.setTimeout;
+  window.setTimeout = () => 0; // evita desconectar nós durante a renderização
+  const out = { sfx: {}, music: {} };
+  try {
+    // efeitos: um a cada 2,5 s
+    const { oc, a, setNow } = mk(SFX.length * 2.5 + 1);
+    SFX.forEach((s, i) => { setNow(i * 2.5); a._last = {}; a._recent = []; a.sfx(s); });
+    const buf = await oc.startRendering();
+    SFX.forEach((s, i) => (out.sfx[s] = stats(buf, i * 2.5, i * 2.5 + 2.4)));
+    // músicas: 12 s de cada
+    for (const m of ['menu', 'race', 'results']) {
+      const { oc: o2, a: a2 } = mk(12);
+      a2._startSong(m);
+      const sq = a2._seq;
+      const sd = 60 / sq.song.bpm / 4;
+      for (let i = 0, t = 0.05; t < 11.8; i++, t += sd) a2._playStep(sq, i % sq.song.steps, t, sd);
+      const b2 = await o2.startRendering();
+      const per = [];
+      for (let k = 0; k < 12; k += 2) per.push(stats(b2, k, k + 2).rms);
+      out.music[m] = { ...stats(b2), rmsPer2s: per, steps: sq.song.steps };
+    }
+  } finally { window.setTimeout = realST; }
+  return out;
+};
+window.audio = audio;
+window.ready = true;
+</script>
+</body>
+</html>

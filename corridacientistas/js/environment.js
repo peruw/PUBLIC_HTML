@@ -202,6 +202,11 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const disposables = [];
   const keep = (...a) => { disposables.push(...a); return a[0]; };
   const UP = new THREE.Vector3(0, 1, 0);
+  // track.sample devolve objeto reutilizado: copia para poder guardar
+  const smp = (sv) => {
+    const r = track.sample(sv);
+    return { pos: r.pos.clone(), right: r.right.clone(), tangent: r.tangent.clone(), wallDist: r.wallDist, halfWidth: r.halfWidth };
+  };
 
   // ------------------------------------------------------------ céu, neblina e luzes
   const SUN_DIR = new THREE.Vector3(0.38, 0.72, 0.58).normalize();
@@ -278,7 +283,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const moundTop = meta.moundTop;
   const extent = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    if (FL[i] === 2) extent[i] = SPAN[i] + 2.2 + ((moundTop[i] || 10) + 3) / 1.15;
+    if (FL[i] === 2) extent[i] = SPAN[i] + 8 + ((moundTop[i] || 10) + 3) / 2.4;
     else extent[i] = WD[i] + (FL[i] === 1 ? 2.5 : 0.8);
   }
   for (let i = 0; i < N; i++) {
@@ -313,7 +318,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
 
   // ------------------------------------------------------------ relevo natural
   const summitS = meta.ctrlS[13];
-  const sSum = track.sample(summitS);
+  const sSum = smp(summitS);
   const obsPos = sSum.pos.clone().addScaledVector(sSum.right, sSum.wallDist + 20);
   const LAGOON = [[125, 522, 92, 40], [152, 468, 48, 34], [72, 560, 46, 30]];
   const ISLETS = [[128, 466, 11, 1.3], [160, 553, 9, 1.0], [82, 566, 7, 0.9], [106, 540, 4.5, 0.6]];
@@ -356,7 +361,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   };
 
   // ------------------------------------------------------------ malha do terreno
-  const fine = hi ? 4 : 6;
+  const fine = hi ? 4 : 7;
   const TERR = 950;
   const axis = (min, max, f0, f1) => {
     const a = [];
@@ -371,23 +376,42 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const zs = axis(CZ - TERR, CZ + TERR, minZ - 75, maxZ + 75);
   const nx = xs.length, nz = zs.length;
   // Marcos precisam de chão plano: definidos antes do relevo
-  const sStart = track.sample(20);
+  const sStart = smp(20);
   const campus = { x: 30, z: -64, y: 0 };
   flats.push([campus.x, campus.z + 6, 58, -0.35]);
   flats.push([30, 36, 62, -0.35]);
   flats.push([obsPos.x, obsPos.z, 22, sSum.pos.y + 0.6]);
   void sStart;
 
-  const H = new Float32Array(nx * nz);
-  const LO = new Float32Array(nx * nz).fill(-1e9);
-  const HI = new Float32Array(nx * nz).fill(1e9);
-  const LOWF = new Float32Array(nx * nz).fill(1e9);
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) H[j * nx + i] = natural(xs[i], zs[j]);
   const bsearch = (arr, v) => {
     let a = 0, b = arr.length - 1;
     while (b - a > 1) { const m = (a + b) >> 1; if (arr[m] <= v) a = m; else b = m; }
     return a;
   };
+  const H = new Float32Array(nx * nz);
+  const LO = new Float32Array(nx * nz).fill(-1e9);
+  const HI = new Float32Array(nx * nz).fill(1e9);
+  const LOWF = new Float32Array(nx * nz).fill(1e9);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) H[j * nx + i] = natural(xs[i], zs[j]);
+  // crista natural sobre o túnel (o terreno encosta no morro que cobre o túnel)
+  for (let s = 0; s < N; s++) {
+    if (FL[s] !== 2) continue;
+    const top = (moundTop[s] || 10) - 1.45;
+    const w0 = SPAN[s] + 7.5;
+    const R = w0 + 48;
+    const i0 = bsearch(xs, X[s] - R), i1 = bsearch(xs, X[s] + R) + 1;
+    const j0 = bsearch(zs, Z[s] - R), j1 = bsearch(zs, Z[s] + R) + 1;
+    for (let j = j0; j <= Math.min(j1, nz - 1); j++) {
+      const dz = zs[j] - Z[s];
+      for (let i = i0; i <= Math.min(i1, nx - 1); i++) {
+        const dx = xs[i] - X[s];
+        const d = Math.sqrt(dx * dx + dz * dz);
+        const r = top * (1 - smooth01((d - w0 - 1) / 46)) + (vnoise(xs[i] / 14, zs[j] / 14) - 0.5) * 2 * smooth01((d - w0) / 10);
+        const o = j * nx + i;
+        if (r > H[o]) H[o] = r;
+      }
+    }
+  }
   for (let s = 0; s < N; s++) {
     const zone = WD[s] + 6.5;
     const R = FL[s] === 2 ? SPAN[s] + 2 : zone + 40;
@@ -486,7 +510,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const WY = meta.waterY;
     let lx0 = Infinity, lx1 = -Infinity, lz0 = Infinity, lz1 = -Infinity;
     for (const [cx, cz, rx, rz] of LAGOON) { lx0 = Math.min(lx0, cx - rx); lx1 = Math.max(lx1, cx + rx); lz0 = Math.min(lz0, cz - rz); lz1 = Math.max(lz1, cz + rz); }
-    lx0 -= 10; lx1 += 10; lz0 -= 10; lz1 += 10;
+    lx0 -= 30; lx1 += 30; lz0 -= 30; lz1 += 30;
     const step = hi ? 2.5 : 4;
     const wx = Math.ceil((lx1 - lx0) / step) + 1, wz = Math.ceil((lz1 - lz0) / step) + 1;
     const pos = [], depth = [], idx = [];
@@ -673,12 +697,6 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     }
     for (let i = 0; i < g.index.count; i++) st.idx.push(base + g.index.getX(i));
   };
-  const posAt = (s, lat, out = new THREE.Vector3()) => {
-    const smp = track.sample(s);
-    out.copy(smp.pos).addScaledVector(smp.right, lat);
-    out.y = groundAt(out.x, out.z);
-    return out;
-  };
   const headingAt = (s) => meta.headingAt(s);
   const animated = []; // funções (dt, t)
 
@@ -766,7 +784,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   // ------------------------------------------------------------ arquibancadas com torcida
   const crowdSpots = [];
   {
-    const smpA = track.sample(track.length - 40), smpB = track.sample(95);
+    const smpA = smp(track.length - 40), smpB = smp(95);
     const a = smpA.pos, b = smpB.pos;
     const dir = b.clone().sub(a).setY(0).normalize();
     const right = new THREE.Vector3(-dir.z, 0, dir.x);
@@ -774,7 +792,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const tiers = 8;
     const stands = [[-36, 40], [44, 108]];
     const seatCols = [col(0xe3262f), col(0x1d7bd8), col(0xffd23f), col(0x2fbf71), col(0x8a3cff)];
-    const wd = track.sample(0).wallDist;
+    const wd = smp(0).wallDist;
     for (const [x0, x1] of stands) {
       const len = x1 - x0;
       const mid = (x0 + x1) / 2;
@@ -792,10 +810,10 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
           const sp = c.clone().addScaledVector(dir, sx).addScaledVector(faceOut, -0.35);
           addS(G.box, sp.x, base.y + h + 0.18, sp.z, len / 6 - 0.4, 0.36, 0.5, seatCols[(sgi + k) % seatCols.length], heading + Math.PI / 2);
         }
-        for (let p = 0.5; p < len - 0.4; p += hi ? 0.78 : 1.1) {
+        for (let p = 0.5; p < len - 0.4; p += hi ? 0.78 : 1.3) {
           if (rand() < 0.14) continue;
           const pp = c.clone().addScaledVector(dir, -len / 2 + p + (rand() - 0.5) * 0.15).addScaledVector(faceOut, 0.05);
-          crowdSpots.push([pp.x, base.y + h, pp.z, heading + Math.PI]);
+          crowdSpots.push([pp.x, base.y + h, pp.z, heading + Math.PI / 2]);
         }
       }
       // parede de trás, cobertura e pilares
@@ -818,7 +836,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   if (crowdSpots.length) {
     const body = keep(new THREE.BoxGeometry(0.46, 0.62, 0.3));
     body.translate(0, 0.35, 0);
-    const head = keep(new THREE.IcosahedronGeometry(0.17, 0));
+    const head = keep(hi ? new THREE.IcosahedronGeometry(0.17, 0) : new THREE.OctahedronGeometry(0.19, 0));
     head.translate(0, 0.86, 0);
     const mk = (geo, colors) => {
       const mat = keep(new THREE.MeshLambertMaterial({ color: 0xffffff }));
@@ -899,10 +917,10 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     [meta.ctrlS[5] + 10, 1, 'tube', 1.5, 10], [meta.ctrlS[5] + 15, 1, 'tube', 1.5, 12],
   ];
   labSpots.forEach(([s, side, kind, R, Hh], k) => {
-    const smp = track.sample(s);
-    let lat = side * (smp.wallDist + R + 4);
-    const p = smp.pos.clone().addScaledVector(smp.right, lat);
-    if (clearance(p.x, p.z) < R + 1.5) { lat += side * (R + 1.5 - clearance(p.x, p.z) + 1); p.copy(smp.pos).addScaledVector(smp.right, lat); }
+    const sm = smp(s);
+    let lat = side * (sm.wallDist + R + 4);
+    const p = sm.pos.clone().addScaledVector(sm.right, lat);
+    if (clearance(p.x, p.z) < R + 1.5) { lat += side * (R + 1.5 - clearance(p.x, p.z) + 1); p.copy(sm.pos).addScaledVector(sm.right, lat); }
     addFlask(p.x, p.z, R, Hh, k, kind);
   });
   // tripé com bico de Bunsen perto de um frasco grande
@@ -963,8 +981,8 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   let dna = null;
   {
     const s = meta.ctrlS[3] + 8;
-    const smp = track.sample(s);
-    const p = smp.pos.clone().addScaledVector(smp.right, -(smp.wallDist + 16));
+    const sm = smp(s);
+    const p = sm.pos.clone().addScaledVector(sm.right, -(sm.wallDist + 16));
     const y = groundAt(p.x, p.z);
     reserve(p.x, p.z, 12);
     // pedestal
@@ -973,8 +991,8 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     texBox(p.x, y + 0.8, p.z + 7.05, 6, 1.2, 0.05, 0, AR.labSign, col(0x5518b8), false);
     const b = new Merge();
     const Hh = 38, R = 4.2, turns = 3.2;
-    const n = hi ? 150 : 80;
-    const sph = keep(new THREE.IcosahedronGeometry(1, hi ? 1 : 0));
+    const n = hi ? 130 : 70;
+    const sph = keep(new THREE.IcosahedronGeometry(1, 0));
     const cylG = keep(new THREE.CylinderGeometry(1, 1, 1, hi ? 8 : 5, 1));
     const cA = col(0x39c6ff), cB = col(0xff4fd8);
     const pairs = [[col(0xff4a4a), col(0x3cff7a)], [col(0xffd23f), col(0x4a7bff)]];
@@ -1018,13 +1036,13 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     ];
     let el = 0;
     for (const [s, side, count] of spots) {
-      const smp = track.sample(s);
+      const sm = smp(s);
       const h = headingAt(s);
       for (let k = 0; k < count; k++) {
         const size = 3.6;
         const along = (k - (count - 1) / 2) * (size + 0.4);
-        const lat = side * (smp.wallDist + 4.5 + (k % 2) * 1.2);
-        const p = smp.pos.clone().addScaledVector(smp.right, lat).addScaledVector(smp.tangent, along);
+        const lat = side * (sm.wallDist + 4.5 + (k % 2) * 1.2);
+        const p = sm.pos.clone().addScaledVector(sm.right, lat).addScaledVector(sm.tangent, along);
         if (clearance(p.x, p.z) < 3) continue;
         const y = groundAt(p.x, p.z);
         const ry = h + (rand() - 0.5) * 0.5;
@@ -1125,7 +1143,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     addTortoise(ISLETS[1][0], ISLETS[1][1], 4.0, 1.5);
     addTortoise(ISLETS[2][0] + 1, ISLETS[2][1], 1.2, 1.2);
     // tartarugas na margem perto do grampo
-    const sh = track.sample(meta.ctrlS[21]);
+    const sh = smp(meta.ctrlS[21]);
     const tp = sh.pos.clone().addScaledVector(sh.right, sh.wallDist + 9);
     if (clearance(tp.x, tp.z) > 3) addTortoise(tp.x, tp.z, 3.5, 1.4);
     // flamingos na água rasa
@@ -1179,7 +1197,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const ax = -40, az = 110;
     if (clearance(ax, az) > 10) {
       const y = groundAt(ax, az);
-      addS(G.cyl, ax, y + 1, ax === ax ? az : az, 3.2, 2, 3.2, col(0x2b3a6b));
+      addS(G.cyl, ax, y + 1, az, 3.2, 2, 3.2, col(0x2b3a6b));
       const b = new Merge();
       const orb = keep(new THREE.TorusGeometry(7, 0.18, 6, hi ? 48 : 28));
       for (let k = 0; k < 3; k++) b.add(orb, mat4(0, 0, 0, Math.PI / 2 + 0.2, (k * Math.PI) / 3, 0, 1, 1, 1), col(0x39c6ff));
@@ -1274,11 +1292,11 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     for (let s = 12; s < track.length; s += hi ? 38 : 55) {
       const i = Math.round(s / ds) % N;
       if (FL[i]) continue;
-      const smp = track.sample(s);
-      const lat = side * (smp.wallDist + 2.6);
-      const p = smp.pos.clone().addScaledVector(smp.right, lat);
+      const sm = smp(s);
+      const lat = side * (sm.wallDist + 2.6);
+      const p = sm.pos.clone().addScaledVector(sm.right, lat);
       if (clearance(p.x, p.z) < 1.2) continue;
-      lampSpots.push([p.x, groundAt(p.x, p.z), p.z, Math.atan2(-smp.right.x * side, -smp.right.z * side)]);
+      lampSpots.push([p.x, groundAt(p.x, p.z), p.z, Math.atan2(-sm.right.x * side, -sm.right.z * side)]);
       side = -side;
     }
   }
@@ -1318,8 +1336,8 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     b.add(G.cyl6, mat4(0, 1.8, 0, 0, 0, 0, 0.32, 3.6, 0.32), col(0x7a5230));
     const ico = keep(new THREE.IcosahedronGeometry(1, hi ? 1 : 0));
     b.add(ico, mat4(0, 5.2, 0, 0, 0, 0, 2.9, 2.5, 2.9), col(0x5fb43b));
-    b.add(ico, mat4(1.4, 4.4, 0.6, 0, 1, 0, 1.8, 1.6, 1.8), col(0x6cc443));
-    b.add(ico, mat4(-1.2, 4.6, -0.7, 0, 2, 0, 1.9, 1.7, 1.9), col(0x57a836));
+    b.add(G.ico, mat4(1.4, 4.4, 0.6, 0, 1, 0, 1.9, 1.7, 1.9), col(0x6cc443));
+    b.add(G.ico, mat4(-1.2, 4.6, -0.7, 0, 2, 0, 2.0, 1.8, 2.0), col(0x57a836));
     return keep(b.build(false));
   })();
   const geoIpe = (() => {
@@ -1328,7 +1346,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     b.add(G.cyl6, mat4(0.8, 4.4, 0, 0, 0, -0.6, 0.15, 2, 0.15), col(0x6b4a33));
     const ico = keep(new THREE.IcosahedronGeometry(1, hi ? 1 : 0));
     b.add(ico, mat4(0, 5.8, 0, 0, 0, 0, 3.2, 2.2, 3.2), col(0xffffff));
-    b.add(ico, mat4(1.6, 5.2, 0.4, 0, 1, 0, 1.8, 1.3, 1.8), col(0xf4f4f4));
+    b.add(G.ico, mat4(1.6, 5.2, 0.4, 0, 1, 0, 1.9, 1.4, 1.9), col(0xf4f4f4));
     return keep(b.build(false));
   })();
   const geoPine = (() => {
@@ -1343,13 +1361,14 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const geoPalm = (() => {
     const b = new Merge();
     let x = 0, y = 0, lean = 0;
-    for (let k = 0; k < 6; k++) {
-      const h = 1.3;
-      lean += 0.07;
-      b.add(G.cyl6, mat4(x + Math.sin(lean) * h / 2, y + Math.cos(lean) * h / 2, 0, 0, 0, -lean, 0.26 - k * 0.02, h, 0.26 - k * 0.02), k % 2 ? col(0xa98a5c) : col(0x8f7349));
+    const trunkG = keep(new THREE.CylinderGeometry(1, 1, 1, hi ? 6 : 5, 1, true));
+    for (let k = 0; k < (hi ? 6 : 4); k++) {
+      const h = hi ? 1.3 : 1.95;
+      lean += hi ? 0.07 : 0.1;
+      b.add(trunkG, mat4(x + Math.sin(lean) * h / 2, y + Math.cos(lean) * h / 2, 0, 0, 0, -lean, 0.26 - k * 0.02, h, 0.26 - k * 0.02), k % 2 ? col(0xa98a5c) : col(0x8f7349));
       x += Math.sin(lean) * h; y += Math.cos(lean) * h;
     }
-    const leaf = keep(new THREE.PlaneGeometry(0.9, 4.2, 1, 4));
+    const leaf = keep(new THREE.PlaneGeometry(0.9, 4.2, 1, hi ? 4 : 2));
     const lp = leaf.attributes.position;
     for (let k = 0; k < lp.count; k++) {
       const t = (lp.getY(k) + 2.1) / 4.2;
@@ -1360,7 +1379,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       const a = (k / 7) * TAU;
       b.add(leaf, mat4(x, y, 0, -1.2, a, 0, 1, 1, 1), k % 2 ? col(0x3fa34d) : col(0x4cb85a));
     }
-    for (let k = 0; k < 3; k++) b.add(G.ico, mat4(x + Math.cos(k * 2.1) * 0.35, y - 0.35, Math.sin(k * 2.1) * 0.35, 0, 0, 0, 0.25), col(0x6b4a2e));
+    if (hi) for (let k = 0; k < 3; k++) b.add(G.ico, mat4(x + Math.cos(k * 2.1) * 0.35, y - 0.35, Math.sin(k * 2.1) * 0.35, 0, 0, 0, 0.25), col(0x6b4a2e));
     return keep(b.build(false));
   })();
   const geoBush = (() => {
@@ -1382,11 +1401,11 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const b = new Merge();
     const t = keep(new THREE.OctahedronGeometry(0.2, 0));
     const r = mulberry(9);
-    for (let k = 0; k < 7; k++) {
-      const a = r() * TAU, d = r() * 0.8;
-      b.add(t, mat4(Math.cos(a) * d, 0.3 + r() * 0.15, Math.sin(a) * d, 0, r() * 3, 0, 1, 0.6, 1), col(0xffffff));
+    const nf = hi ? 4 : 3;
+    for (let k = 0; k < nf; k++) {
+      const a = (k / nf) * TAU + r(), d = 0.3 + r() * 0.5;
+      b.add(t, mat4(Math.cos(a) * d, 0.28 + r() * 0.15, Math.sin(a) * d, 0, r() * 3, 0, 1.2, 0.7, 1.2), col(0xffffff));
     }
-    b.add(keep(new THREE.ConeGeometry(0.9, 0.35, 5, 1)), mat4(0, 0.12, 0), col(0x4f9e35));
     return keep(b.build(false));
   })();
 
@@ -1467,7 +1486,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     return true;
   });
   // arbustos, pedras e flores
-  scatter(Math.round(420 * density), () => [lerp(minX - 90, maxX + 90, rand()), lerp(minZ - 90, maxZ + 90, rand())], (x, z) => {
+  scatter(Math.round(320 * density), () => [lerp(minX - 90, maxX + 90, rand()), lerp(minZ - 90, maxZ + 90, rand())], (x, z) => {
     if (!okSpot(x, z, 1, 1.5)) return false;
     lists.bush.push([x, groundAt(x, z) - 0.1, z, rand() * TAU, 0.7 + rand() * 0.7]);
     return true;
@@ -1478,7 +1497,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     lists.rock.push([x, groundAt(x, z) - 0.15 * s, z, rand() * TAU, s]);
     return true;
   });
-  scatter(Math.round(900 * density), () => [lerp(minX - 50, maxX + 50, rand()), lerp(minZ - 50, maxZ + 50, rand())], (x, z) => {
+  scatter(Math.round(650 * density), () => [lerp(minX - 50, maxX + 50, rand()), lerp(minZ - 50, maxZ + 50, rand())], (x, z) => {
     if (!okSpot(x, z, 0.5, 0.8)) return false;
     lists.flower.push([x, groundAt(x, z) - 0.05, z, rand() * TAU, 0.8 + rand() * 0.6]);
     return true;

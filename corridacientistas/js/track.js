@@ -392,20 +392,20 @@ function buildAtlas(hi, aniso) {
   put('redwhite', 1376, 64, 256, 64, (gg, w, h) => {
     for (let i = 0; i < 8; i++) { gg.fillStyle = i % 2 ? '#ffffff' : '#e3262f'; gg.fillRect(i * 32, 0, 32, h); }
   });
-  put('ramp', 1648, 0, 256, 256, (gg, w, h) => {
+  put('ramp', 1912, 0, 128, 128, (gg, w, h) => {
     const gr = gg.createLinearGradient(0, 0, 0, h);
     gr.addColorStop(0, '#1f7cff'); gr.addColorStop(1, '#0d3fb3');
     gg.fillStyle = gr; gg.fillRect(0, 0, w, h);
     gg.fillStyle = '#ffe14d';
-    for (let j = 0; j < 3; j++) {
-      const y = 20 + j * 80;
-      gg.beginPath(); gg.moveTo(w / 2, y); gg.lineTo(w * 0.85, y + 50); gg.lineTo(w * 0.85, y + 70);
-      gg.lineTo(w / 2, y + 22); gg.lineTo(w * 0.15, y + 70); gg.lineTo(w * 0.15, y + 50); gg.fill();
+    for (let j = 0; j < 2; j++) {
+      const y = 10 + j * 58;
+      gg.beginPath(); gg.moveTo(w / 2, y); gg.lineTo(w * 0.86, y + 30); gg.lineTo(w * 0.86, y + 44);
+      gg.lineTo(w / 2, y + 16); gg.lineTo(w * 0.14, y + 44); gg.lineTo(w * 0.14, y + 30); gg.fill();
     }
-    gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, 10, h); gg.fillRect(w - 10, 0, 10, h);
+    gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, 6, h); gg.fillRect(w - 6, 0, 6, h);
   });
   // seta de curva (aponta para a direita)
-  put('arrow', 1920, 0, 128, 128, (gg, w, h) => {
+  put('arrow', 1648, 0, 128, 128, (gg, w, h) => {
     gg.fillStyle = '#e3262f'; gg.fillRect(0, 0, w, h);
     gg.fillStyle = '#ffffff';
     for (let j = 0; j < 2; j++) {
@@ -414,7 +414,7 @@ function buildAtlas(hi, aniso) {
       gg.lineTo(x, 110); gg.lineTo(x + 32, 64); gg.fill();
     }
   });
-  put('arrowBlue', 1920, 128, 128, 128, (gg, w, h) => {
+  put('arrowBlue', 1780, 0, 128, 128, (gg, w, h) => {
     gg.fillStyle = '#1a55d6'; gg.fillRect(0, 0, w, h);
     gg.fillStyle = '#ffffff';
     for (let j = 0; j < 2; j++) {
@@ -434,7 +434,7 @@ function buildAtlas(hi, aniso) {
     ['campus', 'CAMPUS DA CIÊNCIA', '#f5ecd6', '#e2d3ae', '#2b3a6b', '#ffffff'],
   ];
   row.forEach(([name, text, a, b2, fg, st, deco], i) => {
-    put(name, (i % 2) * 1024, 144 + Math.floor(i / 2) * 144, 1024, 128, banner(text, a, b2, fg, st, deco));
+    put(name, (i % 2) * 1024, 136 + Math.floor(i / 2) * 136, 1024, 128, banner(text, a, b2, fg, st, deco));
   });
   // placas com fórmulas (512x256)
   const boards = [
@@ -448,7 +448,7 @@ function buildAtlas(hi, aniso) {
     ['dna', 'DNA', '#f0e6ff', '#7b2cbf'],
   ];
   boards.forEach(([name, text, bgc, fg], i) => {
-    put(name, (i % 4) * 512, 144 * 4 + 16 + Math.floor(i / 4) * 208, 512, 192, (gg, w, h) => {
+    put(name, (i % 4) * 512, 688 + Math.floor(i / 4) * 168, 512, 160, (gg, w, h) => {
       gg.fillStyle = bgc; gg.fillRect(0, 0, w, h);
       gg.strokeStyle = fg; gg.lineWidth = 12; gg.strokeRect(14, 14, w - 28, h - 28);
       let size = h * 0.5;
@@ -458,8 +458,6 @@ function buildAtlas(hi, aniso) {
       gg.fillStyle = fg; gg.fillText(text, w / 2, h * 0.53);
     });
   });
-  // painel "VAI!" das luzes e letreiro pequeno do 14-bis
-  put('bis', 0, 1000 - 24, 256, 24, (gg, w, h) => { gg.fillStyle = '#f3e7c9'; gg.fillRect(0, 0, w, h); });
   const tex = canvasTex(c, { aniso });
   const wr = regions.white;
   const white = [(wr[0] + wr[2]) / 2, (wr[1] + wr[3]) / 2];
@@ -1019,27 +1017,32 @@ export function buildTrack(scene, quality = {}) {
       if (d < 30) top = Math.max(top, lerp(crossing.sep - 0.45, top, smooth01((d - 14) / 16)));
       moundTop[i] = top;
     }
+    // perfil arredondado: topo cobre a faixa onde o terreno afunda até o chão do túnel
+    const MOUND_K = [-1, -0.7, -0.4, 0, 0.4, 0.7, 1];
     const prof = (i, out) => {
       const top = moundTop[i];
-      const sp = SPAN[i] + 2.2;
-      const slope = 1.15;
-      const w = sp + (top + 3) / slope;
+      const sp = SPAN[i] + 7.5;
+      const w = sp + (top + 3) / 2.4;
       out.length = 0;
-      out.push([-w, -3], [-sp, top], [sp, top], [w, -3]);
+      out.push([-w, -3]);
+      for (const k of MOUND_K) out.push([k * sp, top - 1.1 * k * k]);
+      out.push([w, -3]);
       return out;
     };
     const pr0 = [], pr1 = [];
     const cM = new THREE.Color();
     for (let i = i0; i < i1; i++) {
       prof(i, pr0); prof(i + 1, pr1);
-      for (let f = 0; f < 3; f++) {
+      const nf = pr0.length - 1;
+      for (let f = 0; f < nf; f++) {
         const v0 = gb.count;
         const pairs = [[i, pr0[f]], [i, pr0[f + 1]], [i + 1, pr1[f + 1]], [i + 1, pr1[f]]];
-        cM.copy(f === 1 ? C.grass : C.grassDark);
+        const skirt = f === 0 || f === nf - 1;
+        cM.copy(skirt ? C.grassDark : C.grass);
         for (const [j, [l, h]] of pairs) {
           va.set(X[j] + RX[j] * l, Y[j] + h, Z[j] + RZ[j] * l);
-          const ny = f === 1 ? 1 : 0.75;
-          const nl = f === 0 ? -0.66 : f === 2 ? 0.66 : 0;
+          const ny = skirt ? 0.4 : 1;
+          const nl = f === 0 ? -0.9 : f === nf - 1 ? 0.9 : (l / (SPAN[j] + 7.5)) * 0.25;
           gb.vert(va.x, va.y, va.z, RX[j] * nl, ny, RZ[j] * nl, cM, va.x * GUV, va.z * GUV);
         }
         gb.idx.push(v0, v0 + 1, v0 + 2, v0, v0 + 2, v0 + 3);
@@ -1490,10 +1493,12 @@ export function buildTrack(scene, quality = {}) {
       const f = frame(s);
       const tp = tunnelProfile(s, WD[i]);
       const mt = group.userData.moundTop[Math.min(Math.max(i, Math.ceil(tunnelS[0] / ds) + 1), Math.floor(tunnelS[1] / ds))] || tp.top + 1;
-      const topW = tp.span + 2.2, botW = topW + (mt + 3) / 1.15;
-      const Hh = mt + 1.6;
+      const topW = tp.span + 8.5, botW = tp.span + 25;
+      const Hh = mt + 1.8;
       const shape = new THREE.Shape();
-      shape.moveTo(-botW - 1, -3); shape.lineTo(botW + 1, -3); shape.lineTo(topW + 1.2, Hh); shape.lineTo(-topW - 1.2, Hh); shape.closePath();
+      shape.moveTo(-botW, -3); shape.lineTo(botW, -3); shape.lineTo(botW, 1.5); shape.lineTo(topW + 4, Hh - 2.5);
+      shape.lineTo(topW, Hh - 2.5); shape.lineTo(topW, Hh); shape.lineTo(-topW, Hh); shape.lineTo(-topW, Hh - 2.5);
+      shape.lineTo(-topW - 4, Hh - 2.5); shape.lineTo(-botW, 1.5); shape.closePath();
       const hole = new THREE.Path();
       const seg = 20;
       hole.moveTo(-tp.span, -0.2);
@@ -1534,13 +1539,13 @@ export function buildTrack(scene, quality = {}) {
   let tires = null;
   {
     // pilha de 3 pneus: cilindro aberto com "gomos" + tampa escura
-    const seg = hi ? 8 : 6;
-    const cg = new THREE.CylinderGeometry(0.42, 0.42, 0.93, seg, 6, true);
+    const seg = hi ? 7 : 6;
+    const cg = new THREE.CylinderGeometry(0.42, 0.42, 0.93, seg, hi ? 6 : 1, true);
     const cp = cg.attributes.position;
     for (let k = 0; k < cp.count; k++) {
       const yy = cp.getY(k) + 0.465;
       const row = Math.round(yy / 0.155);
-      const r = row % 2 ? 0.43 : 0.36;
+      const r = !hi ? 0.41 : row % 2 ? 0.43 : 0.36;
       const x = cp.getX(k), z = cp.getZ(k), l = Math.hypot(x, z) || 1;
       cp.setXYZ(k, (x / l) * r, yy, (z / l) * r);
     }
@@ -2051,7 +2056,8 @@ export function buildTrack(scene, quality = {}) {
         const a = t * o.speed;
         const i = Math.round(o.s / ds);
         p.position.set(o.center.x + TX[i] * Math.cos(a) * o.r, o.center.y + Math.sin(a) * 1.2, o.center.z + TZ[i] * Math.cos(a) * o.r);
-        p.position.addScaledVector(_S.right.set(RX[i], 0, RZ[i]), -Math.sin(a) * 1.2);
+        p.position.x -= RX[i] * Math.sin(a) * 1.2;
+        p.position.z -= RZ[i] * Math.sin(a) * 1.2;
       }
     }
     if (startLights.timer > 0) {
