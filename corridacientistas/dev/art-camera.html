@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arte: câmera</title>
+<style>
+  #hud { position: fixed; left: 8px; top: 8px; background: rgba(0,0,0,.55); color: #fff; padding: 6px 10px; border-radius: 8px; font: 13px system-ui, sans-serif; }
+  #hud button { margin: 2px; }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+import * as THREE from '../js/three.js';
+import { CHARACTERS, QUALITY } from '../js/config.js';
+import { bus } from '../js/events.js';
+import { createKartModel } from '../js/models.js';
+import { CameraRig } from '../js/camera.js';
+import { stubScene, StubKart } from './stubs.js';
+
+const P = new URLSearchParams(location.search);
+const quality = QUALITY[P.get('q') || 'alta'];
+const { scene, camera, renderer, track, onFrame } = stubScene();
+renderer.shadowMap.enabled = quality.shadows;
+const sun = scene.children.find((o) => o.isDirectionalLight);
+if (quality.shadows) {
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 300 });
+}
+
+// Karts de teste com os modelos de verdade
+const karts = CHARACTERS.map((c, i) => {
+  const k = new StubKart({ character: c, index: i, isPlayer: i === 0, bus, track, cruise: 17 + (i % 4) * 1.5, lateral: ((i % 3) - 1) * 4 });
+  k.visual.remove(k.model.group);
+  k.model = createKartModel(c.id, { quality });
+  k.visual.add(k.model.group);
+  k.placeAt(track.gridSlots[i]);
+  scene.add(k.object3d);
+  return k;
+});
+const player = karts[0];
+const rig = new CameraRig(camera);
+rig.follow(player);
+const world = { scene, camera, renderer, track, karts, player, phase: 'racing', quality, time: 0 };
+
+let mode = P.get('mode') || 'chase';
+let lookBack = P.get('lookBack') === '1';
+function setMode(m, opts) {
+  mode = m;
+  if (m === 'orbit') rig.setMode('orbit', opts || { target: player, radius: 5, height: 1.8, speed: 0.4 });
+  else if (m === 'podium') rig.setMode('podium', opts || { position: new THREE.Vector3(0, 6, 20), lookAt: new THREE.Vector3(0, 3, 0) });
+  else rig.setMode(m, opts);
+  return m;
+}
+setMode(mode);
+
+// Estado de teste: drift/turbo/pulo simulados no jogador
+let drift = 0, steerT = 0, jumpT = 0;
+onFrame((dt, t) => {
+  world.time = t;
+  for (const k of karts) {
+    k.update(dt);
+    k.controls.steer = Math.sin(t * 0.7 + k.index) * 0.6;
+  }
+  if (drift) {
+    player.drifting = true; player.driftDir = drift;
+    player.heading += drift * 0.45; // kart de lado em relação ao movimento
+    player.object3d.rotation.y = player.heading;
+  } else player.drifting = false;
+  if (jumpT > 0) {
+    jumpT -= dt;
+    const h = Math.sin(Math.max(0, jumpT) / 1.2 * Math.PI) * 3;
+    player.position.y += h; player.object3d.position.y += h; player.onGround = jumpT <= 0;
+  }
+  for (const k of karts) {
+    k.model.update(dt, { speed: k.speed, steer: k === player ? (drift ? drift * 0.8 : steerT) : k.controls.steer, drifting: k.drifting, driftDir: k.driftDir,
+      onGround: k.onGround, boosting: k.boostTime > 0, stunned: k.stunned, time: t });
+  }
+  rig.update(dt, world, { lookBack });
+});
+
+const hud = document.getElementById('hud');
+hud.innerHTML = ['chase', 'orbit', 'podium', 'flyover'].map((m) => `<button data-m="${m}">${m}</button>`).join('') +
+  '<button data-a="lb">olhar p/ trás</button><button data-a="boost">turbo</button><button data-a="shake">tremor</button>' +
+  '<button data-a="driftL">drift ◀</button><button data-a="driftR">drift ▶</button><button data-a="drift0">sem drift</button><button data-a="jump">pulo</button><button data-a="hit">batida</button>';
+hud.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.m) setMode(b.dataset.m);
+  const a = b.dataset.a;
+  if (a === 'lb') lookBack = !lookBack;
+  if (a === 'boost') player.applyBoost(2);
+  if (a === 'shake') rig.shake(0.4, 0.5);
+  if (a === 'driftL') drift = 1;
+  if (a === 'driftR') drift = -1;
+  if (a === 'drift0') drift = 0;
+  if (a === 'jump') jumpT = 1.2;
+  if (a === 'hit') { player.hit('spin'); rig.shake(0.3, 0.4); }
+});
+window.cam = { rig, world, setMode, setLookBack: (v) => (lookBack = v), setDrift: (d) => (drift = d), boost: () => player.applyBoost(2),
+  jump: () => (jumpT = 1.2), shake: (i, d) => rig.shake(i, d), hit: () => player.hit('spin'), hideHud: () => (hud.style.display = 'none'),
+  info: () => ({ mode: rig.mode, fov: +camera.fov.toFixed(1), pos: camera.position.toArray().map((v) => +v.toFixed(2)), shot: rig.shotType, aspect: +camera.aspect.toFixed(2),
+    ground: +(camera.position.y - track.project(camera.position, player.s).groundY).toFixed(2) }) };
+if (P.get('hud') === '0') window.cam.hideHud();
+window.ready = true;
+</script>
+</body>
+</html>

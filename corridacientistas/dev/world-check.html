@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Verificação automática do mundo</title>
+<style>body { font: 13px monospace; background: #111; color: #eee; margin: 16px; } .ok { color: #7f7; } .bad { color: #f77; }</style>
+</head>
+<body>
+<h3>Verificação da pista e do ambiente</h3>
+<pre id="out">rodando…</pre>
+<script type="module">
+// Testes: project() inverte sample() (inclusive no cruzamento), terreno nunca acima da pista,
+// cobertura do terreno sobre o túnel, elementos de jogo dentro da pista, custo de desenho.
+// Uso: dev/world-check.html?q=alta|baixa  → resultado em window.result e na página.
+import * as THREE from '../js/three.js';
+import { QUALITY } from '../js/config.js';
+import { buildTrack } from '../js/track.js';
+import { buildEnvironment } from '../js/environment.js';
+
+const q = QUALITY[new URLSearchParams(location.search).get('q') || 'alta'];
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setSize(640, 360);
+if (q.shadows) renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 2500);
+const t0 = performance.now();
+const track = buildTrack(scene, q);
+const t1 = performance.now();
+const env = buildEnvironment(scene, track, q, renderer);
+const t2 = performance.now();
+const res = { quality: q.id, buildMs: { track: Math.round(t1 - t0), env: Math.round(t2 - t1) }, length: +track.length.toFixed(1) };
+const fail = [];
+
+// 1) project(sample(s) + right*lat, sAnterior) devolve s e lateral
+{
+  let maxDs = 0, maxDl = 0, maxDy = 0, prev;
+  for (let s = 0; s < track.length; s += 0.5) {
+    for (const lat of [-8, 0, 8]) {
+      const smp = track.sample(s);
+      const y = smp.pos.y;
+      const p = smp.pos.clone().addScaledVector(smp.right, lat);
+      const r = track.project(p, prev);
+      let d = Math.abs(r.s - s); d = Math.min(d, track.length - d);
+      maxDs = Math.max(maxDs, d);
+      maxDl = Math.max(maxDl, Math.abs(r.lateral - lat));
+      // chão fora das rampas = altura da linha central
+      const onRamp = track.ramps.some((rp) => Math.abs(((s - rp.s + track.length * 1.5) % track.length) - track.length / 2) < rp.length / 2 + 0.5);
+      if (!onRamp) maxDy = Math.max(maxDy, Math.abs(r.groundY - y));
+    }
+    prev = s;
+  }
+  res.project = { maxErrS: maxDs, maxErrLateral: maxDl, maxErrGroundY: maxDy };
+  if (maxDs > 0.3 || maxDl > 0.1 || maxDy > 0.05) fail.push('project');
+  // sem dica (busca global) nos dois níveis do cruzamento
+  const c = track.meta.crossing;
+  const up = track.sample(c.upperS).pos.clone(); up.y += 0.4;
+  const gu = track.project(up).s;
+  const lo = track.sample(c.lowerS).pos.clone(); lo.y += 0.4;
+  const gl = track.project(lo).s;
+  res.crossing = { upperS: +c.upperS.toFixed(1), lowerS: +c.lowerS.toFixed(1), verticalSep: +c.sep.toFixed(2), globalUpper: +gu.toFixed(1), globalLower: +gl.toFixed(1) };
+  if (Math.abs(gu - c.upperS) > 1 || Math.abs(gl - c.lowerS) > 1 || c.sep < 9) fail.push('crossing');
+}
+// 2) terreno abaixo da pista e do acostamento (fora de ponte/túnel)
+{
+  const m = track.meta;
+  let worst = -1e9, where = '';
+  for (let i = 0; i < m.N; i++) {
+    if (m.FL[i]) continue;
+    const smp = track.sample(i * m.ds);
+    for (let lat = -m.WD[i]; lat <= m.WD[i] + 1e-6; lat += 0.5) {
+      const g = env.groundAt(smp.pos.x + smp.right.x * lat, smp.pos.z + smp.right.z * lat) - smp.pos.y;
+      if (g > worst) { worst = g; where = `s=${(i * m.ds).toFixed(0)} lat=${lat}`; }
+    }
+  }
+  res.terrain = { worstAboveRoad: +worst.toFixed(3), where };
+  if (worst > -0.1) fail.push('terrain');
+}
+// 3) vértices do terreno removidos sobre o túnel precisam estar cobertos (morro/fachada/pista)
+{
+  const terr = scene.getObjectByName('terreno');
+  const g = terr.geometry, P = g.attributes.position, idx = g.index.array;
+  const kept = new Set();
+  for (let k = 0; k < idx.length; k += 6) kept.add(Math.min(idx[k], idx[k + 1], idx[k + 2], idx[k + 3], idx[k + 4], idx[k + 5]));
+  let nx = 0; while (nx < P.count && P.getZ(nx) === P.getZ(0)) nx++;
+  const covers = ['acostamento', 'estruturas', 'asfalto'].map((n) => scene.getObjectByName(n));
+  const rc = new THREE.Raycaster();
+  let removed = 0, uncovered = 0;
+  for (let o = 0; o < P.count - nx - 1; o++) {
+    if ((o + 1) % nx === 0 || kept.has(o)) continue;
+    removed++;
+    const xa = P.getX(o), za = P.getZ(o), xb = P.getX(o + 1), zb = P.getZ(o + nx);
+    for (const [u, v] of [[0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9], [0.5, 0.5]]) {
+      rc.set(new THREE.Vector3(xa + (xb - xa) * u, 300, za + (zb - za) * v), new THREE.Vector3(0, -1, 0));
+      if (!rc.intersectObjects(covers, false).length) { uncovered++; break; }
+    }
+  }
+  res.terrainHoles = { removedCells: removed, uncovered };
+  if (uncovered > 0) fail.push('holes');
+}
+// 4) elementos de jogo dentro da pista
+{
+  const bad = [];
+  for (const b of track.itemBoxSlots) { const r = track.project(b.pos, b.s); if (Math.abs(r.lateral) > r.halfWidth - 1) bad.push('box@' + b.s.toFixed(0)); }
+  for (const p of track.boostPads) { const hw = track.sample(p.s).halfWidth; if (Math.abs(p.lateral) + p.width / 2 > hw) bad.push('pad@' + p.s.toFixed(0)); }
+  for (const p of track.ramps) { const hw = track.sample(p.s).halfWidth; if (Math.abs(p.lateral) + p.width / 2 > hw) bad.push('ramp@' + p.s.toFixed(0)); }
+  for (const g of track.gridSlots) { if (!(g.s > track.length - 40)) bad.push('grid@' + g.s.toFixed(0)); }
+  let rlMax = 0; for (let s = 0; s < track.length; s += 1) rlMax = Math.max(rlMax, Math.abs(track.racingLine(s)) - (track.sample(s).halfWidth - 2));
+  res.gameplay = { boxes: track.itemBoxSlots.length, pads: track.boostPads.length, ramps: track.ramps.length, grid: track.gridSlots.length, minimap: track.minimapPoints.length, racingLineOverflow: +rlMax.toFixed(3), problems: bad };
+  if (bad.length || rlMax > 1e-3) fail.push('gameplay');
+}
+// 5) custo de desenho em vistas de perseguição (com e sem passe de sombra)
+{
+  const rows = [];
+  let maxCalls = 0, maxTris = 0;
+  for (let s = 0; s < track.length; s += 60) {
+    const a = track.sample(s - 6); camera.position.copy(a.pos); camera.position.y += 2.5;
+    const b = track.sample(s + 8); camera.lookAt(b.pos.x, b.pos.y + 1.2, b.pos.z);
+    track.update(1 / 60, s); env.update(1 / 60, s, camera);
+    renderer.info.autoReset = false; renderer.info.reset();
+    renderer.render(scene, camera);
+    maxCalls = Math.max(maxCalls, renderer.info.render.calls); maxTris = Math.max(maxTris, renderer.info.render.triangles);
+    renderer.info.autoReset = true;
+  }
+  res.draw = { maxCallsInclShadow: maxCalls, maxTrianglesInclShadow: maxTris };
+  void rows;
+}
+res.pass = fail.length === 0;
+res.failed = fail;
+window.result = res;
+const out = document.getElementById('out');
+out.className = res.pass ? 'ok' : 'bad';
+out.textContent = JSON.stringify(res, null, 2);
+console.log('world-check', JSON.stringify(res));
+</script>
+</body>
+</html>

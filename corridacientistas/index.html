@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0b1330" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Corrida dos Cientistas</title>
+  <meta name="description" content="Kart 3D com cientistas famosos: Newton, Marie Curie, Einstein, Santos Dumont e outros. Pegue a Maçã de Newton, o Buraco Negro e a Bobina de Tesla. Jogue no PC ou no celular." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.quantaaulas.com/corridacientistas/" />
+  <meta property="og:title" content="Corrida dos Cientistas" />
+  <meta property="og:description" content="Kart 3D com Newton, Marie Curie, Einstein, Santos Dumont e outros cientistas. Jogue no PC ou no celular!" />
+  <meta property="og:image" content="https://www.quantaaulas.com/assets/corridacientistas-preview.jpg" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="Quanta Aulas" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
+  <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <div id="touch-layer"></div>
+  <div id="flash"></div>
+
+  <!-- HUD da corrida -->
+  <div id="hud" class="hidden" aria-hidden="true">
+    <div class="hud-item" id="hud-item">
+      <div class="hud-item-slot"><span id="hud-item-icon"></span><span id="hud-item-count" class="hidden"></span></div>
+      <div class="hud-item-name" id="hud-item-name"></div>
+    </div>
+    <canvas id="hud-minimap" width="180" height="180"></canvas>
+    <div class="hud-race">
+      <div class="hud-pos"><span id="hud-pos-num">1</span><span class="hud-pos-suf">º</span><span class="hud-pos-total">/8</span></div>
+      <div class="hud-lap">Volta <span id="hud-lap">1/3</span></div>
+      <div class="hud-time" id="hud-time">0:00.00</div>
+    </div>
+    <button class="hud-pause" id="hud-pause" aria-label="Pausar">❚❚</button>
+    <div id="hud-toasts"></div>
+    <div id="hud-center"></div>
+    <div id="hud-drift" class="hidden"></div>
+  </div>
+
+  <!-- Carregando -->
+  <section class="screen" id="screen-loading">
+    <div class="loading-card">
+      <div class="atom-logo small"><i></i><i></i><i></i><b></b></div>
+      <p id="loading-text">Preparando o laboratório…</p>
+      <div class="loading-bar"><div id="loading-fill"></div></div>
+    </div>
+  </section>
+
+  <!-- Tela inicial -->
+  <section class="screen hidden" id="screen-title">
+    <div class="title-wrap">
+      <div class="logo">
+        <div class="atom-logo"><i></i><i></i><i></i><b></b></div>
+        <h1><span>Corrida dos</span> Cientistas</h1>
+        <p class="tagline">Newton, Curie, Einstein e companhia disputando no Campus da Ciência!</p>
+      </div>
+      <div class="menu-buttons">
+        <button class="btn btn-primary btn-big" data-action="play">▶ JOGAR</button>
+        <button class="btn" data-action="howto">📖 Como jogar</button>
+        <div class="row">
+          <button class="btn btn-small" data-action="toggle-sound" id="btn-sound">🔊 Som: ligado</button>
+          <button class="btn btn-small" data-action="toggle-quality" id="btn-quality">⚙️ Qualidade: alta</button>
+        </div>
+        <a class="back-site" href="/">← Voltar ao site Quanta Aulas</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Escolha do cientista -->
+  <section class="screen hidden" id="screen-select">
+    <div class="select-wrap panel">
+      <header class="select-head">
+        <button class="btn btn-small" data-action="back">← Voltar</button>
+        <h2>Escolha seu cientista</h2>
+        <span></span>
+      </header>
+      <div class="select-body">
+        <div class="char-grid" id="char-grid"></div>
+        <div class="char-detail" id="char-detail">
+          <img id="detail-portrait" alt="" />
+          <div class="detail-text">
+            <h3 id="detail-name"></h3>
+            <p class="detail-meta" id="detail-meta"></p>
+            <p class="detail-bio" id="detail-bio"></p>
+            <div class="stats" id="detail-stats"></div>
+          </div>
+        </div>
+      </div>
+      <footer class="select-foot">
+        <div class="opt">
+          <span class="opt-label">Motor</span>
+          <div class="seg" id="opt-cc"></div>
+        </div>
+        <div class="opt">
+          <span class="opt-label">Voltas</span>
+          <div class="seg" id="opt-laps"></div>
+        </div>
+        <button class="btn btn-primary btn-go" data-action="start">CORRER! 🏁</button>
+      </footer>
+    </div>
+  </section>
+
+  <!-- Como jogar -->
+  <section class="screen hidden" id="screen-howto">
+    <div class="panel howto-wrap">
+      <header class="select-head">
+        <button class="btn btn-small" data-action="back">← Voltar</button>
+        <h2>Como jogar</h2>
+        <span></span>
+      </header>
+      <div class="howto-body">
+        <div class="howto-controls">
+          <div class="howto-box">
+            <h3>💻 Computador</h3>
+            <ul>
+              <li><kbd>W</kbd>/<kbd>↑</kbd> acelera · <kbd>S</kbd>/<kbd>↓</kbd> freia e dá ré</li>
+              <li><kbd>A</kbd><kbd>D</kbd> ou <kbd>←</kbd><kbd>→</kbd> vira</li>
+              <li><kbd>Espaço</kbd> pula e faz <b>drift</b></li>
+              <li><kbd>E</kbd>, <kbd>X</kbd> ou <kbd>Shift</kbd> usa o item</li>
+              <li><kbd>C</kbd> olha para trás · <kbd>Esc</kbd>/<kbd>P</kbd> pausa · <kbd>M</kbd> som</li>
+              <li>Controle: <kbd>A</kbd>/<kbd>RT</kbd> acelera · <kbd>B</kbd>/<kbd>LT</kbd> freia · <kbd>RB</kbd>/<kbd>X</kbd> drift · <kbd>LB</kbd>/<kbd>Y</kbd> item · <kbd>Start</kbd> pausa</li>
+            </ul>
+          </div>
+          <div class="howto-box">
+            <h3>📱 Celular</h3>
+            <ul>
+              <li>Segure o celular <b>deitado</b>.</li>
+              <li>O kart acelera sozinho.</li>
+              <li>◀ ▶ viram · <b>DRIFT</b> pula · <b>ITEM</b> usa · <b>FREIO</b> freia.</li>
+              <li>Na largada, <b>segure ◀, ▶ ou DRIFT</b> logo depois do <b>2</b> para largar com turbo.</li>
+              <li>No menu de pausa (❚❚) dá para desligar a aceleração automática.</li>
+            </ul>
+          </div>
+          <div class="howto-box">
+            <h3>🔥 Dicas de piloto</h3>
+            <ul>
+              <li>Segure o <b>drift</b> numa curva: as faíscas ficam <span class="c-blue">azuis</span>, <span class="c-orange">laranja</span> e <span class="c-purple">roxas</span>. Solte para ganhar turbo!</li>
+              <li>Acelere logo depois do <b>2</b> na contagem para largar com turbo.</li>
+              <li>Aperte o drift no ar, depois de uma rampa, para fazer uma manobra.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="howto-items">
+          <h3>🧪 Itens da ciência</h3>
+          <div id="howto-items"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pausa -->
+  <section class="screen hidden dim" id="screen-pause">
+    <div class="panel small-panel">
+      <h2>Pausado</h2>
+      <button class="btn btn-primary" data-action="resume">▶ Continuar</button>
+      <button class="btn" data-action="restart">↻ Reiniciar corrida</button>
+      <button class="btn btn-small" data-action="toggle-sound" id="btn-sound-2">🔊 Som: ligado</button>
+      <button class="btn btn-small touch-only" data-action="toggle-auto" id="btn-auto">Aceleração automática: ligada</button>
+      <button class="btn" data-action="quit">✕ Sair para o menu</button>
+    </div>
+  </section>
+
+  <!-- Resultado -->
+  <section class="screen hidden dim-light" id="screen-results">
+    <div class="panel results-wrap">
+      <h2 id="results-title">Resultado</h2>
+      <ol class="results-list" id="results-list"></ol>
+      <div class="fact-card" id="results-fact"></div>
+      <div class="row">
+        <button class="btn btn-primary" data-action="restart">↻ Correr de novo</button>
+        <button class="btn" data-action="play">Trocar cientista</button>
+        <button class="btn" data-action="quit">Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Aviso de orientação -->
+  <div id="rotate-hint" class="hidden">
+    <div class="rotate-phone">📱</div>
+    <p>Gire o celular para jogar na horizontal</p>
+  </div>
+
+  <!-- Erro de carregamento -->
+  <section class="screen hidden" id="screen-error">
+    <div class="panel small-panel">
+      <h2>Ops!</h2>
+      <p id="error-text">Não foi possível carregar o jogo. Verifique sua conexão com a internet e recarregue a página.</p>
+      <button class="btn btn-primary" onclick="location.reload()">Recarregar</button>
+    </div>
+  </section>
+
+  <script>
+    // Se o módulo principal não iniciar (sem internet, rede bloqueando, navegador antigo), mostra um aviso.
+    (function () {
+      function showLoadError(blocked) {
+        if (window.__gameReady || window.__gameLoadError) return;
+        window.__gameLoadError = true;
+        document.getElementById('screen-loading').classList.add('hidden');
+        if (blocked) {
+          document.getElementById('error-text').textContent =
+            'Não foi possível carregar o jogo. A internet desta rede pode estar bloqueando uma parte dele. Recarregue a página ou tente em outra rede.';
+        }
+        document.getElementById('screen-error').classList.remove('hidden');
+      }
+      // erro ao baixar um script (ex.: biblioteca 3D bloqueada) aparece na hora
+      window.addEventListener('error', function (e) {
+        var t = e.target;
+        if (t && t.tagName === 'SCRIPT') showLoadError(true);
+      }, true);
+      // reserva: 45 s de espera, contando só com a aba visível
+      var waited = 0;
+      var timer = setInterval(function () {
+        if (window.__gameReady || window.__gameLoadError) return clearInterval(timer);
+        if (!document.hidden) waited++;
+        if (waited >= 45) {
+          clearInterval(timer);
+          showLoadError(false);
+        }
+      }, 1000);
+    })();
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste — patrocínio Quanta Aulas</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font: 12px monospace; }
+  #hud { position: fixed; left: 8px; top: 8px; color: #fff; background: rgba(0,0,0,.55); padding: 6px 8px; border-radius: 6px; white-space: pre; pointer-events: none; }
+  #atlas { position: fixed; right: 0; top: 0; max-width: 60vw; max-height: 100vh; display: none; background: repeating-conic-gradient(#888 0 25%, #bbb 0 50%) 0 0 / 16px 16px; }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<canvas id="atlas"></canvas>
+<script type="module">
+// Página de teste do patrocínio (js/ads.js): pista + ambiente + anúncios.
+// ?q=alta|baixa &s=<m> &lat=<m> &view=chase|over|fly|free &ads=0 &env=0 &hud=0 &anim=1
+// Funções: setView(s, lat, modo, opts), toggleAds(bool), stats(), adsStats(), checkOverlaps(),
+//          checkCorridor(), showAtlas(bool), tick(seg) (avança a animação e redesenha).
+// Desenha sob demanda (sem laço contínuo) para as capturas no SwiftShader não travarem.
+import * as THREE from '../js/three.js';
+import { QUALITY } from '../js/config.js';
+import { buildTrack } from '../js/track.js';
+import { buildEnvironment } from '../js/environment.js';
+import { buildAds } from '../js/ads.js';
+
+const params = new URLSearchParams(location.search);
+const quality = QUALITY[params.get('q') || 'alta'];
+const renderer = new THREE.WebGLRenderer({ antialias: quality.antialias, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, quality.pixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+if (quality.shadows) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, quality.drawDistance + 400);
+
+const t0 = performance.now();
+const track = buildTrack(scene, quality);
+const tTrack = performance.now() - t0;
+let env = null;
+if (params.get('env') !== '0') env = buildEnvironment(scene, track, quality, renderer);
+else {
+  scene.background = new THREE.Color(0x8fd3ff);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x446633, 1.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(80, 120, 40); scene.add(sun);
+}
+const t1 = performance.now();
+let ads = null;
+if (params.get('ads') !== '0') ads = buildAds(scene, track, quality, env);
+const tAds = performance.now() - t1;
+
+// Câmera
+let mode = params.get('view') || 'chase';
+let camS = parseFloat(params.get('s') || '-12');
+let camLat = parseFloat(params.get('lat') || '0');
+let viewOpts = {};
+const look = new THREE.Vector3();
+function placeChase(s, lat = 0, back = 6, height = 2.5, ahead = 8) {
+  const a = track.sample(s - back);
+  const p = a.pos.clone().addScaledVector(a.right, lat); p.y += height;
+  const b = track.sample(s + ahead);
+  look.copy(b.pos).addScaledVector(b.right, lat); look.y += 1.2;
+  camera.position.copy(p); camera.lookAt(look);
+}
+let savedFog = null;
+window.setView = (s, lat = 0, m = 'chase', opts = {}) => {
+  mode = m; camS = s; camLat = lat; viewOpts = opts;
+  if (opts.fov) { camera.fov = opts.fov; camera.updateProjectionMatrix(); }
+  else if (camera.fov !== 70) { camera.fov = 70; camera.updateProjectionMatrix(); }
+  if (m === 'over' || opts.nofog) { if (scene.fog) savedFog = scene.fog; scene.fog = null; }
+  else if (savedFog) { scene.fog = savedFog; savedFog = null; }
+  if (m === 'chase') placeChase(s, lat, opts.back ?? 6, opts.height ?? 2.5, opts.ahead ?? 8);
+  if (m === 'over') {
+    const cx = opts.x ?? 70, cz = opts.z ?? 255;
+    camera.position.set(cx, opts.h ?? 620, cz + (opts.tilt ?? 1));
+    camera.lookAt(cx, 0, cz);
+  }
+  if (m === 'free') {
+    camera.position.set(opts.px, opts.py, opts.pz);
+    camera.lookAt(opts.lx, opts.ly, opts.lz);
+  }
+  if (m === 'blimp') {
+    // olha para o dirigível a partir de um ponto
+    const b = ads && ads.group.getObjectByName('dirigivel');
+    if (b) {
+      b.updateMatrixWorld();
+      const p = new THREE.Vector3().setFromMatrixPosition(b.matrixWorld);
+      camera.position.set(p.x + (opts.dx ?? 40), p.y + (opts.dy ?? -10), p.z + (opts.dz ?? 40));
+      camera.lookAt(p);
+    }
+  }
+  draw();
+  return true;
+};
+window.THREE = THREE; window.scene = scene; window.camera = camera; window.renderer = renderer;
+window.track = track; window.env = env; window.ads = ads;
+
+let simT = 0;
+function draw(dt = 0) {
+  simT += dt;
+  track.update(dt, simT);
+  if (env) env.update(dt, simT, camera);
+  if (ads) ads.update(dt, simT, camera);
+  renderer.render(scene, camera);
+}
+// avança a simulação (dirigível etc.) em passos e redesenha
+window.tick = (sec = 1, step = 1 / 30) => {
+  for (let k = 0; k < Math.round(sec / step); k++) {
+    simT += step;
+    track.update(step, simT);
+    if (env) env.update(step, simT, camera);
+    if (ads) ads.update(step, simT, camera);
+  }
+  if (mode === 'blimp') return setView(camS, camLat, 'blimp', viewOpts);
+  draw();
+  return simT.toFixed(1);
+};
+window.toggleAds = (on) => { if (ads) ads.group.visible = on; draw(); return on; };
+
+// Estatísticas gerais e só dos anúncios (diferença com/sem anúncios; conta o passe de sombra)
+const measure = () => {
+  renderer.info.autoReset = false;
+  renderer.info.reset();
+  renderer.render(scene, camera);
+  const r = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles };
+  renderer.info.autoReset = true;
+  return r;
+};
+window.stats = () => {
+  const withAds = measure();
+  let only = null;
+  if (ads) {
+    ads.group.visible = false;
+    const without = measure();
+    ads.group.visible = true;
+    only = { calls: withAds.calls - without.calls, tris: withAds.tris - without.tris };
+  }
+  renderer.render(scene, camera);
+  return { all: withAds, ads: only, tex: renderer.info.memory.textures, geos: renderer.info.memory.geometries };
+};
+// Inventário dos anúncios (independente da câmera)
+window.adsStats = () => {
+  if (!ads) return null;
+  let meshes = 0, tris = 0;
+  const list = [];
+  ads.group.traverse((o) => {
+    if (!o.isMesh) return;
+    meshes++;
+    const g = o.geometry;
+    const n = (g.index ? g.index.count : g.attributes.position.count) / 3;
+    tris += n;
+    list.push(`${o.name}:${n}${o.castShadow ? 's' : ''}`);
+  });
+  const img = ads.atlas && ads.atlas.image;
+  return { meshes, tris, atlas: img ? `${img.width}x${img.height}` : '-', list: list.join(' ') };
+};
+window.showAtlas = (on = true) => {
+  const c = document.getElementById('atlas');
+  c.style.display = on ? 'block' : 'none';
+  if (on && ads && ads.atlas) {
+    const img = ads.atlas.image;
+    c.width = img.width; c.height = img.height;
+    c.getContext('2d').drawImage(img, 0, 0);
+  }
+  return on;
+};
+window.showCanvas = (name) => {
+  const c = document.getElementById('atlas');
+  const src = ads && ads.debug && ads.debug.canvases[name];
+  if (!src) return 'sem ' + name;
+  c.style.display = 'block';
+  c.width = src.width; c.height = src.height;
+  c.getContext('2d').drawImage(src, 0, 0);
+  return `${src.width}x${src.height}`;
+};
+
+// ------------------------------------------------------------ verificações
+// Caixas sólidas dos anúncios (OBB em espaço de mundo) vs. triângulos do cenário.
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+const _tri = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+function triObb(tri, o) {
+  // SAT: eixos da caixa, normal do triângulo e produtos vetoriais (13 eixos)
+  const ax = [o.ax, o.ay, o.az];
+  const h = [o.hx, o.hy, o.hz];
+  const v = tri.map((p) => { const d = p.clone().sub(o.c); return [d.dot(o.ax), d.dot(o.ay), d.dot(o.az)]; });
+  const e = [0, 1, 2].map((k) => [v[(k + 1) % 3][0] - v[k][0], v[(k + 1) % 3][1] - v[k][1], v[(k + 1) % 3][2] - v[k][2]]);
+  const test = (L) => {
+    const l2 = L[0] * L[0] + L[1] * L[1] + L[2] * L[2];
+    if (l2 < 1e-12) return true;
+    const p = v.map((q) => q[0] * L[0] + q[1] * L[1] + q[2] * L[2]);
+    const r = h[0] * Math.abs(L[0]) + h[1] * Math.abs(L[1]) + h[2] * Math.abs(L[2]);
+    return !(Math.min(...p) > r || Math.max(...p) < -r);
+  };
+  for (let k = 0; k < 3; k++) { const L = [0, 0, 0]; L[k] = 1; if (!test(L)) return false; }
+  const n = [e[0][1] * e[1][2] - e[0][2] * e[1][1], e[0][2] * e[1][0] - e[0][0] * e[1][2], e[0][0] * e[1][1] - e[0][1] * e[1][0]];
+  if (!test(n)) return false;
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    const a = [0, 0, 0]; a[i] = 1;
+    const L = [a[1] * e[j][2] - a[2] * e[j][1], a[2] * e[j][0] - a[0] * e[j][2], a[0] * e[j][1] - a[1] * e[j][0]];
+    if (!test(L)) return false;
+  }
+  return true;
+}
+// objetos que não contam como colisão (chão, céu, água, efeitos sem corpo)
+const IGNORE = /^(asfalto|acostamento|decalques|aceleradores|terreno|lagoa|ceu|montanhas|nuvens|horizonte|tunel-ceu|estrelas|brilho|arcos-tesla|passaros|bolhas|flores|luzes-tunel)/;
+window.checkOverlaps = (opts = {}) => {
+  if (!ads || !ads.debug) return 'sem anúncios';
+  const t = performance.now();
+  const shrink = opts.shrink ?? 0.02;
+  const boxes = ads.debug.solids.map((o, i) => ({ ...o, i, hx: o.hx - shrink, hy: o.hy - shrink, hz: o.hz - shrink }));
+  // grade de busca
+  const CELL = 16;
+  const grid = new Map();
+  const key = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+  for (const o of boxes) {
+    const r = Math.hypot(o.hx, o.hy, o.hz);
+    o.r = r;
+    for (let x = Math.floor((o.c.x - r) / CELL); x <= Math.floor((o.c.x + r) / CELL); x++) {
+      for (let z = Math.floor((o.c.z - r) / CELL); z <= Math.floor((o.c.z + r) / CELL); z++) {
+        const k = `${x},${z}`;
+        if (!grid.has(k)) grid.set(k, []);
+        grid.get(k).push(o);
+      }
+    }
+  }
+  const hits = new Map();
+  let triCount = 0;
+  const m4 = new THREE.Matrix4(), mi = new THREE.Matrix4();
+  const testTri = (name) => {
+    triCount++;
+    const cx = (_tri[0].x + _tri[1].x + _tri[2].x) / 3, cz = (_tri[0].z + _tri[1].z + _tri[2].z) / 3;
+    // o triângulo pode ser grande: consulta as células que o AABB cobre
+    const x0 = Math.min(_tri[0].x, _tri[1].x, _tri[2].x), x1 = Math.max(_tri[0].x, _tri[1].x, _tri[2].x);
+    const z0 = Math.min(_tri[0].z, _tri[1].z, _tri[2].z), z1 = Math.max(_tri[0].z, _tri[1].z, _tri[2].z);
+    const seen = new Set();
+    for (let x = Math.floor(x0 / CELL); x <= Math.floor(x1 / CELL); x++) for (let z = Math.floor(z0 / CELL); z <= Math.floor(z1 / CELL); z++) {
+      const L = grid.get(`${x},${z}`);
+      if (!L) continue;
+      for (const o of L) {
+        if (seen.has(o.i)) continue;
+        seen.add(o.i);
+        const y0 = Math.min(_tri[0].y, _tri[1].y, _tri[2].y), y1 = Math.max(_tri[0].y, _tri[1].y, _tri[2].y);
+        if (y0 > o.c.y + o.r || y1 < o.c.y - o.r) continue;
+        if (x0 > o.c.x + o.r || x1 < o.c.x - o.r || z0 > o.c.z + o.r || z1 < o.c.z - o.r) continue;
+        if (triObb(_tri, o)) {
+          const k = `${o.tag} × ${name}`;
+          const h = hits.get(k) || { n: 0, at: `(${o.c.x.toFixed(1)}, ${o.c.y.toFixed(1)}, ${o.c.z.toFixed(1)})` };
+          h.n++;
+          hits.set(k, h);
+        }
+      }
+    }
+    void cx; void cz;
+  };
+  scene.updateMatrixWorld(true);
+  scene.traverse((obj) => {
+    if (!obj.isMesh || !obj.visible) return;
+    let p = obj; let inAds = false;
+    while (p) { if (ads && p === ads.group) inAds = true; p = p.parent; }
+    if (inAds) return;
+    const name = obj.name || obj.parent?.name || obj.type;
+    if (IGNORE.test(name)) return;
+    const g = obj.geometry;
+    const P = g.attributes.position;
+    const I = g.index;
+    const nt = (I ? I.count : P.count) / 3;
+    const inst = obj.isInstancedMesh ? obj.count : 1;
+    for (let k = 0; k < inst; k++) {
+      m4.copy(obj.matrixWorld);
+      if (obj.isInstancedMesh) { obj.getMatrixAt(k, mi); m4.multiply(mi); }
+      for (let t2 = 0; t2 < nt; t2++) {
+        for (let j = 0; j < 3; j++) {
+          const vi = I ? I.getX(t2 * 3 + j) : t2 * 3 + j;
+          _tri[j].fromBufferAttribute(P, vi).applyMatrix4(m4);
+        }
+        testTri(name);
+      }
+    }
+  });
+  const out = [...hits.entries()].map(([k, h]) => `${k}: ${h.n} tri @ ${h.at}`);
+  return { boxes: boxes.length, tris: triCount, ms: Math.round(performance.now() - t), overlaps: out.length, list: out };
+};
+// Corredor: nenhum vértice sólido dos anúncios dentro de |lateral| < wallDist + 0.3 abaixo de 7 m
+window.checkCorridor = () => {
+  if (!ads) return 'sem anúncios';
+  let bad = 0, worst = '', n = 0;
+  const v = new THREE.Vector3();
+  ads.group.updateMatrixWorld(true);
+  ads.group.traverse((o) => {
+    if (!o.isMesh || o.name === 'dirigivel' || o.userData.noCorridor) return;
+    const P = o.geometry.attributes.position;
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld);
+      n++;
+      const r = track.project(v);
+      // pode haver mais de um trecho perto (cruzamento): testa também com busca local pelas vizinhanças
+      if (v.y - r.groundY > 7) continue;
+      if (v.y < r.groundY - 3) continue; // abaixo do tabuleiro (ex.: embaixo do viaduto)
+      const lim = r.wallDist + 0.3;
+      if (Math.abs(r.lateral) < lim - 1e-3) {
+        bad++;
+        if (bad < 12) worst += ` [${o.name} s=${r.s.toFixed(1)} lat=${r.lateral.toFixed(2)} lim=${lim.toFixed(2)} dy=${(v.y - r.groundY).toFixed(2)}]`;
+      }
+    }
+  });
+  return { verts: n, bad, worst };
+};
+// Pés no chão: nenhum pé flutuando (fundo do pé acima do terreno)
+window.checkGround = () => {
+  if (!ads || !ads.debug || !env) return 'sem dados';
+  let bad = 0, worst = '';
+  for (const f of ads.debug.feet) {
+    const g = env.groundAt(f.x, f.z);
+    if (f.y > g + 0.02) { bad++; if (bad < 10) worst += ` [${f.tag} (${f.x.toFixed(1)},${f.z.toFixed(1)}) pé=${f.y.toFixed(2)} chão=${g.toFixed(2)}]`; }
+  }
+  return { feet: ads.debug.feet.length, floating: bad, worst };
+};
+// Marcadores de s a cada 50 m (vista de cima)
+window.marks = (every = 50) => {
+  const grp = new THREE.Group(); grp.name = 'marcas';
+  for (let s = 0; s < track.length; s += every) {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+    const g = c.getContext('2d'); g.fillStyle = '#ff0'; g.font = 'bold 44px sans-serif'; g.fillText(String(s), 4, 48);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+    const p = track.sample(s).pos; sp.position.set(p.x, p.y + 20, p.z); sp.scale.set(24, 12, 1); sp.renderOrder = 999;
+    grp.add(sp);
+  }
+  scene.add(grp); draw(); return grp.children.length;
+};
+
+setView(camS, camLat, mode);
+const hud = document.getElementById('hud');
+if (params.get('hud') === '0') hud.style.display = 'none';
+hud.textContent = `q=${quality.id} track=${tTrack.toFixed(0)}ms ads=${tAds.toFixed(0)}ms`;
+if (params.get('anim') === '1') {
+  const clock = new THREE.Clock();
+  const loop = () => {
+    const dt = Math.min(clock.getDelta(), 1 / 20);
+    if (mode === 'fly') { camS = (camS + dt * 28) % track.length; placeChase(camS, track.racingLine(camS)); }
+    draw(dt);
+    requestAnimationFrame(loop);
+  };
+  loop();
+}
+window.ready = true;
+</script>
+</body>
+</html>

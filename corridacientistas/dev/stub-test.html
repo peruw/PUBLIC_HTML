@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><script type="module">
+import * as THREE from '../js/three.js';
+import { stubScene, StubKart } from './stubs.js';
+import { CHARACTERS } from '../js/config.js';
+import { bus } from '../js/events.js';
+const { scene, camera, track, onFrame } = stubScene();
+const karts = CHARACTERS.map((c, i) => { const k = new StubKart({ character: c, index: i, bus, track, cruise: 18 + i, lateral: (i % 3 - 1) * 4 }); k.placeAt(track.gridSlots[i]); scene.add(k.object3d); return k; });
+onFrame((dt) => {
+  karts.forEach((k) => k.update(dt));
+  const k = karts[0]; const back = new THREE.Vector3(Math.sin(k.heading), 0, Math.cos(k.heading)).multiplyScalar(-7);
+  camera.position.copy(k.position).add(back).add(new THREE.Vector3(0, 3, 0)); camera.lookAt(k.position.clone().add(new THREE.Vector3(0, 1, 0)));
+});
+window.ready = true; window.track = track;
+</script></body></html>

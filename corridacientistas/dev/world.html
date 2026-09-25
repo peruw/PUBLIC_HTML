@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste do mundo — pista + ambiente</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font: 12px monospace; }
+  #hud { position: fixed; left: 8px; top: 8px; color: #fff; background: rgba(0,0,0,.55); padding: 6px 8px; border-radius: 6px; white-space: pre; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+// Página de teste do mundo: ?q=alta|baixa &s=<metros> &lat=<m> &view=chase|over|fly|free &env=0 &kart=1
+import * as THREE from '../js/three.js';
+import { QUALITY } from '../js/config.js';
+import { buildTrack } from '../js/track.js';
+import { bus } from '../js/events.js';
+
+const params = new URLSearchParams(location.search);
+const quality = QUALITY[params.get('q') || 'alta'];
+const renderer = new THREE.WebGLRenderer({ antialias: quality.antialias });
+renderer.setPixelRatio(Math.min(devicePixelRatio, quality.pixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+if (quality.shadows) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 2500);
+
+const t0 = performance.now();
+const track = buildTrack(scene, quality);
+const tTrack = performance.now() - t0;
+let env = null;
+if (params.get('env') !== '0') {
+  const { buildEnvironment } = await import('../js/environment.js');
+  env = buildEnvironment(scene, track, quality, renderer);
+} else {
+  scene.background = new THREE.Color(0x8fd3ff);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x446633, 1.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(80, 120, 40); scene.add(sun);
+}
+const tEnv = performance.now() - t0 - tTrack;
+
+// Karts de referência (caixas) no grid para dar escala
+if (params.get('kart') !== '0') {
+  const colors = [0xd7263d, 0x7ed957, 0x6a4c93, 0x1d7bd8, 0xf4a261, 0x3a7d44, 0xf1c40f, 0x17a2b8];
+  track.gridSlots.forEach((g, i) => {
+    const k = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.5, 1.8), new THREE.MeshLambertMaterial({ color: colors[i] }));
+    body.position.y = 0.45; body.castShadow = true; k.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), new THREE.MeshLambertMaterial({ color: 0xf2c9a0 }));
+    head.position.set(0, 1.35, -0.2); head.castShadow = true; k.add(head);
+    k.position.copy(g.pos); k.rotation.y = g.heading;
+    scene.add(k);
+  });
+  // caixas de item (placeholder)
+  const boxGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+  const boxMat = new THREE.MeshLambertMaterial({ color: 0xff66cc, transparent: true, opacity: 0.8 });
+  const boxes = new THREE.InstancedMesh(boxGeo, boxMat, track.itemBoxSlots.length);
+  const m = new THREE.Matrix4();
+  track.itemBoxSlots.forEach((b, i) => { m.makeTranslation(b.pos.x, b.pos.y, b.pos.z); boxes.setMatrixAt(i, m); });
+  scene.add(boxes);
+}
+
+// Sobreposição de depuração: trajetória ideal (amarelo), aceleradores (ciano), rampas (laranja), caixas (rosa)
+if (params.get('rl') === '1') {
+  const pts = [];
+  for (let s = 0; s <= track.length; s += 2) { const p = track.sample(s); const l = track.racingLine(s); pts.push(p.pos.clone().addScaledVector(p.right, l).add(new THREE.Vector3(0, 0.6, 0))); }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffff00, depthTest: false }));
+  line.renderOrder = 99; scene.add(line);
+  const mk = (arr, color, h) => arr.forEach((o) => { const p = track.sample(o.s); const m = new THREE.Mesh(new THREE.BoxGeometry(o.width || 2, h, o.length || 2), new THREE.MeshBasicMaterial({ color, depthTest: false })); m.position.copy(p.pos).addScaledVector(p.right, o.lateral || 0); m.position.y += 1; m.rotation.y = Math.atan2(p.tangent.x, p.tangent.z); m.renderOrder = 100; scene.add(m); });
+  mk(track.boostPads, 0x00ffff, 1); mk(track.ramps, 0xff8800, 1);
+  track.itemBoxSlots.forEach((b) => { const m = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), new THREE.MeshBasicMaterial({ color: 0xff44cc, depthTest: false })); m.position.copy(b.pos); m.renderOrder = 100; scene.add(m); });
+}
+// Câmera
+let mode = params.get('view') || 'chase';
+let camS = parseFloat(params.get('s') || '-12');
+let camLat = parseFloat(params.get('lat') || '0');
+let camHint = undefined;
+const look = new THREE.Vector3();
+function placeChase(s, lat = 0, back = 6, height = 2.5) {
+  const a = track.sample(s - back);
+  const p = a.pos.clone().addScaledVector(a.right, lat); p.y += height;
+  const b = track.sample(s + 8);
+  look.copy(b.pos).addScaledVector(b.right, lat); look.y += 1.2;
+  camera.position.copy(p); camera.lookAt(look);
+}
+let savedFog = null;
+window.setView = (s, lat = 0, m = 'chase', opts = {}) => {
+  mode = m; camS = s; camLat = lat;
+  if (m === 'over' || opts.nofog) { if (scene.fog) savedFog = scene.fog; scene.fog = null; }
+  else if (savedFog) { scene.fog = savedFog; savedFog = null; }
+  if (m === 'chase') placeChase(s, lat, opts.back ?? 6, opts.height ?? 2.5);
+  if (m === 'over') {
+    const cx = opts.x ?? 70, cz = opts.z ?? 255;
+    camera.position.set(cx, opts.h ?? 620, cz + (opts.tilt ?? 1));
+    camera.lookAt(cx, 0, cz);
+  }
+  if (m === 'plane') {
+    const pl = scene.getObjectByName('14-bis');
+    const p = pl.position;
+    camera.position.set(p.x + (opts.dx ?? 14), p.y + (opts.dy ?? 4), p.z + (opts.dz ?? 14));
+    camera.lookAt(p);
+  }
+  if (m === 'free') {
+    camera.position.set(opts.px, opts.py, opts.pz);
+    camera.lookAt(opts.lx, opts.ly, opts.lz);
+  }
+  return true;
+};
+window.bus = bus; window.env = env; window.track = track; window.renderer = renderer; window.scene = scene; window.camera = camera; window.THREE = THREE;
+window.stats = () => {
+  // conta também o passe de sombra (autoReset desligado durante a medição)
+  renderer.info.autoReset = false;
+  renderer.info.reset();
+  renderer.render(scene, camera);
+  const all = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles };
+  renderer.info.autoReset = true;
+  renderer.render(scene, camera);
+  return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, callsWithShadow: all.calls, trisWithShadow: all.tris, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures };
+};
+window.breakdown = () => {
+  const out = [];
+  scene.traverse((o) => {
+    if (!o.geometry) return;
+    const g = o.geometry;
+    const n = g.index ? g.index.count / 3 : (g.attributes.position ? g.attributes.position.count / 3 : 0);
+    const inst = o.isInstancedMesh ? o.count : 1;
+    out.push([o.name || o.type, Math.round(n * inst), inst]);
+  });
+  out.sort((a, b) => b[1] - a[1]);
+  return out.slice(0, 25).map((r) => r.join(':')).join(' | ');
+};
+// Terreno nunca acima da pista/acostamento (fora de ponte e túnel)
+window.checkTerrain = () => {
+  if (!env || !env.groundAt) return 'sem ambiente';
+  const m = track.meta;
+  let worst = -1e9, where = '';
+  for (let i = 0; i < m.N; i++) {
+    if (m.FL[i]) continue;
+    const s = i * m.ds;
+    const smp = track.sample(s);
+    for (let lat = -m.WD[i]; lat <= m.WD[i] + 1e-6; lat += 1) {
+      const x = smp.pos.x + smp.right.x * lat, z = smp.pos.z + smp.right.z * lat;
+      // pior caso entre os 4 cantos da célula (a malha é triangulada)
+      const g = env.groundAt(x, z);
+      const d = g - smp.pos.y;
+      if (d > worst) { worst = d; where = `s=${s.toFixed(0)} lat=${lat.toFixed(1)}`; }
+    }
+  }
+  return { worstAboveRoad: +worst.toFixed(3), where };
+};
+// Verificação automática de project()
+window.checkProject = () => {
+  let maxDs = 0, maxDl = 0, worst = '';
+  let prevS;
+  for (let s = 0; s < track.length; s += 0.5) {
+    for (const lat of [-8, 0, 8]) {
+      const smp = track.sample(s);
+      const p = smp.pos.clone().addScaledVector(smp.right, lat);
+      const r = track.project(p, prevS === undefined ? undefined : prevS);
+      let d = Math.abs(r.s - s); d = Math.min(d, track.length - d);
+      const dl = Math.abs(r.lateral - lat);
+      if (d > maxDs) { maxDs = d; worst = `s=${s} lat=${lat} -> ${r.s.toFixed(2)}, ${r.lateral.toFixed(2)}`; }
+      if (dl > maxDl) { maxDl = dl; if (dl > 0.1) worst = `s=${s} lat=${lat} -> ${r.s.toFixed(2)}, ${r.lateral.toFixed(2)}`; }
+      const gy = Math.abs(r.groundY - smp.pos.y);
+      if (gy > 0.6) worst += ` | groundY ${gy.toFixed(2)} at ${s}`;
+    }
+    prevS = s;
+  }
+  // busca global (sem dica) nos dois níveis do cruzamento
+  const c = track.meta.crossing;
+  const up = track.sample(c.upperS).pos.clone(); up.y += 0.5;
+  const lo = track.sample(c.lowerS).pos.clone(); lo.y += 0.5;
+  const gu = track.project(up).s, gl = track.project(lo).s;
+  return { maxDs: maxDs.toExponential(2), maxDl: maxDl.toExponential(2), worst, crossing: { upperS: c.upperS.toFixed(1), lowerS: c.lowerS.toFixed(1), sep: c.sep.toFixed(2), globalUpper: gu.toFixed(1), globalLower: gl.toFixed(1) } };
+};
+
+setView(camS, camLat, mode);
+const hud = document.getElementById('hud');
+if (params.get('hud') === '0') hud.style.display = 'none';
+const clock = new THREE.Clock();
+let frames = 0;
+function frame() {
+  const dt = Math.min(clock.getDelta(), 1 / 20);
+  const t = clock.elapsedTime;
+  if (mode === 'plane') setView(0, 0, 'plane', window.planeOpts || {});
+  if (mode === 'fly') { camS = (camS + dt * 28) % track.length; placeChase(camS, track.racingLine(camS)); }
+  track.update(dt, t);
+  if (env) env.update(dt, t, camera);
+  renderer.render(scene, camera);
+  frames++;
+  if (frames % 10 === 1) hud.textContent = `q=${quality.id} s=${camS.toFixed(0)} len=${track.length.toFixed(0)}\ncalls=${renderer.info.render.calls} tris=${renderer.info.render.triangles}\nbuild track=${tTrack.toFixed(0)}ms env=${tEnv.toFixed(0)}ms`;
+  requestAnimationFrame(frame);
+}
+frame();
+window.ready = true;
+</script>
+</body>
+</html>

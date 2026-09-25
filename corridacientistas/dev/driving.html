@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Teste de direção</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; touch-action: none; user-select: none; }
+  #hud { position: fixed; left: 50%; transform: translateX(-50%); top: 8px; color: #fff; font: 13px/1.35 monospace;
+    background: rgba(0,0,0,.45); padding: 6px 10px; border-radius: 8px; pointer-events: none; white-space: pre; z-index: 5; }
+  #touch-layer { position: fixed; inset: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<div id="touch-layer"></div>
+<script type="module">
+import * as THREE from '../js/three.js';
+import { CHARACTERS, CLASSES } from '../js/config.js';
+import { EventBus } from '../js/events.js';
+import { Kart, updateKarts, TUNING } from '../js/kart.js';
+import { AIDriver } from '../js/ai.js';
+import { Input } from '../js/input.js';
+import { buildStubTrack, stubLights, createStubKartModel } from './stubs.js';
+import { buildTestTrack } from './driving-track.js';
+
+const params = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 2000);
+stubLights(scene);
+let track;
+if (params.get('track') === 'real') {
+  const { buildTrack } = await import('../js/track.js');
+  const { QUALITY } = await import('../js/config.js');
+  track = buildTrack(scene, QUALITY.baixa);
+} else track = params.get('track') === 'hard' ? buildTestTrack(scene) : buildStubTrack(scene);
+const bus = new EventBus();
+
+// ---- mini sistema de itens (só para testar a IA) ----
+const items = {
+  hazards: [],
+  used: {},
+  update(dt, world) {
+    for (const k of world.karts) {
+      if (k.roulette) {
+        k.roulette.time -= dt;
+        if (k.roulette.time <= 0) { k.roulette = null; }
+      }
+      if (!k.controls.useItem) continue;
+      k.controls.useItem = false;
+      if (!k.item) continue;
+      const id = k.item;
+      items.used[id] = (items.used[id] || 0) + 1;
+      bus.emit('item:use', { kart: k, item: id });
+      if (id === 'foguete') k.applyBoost(1.5, 1, 'item');
+      else if (id === 'pilha3') { k.applyBoost(1.2, 1, 'item'); k.itemCount--; if (k.itemCount > 0) continue; }
+      else if (id === 'maca') {
+        const back = new THREE.Vector3(-Math.sin(k.heading), 0, -Math.cos(k.heading)).multiplyScalar(2.5);
+        const pos = k.position.clone().add(back);
+        items.hazards.push({ position: pos, s: track.project(pos, k.s).s, radius: 0.9, type: 'maca', mesh: addApple(pos) });
+      } else if (id === 'faraday') k.starTime = 7;
+      else if (id === 'tesla') for (const o of world.karts) if (o !== k) { o.shrink(5); o.hit('shock', k); }
+      k.item = null; k.itemCount = 0;
+    }
+    // colisão com perigos
+    for (let i = items.hazards.length - 1; i >= 0; i--) {
+      const h = items.hazards[i];
+      for (const k of world.karts) {
+        if (Math.hypot(k.position.x - h.position.x, k.position.z - h.position.z) < h.radius + 0.9 && Math.abs(k.position.y - h.position.y) < 1.5) {
+          items.hits = (items.hits || 0) + 1;
+          if (!k.invincible) k.hit('spin', null);
+          scene.remove(h.mesh);
+          items.hazards.splice(i, 1);
+          break;
+        }
+      }
+    }
+  },
+};
+const appleGeo = new THREE.SphereGeometry(0.5, 12, 8);
+const appleMat = new THREE.MeshLambertMaterial({ color: 0xe63946 });
+function addApple(pos) { const m = new THREE.Mesh(appleGeo, appleMat); m.position.copy(pos).add(new THREE.Vector3(0, 0.5, 0)); scene.add(m); return m; }
+
+// ---- módulos reais (?full): modelos, itens e efeitos ----
+const FULL = params.has('full');
+let realModels = null;
+let fx = null;
+let realItems = null;
+let realQuality = null;
+if (FULL) {
+  const { QUALITY } = await import('../js/config.js');
+  realQuality = QUALITY.alta;
+  realModels = await import('../js/models.js');
+  const { Effects } = await import('../js/effects.js');
+  const { ItemSystem } = await import('../js/items.js');
+  fx = new Effects({ scene, bus, quality: QUALITY.alta });
+  realItems = new ItemSystem({ scene, track, bus, effects: fx, quality: QUALITY.alta });
+}
+
+// ---- karts ----
+const karts = CHARACTERS.map((character, index) => {
+  const model = FULL ? realModels.createKartModel(character.id, { quality: realQuality }) : createStubKartModel(character.id);
+  const k = new Kart({ character, isPlayer: index === 0, model, bus, index });
+  scene.add(k.object3d);
+  return k;
+});
+const player = karts[0];
+const input = new Input({ touchLayer: document.getElementById('touch-layer'), bus });
+input.showTouch(true); // como na corrida (só aparece em tela de toque)
+const world = {
+  scene, camera, renderer, track, karts, player, items: FULL ? realItems : items, effects: fx, bus,
+  time: 0, phase: 'countdown', quality: null, cc: CLASSES['100cc'], totalLaps: 3,
+};
+let ais = [];
+let playerAI = null;
+let autopilot = params.has('auto');
+let scripted = null; // controles fixos ou função (kart, world) -> controles (testes)
+let countdownT = 0;
+
+// ---- eventos ----
+const counts = {};
+const log = [];
+for (const ev of ['kart:hop', 'kart:land', 'kart:driftStart', 'kart:driftLevel', 'kart:driftEnd', 'kart:boost', 'kart:trick', 'kart:hit', 'kart:bump', 'kart:wall', 'item:use']) {
+  bus.on(ev, (d) => {
+    counts[ev] = (counts[ev] || 0) + 1;
+    const who = d.kart ?? d.a;
+    if (who === player || d.b === player) {
+      const extra = d.level !== undefined ? ` lvl=${d.level}` : d.source ? ` ${d.source}` : d.type ? ` ${d.type}` : d.strength !== undefined ? ` ${d.strength.toFixed(2)}` : d.airTime !== undefined ? ` ${d.airTime.toFixed(2)}s` : '';
+      log.push(`${world.time.toFixed(2)} ${ev}${extra}`);
+      if (log.length > 60) log.shift();
+    }
+  });
+}
+
+// ---- estatísticas por kart ----
+const stats = new Map();
+function resetStats() {
+  stats.clear();
+  for (const k of karts) stats.set(k, { laps: 0, lapTimes: [], lastLapAt: 0, maxStuck: 0, stuck: 0, walls: 0, offroad: 0, prevS: k.s, wraps: 0 });
+}
+bus.on('kart:wall', ({ kart }) => { const st = stats.get(kart); if (st) st.walls++; });
+
+function reset({ skill = CLASSES['100cc'].aiSkill, cc = '100cc', countdown = true, auto = autopilot, playerSkill = 0.95 } = {}) {
+  world.cc = CLASSES[cc];
+  karts.forEach((k, i) => k.placeAt(track.gridSlots[i]));
+  ais = karts.slice(1).map((k) => new AIDriver(k, track, { skill }));
+  playerAI = new AIDriver(player, track, { skill: playerSkill });
+  autopilot = auto;
+  if (FULL) { realItems.reset(karts); fx.reset(); }
+  for (const h of items.hazards) scene.remove(h.mesh);
+  items.hazards.length = 0;
+  items.used = {};
+  items.hits = 0;
+  world.time = 0;
+  countdownT = countdown ? 3 : 0;
+  world.phase = countdown ? 'countdown' : 'racing';
+  for (const k of karts) { k.frozen = countdown; k.item = null; k.itemCount = 0; k.roulette = null; }
+  if (countdown) bus.emit('race:countdown', { n: 3 });
+  for (const key in counts) delete counts[key];
+  log.length = 0;
+  resetStats();
+}
+
+// ---- passo da simulação ----
+let lastCount = 3;
+function step(dt) {
+  if (countdownT > 0) {
+    countdownT -= dt;
+    const n = Math.ceil(countdownT);
+    if (n !== lastCount && n >= 1) { lastCount = n; bus.emit('race:countdown', { n }); }
+    if (countdownT <= 0) {
+      for (const k of karts) k.frozen = false;
+      world.phase = 'racing';
+      bus.emit('race:go', {});
+    }
+  } else world.time += dt;
+
+  if (scripted) {
+    const pc = player.controls;
+    const c = typeof scripted === 'function' ? scripted(player, world) : scripted;
+    pc.throttle = c.throttle ?? 0; pc.brake = c.brake ?? 0; pc.steer = c.steer ?? 0; pc.drift = !!c.drift;
+    if (c.useItem) pc.useItem = true;
+  } else if (autopilot) playerAI.update(dt, world);
+  else {
+    const c = input.poll();
+    const pc = player.controls;
+    pc.throttle = c.throttle; pc.brake = c.brake; pc.steer = c.steer; pc.drift = c.drift; pc.lookBack = c.lookBack;
+    if (c.useItem) pc.useItem = true;
+  }
+  for (const ai of ais) ai.update(dt, world);
+  updateKarts(karts, dt, world);
+  world.items.update(dt, world);
+
+  // voltas e travamentos
+  const L = track.length;
+  for (const k of karts) {
+    const st = stats.get(k);
+    if (st.prevS > L - 60 && k.s < 60) st.wraps++;
+    else if (st.prevS < 60 && k.s > L - 60) st.wraps--;
+    st.prevS = k.s;
+    const laps = Math.floor(k.distance / L);
+    if (laps > st.laps) { st.laps = laps; st.lapTimes.push(+(world.time - st.lastLapAt).toFixed(2)); st.lastLapAt = world.time; }
+    if (!k.frozen && !k.stunned && Math.abs(k.speed) < 1) { st.stuck += dt; st.maxStuck = Math.max(st.maxStuck, st.stuck); } else st.stuck = 0;
+    if (k.offroad) st.offroad += dt;
+  }
+}
+
+// ---- câmera ----
+const camPos = new THREE.Vector3();
+const camLook = new THREE.Vector3();
+const tmp = new THREE.Vector3();
+let camTarget = player;
+function updateCamera(dt, snap) {
+  const k = camTarget;
+  const fwd = tmp.set(Math.sin(k.heading), 0, Math.cos(k.heading));
+  const desired = new THREE.Vector3().copy(k.position).addScaledVector(fwd, -6.5).add(new THREE.Vector3(0, 2.8, 0));
+  const a = snap ? 1 : 1 - Math.exp(-6 * dt);
+  camPos.lerp(desired, a);
+  const look = new THREE.Vector3().copy(k.position).addScaledVector(fwd, 4).add(new THREE.Vector3(0, 1.1, 0));
+  camLook.lerp(look, snap ? 1 : 1 - Math.exp(-10 * dt));
+  camera.position.copy(camPos);
+  camera.lookAt(camLook);
+  const fovT = 70 + Math.max(0, k.speed - 20) * 0.6 + (k.boostTime > 0 ? 6 : 0);
+  camera.fov += (fovT - camera.fov) * Math.min(1, dt * 4);
+  camera.updateProjectionMatrix();
+}
+
+// ---- HUD ----
+const hud = document.getElementById('hud');
+const DL = ['-', 'AZUL', 'LARANJA', 'ROXO'];
+function drawHud(fps) {
+  const k = player;
+  const st = stats.get(k);
+  hud.textContent =
+    `vel ${k.speed.toFixed(1)} / ${k.maxSpeed.toFixed(1)} m/s   ${autopilot ? '[AUTO]' : ''}  fps ${fps.toFixed(0)}\n` +
+    `drift ${k.drifting ? (k.driftDir > 0 ? 'DIR' : 'ESQ') : '-'} nível ${DL[k.driftLevel]} carga ${k.driftCharge.toFixed(2)}  turbo ${k.boostTime.toFixed(2)}\n` +
+    `s ${k.s.toFixed(0)} lat ${k.lateral.toFixed(1)} ${k.offroad ? 'ACOSTAMENTO' : ''} ${k.onGround ? '' : 'NO AR'}  volta ${st.laps + 1}  ${world.phase}\n` +
+    log.slice(-4).join('\n');
+}
+
+// ---- loop ----
+reset({ countdown: !params.has('nocount') });
+updateCamera(0, true);
+const clock = new THREE.Clock();
+let fps = 60;
+let acc = 0;
+let simSpeed = 1;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
+  acc += dt * simSpeed;
+  let n = 0;
+  while (acc >= 1 / 60 && n < 8 * simSpeed) { step(1 / 60); acc -= 1 / 60; n++; }
+  if (n >= 8 * simSpeed) acc = 0;
+  if (fx) fx.update(dt, world);
+  updateCamera(dt);
+  drawHud(fps);
+  renderer.render(scene, camera);
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+addEventListener('keydown', (e) => { if (e.code === 'KeyT') autopilot = !autopilot; if (e.code === 'KeyR') reset(); });
+
+// ---- ganchos de teste ----
+function kartSummary(k) {
+  const st = stats.get(k);
+  return { id: k.character.id, laps: st.laps, wraps: st.wraps, lapTimes: st.lapTimes, maxStuck: +st.maxStuck.toFixed(2), walls: st.walls, offroad: +st.offroad.toFixed(1), sf: +k.speedFactor.toFixed(3) };
+}
+window.__drv = {
+  THREE, world, karts, player, input, bus, track, TUNING, counts, log, items, FULL,
+  get ais() { return ais; },
+  get playerAI() { return playerAI; },
+  reset,
+  step,
+  setAutopilot(on) { autopilot = on; },
+  setControls(c) { scripted = c; },
+  // Roda n passos chamando fn(i) antes de cada um; devolve o que fn acumular.
+  run(seconds, fn) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) { fn && fn(i); step(1 / 60); } updateCamera(0, true); },
+  setSimSpeed(s) { simSpeed = s; },
+  follow(i) { camTarget = karts[i]; updateCamera(0, true); },
+  // Roda a simulação `seconds` segundos de uma vez (síncrono).
+  sim(seconds) { const n = Math.round(seconds * 60); for (let i = 0; i < n; i++) step(1 / 60); updateCamera(0, true); return this.summary(); },
+  summary() { return karts.map(kartSummary); },
+  state(i = 0) {
+    const k = karts[i];
+    return { s: +k.s.toFixed(1), lat: +k.lateral.toFixed(2), speed: +k.speed.toFixed(2), max: +k.maxSpeed.toFixed(2), onGround: k.onGround, y: +k.position.y.toFixed(2), drifting: k.drifting, dir: k.driftDir, lvl: k.driftLevel, charge: +k.driftCharge.toFixed(2), boost: +k.boostTime.toFixed(2), spin: +k.spinTime.toFixed(2), tumble: +k.tumbleTime.toFixed(2), shrink: +k.shrinkTime.toFixed(2), star: +k.starTime.toFixed(2), scale: +k._scale.toFixed(2), heading: +k.heading.toFixed(3), offroad: k.offroad };
+  },
+  // Coloca o kart i em s/lateral com rumo da pista.
+  place(i, s, lat = 0, speed = 0) {
+    const k = karts[i];
+    const smp = track.sample(s);
+    const pos = smp.pos.clone().addScaledVector(smp.right, lat);
+    k.placeAt({ pos, heading: Math.atan2(smp.tangent.x, smp.tangent.z), s });
+    k.speed = speed;
+    k.frozen = false;
+    stats.get(k).prevS = k.s;
+    return this.state(i);
+  },
+};
+window.ready = true;
+</script>
+</body>
+</html>
