@@ -26,6 +26,18 @@ drop trigger if exists reports_rate_limit on public.reports;
 create trigger reports_rate_limit before insert on public.reports
   for each row execute function public.rate_limit('reporter_id', '1 day', '20');
 
+-- Mensagem só pode ser denunciada por quem participa da conversa.
+-- (definer: ler messages direto na policy de reports gera recursão de RLS
+--  com a policy de admin de messages, que lê reports)
+create or replace function public.can_report_message(p_id text) returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select case when p_id ~ '^[0-9]{1,18}$' then exists (
+    select 1 from public.messages m join public.conversations c on c.id = m.conversation_id
+    where m.id = p_id::bigint and (select auth.uid()) in (c.student_id, c.tutor_id))
+  else false end
+$$;
+
 -- ---------- RLS ----------
 alter table public.reports enable row level security;
 
@@ -34,10 +46,7 @@ create policy reports_insert on public.reports for insert to authenticated
   with check (
     reporter_id = (select auth.uid())
     and (select public.is_active_user())
-    -- mensagem só pode ser denunciada por quem a enxerga (participante da conversa)
-    and (target_type <> 'message' or case when reports.target_id ~ '^[0-9]{1,18}$'
-           then exists (select 1 from public.messages m where m.id = reports.target_id::bigint)
-           else false end)
+    and (target_type <> 'message' or public.can_report_message(target_id))
   );
 
 drop policy if exists reports_select_admin on public.reports;
@@ -181,7 +190,9 @@ begin
   );
 end $$;
 
-revoke execute on function public.admin_moderate(text, text, text, bigint), public.export_my_data()
+revoke execute on function public.admin_moderate(text, text, text, bigint), public.export_my_data(),
+  public.can_report_message(text)
   from public, anon, authenticated;
-grant execute on function public.admin_moderate(text, text, text, bigint), public.export_my_data()
+grant execute on function public.admin_moderate(text, text, text, bigint), public.export_my_data(),
+  public.can_report_message(text)
   to authenticated;

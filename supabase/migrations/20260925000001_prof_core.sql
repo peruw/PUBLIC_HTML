@@ -420,11 +420,12 @@ returns table (
   rating_count int, plan text, subjects text[], total bigint)
 language sql stable set search_path = ''
 as $$
-  with p0 as (
+  -- materialized: a tsquery é calculada uma vez, não por linha
+  with p0 as materialized (
     select case when nullif(btrim(q), '') is null then null
                 else websearch_to_tsquery('public.pt_unaccent', q) end as tsq
   ),
-  p as (
+  p as materialized (
     -- consulta só com stopwords vira "sem filtro"
     select case when p0.tsq is null or numnode(p0.tsq) = 0 then null else p0.tsq end as tsq from p0
   ),

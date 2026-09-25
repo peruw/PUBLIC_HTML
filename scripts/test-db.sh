@@ -40,7 +40,7 @@ locale -a 2>/dev/null | grep -qi '^c\.utf-\?8$' || LOCALE=C
 echo "==> Postgres temporário em $D (porta $PORT, $("$PGBIN/postgres" --version))"
 as_pg "$PGBIN/initdb" -D "$D/data" -A trust -U postgres -E UTF8 --locale="$LOCALE" >/dev/null
 if ! as_pg "$PGBIN/pg_ctl" -D "$D/data" -l "$D/server.log" -w \
-     -o "-p $PORT -k $D -c listen_addresses='' -c fsync=off" start >/dev/null; then
+     -o "-p $PORT -k $D -c listen_addresses='' -c fsync=off -c wal_level=logical" start >/dev/null; then
   cat "$D/server.log" >&2
   exit 2
 fi
@@ -51,7 +51,8 @@ PSQL=("$PGBIN/psql" -X -q -v ON_ERROR_STOP=1 -h "$D" -p "$PORT" -U postgres -d p
 
 run_sql() {
   echo "==> $1"
-  if ! "${PSQL[@]}" -f "$ROOT/$1"; then
+  # tira o prefixo "psql:arquivo:linha: NOTICE:" das asserções (erros ficam completos)
+  if ! "${PSQL[@]}" -f "$ROOT/$1" 2>&1 | sed -E 's/^psql:[^ ]+ NOTICE:  /   /'; then
     echo "FALHOU em $1" >&2
     exit 1
   fi
