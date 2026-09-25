@@ -154,7 +154,8 @@ async function init() {
 
   // Pré-compila os shaders para evitar travadas na primeira corrida.
   try {
-    if (renderer.compileAsync) await renderer.compileAsync(scene, camera);
+    // compileAsync só adianta com KHR_parallel_shader_compile (sem ela o three só avisa no console)
+    if (renderer.compileAsync && renderer.extensions?.has('KHR_parallel_shader_compile')) await renderer.compileAsync(scene, camera);
     else renderer.compile(scene, camera);
   } catch (err) {
     console.warn('pré-compilação falhou', err);

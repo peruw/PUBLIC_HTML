@@ -172,7 +172,7 @@ export const ITEMS = {
   },
   alfa: {
     id: 'alfa', name: 'Partícula Alfa', icon: 'α', color: 0xffd23f,
-    effect: 'Disparo em linha reta que ricocheteia nos muros. Segurando “olhar para trás” (C), sai para trás.', // (casco verde)
+    effect: 'Disparo em linha reta que ricocheteia nos muros. No computador, segure C para atirar para trás.', // (casco verde)
     fact: 'Em 1909, a equipe de Rutherford disparou partículas alfa contra uma folha de ouro. Algumas ricochetearam: o átomo tem um núcleo pequeno e denso!',
     weights: [40, 25, 20, 15, 10, 5, 0, 0],
   },

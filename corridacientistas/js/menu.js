@@ -55,7 +55,7 @@ export class Menu {
     this.portraits = {};
     this.opts = {
       character: store.get('character', 'newton'),
-      cc: store.get('cc', '100cc'),
+      cc: store.get('cc', '50cc'), // primeira vez: classe mais tranquila
       laps: store.get('laps', RACE.defaultLaps),
     };
     if (!CHARACTERS.some((c) => c.id === this.opts.character)) this.opts.character = 'newton';

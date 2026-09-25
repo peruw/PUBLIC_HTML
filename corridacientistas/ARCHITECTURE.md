@@ -85,8 +85,8 @@ export class Kart {
   drifting, driftDir (-1|0|1), driftLevel (0..3), boostTime, starTime, shrinkTime, spinTime, tumbleTime
   frozen          // true durante a contagem (não se move)
   speedFactor     // multiplicador extra de velocidade (IA usa para rubber-band), padrão 1
-  get maxSpeed(); get invincible(); get stunned()
-  item, itemCount, roulette       // controlados por items.js: roulette = { time, showing } | null
+  get maxSpeed(); get invincible(); get stunned(); get recovering()   // recovering: atordoado + 1 s de proteção (hit() recusa)
+  item, itemCount, roulette       // controlados por items.js: roulette = { time, showing, result } | null
   lap, progress, place, finished, finishTime   // controlados por race.js
   placeAt(slot)                   // reposiciona no grid, zera estados
   update(dt, world)
@@ -105,7 +105,7 @@ export function updateKarts(karts, dt, world)   // update de cada um + colisões
 ## IA: `js/ai.js` (direção)
 ```js
 export class AIDriver {
-  constructor(kart, track, { skill })   // skill 0..1 (CLASSES[x].aiSkill)
+  constructor(kart, track, { skill, lane })   // skill 0..1 (CLASSES[x].aiSkill); lane = faixa preferida (índice sorteado por corrida)
   update(dt, world)                     // escreve kart.controls (inclusive useItem)
 }
 ```
@@ -167,11 +167,12 @@ export class Effects {
 
 ## Modelos: `js/models.js` (arte)
 ```js
-export function createKartModel(characterId, { quality }) -> { group, update(dt, state) }
+export function createKartModel(characterId, { quality }) -> { group, update(dt, state), stats, anchors, dispose }
+   // group contém um THREE.LOD: modelo detalhado perto, malha simplificada além de ~25 m
    // group: origem no contato com o chão, frente +Z, ~1,8 m de comprimento, ~1,3 m de largura,
    // topo da cabeça ~1,7 m. state = { speed, steer, drifting, driftDir, onGround, boosting, stunned, time }
    // update gira rodas, esterça as dianteiras, inclina o piloto, anima acessórios.
-export function renderPortraits(renderer, size = 256) -> { [id]: dataURL }   // busto do cientista
+export function renderPortraits(renderer, size = 256, { ss = 2 } = {}) -> { [id]: dataURL }   // busto do cientista; ss = supersampling
 ```
 Cada cientista precisa ser reconhecível pela silhueta (ver `look` em `config.js`), em estilo low-poly, colorido e caricato.
 
@@ -215,6 +216,7 @@ export class AudioSystem {
 |---|---|
 | `race:countdown` | `{ n }` (3, 2, 1) |
 | `race:go` | `{}` |
+| `race:reset` | `{}` (volta ao menu ou nova corrida: apaga as luzes de largada) |
 | `race:lap` | `{ kart, lap }` |
 | `race:finalLap` | `{ kart }` (só o jogador) |
 | `race:finish` | `{ kart, place, time }` |
