@@ -84,13 +84,16 @@ create policy reviews_insert on public.reviews for insert to authenticated
               and public.can_review(tutor_id)
               and (select public.is_active_user()));
 
+-- Avaliação oculta pelo admin fica travada: o autor não edita nem apaga
+-- (apagar liberaria o unique para repostar como publicada). Banido não edita.
 drop policy if exists reviews_update_own on public.reviews;
 create policy reviews_update_own on public.reviews for update to authenticated
-  using (student_id = (select auth.uid())) with check (student_id = (select auth.uid()));
+  using (student_id = (select auth.uid()) and status = 'published' and (select public.is_active_user()))
+  with check (student_id = (select auth.uid()) and (select public.is_active_user()));
 
 drop policy if exists reviews_delete_own on public.reviews;
 create policy reviews_delete_own on public.reviews for delete to authenticated
-  using (student_id = (select auth.uid()));
+  using (student_id = (select auth.uid()) and status = 'published');
 
 -- ---------- Grants ----------
 revoke all on table public.reviews from anon, authenticated;

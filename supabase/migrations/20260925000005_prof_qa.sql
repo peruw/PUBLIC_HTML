@@ -120,16 +120,22 @@ create policy questions_select on public.questions for select to anon, authentic
 drop policy if exists questions_insert on public.questions;
 create policy questions_insert on public.questions for insert to authenticated
   with check (author_id = (select auth.uid()) and (select public.is_active_user()));
+-- Conteúdo oculto pelo admin fica travado para o autor (não edita nem apaga para repostar).
+-- Banido não edita.
 drop policy if exists questions_update_own on public.questions;
 create policy questions_update_own on public.questions for update to authenticated
-  using (author_id = (select auth.uid())) with check (author_id = (select auth.uid()));
+  using (author_id = (select auth.uid()) and status = 'open' and (select public.is_active_user()))
+  with check (author_id = (select auth.uid()) and (select public.is_active_user()));
 drop policy if exists questions_delete_own on public.questions;
 create policy questions_delete_own on public.questions for delete to authenticated
-  using (author_id = (select auth.uid()));
+  using (author_id = (select auth.uid()) and status = 'open');
 
+-- Resposta pública só se a pergunta também estiver no ar
 drop policy if exists answers_select on public.answers;
 create policy answers_select on public.answers for select to anon, authenticated
-  using (status = 'published' or tutor_id = (select auth.uid()) or (select public.is_admin()));
+  using ((status = 'published' and exists (select 1 from public.questions qq
+                                           where qq.id = answers.question_id and qq.status = 'open'))
+         or tutor_id = (select auth.uid()) or (select public.is_admin()));
 drop policy if exists answers_insert on public.answers;
 create policy answers_insert on public.answers for insert to authenticated
   with check (
@@ -140,12 +146,18 @@ create policy answers_insert on public.answers for insert to authenticated
     and exists (select 1 from public.questions qq
                 where qq.id = answers.question_id and qq.status = 'open')
   );
+-- Editar exige conta ativa e anúncio não suspenso (as mesmas regras de responder)
 drop policy if exists answers_update_own on public.answers;
 create policy answers_update_own on public.answers for update to authenticated
-  using (tutor_id = (select auth.uid())) with check (tutor_id = (select auth.uid()));
+  using (
+    tutor_id = (select auth.uid()) and status = 'published'
+    and (select public.is_active_user())
+    and exists (select 1 from public.tutor_profiles tp
+                where tp.user_id = (select auth.uid()) and not tp.suspended))
+  with check (tutor_id = (select auth.uid()) and (select public.is_active_user()));
 drop policy if exists answers_delete_own on public.answers;
 create policy answers_delete_own on public.answers for delete to authenticated
-  using (tutor_id = (select auth.uid()));
+  using (tutor_id = (select auth.uid()) and status = 'published');
 
 -- ---------- Grants ----------
 revoke all on table public.questions, public.answers from anon, authenticated;

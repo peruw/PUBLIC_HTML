@@ -114,12 +114,12 @@ begin
       if p_type not in ('tutor', 'user') then
         raise exception 'Ação inválida para este item.' using errcode = 'P0001';
       end if;
+      -- o anúncio de um banido sai do ar pelas policies/busca (banned_at);
+      -- "suspended" fica intacto para desbanir não desfazer uma suspensão à parte
       update public.profiles set banned_at = case when p_action = 'ban' then now() end where id = v_uuid;
       if not found then
         raise exception 'Usuário não encontrado.' using errcode = 'P0001';
       end if;
-      -- banir também tira o anúncio do ar (e desbanir devolve)
-      update public.tutor_profiles set suspended = (p_action = 'ban') where user_id = v_uuid;
     end if;
 
   elsif p_action = 'dismiss' then

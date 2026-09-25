@@ -534,8 +534,10 @@
   .pf-tutor-side {
     grid-column: 1 / -1;
     flex-direction: row; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px 12px; /* preço alto + botão longo não estouram em 360px */
     text-align: left;
   }
+  .pf-tutor-side .btn { margin-left: auto; } /* quebrou a linha: botão continua à direita */
 }
 
 /* ---------- Paginação ---------- */

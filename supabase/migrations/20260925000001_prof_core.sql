@@ -57,13 +57,19 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   role text not null default 'student' check (role in ('student', 'tutor')),
   full_name text not null default '' check (char_length(full_name) <= 80),
-  avatar_path text check (avatar_path is null or split_part(avatar_path, '/', 1) = id::text),
+  avatar_path text,
   is_admin boolean not null default false,
   banned_at timestamptz,
   terms_accepted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Foto só na própria pasta, nome simples ("<uid>/avatar-123.webp"): sem "..", sem subpastas.
+-- (drop/add: vale também para bancos criados com a regra antiga, que se chamava profiles_check)
+alter table public.profiles drop constraint if exists profiles_check;
+alter table public.profiles drop constraint if exists profiles_avatar_path_check;
+alter table public.profiles add constraint profiles_avatar_path_check check (
+  avatar_path is null or avatar_path ~ ('^' || id::text || '/[A-Za-z0-9_-]{1,100}\.(webp|png|jpe?g)$'));
 
 create table if not exists public.plans (
   code text primary key check (code in ('basico', 'profissional', 'premium')),
@@ -177,30 +183,45 @@ as $$
   )
 $$;
 
+-- Anúncio visível ao público: publicado, não suspenso e dono não banido.
+-- (definer: as policies de profiles/tutor_profiles/tutor_subjects não enxergam um banido)
+create or replace function public.is_public_tutor(p_uid uuid) returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select exists (
+    select 1 from public.tutor_profiles tp join public.profiles p on p.id = tp.user_id
+    where tp.user_id = p_uid and tp.published and not tp.suspended and p.banned_at is null
+  )
+$$;
+
 -- ---------- Triggers de tutor_profiles ----------
--- Valida publicação e reconstrói o índice de busca.
+-- Valida o anúncio publicado (ao publicar e em toda edição depois) e reconstrói o índice de busca.
+-- Remover a última matéria passa por aqui via touch_tutor.
 create or replace function public.tutor_before_write() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 declare
   v_name text;
   v_subjects text;
+  -- publicando agora: "antes de publicar"; já publicado: sugere despublicar
+  v_fim text := case when tg_op = 'INSERT' or not old.published then ' antes de publicar.'
+                     else ' (ou despublique o anúncio).' end;
 begin
-  if new.published and (tg_op = 'INSERT' or not old.published) then
+  if new.published then
     if btrim(coalesce(new.headline, '')) = '' then
-      raise exception 'Preencha o título do anúncio antes de publicar.' using errcode = 'P0001';
+      raise exception 'Preencha o título do anúncio%', v_fim using errcode = 'P0001';
     end if;
     if new.hourly_rate_cents is null then
-      raise exception 'Informe o valor da hora-aula antes de publicar.' using errcode = 'P0001';
+      raise exception 'Informe o valor da hora-aula%', v_fim using errcode = 'P0001';
     end if;
     if not (new.mode_online or new.mode_presencial) then
-      raise exception 'Escolha aulas online e/ou presenciais antes de publicar.' using errcode = 'P0001';
+      raise exception 'Escolha aulas online e/ou presenciais%', v_fim using errcode = 'P0001';
     end if;
     if new.mode_presencial and (new.uf is null or new.city_ibge is null) then
       raise exception 'Informe estado e cidade para aulas presenciais.' using errcode = 'P0001';
     end if;
     if not exists (select 1 from public.tutor_subjects ts where ts.tutor_id = new.user_id) then
-      raise exception 'Adicione ao menos uma matéria antes de publicar.' using errcode = 'P0001';
+      raise exception 'Adicione ao menos uma matéria%', v_fim using errcode = 'P0001';
     end if;
   end if;
 
@@ -258,7 +279,9 @@ declare
   v_max int;
   v_count int;
 begin
-  -- matéria já cadastrada: deixa o ON CONFLICT/unique resolver (upsert no limite não falha)
+  -- matéria já cadastrada: deixa o ON CONFLICT DO NOTHING / unique resolver (não acusa limite à toa).
+  -- Cliente: insert() para matéria nova (ou upsert com ignoreDuplicates) e update({ levels });
+  -- upsert() com merge gera "DO UPDATE SET tutor_id, subject_id…" e é negado (só levels é atualizável).
   if exists (select 1 from public.tutor_subjects ts
              where ts.tutor_id = new.tutor_id and ts.subject_id = new.subject_id) then
     return new;
@@ -344,6 +367,15 @@ drop trigger if exists prof_on_auth_user_created on auth.users;
 create trigger prof_on_auth_user_created after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Contas que já existiam no projeto antes desta migração também ganham perfil (como aluno)
+insert into public.profiles (id, full_name)
+select u.id,
+       coalesce(nullif(left(btrim(regexp_replace(
+         coalesce(u.raw_user_meta_data ->> 'full_name', u.raw_user_meta_data ->> 'name', ''), '\s+', ' ', 'g')), 80), ''),
+         'Usuário')
+from auth.users u
+on conflict (id) do nothing;
+
 -- Aluno vira professor (cria anúncio não publicado). Retorna o slug.
 create or replace function public.become_tutor() returns text
 language plpgsql security definer set search_path = ''
@@ -381,7 +413,17 @@ begin
 end $$;
 
 -- ---------- Rate limit genérico ----------
+-- Registro só de inserção: apagar e repostar não zera o limite. Nenhum cliente lê ou grava.
+create table if not exists public.rate_events (
+  id bigint generated always as identity primary key,
+  actor uuid not null references public.profiles (id) on delete cascade,
+  tbl text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists rate_events_actor_idx on public.rate_events (actor, tbl, created_at);
+
 -- Uso: before insert … execute function public.rate_limit('coluna_do_ator', '1 day', '5')
+-- (o 1º argumento só documenta a coluna; o ator é sempre auth.uid())
 create or replace function public.rate_limit() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
@@ -392,12 +434,18 @@ begin
   if v_actor is null then
     return new; -- service_role / manutenção
   end if;
-  execute format('select count(*) from %I.%I where %I = $1 and created_at > now() - $2::interval',
-                 tg_table_schema, tg_table_name, tg_argv[0])
-    into v_count using v_actor, tg_argv[1];
+  -- serializa por ator+tabela: requisições paralelas não furam o limite
+  -- (a contagem abaixo roda depois do lock, com snapshot novo)
+  perform pg_advisory_xact_lock(hashtextextended('rate_limit:' || tg_table_name || ':' || v_actor::text, 0));
+  -- poda o que já saiu da janela (mantém a tabela pequena, sem cron)
+  delete from public.rate_events e
+   where e.actor = v_actor and e.tbl = tg_table_name and e.created_at <= now() - tg_argv[1]::interval;
+  select count(*) into v_count from public.rate_events e
+   where e.actor = v_actor and e.tbl = tg_table_name and e.created_at > now() - tg_argv[1]::interval;
   if v_count >= tg_argv[2]::int then
     raise exception 'Limite atingido, tente mais tarde.' using errcode = 'P0001';
   end if;
+  insert into public.rate_events (actor, tbl) values (v_actor, tg_table_name);
   return new;
 end $$;
 
@@ -478,13 +526,17 @@ alter table public.plans enable row level security;
 alter table public.subjects enable row level security;
 alter table public.tutor_profiles enable row level security;
 alter table public.tutor_subjects enable row level security;
+alter table public.rate_events enable row level security; -- sem policies: só funções definer
 
+-- Público vê só professores com anúncio no ar (não lista cadastros despublicados, suspensos ou banidos)
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select on public.profiles for select to anon, authenticated
-  using (role = 'tutor' or id = (select auth.uid()) or (select public.is_admin()));
+  using ((role = 'tutor' and public.is_public_tutor(id)) or id = (select auth.uid()) or (select public.is_admin()));
+-- Banido não edita mais nada (nome aparece nas avaliações e perguntas)
 drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles for update to authenticated
-  using (id = (select auth.uid())) with check (id = (select auth.uid()));
+  using (id = (select auth.uid()) and (select public.is_active_user()))
+  with check (id = (select auth.uid()) and (select public.is_active_user()));
 
 drop policy if exists plans_select on public.plans;
 create policy plans_select on public.plans for select to anon, authenticated using (true);
@@ -493,26 +545,33 @@ drop policy if exists subjects_select on public.subjects;
 create policy subjects_select on public.subjects for select to anon, authenticated using (true);
 
 drop policy if exists tutor_profiles_select on public.tutor_profiles;
+-- Banimento não mexe em "suspended" (desbanir não pode desfazer uma suspensão à parte):
+-- is_public_tutor também tira do ar o anúncio de dono banido
 create policy tutor_profiles_select on public.tutor_profiles for select to anon, authenticated
-  using ((published and not suspended) or user_id = (select auth.uid()) or (select public.is_admin()));
+  using ((published and not suspended and public.is_public_tutor(user_id))
+         or user_id = (select auth.uid()) or (select public.is_admin()));
 drop policy if exists tutor_profiles_update_own on public.tutor_profiles;
 create policy tutor_profiles_update_own on public.tutor_profiles for update to authenticated
-  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+  using (user_id = (select auth.uid()) and (select public.is_active_user()))
+  with check (user_id = (select auth.uid()) and (select public.is_active_user()));
 
 drop policy if exists tutor_subjects_select on public.tutor_subjects;
-create policy tutor_subjects_select on public.tutor_subjects for select to anon, authenticated using (true);
+create policy tutor_subjects_select on public.tutor_subjects for select to anon, authenticated
+  using (public.is_public_tutor(tutor_id) or tutor_id = (select auth.uid()) or (select public.is_admin()));
 drop policy if exists tutor_subjects_insert_own on public.tutor_subjects;
 create policy tutor_subjects_insert_own on public.tutor_subjects for insert to authenticated
-  with check (tutor_id = (select auth.uid()));
+  with check (tutor_id = (select auth.uid()) and (select public.is_active_user()));
 drop policy if exists tutor_subjects_update_own on public.tutor_subjects;
 create policy tutor_subjects_update_own on public.tutor_subjects for update to authenticated
-  using (tutor_id = (select auth.uid())) with check (tutor_id = (select auth.uid()));
+  using (tutor_id = (select auth.uid()) and (select public.is_active_user()))
+  with check (tutor_id = (select auth.uid()) and (select public.is_active_user()));
 drop policy if exists tutor_subjects_delete_own on public.tutor_subjects;
 create policy tutor_subjects_delete_own on public.tutor_subjects for delete to authenticated
-  using (tutor_id = (select auth.uid()));
+  using (tutor_id = (select auth.uid()) and (select public.is_active_user()));
 
 -- ---------- Grants (Supabase dá ALL por padrão; aqui fica o mínimo) ----------
-revoke all on table public.profiles, public.plans, public.subjects, public.tutor_profiles, public.tutor_subjects
+revoke all on table public.profiles, public.plans, public.subjects, public.tutor_profiles, public.tutor_subjects,
+  public.rate_events
   from anon, authenticated;
 grant select on table public.profiles, public.plans, public.subjects, public.tutor_profiles, public.tutor_subjects
   to anon, authenticated;
@@ -530,10 +589,12 @@ revoke execute on function
 
 -- Usadas em policies (anon também: is_admin() aparece nas policies de leitura) ou pela busca pública.
 revoke execute on function public.effective_plan(text, timestamptz), public.is_admin(), public.is_active_user(),
+  public.is_public_tutor(uuid),
   public.plan_price(text, int), public.search_tutors(text, text, text, int, text, int, int, text, int, int),
   public.become_tutor()
   from public, anon, authenticated;
 grant execute on function public.effective_plan(text, timestamptz), public.is_admin(),
+  public.is_public_tutor(uuid),
   public.plan_price(text, int), public.search_tutors(text, text, text, int, text, int, int, text, int, int)
   to anon, authenticated;
 grant execute on function public.is_active_user(), public.become_tutor() to authenticated;

@@ -32,6 +32,12 @@ create function tests.uid(p text) returns uuid language sql immutable as $$
     when 'teresa'   then '00000000-0000-4000-c000-000000000011'
     when 'otavio'   then '00000000-0000-4000-c000-000000000012'
     when 'silvia'   then '00000000-0000-4000-c000-000000000013'
+    when 'vitor'    then '00000000-0000-4000-c000-000000000021'
+    when 'xavier'   then '00000000-0000-4000-c000-000000000022'
+    when 'extra1'   then '00000000-0000-4000-d000-000000000001'
+    when 'extra2'   then '00000000-0000-4000-d000-000000000002'
+    when 'extra3'   then '00000000-0000-4000-d000-000000000003'
+    when 'antiga'   then '00000000-0000-4000-e000-000000000001'
   end)::uuid
 $$;
 
@@ -120,6 +126,66 @@ begin
   return n;
 end $$;
 
+-- Concorrência: dblink abre conexões de verdade (PostgREST atende requisições em paralelo)
+do $$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'dblink') then
+    create extension if not exists dblink schema tests;
+  end if;
+end $$;
+
+-- Roda cada comando numa conexão própria, como p_user, todas com a transação aberta ao
+-- mesmo tempo; faz commit na ordem em que terminam. Devolve quantos deram certo.
+create function tests.race(p_user text, p_sqls text[]) returns int language plpgsql as $$
+declare
+  n int := coalesce(array_length(p_sqls, 1), 0);
+  cs text := format('host=%s port=%s dbname=%s user=%s',
+                    split_part(current_setting('unix_socket_directories'), ',', 1),
+                    current_setting('port'), current_database(), session_user);
+  v_msgs text := current_setting('client_min_messages');
+  done boolean[] := array_fill(false, array[n]);
+  v_ok int := 0;
+  pending int;
+  c text;
+begin
+  -- os erros esperados (limite) viram NOTICE do dblink: silencia só aqui
+  perform set_config('client_min_messages', 'warning', false);
+  for i in 1..n loop
+    c := 'tests_race_' || i;
+    perform tests.dblink_connect(c, cs);
+    perform tests.dblink_exec(c, 'begin');
+    perform tests.dblink_exec(c, 'set local role authenticated');
+    perform tests.dblink_exec(c, format('set local request.jwt.claim.sub = %L', tests.uid(p_user)));
+    perform tests.dblink_send_query(c, p_sqls[i]);
+  end loop;
+  for tick in 1..3000 loop -- até ~30 s
+    pending := 0;
+    for i in 1..n loop
+      continue when done[i];
+      c := 'tests_race_' || i;
+      if tests.dblink_is_busy(c) = 1 then
+        pending := pending + 1;
+        continue;
+      end if;
+      perform * from tests.dblink_get_result(c, false) as t(r text);
+      if tests.dblink_error_message(c) = 'OK' then
+        v_ok := v_ok + 1;
+      end if;
+      perform * from tests.dblink_get_result(c, false) as t(r text); -- esvazia
+      perform tests.dblink_exec(c, 'commit');
+      perform tests.dblink_disconnect(c);
+      done[i] := true;
+    end loop;
+    exit when pending = 0;
+    perform pg_sleep(0.01);
+  end loop;
+  perform set_config('client_min_messages', v_msgs, false);
+  if pending > 0 then
+    raise exception 'tests.race: conexões travadas (deadlock?)';
+  end if;
+  return v_ok;
+end $$;
+
 -- Usuários de teste (como superusuário; o trigger de signup cria os perfis)
 create function tests.new_user(p_id uuid, p_name text, p_role text default 'student') returns uuid
 language plpgsql as $$
@@ -182,6 +248,10 @@ begin
     ('anon', 'public.answers', 'INSERT', false), ('anon', 'public.messages', 'INSERT', false),
     ('anon', 'public.reports', 'INSERT', false), ('anon', 'public.payments', 'INSERT', false),
     ('anon', 'public.plans', 'UPDATE', false), ('anon', 'public.subjects', 'INSERT', false),
+    -- registro do rate limit: só funções definer
+    ('anon', 'public.rate_events', 'SELECT', false), ('authenticated', 'public.rate_events', 'SELECT', false),
+    ('authenticated', 'public.rate_events', 'INSERT', false), ('authenticated', 'public.rate_events', 'UPDATE', false),
+    ('authenticated', 'public.rate_events', 'DELETE', false),
     -- authenticated: leitura
     ('authenticated', 'public.conversations', 'SELECT', true), ('authenticated', 'public.messages', 'SELECT', true),
     ('authenticated', 'public.payments', 'SELECT', true), ('authenticated', 'public.reports', 'SELECT', true),
@@ -259,6 +329,7 @@ begin
     ('public.plan_price(text,integer)', true, true),
     ('public.effective_plan(text,timestamptz)', true, true),
     ('public.is_admin()', true, true),
+    ('public.is_public_tutor(uuid)', true, true),
     ('public.reviewer_name(public.reviews)', true, true),
     ('public.author_name(public.questions)', true, true),
     -- só logado
@@ -350,6 +421,11 @@ begin
   insert into auth.users (id, email, raw_user_meta_data)
   values (v_id, 'google@teste.local', '{"name":"Carlos Google"}');
   perform tests.eq((select full_name from public.profiles where id = v_id), 'Carlos Google', 'signup: usa "name" do login social');
+
+  -- conta que já existia antes da migração (00_shim.sql) ganhou perfil de aluno
+  perform tests.ok((select role = 'student' and full_name = 'Conta Antiga' and not is_admin
+                    from public.profiles where id = tests.uid('antiga')),
+                   'backfill: conta anterior à migração ganha perfil (aluno, nome normalizado)');
 
   perform tests.eq(public.short_name('Maria da Silva'), 'Maria S.', 'short_name: "Maria da Silva" -> "Maria S."');
   perform tests.eq(public.short_name('Maria'), 'Maria', 'short_name: nome único fica inteiro');
@@ -1317,12 +1393,17 @@ begin
   perform tests.login('tiago');
   perform tests.ok(public.is_active_user(), 'moderação: desbanido volta a ser ativo');
 
-  -- banir professor também suspende o anúncio
+  -- banir professor tira o anúncio do ar (pelas policies/busca, sem mexer em suspended)
   perform tests.login('admin');
   perform public.admin_moderate('tutor', tests.uid('leo')::text, 'ban');
   perform tests.anon();
   perform tests.ok(not exists (select 1 from public.search_tutors(p_lim => 50) where slug = 'leo-futuro'),
                    'moderação: professor banido sai da busca');
+  perform tests.eq((select count(*) from public.tutor_profiles where user_id = tests.uid('leo'))::text, '0',
+                   'moderação: professor banido sai do perfil público');
+  perform tests.su();
+  perform tests.ok((select not suspended from public.tutor_profiles where user_id = tests.uid('leo')),
+                   'moderação: banir não mexe em suspended');
   perform tests.login('admin');
   perform public.admin_moderate('tutor', tests.uid('leo')::text, 'unban');
   perform tests.anon();
@@ -1400,6 +1481,8 @@ declare
 begin
   perform tests.su();
   select count(*) into v_pay from public.payments where user_id in (tests.uid('teresa'), tests.uid('paula'));
+  perform tests.ok(exists (select 1 from public.rate_events where actor = tests.uid('paula')),
+                   'rate_events: ações da Paula registradas (antes da exclusão)');
   delete from auth.users where id = tests.uid('paula');
   perform tests.ok(not exists (select 1 from public.profiles where id = tests.uid('paula')), 'exclusão: perfil removido');
   perform tests.ok(not exists (select 1 from public.conversations where student_id = tests.uid('paula')),
@@ -1408,6 +1491,8 @@ begin
                    'exclusão: avaliação removida recalcula a nota');
   perform tests.ok(exists (select 1 from public.reports where reporter_id is null and target_id = tests.uid('teresa')::text),
                    'exclusão: denúncia fica anônima');
+  perform tests.ok(not exists (select 1 from public.rate_events where actor = tests.uid('paula')),
+                   'exclusão: registro do rate limit removido');
 
   delete from auth.users where id = tests.uid('teresa');
   perform tests.ok(not exists (select 1 from public.tutor_profiles where user_id = tests.uid('teresa')),
@@ -1415,6 +1500,412 @@ begin
   perform tests.eq((select count(*) from public.payments where user_id is null)::text, v_pay::text,
                    'exclusão: pagamentos ficam sem usuário (registro fiscal)');
   perform tests.ok(not exists (select 1 from public.answers where tutor_id = tests.uid('teresa')), 'exclusão: respostas removidas');
+end $$;
+
+-- =====================================================================
+-- 17. Regressões da revisão de segurança
+-- =====================================================================
+-- 17a. rate limit conta um registro só de inserção: apagar e repostar não zera
+do $$
+declare
+  v_xadrez smallint := (select id from public.subjects where slug = 'xadrez');
+begin
+  perform tests.new_user(tests.uid('vitor'), 'Vitor Veloz');
+  perform tests.login('vitor');
+  for i in 1..5 loop
+    insert into public.questions (subject_id, title) values (v_xadrez, 'Pergunta repetida número ' || i);
+  end loop;
+  perform tests.eq(tests.affected('delete from public.questions where author_id = auth.uid()')::text, '5',
+                   'rate_limit: autor apaga as próprias perguntas');
+  perform tests.throws(format('insert into public.questions (subject_id, title) values (%s, %L)', v_xadrez,
+                       'Repostando depois de apagar'), 'P0001',
+                       'rate_limit: apagar e repostar não zera o limite de perguntas', '%Limite atingido%');
+  perform tests.throws('select count(*) from public.rate_events', '42501', 'rate_events: cliente não lê');
+  perform tests.throws(format('insert into public.rate_events (actor, tbl) values (%L, %L)', tests.uid('vitor'), 'x'),
+                       '42501', 'rate_events: cliente não grava');
+  perform tests.throws('delete from public.rate_events', '42501', 'rate_events: cliente não zera o próprio limite');
+  perform tests.anon();
+  perform tests.throws('select count(*) from public.rate_events', '42501', 'rate_events: anon não lê');
+
+  -- eventos fora da janela são podados na próxima inserção
+  perform tests.su();
+  update public.rate_events set created_at = now() - interval '2 days'
+   where actor = tests.uid('vitor') and tbl = 'questions';
+  perform tests.login('vitor');
+  insert into public.questions (subject_id, title) values (v_xadrez, 'Pergunta de um novo dia');
+  perform tests.su();
+  perform tests.eq((select count(*) from public.rate_events where actor = tests.uid('vitor') and tbl = 'questions')::text,
+                   '1', 'rate_limit: eventos fora da janela são podados');
+end $$;
+
+-- 17b. requisições paralelas não furam os limites (conexões reais via dblink)
+do $$
+begin
+  perform tests.new_user(tests.uid('xavier'), 'Xavier Paralelo');
+end $$;
+
+do $$
+declare
+  v_sqls text[];
+begin
+  if not exists (select 1 from pg_extension where extname = 'dblink') then
+    raise warning 'PULADO: dblink indisponível, testes de concorrência não rodaram';
+    return;
+  end if;
+  select array_agg(format('insert into public.questions (title) values (%L)', 'Pergunta paralela número ' || i))
+    into v_sqls from generate_series(1, 12) i;
+  perform tests.eq(tests.race('xavier', v_sqls)::text, '5', 'rate_limit: 12 perguntas em paralelo, só 5 passam');
+  perform tests.eq((select count(*) from public.questions where author_id = tests.uid('xavier'))::text, '5',
+                   'rate_limit: em paralelo grava no máximo 5 perguntas');
+
+  -- 13 contatos novos ao mesmo tempo (11 extras + Ana + Bruno): só 10 passam
+  select array_agg(format('select public.start_conversation(%L, %L)', t, 'Oi! Tem horário esta semana?'))
+    into v_sqls
+    from unnest(array(select ('00000000-0000-4000-d000-0000000000' || lpad(i::text, 2, '0'))::uuid
+                      from generate_series(1, 11) i) || array[tests.uid('ana'), tests.uid('bruno')]) t;
+  perform tests.eq(tests.race('xavier', v_sqls)::text, '10', 'start_conversation: 13 contatos em paralelo, só 10 passam');
+  perform tests.eq((select count(*) from public.conversations where student_id = tests.uid('xavier'))::text, '10',
+                   'start_conversation: em paralelo abre no máximo 10 conversas');
+
+  -- várias abas abrindo a mesma conversa: uma conversa só, todas as mensagens
+  select array_agg(format('select public.start_conversation(%L, %L)', tests.uid('carla'), 'Mensagem paralela ' || i))
+    into v_sqls from generate_series(1, 4) i;
+  perform tests.eq(tests.race('vitor', v_sqls)::text, '4', 'start_conversation: pedidos paralelos ao mesmo professor passam');
+  perform tests.eq((select count(*)::text || '/' || sum((select count(*) from public.messages m where m.conversation_id = c.id))
+                    from public.conversations c
+                    where c.student_id = tests.uid('vitor') and c.tutor_id = tests.uid('carla')), '1/4',
+                   'start_conversation: paralelos reaproveitam uma conversa com as 4 mensagens');
+end $$;
+
+-- 17c. conteúdo oculto pelo admin fica travado para o autor (não apaga para repostar)
+do $$
+declare
+  v_review bigint;
+  v_seed_q bigint;
+  v_ans bigint;
+begin
+  perform tests.su();
+  select id into v_review from public.reviews where student_id = tests.uid('maria') and tutor_id = tests.uid('ana');
+  select id into v_seed_q from public.questions where author_id = tests.uid('joao') order by id limit 1;
+  select id into v_ans from public.answers where question_id = v_seed_q and tutor_id = tests.uid('gabriela');
+
+  perform tests.login('admin');
+  perform public.admin_moderate('review', v_review::text, 'hide');
+  perform public.admin_moderate('answer', v_ans::text, 'hide');
+
+  perform tests.login('maria');
+  perform tests.eq(tests.affected(format('delete from public.reviews where id = %s', v_review))::text, '0',
+                   'moderação: autor não apaga avaliação oculta');
+  perform tests.eq(tests.affected(format('update public.reviews set comment = %L where id = %s', 'editada', v_review))::text,
+                   '0', 'moderação: autor não edita avaliação oculta');
+  perform tests.throws(format('insert into public.reviews (tutor_id, rating, comment) values (%L, 1, %L)',
+                       tests.uid('ana'), 'CONTEUDO QUE O ADMIN ESCONDEU'), '23505',
+                       'moderação: avaliação oculta não volta como publicada');
+  perform tests.eq((select rating_count::text from public.tutor_profiles where user_id = tests.uid('ana')), '0',
+                   'moderação: avaliação oculta segue fora da média');
+
+  perform tests.login('gabriela');
+  perform tests.eq(tests.affected(format('delete from public.answers where id = %s', v_ans))::text, '0',
+                   'moderação: professor não apaga resposta oculta');
+  perform tests.eq(tests.affected(format('update public.answers set body = %L where id = %s',
+                   'Resposta editada depois de ocultada pelo admin.', v_ans))::text, '0',
+                   'moderação: professor não edita resposta oculta');
+  perform tests.throws(format('insert into public.answers (question_id, body) values (%s, %L)', v_seed_q,
+                       'SPAM QUE O ADMIN ESCONDEU, chama no zap'), '23505',
+                       'moderação: resposta oculta não volta como publicada');
+
+  -- pergunta oculta: autor não apaga nem edita; as respostas saem do público
+  perform tests.login('admin');
+  perform public.admin_moderate('answer', v_ans::text, 'restore');
+  perform public.admin_moderate('question', v_seed_q::text, 'hide');
+  perform tests.login('joao');
+  perform tests.eq(tests.affected(format('delete from public.questions where id = %s', v_seed_q))::text, '0',
+                   'moderação: autor não apaga pergunta oculta');
+  perform tests.eq(tests.affected(format('update public.questions set title = %L where id = %s',
+                   'Título trocado depois de ocultada', v_seed_q))::text, '0', 'moderação: autor não edita pergunta oculta');
+  perform tests.anon();
+  perform tests.eq((select count(*) from public.answers where question_id = v_seed_q)::text, '0',
+                   'answers: resposta de pergunta oculta sai do público');
+  perform tests.login('gabriela');
+  perform tests.eq((select count(*) from public.answers where question_id = v_seed_q)::text, '1',
+                   'answers: professor ainda vê a própria resposta de pergunta oculta');
+  perform tests.login('admin');
+  perform tests.eq((select count(*) from public.answers where question_id = v_seed_q)::text, '1',
+                   'answers: admin vê resposta de pergunta oculta');
+
+  perform public.admin_moderate('question', v_seed_q::text, 'restore');
+  perform public.admin_moderate('review', v_review::text, 'restore');
+  perform tests.anon();
+  perform tests.eq((select count(*) from public.answers where question_id = v_seed_q)::text, '1',
+                   'answers: pergunta restaurada devolve a resposta');
+  perform tests.login('maria');
+  perform tests.eq(tests.affected(format('update public.reviews set comment = %L where id = %s',
+                   'Explica com muita calma. Recomendo!', v_review))::text, '1',
+                   'reviews: autor ainda edita a própria publicada');
+end $$;
+
+-- 17d. banido não edita nada; o anúncio sai do ar sem mexer em suspended
+do $$
+declare
+  v_seed_q bigint;
+begin
+  perform tests.su();
+  select id into v_seed_q from public.questions where author_id = tests.uid('joao') order by id limit 1;
+  -- plano pago: o limite de matérias não mascara a checagem de RLS
+  update public.tutor_profiles set plan = 'profissional', plan_expires_at = now() + interval '30 days'
+   where user_id = tests.uid('gabriela');
+  perform tests.login('admin');
+  perform public.admin_moderate('user', tests.uid('maria')::text, 'ban');
+  perform public.admin_moderate('user', tests.uid('joao')::text, 'ban');
+  perform public.admin_moderate('user', tests.uid('gabriela')::text, 'ban');
+
+  perform tests.login('maria');
+  perform tests.eq(tests.affected($q$update public.reviews set rating = 1, comment = 'ABUSO EDITADO APOS BAN'
+                                     where student_id = auth.uid()$q$)::text, '0', 'banido: não edita avaliação');
+  perform tests.eq((select rating_avg::text from public.tutor_profiles where user_id = tests.uid('ana')), '5.00',
+                   'banido: nota do professor não muda');
+  perform tests.eq(tests.affected($q$update public.profiles set full_name = 'Xingamento Ofensivo'
+                                     where id = auth.uid()$q$)::text, '0', 'banido: não troca o nome público');
+  perform tests.eq(tests.affected(format('update public.profiles set avatar_path = %L where id = auth.uid()',
+                   tests.uid('maria')::text || '/avatar-2.webp'))::text, '0', 'banido: não troca a foto');
+  perform tests.throws(format('insert into storage.objects (bucket_id, name) values (%L, %L)', 'avatars',
+                       tests.uid('maria')::text || '/avatar-9.webp'), '42501', 'banido: não sobe arquivo de foto');
+
+  perform tests.login('joao');
+  perform tests.eq(tests.affected($q$update public.questions set title = 'SPAM EDITADO APOS BAN compre agora'
+                                     where author_id = auth.uid()$q$)::text, '0', 'banido: não edita pergunta');
+
+  perform tests.login('gabriela');
+  perform tests.eq(tests.affected($q$update public.answers set body = 'SPAM EDITADO APOS BAN, chama no zap agora'
+                                     where tutor_id = auth.uid()$q$)::text, '0', 'banido: não edita resposta');
+  perform tests.eq(tests.affected($q$update public.tutor_profiles set headline = 'Anúncio editado após ban'
+                                     where user_id = auth.uid()$q$)::text, '0', 'banido: não edita o anúncio');
+  perform tests.throws(format('insert into public.tutor_subjects (tutor_id, subject_id) select %L, id from public.subjects where slug = %L',
+                       tests.uid('gabriela'), 'fisica'), '42501', 'banido: não adiciona matéria');
+  perform tests.eq(tests.affected($q$update public.tutor_subjects set levels = '{medio}' where tutor_id = auth.uid()$q$)::text,
+                   '0', 'banido: não altera níveis');
+  perform tests.eq(tests.affected('delete from public.tutor_subjects where tutor_id = auth.uid()')::text, '0',
+                   'banido: não remove matéria');
+
+  perform tests.anon();
+  perform tests.eq((select count(*) from public.tutor_profiles where user_id = tests.uid('gabriela'))::text, '0',
+                   'banido: anúncio sai do perfil público');
+  perform tests.eq((select count(*) from public.profiles where id = tests.uid('gabriela'))::text, '0',
+                   'banido: perfil sai do público');
+  perform tests.eq((select count(*) from public.tutor_subjects where tutor_id = tests.uid('gabriela'))::text, '0',
+                   'banido: matérias saem do público');
+  perform tests.ok(not exists (select 1 from public.search_tutors(p_lim => 50) where slug = 'gabriela-nunes'),
+                   'banido: sai da busca');
+  perform tests.su();
+  perform tests.ok((select not suspended from public.tutor_profiles where user_id = tests.uid('gabriela')),
+                   'banido: suspended intacto');
+
+  -- professor suspenso também não edita a resposta
+  perform tests.login('admin');
+  perform public.admin_moderate('user', tests.uid('maria')::text, 'unban');
+  perform public.admin_moderate('user', tests.uid('joao')::text, 'unban');
+  perform public.admin_moderate('user', tests.uid('gabriela')::text, 'unban');
+  perform public.admin_moderate('tutor', tests.uid('gabriela')::text, 'suspend');
+  perform tests.login('gabriela');
+  perform tests.eq(tests.affected($q$update public.answers set body = 'Resposta editada com o anúncio suspenso.'
+                                     where tutor_id = auth.uid()$q$)::text, '0', 'suspenso: não edita resposta');
+  perform tests.login('admin');
+  perform public.admin_moderate('tutor', tests.uid('gabriela')::text, 'unsuspend');
+  perform tests.login('gabriela');
+  perform tests.eq(tests.affected($q$update public.answers set body = 'Use soma e produto quando a = 1: dois números com soma -b e produto c.'
+                                     where tutor_id = auth.uid()$q$)::text, '1', 'reativado: volta a editar a resposta');
+  perform tests.login('maria');
+  perform tests.eq(tests.affected($q$update public.profiles set full_name = 'Maria Santos' where id = auth.uid()$q$)::text,
+                   '1', 'desbanido: volta a editar o perfil');
+  perform tests.anon();
+  perform tests.ok(exists (select 1 from public.search_tutors(p_lim => 50) where slug = 'gabriela-nunes'),
+                   'desbanido: volta à busca');
+  perform tests.eq((select count(*) from public.questions where id = v_seed_q)::text, '1',
+                   'desbanido: pergunta continua no ar');
+  perform tests.su();
+  update public.tutor_profiles set plan = 'basico', plan_expires_at = null where user_id = tests.uid('gabriela');
+end $$;
+
+-- 17e. desbanir não desfaz uma suspensão à parte
+do $$
+begin
+  perform tests.login('admin');
+  perform public.admin_moderate('tutor', tests.uid('carla')::text, 'suspend');
+  perform public.admin_moderate('user', tests.uid('carla')::text, 'ban');
+  perform public.admin_moderate('user', tests.uid('carla')::text, 'unban');
+  perform tests.su();
+  perform tests.ok((select suspended from public.tutor_profiles where user_id = tests.uid('carla')),
+                   'moderação: desbanir mantém a suspensão do anúncio');
+  perform tests.anon();
+  perform tests.eq((select count(*) from public.tutor_profiles where user_id = tests.uid('carla'))::text, '0',
+                   'moderação: suspenso e desbanido segue fora do ar');
+  perform tests.login('admin');
+  perform public.admin_moderate('tutor', tests.uid('carla')::text, 'unsuspend');
+  perform tests.anon();
+  perform tests.eq((select count(*) from public.tutor_profiles where user_id = tests.uid('carla'))::text, '1',
+                   'moderação: reativar explicitamente devolve o anúncio');
+end $$;
+
+-- 17f. público só enxerga professores com anúncio no ar
+do $$
+begin
+  perform tests.anon();
+  perform tests.eq((select count(*) from public.profiles where id = tests.uid('otavio'))::text, '0',
+                   'profiles: anon não lê professor despublicado');
+  perform tests.eq((select count(*) from public.profiles where id = tests.uid('silvia'))::text, '0',
+                   'profiles: anon não lê professor suspenso');
+  perform tests.eq((select count(*) from public.profiles p
+                    where not exists (select 1 from public.tutor_profiles t where t.user_id = p.id))::text, '0',
+                   'profiles: anon não enumera cadastros sem anúncio no ar');
+  perform tests.eq((select count(*) from public.tutor_subjects where tutor_id in (tests.uid('otavio'), tests.uid('silvia')))::text,
+                   '0', 'tutor_subjects: anon não lê matérias de anúncio fora do ar');
+  perform tests.login('rafael');
+  perform tests.eq((select count(*) from public.profiles where id = tests.uid('otavio'))::text, '0',
+                   'profiles: logado não lê professor despublicado');
+  perform tests.login('otavio');
+  perform tests.eq((select count(*) from public.profiles where id = tests.uid('otavio'))::text
+                   || '/' || (select count(*) from public.tutor_subjects where tutor_id = tests.uid('otavio')),
+                   '1/1', 'profiles/tutor_subjects: dono lê os próprios fora do ar');
+  perform tests.login('admin');
+  perform tests.eq((select count(*) from public.tutor_subjects where tutor_id = tests.uid('otavio'))::text, '1',
+                   'tutor_subjects: admin lê matérias de anúncio fora do ar');
+
+  -- quem conversa com o professor continua vendo o nome dele se o anúncio for suspenso
+  perform public.admin_moderate('tutor', tests.uid('extra1')::text, 'suspend');
+  perform tests.login('tiago');
+  perform tests.eq((select count(*) from public.profiles where id = tests.uid('extra1'))::text, '1',
+                   'profiles: aluno ainda vê o professor suspenso com quem conversa');
+  perform tests.anon();
+  perform tests.eq((select count(*) from public.profiles where id = tests.uid('extra1'))::text, '0',
+                   'profiles: anon não vê o professor suspenso');
+  perform tests.login('admin');
+  perform public.admin_moderate('tutor', tests.uid('extra1')::text, 'unsuspend');
+end $$;
+
+-- 17g. avatar_path só no formato do upload (sem "..", sem subpasta)
+do $$
+declare
+  v_me text := tests.uid('rafael')::text;
+begin
+  perform tests.login('rafael');
+  perform tests.throws(format('update public.profiles set avatar_path = %L where id = auth.uid()',
+                       v_me || '/../../outro-bucket/arquivo.png'), '23514', 'avatar_path: ".." recusado');
+  perform tests.throws(format('update public.profiles set avatar_path = %L where id = auth.uid()',
+                       v_me || '/../' || tests.uid('ana')::text || '/avatar.webp'), '23514', 'avatar_path: pasta alheia via ".." recusada');
+  perform tests.throws(format('update public.profiles set avatar_path = %L where id = auth.uid()',
+                       v_me || '/sub/avatar.webp'), '23514', 'avatar_path: subpasta recusada');
+  perform tests.throws(format('update public.profiles set avatar_path = %L where id = auth.uid()',
+                       v_me || '/avatar.svg'), '23514', 'avatar_path: extensão fora da lista recusada');
+  perform tests.eq(tests.affected(format('update public.profiles set avatar_path = %L where id = auth.uid()',
+                   v_me || '/avatar-1727222400000.webp'))::text, '1', 'avatar_path: formato do upload aceito');
+end $$;
+
+-- 17h. apply_payment: checkout antigo de plano inferior e estorno de outra tentativa
+do $$
+declare
+  pa uuid; pb uuid; pc uuid; pd uuid;
+  v_exp timestamptz;
+begin
+  perform tests.su();
+  update public.tutor_profiles set plan = 'basico', plan_expires_at = null
+   where user_id in (tests.uid('carla'), tests.uid('eduarda'));
+  perform tests.service();
+  insert into public.payments (user_id, plan, months, amount_cents)
+    values (tests.uid('carla'), 'profissional', 1, public.plan_price('profissional', 1)) returning id into pa;
+  insert into public.payments (user_id, plan, months, amount_cents)
+    values (tests.uid('carla'), 'premium', 12, public.plan_price('premium', 12)) returning id into pb;
+  perform tests.eq(public.apply_payment(pb, 'mp-pb', 'approved', 53910, '{}'), 'applied', 'apply_payment: premium 12 meses');
+  select plan_expires_at into v_exp from public.tutor_profiles where user_id = tests.uid('carla');
+  perform tests.eq(public.apply_payment(pa, 'mp-pa', 'approved', 2990, '{}'), 'superseded',
+                   'apply_payment: checkout antigo de plano inferior não rebaixa (superseded)');
+  perform tests.ok((select plan = 'premium' and plan_expires_at = v_exp from public.tutor_profiles
+                    where user_id = tests.uid('carla')), 'apply_payment: superseded preserva plano e validade');
+  perform tests.ok((select status = 'approved' and applied_at is null from public.payments where id = pa),
+                   'apply_payment: superseded fica pago e não aplicado');
+  perform tests.eq(public.apply_payment(pa, 'mp-pa', 'approved', 2990, '{}'), 'already_applied',
+                   'apply_payment: superseded é idempotente');
+  perform tests.eq(public.apply_payment(pa, 'mp-pa', 'refunded', 2990, '{}'), 'updated',
+                   'apply_payment: estorno de superseded só registra');
+  perform tests.ok((select plan = 'premium' and plan_expires_at = v_exp from public.tutor_profiles
+                    where user_id = tests.uid('carla')), 'apply_payment: estorno de superseded não mexe no plano');
+
+  -- upgrade (profissional vigente -> premium) continua valendo
+  insert into public.payments (user_id, plan, months, amount_cents)
+    values (tests.uid('eduarda'), 'profissional', 1, public.plan_price('profissional', 1)) returning id into pc;
+  insert into public.payments (user_id, plan, months, amount_cents)
+    values (tests.uid('eduarda'), 'premium', 1, public.plan_price('premium', 1)) returning id into pd;
+  perform tests.eq(public.apply_payment(pc, '111', 'pending', 2990, '{}'), 'updated', 'apply_payment: Pix pendente');
+  perform tests.eq(public.apply_payment(pc, '222', 'approved', 2990, '{}'), 'applied', 'apply_payment: cartão aprovado na mesma referência');
+  perform tests.eq(public.apply_payment(pd, 'mp-pd', 'approved', 5990, '{}'), 'applied', 'apply_payment: upgrade para plano superior');
+  perform tests.eq((select plan from public.tutor_profiles where user_id = tests.uid('eduarda')), 'premium',
+                   'apply_payment: upgrade troca o plano');
+  select plan_expires_at into v_exp from public.tutor_profiles where user_id = tests.uid('eduarda');
+
+  -- Pix abandonado expira depois do cartão aprovado: não desfaz nada
+  perform tests.eq(public.apply_payment(pc, '111', 'cancelled', 2990, '{}'), 'already_applied',
+                   'apply_payment: cancelamento de outra tentativa não desfaz o pagamento');
+  perform tests.eq(public.apply_payment(pc, '333', 'refunded', 2990, '{}'), 'already_applied',
+                   'apply_payment: estorno de outro pagamento do MP não desfaz');
+  perform tests.ok((select status = 'approved' and mp_payment_id = '222' from public.payments where id = pc),
+                   'apply_payment: referência segue quitada pelo pagamento 222');
+  perform tests.eq(public.apply_payment(pc, '222', 'refunded', 2990, '{}'), 'reversed',
+                   'apply_payment: estorno do pagamento que quitou desfaz');
+  perform tests.ok((select plan = 'premium' and plan_expires_at = v_exp from public.tutor_profiles
+                    where user_id = tests.uid('eduarda')), 'apply_payment: estorno do profissional não mexe no premium');
+end $$;
+
+-- 17i. anúncio publicado não pode ser esvaziado
+do $$
+begin
+  perform tests.login('extra2');
+  perform tests.throws($q$update public.tutor_profiles set headline = '' where user_id = auth.uid()$q$,
+                       'P0001', 'publicado: não esvazia o título', '%despublique%');
+  perform tests.throws($q$update public.tutor_profiles set hourly_rate_cents = null where user_id = auth.uid()$q$,
+                       'P0001', 'publicado: não apaga o preço', '%hora-aula%');
+  perform tests.throws($q$update public.tutor_profiles set mode_online = false, mode_presencial = false
+                          where user_id = auth.uid()$q$, 'P0001', 'publicado: não fica sem modalidade', '%online%');
+  perform tests.throws($q$update public.tutor_profiles set mode_presencial = true where user_id = auth.uid()$q$,
+                       'P0001', 'publicado: presencial exige cidade depois de publicar', '%cidade%');
+  perform tests.throws('delete from public.tutor_subjects where tutor_id = auth.uid()',
+                       'P0001', 'publicado: não remove a última matéria', '%matéria%');
+  perform tests.anon();
+  perform tests.ok((select headline <> '' and hourly_rate_cents is not null and cardinality(subjects) = 1
+                    from public.search_tutors(p_lim => 50) where slug = 'extra-tutor-2'),
+                   'publicado: anúncio segue completo na busca');
+  perform tests.login('extra2');
+  perform tests.eq(tests.affected('update public.tutor_profiles set published = false where user_id = auth.uid()')::text,
+                   '1', 'despublicar: sempre permitido');
+  perform tests.eq(tests.affected('delete from public.tutor_subjects where tutor_id = auth.uid()')::text, '1',
+                   'despublicado: pode remover a última matéria');
+  perform tests.eq(tests.affected($q$update public.tutor_profiles set headline = '' where user_id = auth.uid()$q$)::text,
+                   '1', 'despublicado: pode esvaziar o anúncio');
+end $$;
+
+-- 17j. matérias: contrato de upsert do cliente
+do $$
+begin
+  perform tests.login('extra3');
+  insert into public.tutor_subjects (tutor_id, subject_id)
+    select auth.uid(), id from public.subjects where slug in ('fisica', 'quimica');
+  perform tests.eq(tests.affected($q$insert into public.tutor_subjects (tutor_id, subject_id)
+                   select auth.uid(), id from public.subjects where slug = 'xadrez'
+                   on conflict (tutor_id, subject_id) do nothing$q$)::text, '0',
+                   'limite: upsert com ignoreDuplicates de matéria existente passa no limite');
+  perform tests.throws($q$insert into public.tutor_subjects (tutor_id, subject_id, levels)
+                   select auth.uid(), id, '{adulto}' from public.subjects where slug = 'xadrez'
+                   on conflict (tutor_id, subject_id) do update
+                   set tutor_id = excluded.tutor_id, subject_id = excluded.subject_id, levels = excluded.levels$q$,
+                   '42501', 'tutor_subjects: upsert com merge é negado (cliente usa insert + update de levels)');
+  perform tests.eq(tests.affected($q$update public.tutor_subjects set levels = '{adulto}' where tutor_id = auth.uid()$q$)::text,
+                   '3', 'tutor_subjects: update de levels continua liberado');
+end $$;
+
+-- 17k. conta anterior à migração funciona normalmente
+do $$
+begin
+  perform tests.login('antiga');
+  perform tests.ok(public.is_active_user(), 'backfill: conta antiga é usuário ativo');
+  perform tests.eq(public.become_tutor(), 'conta-antiga', 'backfill: conta antiga vira professora');
 end $$;
 
 -- ---------- Resumo ----------

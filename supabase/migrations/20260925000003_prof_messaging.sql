@@ -127,6 +127,12 @@ begin
 
   select c.id into v_conv from public.conversations c where c.student_id = v_uid and c.tutor_id = p_tutor;
   if v_conv is null then
+    -- serializa por aluno: chamadas paralelas não furam o limite diário.
+    -- Depois do lock a contagem tem snapshot novo; relê a conversa (pode ter sido criada em paralelo).
+    perform pg_advisory_xact_lock(hashtextextended('start_conversation:' || v_uid::text, 0));
+    select c.id into v_conv from public.conversations c where c.student_id = v_uid and c.tutor_id = p_tutor;
+  end if;
+  if v_conv is null then
     select count(*) into v_new from public.conversations c
       where c.student_id = v_uid and c.created_at > now() - interval '1 day';
     if v_new >= 10 then

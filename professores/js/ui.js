@@ -28,10 +28,14 @@ function appendChildren(el, children) {
   }
 }
 
+// Atributos enumerados: false precisa virar "false" (omitir não é o mesmo que false)
+const ENUM_BOOL_ATTRS = new Set(['spellcheck', 'draggable', 'contenteditable']);
+
 /**
  * Cria um elemento de forma segura.
  * attrs: class (string ou array), dataset {}, style (string ou objeto), on<Evento> (função),
- *        aria-*, booleanos (true = atributo vazio; false/null = omitido), value/checked/selected (propriedade).
+ *        aria-* (booleano vira "true"/"false": { 'aria-selected': ativo }),
+ *        booleanos (true = atributo vazio; false/null = omitido), value/checked/selected (propriedade).
  * children: string/número (vira texto), Node, arrays, null/false ignorados.
  * Nunca usa innerHTML: strings sempre viram text nodes.
  * @returns {HTMLElement}
@@ -40,6 +44,10 @@ export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
   const props = []; // value/checked/... aplicados depois dos filhos (ex.: <select> precisa das <option>)
   for (const [key, val] of Object.entries(attrs || {})) {
+    if (typeof val === 'boolean' && (/^aria-/i.test(key) || ENUM_BOOL_ATTRS.has(key.toLowerCase()))) {
+      el.setAttribute(key, String(val));
+      continue;
+    }
     if (val == null || val === false) continue;
     if (key === 'class' || key === 'className') {
       el.className = Array.isArray(val) ? val.filter(Boolean).join(' ') : String(val);
@@ -163,11 +171,15 @@ export function planBadge(plan) {
 
 // ---------- Toast ----------
 
+// Com um modal aberto, o resto da página fica inerte e abaixo do fundo escuro:
+// a região de avisos vai para DENTRO do <dialog> mais recente (camada superior).
 function toastRegion() {
-  let region = document.getElementById('pfToasts');
+  const host = [...document.querySelectorAll('dialog.pf-modal[open]')].pop() || document.body;
+  let region = host.querySelector(':scope > .pf-toasts');
   if (!region) {
-    region = h('div', { id: 'pfToasts', class: 'pf-toasts', 'aria-live': 'polite', 'aria-atomic': 'false' });
-    document.body.appendChild(region);
+    region = h('div', { class: 'pf-toasts', 'aria-live': 'polite', 'aria-atomic': 'false' });
+    if (host === document.body) region.id = 'pfToasts';
+    host.appendChild(region);
   }
   return region;
 }
@@ -242,6 +254,10 @@ export function modal({ title = '', content = null, actions = [], onClose, size 
     if (closed) return;
     closed = true;
     if (dlg.open && typeof dlg.close === 'function') dlg.close();
+    else dlg.removeAttribute('open');
+    // Avisos ainda visíveis (ex.: "Enviado!" logo antes de fechar) continuam na página
+    const left = dlg.querySelector(':scope > .pf-toasts');
+    if (left && left.children.length) toastRegion().append(...left.children);
     dlg.remove();
     if (opener && typeof opener.focus === 'function') opener.focus();
     if (onClose) onClose();
@@ -278,11 +294,23 @@ export function modal({ title = '', content = null, actions = [], onClose, size 
 
   // Esc (cancel) e clique no fundo
   dlg.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
-  dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });
+  // Fecha só se o clique COMEÇOU e TERMINOU fora da caixa: arrastar a seleção de um
+  // campo e soltar no fundo gera "click" no <dialog> e não pode descartar o texto digitado
+  const outside = (e) => {
+    const r = dlg.getBoundingClientRect();
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  };
+  let downOnBackdrop = false;
+  dlg.addEventListener('pointerdown', (e) => { downOnBackdrop = e.target === dlg && outside(e); });
+  dlg.addEventListener('click', (e) => {
+    if (e.target === dlg && downOnBackdrop && outside(e)) close();
+    downOnBackdrop = false;
+  });
 
   document.body.appendChild(dlg);
   if (typeof dlg.showModal === 'function') dlg.showModal();
   else dlg.setAttribute('open', '');
+  toastRegion(); // região aria-live vazia já dentro do modal (avisos seguintes são anunciados)
 
   // Foco no primeiro campo do conteúdo, se houver
   const first = dlg.querySelector('.pf-modal-body input, .pf-modal-body select, .pf-modal-body textarea');
@@ -413,9 +441,13 @@ export function debounce(fn, ms = 300) {
 
 let revealObs = null;
 
-/** Observa elementos .reveal (útil para conteúdo inserido depois do initChrome). */
+/**
+ * Observa elementos .reveal dentro de root (e o próprio root, se for .reveal).
+ * Depois do initChrome() é automático para conteúdo inserido via JS.
+ */
 export function observeReveal(root = document) {
-  const items = root.querySelectorAll('.reveal:not(.in)');
+  const items = [...root.querySelectorAll('.reveal:not(.in)')];
+  if (root instanceof Element && root.matches('.reveal:not(.in)')) items.push(root);
   if (!items.length) return;
   if (!('IntersectionObserver' in window)) {
     items.forEach((el) => el.classList.add('in'));
@@ -479,6 +511,14 @@ export function initChrome() {
   }
 
   observeReveal();
+  // .reveal começa invisível: conteúdo renderizado depois (cards, listas) também precisa ser observado
+  if ('MutationObserver' in window) {
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        for (const n of m.addedNodes) if (n.nodeType === 1) observeReveal(n);
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  }
 
   // Link ativo (perfil em /professores/p/<slug> não marca nada)
   const here = normPath(location.pathname);

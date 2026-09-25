@@ -16,9 +16,19 @@ create table if not exists public.payments (
   mp_preference_id text,
   mp_payment_id text unique,
   raw jsonb,
+  applied_at timestamptz, -- quando o plano foi concedido (null = aprovado mas não aplicado)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- bancos criados antes da coluna: todo aprovado até então concedeu o plano (só na 1ª vez)
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'payments' and column_name = 'applied_at') then
+    alter table public.payments add column applied_at timestamptz;
+    update public.payments set applied_at = updated_at where status = 'approved';
+  end if;
+end $$;
 create index if not exists payments_user_idx on public.payments (user_id, created_at desc);
 
 drop trigger if exists payments_updated_at on public.payments;
@@ -27,7 +37,9 @@ create trigger payments_updated_at before update on public.payments
 
 -- Aplica o resultado de um pagamento consultado na API do MP.
 -- Idempotente; confere o valor; estende a validade do plano.
--- Retorna: applied | already_applied | amount_mismatch | reversed | updated | ignored | conflict | not_found | no_tutor
+-- Retorna: applied | already_applied | amount_mismatch | reversed | updated | ignored | conflict | not_found
+--          | no_tutor | superseded (plano inferior pago com um superior em vigor: aprovado, não aplicado,
+--          estornar manualmente)
 create or replace function public.apply_payment(
   p_id uuid, p_mp_payment_id text, p_status text, p_amount_cents int, p_raw jsonb)
 returns text
@@ -59,9 +71,15 @@ begin
   end if;
 
   if v_pay.status = 'approved' then
-    if p_status in ('refunded', 'charged_back', 'cancelled') then
+    -- só o pagamento do MP que quitou a referência pode desfazê-la (Pix expirado ou
+    -- tentativa duplicada da mesma preferência chega como outro id e é ignorado)
+    if p_status in ('refunded', 'charged_back', 'cancelled')
+       and v_pay.mp_payment_id is not null and p_mp_payment_id = v_pay.mp_payment_id then
       -- estorno: registra e devolve os meses concedidos (se o plano ainda é o mesmo)
       update public.payments set status = p_status, raw = coalesce(p_raw, raw) where id = p_id;
+      if v_pay.applied_at is null then
+        return 'updated'; -- nunca concedeu plano (superseded/no_tutor): nada a devolver
+      end if;
       update public.tutor_profiles tp
         set plan_expires_at = tp.plan_expires_at - make_interval(months => v_pay.months)
         where tp.user_id = v_pay.user_id and tp.plan = v_pay.plan and tp.plan_expires_at is not null;
@@ -84,6 +102,17 @@ begin
     return case when v_status = 'amount_mismatch' then 'amount_mismatch' else 'updated' end;
   end if;
 
+  -- checkout antigo de plano inferior pago depois de um superior: não troca o plano
+  -- (trocaria premium por profissional e apagaria o tempo pago)
+  perform 1 from public.tutor_profiles tp
+    join public.plans cur on cur.code = public.effective_plan(tp.plan, tp.plan_expires_at)
+    join public.plans novo on novo.code = v_pay.plan
+    where tp.user_id = v_pay.user_id and cur.rank_tier > novo.rank_tier
+    for update of tp;
+  if found then
+    return 'superseded';
+  end if;
+
   -- renova a partir da validade atual se for o mesmo plano ainda ativo; senão a partir de agora
   update public.tutor_profiles tp set
     plan = v_pay.plan,
@@ -94,6 +123,7 @@ begin
   if not found then
     return 'no_tutor';
   end if;
+  update public.payments set applied_at = now() where id = p_id;
   return 'applied';
 end $$;
 

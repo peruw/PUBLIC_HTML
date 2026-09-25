@@ -101,3 +101,7 @@ create publication supabase_realtime;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+
+-- ---------- Conta criada antes das migrações do portal (testa o backfill de profiles) ----------
+insert into auth.users (id, email, raw_user_meta_data)
+values ('00000000-0000-4000-e000-000000000001', 'antiga@teste.local', '{"name":"  Conta   Antiga "}');
