@@ -9,6 +9,7 @@ import {
   extractNotification,
   hmacSha256Hex,
   isDowngrade,
+  isStaleReversal,
   isTransientDbError,
   isUuid,
   isValidMonths,
@@ -18,6 +19,7 @@ import {
   pickRaw,
   planRank,
   planTitle,
+  REVERSAL_STATUSES,
   timingSafeEqual,
   toCents,
   verifySignature,
@@ -387,5 +389,53 @@ describe('pagamento', () => {
     assert.equal(isTransientDbError({ code: 'PGRST000' }), true, 'PostgREST sem banco');
     assert.equal(isTransientDbError({ code: 'PGRST202' }), true, 'função ainda não criada');
     assert.equal(isTransientDbError({}), true, 'erro de rede sem código');
+  });
+});
+
+// Regressão: uma preferência pode ter vários pagamentos no MP; estorno/cancelamento de outra tentativa
+// não pode desfazer o plano pago (antes: Pix abandonado expirando depois do cartão tirava o plano)
+describe('isStaleReversal', () => {
+  const approvedBy222 = { status: 'approved', mp_payment_id: '222' };
+
+  test('REVERSAL_STATUSES', () => {
+    assert.deepEqual([...REVERSAL_STATUSES].sort(), ['cancelled', 'charged_back', 'refunded']);
+  });
+
+  test('Pix abandonado (111) cancelado depois do cartão (222) aprovado: ignora', () => {
+    assert.equal(isStaleReversal(approvedBy222, '111', 'cancelled'), true);
+  });
+
+  test('pagamento duplicado (333) estornado: ignora', () => {
+    assert.equal(isStaleReversal(approvedBy222, '333', 'refunded'), true);
+    assert.equal(isStaleReversal(approvedBy222, '333', 'charged_back'), true);
+  });
+
+  test('estorno/contestação do pagamento que quitou a referência: segue para apply_payment', () => {
+    assert.equal(isStaleReversal(approvedBy222, '222', 'refunded'), false);
+    assert.equal(isStaleReversal(approvedBy222, '222', 'charged_back'), false);
+    assert.equal(isStaleReversal({ status: 'approved', mp_payment_id: 222 }, '222', 'refunded'), false, 'id numérico');
+  });
+
+  test('aprovado no MP nunca vira cancelled: cancelled em referência aprovada sempre é ignorado', () => {
+    assert.equal(isStaleReversal(approvedBy222, '222', 'cancelled'), true);
+  });
+
+  test('referência aprovada sem mp_payment_id: não desfaz (tratar à mão)', () => {
+    assert.equal(isStaleReversal({ status: 'approved', mp_payment_id: null }, '222', 'refunded'), true);
+    assert.equal(isStaleReversal({ status: 'approved' }, '222', 'refunded'), true);
+  });
+
+  test('referência ainda não aprovada ou inexistente: apply_payment decide', () => {
+    for (const st of ['pending', 'in_process', 'rejected', 'cancelled', 'refunded', 'charged_back', 'amount_mismatch']) {
+      assert.equal(isStaleReversal({ status: st, mp_payment_id: '111' }, '222', 'cancelled'), false, st);
+    }
+    assert.equal(isStaleReversal(null, '222', 'refunded'), false);
+    assert.equal(isStaleReversal(undefined, '222', 'refunded'), false);
+  });
+
+  test('status que não desfazem plano nunca são barrados', () => {
+    for (const st of ['approved', 'pending', 'in_process', 'rejected']) {
+      assert.equal(isStaleReversal(approvedBy222, '333', st), false, st);
+    }
   });
 });

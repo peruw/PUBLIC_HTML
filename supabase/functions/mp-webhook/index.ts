@@ -5,16 +5,20 @@
 import { adminClient } from '../_shared/supabase.ts';
 import {
   extractNotification,
+  isStaleReversal,
   isTransientDbError,
   isUuid,
   normalizeStatus,
   pickRaw,
+  REVERSAL_STATUSES,
   toCents,
   verifySignature,
 } from '../_shared/mp.ts';
 
 const MP_API = 'https://api.mercadopago.com';
 const MAX_BODY = 64 * 1024;
+// Resultados de apply_payment que pedem ação manual (estorno, suporte)
+const NEEDS_ATTENTION = ['superseded', 'amount_mismatch', 'conflict', 'no_tutor', 'not_found'];
 
 function text(status: number, msg: string): Response {
   return new Response(msg, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
@@ -101,12 +105,30 @@ Deno.serve(async (req) => {
       return text(200, 'ignored amount');
     }
 
-    // apply_payment confere o valor, trava as linhas e é idempotente
     const admin = adminClient();
+    const mpId = String(payment.id);
+    const status = normalizeStatus(payment.status);
+
+    // Estorno/cancelamento de OUTRA tentativa da mesma preferência (Pix abandonado, duplicado)
+    // não pode desfazer o plano que o pagamento aprovado concedeu
+    if (REVERSAL_STATUSES.includes(status)) {
+      const { data: row, error: rowErr } = await admin
+        .from('payments').select('status, mp_payment_id').eq('id', ref).maybeSingle();
+      if (rowErr) {
+        console.error('mp-webhook: falha ao ler payments', rowErr.code, rowErr.message);
+        return isTransientDbError(rowErr) ? text(500, 'retry') : text(200, 'not applied');
+      }
+      if (isStaleReversal(row, mpId, status)) {
+        console.warn(`mp-webhook: ${status} do pagamento ${mpId} ignorado; ${ref} foi quitado pelo pagamento ${row?.mp_payment_id}`);
+        return text(200, 'other attempt');
+      }
+    }
+
+    // apply_payment confere o valor, trava as linhas e é idempotente
     const { data, error } = await admin.rpc('apply_payment', {
       p_id: ref,
-      p_mp_payment_id: String(payment.id),
-      p_status: normalizeStatus(payment.status),
+      p_mp_payment_id: mpId,
+      p_status: status,
       p_amount_cents: cents,
       p_raw: pickRaw(payment),
     });
@@ -114,8 +136,12 @@ Deno.serve(async (req) => {
       console.error('mp-webhook: apply_payment falhou', error.code, error.message);
       return isTransientDbError(error) ? text(500, 'retry') : text(200, 'not applied');
     }
-    console.log(`mp-webhook: pagamento ${payment.id} (${ref}) status=${payment.status} -> ${data}`);
-    return text(200, String(data ?? 'ok'));
+    const result = String(data ?? 'ok');
+    const line = `mp-webhook: pagamento ${mpId} (${ref}) status=${payment.status} -> ${result}`;
+    // superseded = plano inferior pago com um superior em vigor: não aplicado, estornar manualmente
+    if (NEEDS_ATTENTION.includes(result)) console.warn(`${line} (verificar/estornar manualmente)`);
+    else console.log(line);
+    return text(200, result);
   } catch (err) {
     console.error('mp-webhook:', err);
     return text(500, 'retry');

@@ -10,7 +10,7 @@
     "municipios": "node scripts/build-municipios.mjs",
     "test:e2e": "playwright test",
     "test:db": "bash scripts/test-db.sh",
-    "test:fn": "node --test supabase/functions/_shared/"
+    "test:fn": "node --test \"supabase/functions/_shared/*.test.ts\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1"

@@ -1,10 +1,9 @@
 // Exclui a conta do usuário logado (LGPD).
-// Apaga os arquivos em avatars/<uid>/ e o usuário do Auth; o resto sai por ON DELETE CASCADE
+// Apaga os arquivos em avatars/<uid>/ (com subpastas) e o usuário do Auth; o resto sai por ON DELETE CASCADE
 // (payments ficam com user_id nulo para a contabilidade).
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
+import { removeFolder } from '../_shared/storage.ts';
 import { adminClient, getCaller } from '../_shared/supabase.ts';
-
-const PAGE = 100;
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req);
@@ -17,16 +16,9 @@ Deno.serve(async (req) => {
     const user = await getCaller(req, admin);
     if (!user) return reply(401, { error: 'Faça login para continuar.' });
 
-    // Avatares: lista e remove em lotes (limite de voltas por segurança)
-    const bucket = admin.storage.from('avatars');
-    for (let i = 0; i < 50; i++) {
-      const { data: files, error } = await bucket.list(user.id, { limit: PAGE });
-      if (error) throw error;
-      if (!files || files.length === 0) break;
-      const { error: rmErr } = await bucket.remove(files.map((f) => `${user.id}/${f.name}`));
-      if (rmErr) throw rmErr;
-      if (files.length < PAGE) break;
-    }
+    // Avatares: remove tudo em avatars/<uid>/, inclusive subpastas (antes de apagar o usuário;
+    // se falhar, a conta fica e o usuário pode tentar de novo)
+    await removeFolder(admin.storage.from('avatars'), user.id);
 
     const { error: delErr } = await admin.auth.admin.deleteUser(user.id);
     if (delErr) throw delErr;
