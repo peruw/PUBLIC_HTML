@@ -16,8 +16,9 @@
 <script type="module">
 // Página de teste do patrocínio (js/ads.js): pista + ambiente + anúncios.
 // ?q=alta|baixa &s=<m> &lat=<m> &view=chase|over|fly|free &ads=0 &env=0 &hud=0 &anim=1
-// Funções: setView(s, lat, modo, opts), toggleAds(bool), stats(), adsStats(), checkOverlaps(),
-//          checkCorridor(), showAtlas(bool), tick(seg) (avança a animação e redesenha).
+// Funções: setView(s, lat, modo, opts), toggleAds(bool), stats(), adsStats(), memStats(), checkOverlaps(),
+//          checkCorridor(), checkGround(), sightAll(), sight(s, lat, faceS, opts), showAtlas(bool),
+//          atlasCrop(...), tick(seg) (avança a animação e redesenha).
 // Desenha sob demanda (sem laço contínuo) para as capturas no SwiftShader não travarem.
 import * as THREE from '../js/three.js';
 import { QUALITY } from '../js/config.js';
@@ -49,7 +50,7 @@ else {
 }
 const t1 = performance.now();
 let ads = null;
-if (params.get('ads') !== '0') ads = buildAds(scene, track, quality, env);
+if (params.get('ads') !== '0') ads = buildAds(scene, track, quality, env, { debug: true });
 const tAds = performance.now() - t1;
 
 // Câmera
@@ -184,6 +185,20 @@ window.adsStats = () => {
   const img = ads.atlas && ads.atlas.image;
   return { meshes, tris, atlas: img ? `${img.width}x${img.height}` : '-', list: list.join(' ') };
 };
+// Memória de textura (com mipmaps) e das telas de pintura dos anúncios
+window.memStats = () => {
+  if (!ads) return null;
+  const mib = (w, h) => +((w * h * 4 * 4 / 3) / 1048576).toFixed(1);
+  const c = ads.debug.canvases;
+  return {
+    atlas: `${c.atlas.width}x${c.atlas.height}`, atlasMiB: mib(c.atlas.width, c.atlas.height),
+    tinta: `${c.grass.width}x${c.grass.height}`, tintaMiB: mib(c.grass.width, c.grass.height),
+    redraws: ads.debug.redraws, pending: ads.debug.pending, comLogo: ads.debug.drawnWithLogo, comFonte: ads.debug.drawnWithFont,
+  };
+};
+// Visada dos outdoors (fração do painel visível da câmera de perseguição na aproximação)
+window.sightAll = () => ads && { placed: ads.debug.billSight, moves: ads.debug.billMoves, skipped: ads.debug.skipped };
+window.sight = (s, lat, faceS, opts = {}) => ads && ads.debug.sight(s, lat, faceS, opts);
 window.showAtlas = (on = true) => {
   const c = document.getElementById('atlas');
   c.style.display = on ? 'block' : 'none';

@@ -21,7 +21,8 @@ const LOGO_URL = new URL('../assets/quanta-logo.png', import.meta.url).href;
 const ENVELOPE = '#eef3f0'; // cor do dirigível (o painel do atlas usa a mesma, sem emenda)
 
 // ---------------------------------------------------------------------------
-// Carregamento da fonte e do logotipo (uma vez por página)
+// Carregamento da fonte e do logotipo (uma vez por página). Sem prazo aqui: buildAds decide até
+// quando vale redesenhar o atlas (a fonte pode chegar tarde numa rede lenta e ainda entrar).
 let fontPromise = null;
 function brandFontLoaded() {
   if (typeof document === 'undefined' || !document.fonts) return false;
@@ -32,24 +33,26 @@ function loadBrandFont() {
   if (fontPromise) return fontPromise;
   fontPromise = new Promise((resolve) => {
     if (typeof document === 'undefined' || !document.fonts) { resolve(false); return; }
-    const test = '800 64px "Plus Jakarta Sans"';
     if (brandFontLoaded()) { resolve(true); return; }
-    const timer = setTimeout(() => resolve(false), 8000);
-    const load = () => Promise.all([document.fonts.load(test), document.fonts.load('700 64px "Plus Jakarta Sans"')])
-      .then(([a]) => { clearTimeout(timer); resolve(a.length > 0); }, () => { clearTimeout(timer); resolve(false); });
-    if (!document.querySelector('link[data-quanta-font]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = FONT_CSS;
-      link.dataset.quantaFont = '1';
-      link.onload = load;
-      link.onerror = () => { clearTimeout(timer); resolve(false); };
-      document.head.appendChild(link);
-    } else load();
+    const load = () => Promise.all([document.fonts.load('800 64px "Plus Jakarta Sans"'), document.fonts.load('700 64px "Plus Jakarta Sans"')])
+      .then(([a]) => resolve(a.length > 0), () => resolve(false));
+    // a página pode já pedir a fonte no <link> do Google Fonts (baixa junto com o three.js)
+    const link = document.querySelector('link[href*="Plus+Jakarta+Sans"]');
+    if (link) {
+      if (link.sheet) load();
+      else { link.addEventListener('load', load); link.addEventListener('error', () => resolve(false)); }
+      return;
+    }
+    const el = document.createElement('link');
+    el.rel = 'stylesheet';
+    el.href = FONT_CSS;
+    el.onload = load;
+    el.onerror = () => resolve(false);
+    document.head.appendChild(el);
   });
   return fontPromise;
 }
-let logoPromise = null;
+let logoPromise = null, logoImg = null;
 function loadLogo() {
   if (logoPromise) return logoPromise;
   logoPromise = new Promise((resolve) => {
@@ -57,11 +60,18 @@ function loadLogo() {
     const img = new Image();
     img.decoding = 'async';
     img.fetchPriority = 'high'; // <img> criada por script entraria com prioridade baixa
-    img.onload = () => { art.img = img; art.tint.clear(); resolve(img); };
+    img.onload = () => { art.img = img; resolve(img); };
     img.onerror = () => resolve(null);
     img.src = LOGO_URL;
+    logoImg = img;
   });
   return logoPromise;
+}
+// Logo pronto? Com a thread ocupada montando a cena, o PNG costuma já ter chegado mas o evento
+// "load" ainda está na fila: complete + naturalWidth já permitem desenhá-lo (evita pintar o atlas duas vezes).
+function logoReadyNow() {
+  if (!art.img && logoImg && logoImg.complete && logoImg.naturalWidth > 0) art.img = logoImg;
+  return !!art.img;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +84,7 @@ function makeCanvas(w, h) {
 }
 const LOGO_PX = 512;
 const LOGO_BOX = [19, 12, 321, 322]; // área opaca do PNG (alvo + flecha)
+// img: PNG do logo; tint: logos recoloridos (cache só durante uma pintura do atlas; depois é liberado)
 const art = { img: null, tint: new Map() };
 // Começa a baixar logo e fonte já na importação: enquanto pista e ambiente são montados eles chegam,
 // e o atlas costuma nascer certo (sem redesenhar).
@@ -186,6 +197,18 @@ function roundRect(g, x, y, w, h, r) {
   g.arcTo(x, y + h, x, y, r);
   g.arcTo(x, y, x + w, y, r);
   g.closePath();
+}
+// Ícone genérico de câmera (contorno): indica que o @ é do Instagram
+function cameraGlyph(g, x, y, s, color) {
+  g.save();
+  g.strokeStyle = color;
+  g.fillStyle = color;
+  g.lineWidth = s * 0.1;
+  roundRect(g, x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.27);
+  g.stroke();
+  g.beginPath(); g.arc(x + s / 2, y + s / 2, s * 0.21, 0, TAU); g.stroke();
+  g.beginPath(); g.arc(x + s * 0.745, y + s * 0.255, s * 0.065, 0, TAU); g.fill();
+  g.restore();
 }
 // Fundos
 function bgDark(g, w, h, rings = true) {
@@ -312,23 +335,24 @@ const PAINT = {
     bgGreen(g, w, h);
     text(g, 'quantaaulas.com', w / 2, h / 2 - 12, { size: 124, color: BRAND.bg, align: 'center', maxW: w - 80 });
   },
-  h6(g, w, h) { // instagram
+  h6(g, w, h) { // instagram: ícone de câmera + @
     bgDark(g, w, h);
     brandBar(g, 0, h - 10, w, 10);
-    const s = fitSize(g, '@quanta_aulas', 118, w - 240);
+    const gs = 104, gap = 30;
+    const s = fitSize(g, '@quanta_aulas', 118, w - 70 - gs - gap);
     const tw = textWidth(g, '@quanta_aulas', s);
     const aw = textWidth(g, '@', s);
-    const x0 = (w - tw) / 2 + 60;
-    logo(g, x0 - 150, h / 2 - 62, 118, BRAND.brand);
-    text(g, '@', x0, h / 2 - 10, { size: s, color: BRAND.brand });
-    text(g, 'quanta_aulas', x0 + aw, h / 2 - 10, { size: s, color: BRAND.ink });
+    const x0 = (w - (gs + gap + tw)) / 2;
+    const yc = h / 2 - 10;
+    cameraGlyph(g, x0, yc - gs / 2, gs, BRAND.brand);
+    text(g, '@', x0 + gs + gap, yc, { size: s, color: BRAND.brand });
+    text(g, 'quanta_aulas', x0 + gs + gap + aw, yc, { size: s, color: BRAND.ink });
   },
-  h7(g, w, h) { // slogan
+  h7(g, w, h) { // slogan sem logo, no maior corpo que cabe (lido de longe)
     bgPaper(g, w, h);
     g.fillStyle = BRAND.deep;
     g.fillRect(0, h - 12, w, 12);
-    logo(g, 36, h / 2 - 70, 134, BRAND.logo);
-    text(g, 'A evolução do aprendizado', 206, h / 2 - 12, { size: 84, color: BRAND.bg, maxW: w - 240, weight: 800 });
+    text(g, 'A evolução do aprendizado', w / 2, h / 2 - 16, { size: 116, color: BRAND.bg, align: 'center', maxW: w - 64 });
   },
   h8(g, w, h) { // aulas publicadas
     bgDark(g, w, h);
@@ -399,25 +423,27 @@ const PAINT = {
     text(g, 'A evolução do aprendizado', w - 60, h - 46, { size: 40, weight: 700, color: BRAND.brand, align: 'right' });
     logo(g, 56, 44, 320, BRAND.logo);
     text(g, 'DOUTOR PELO ITA', 430, 150, { size: 136, color: BRAND.bg, maxW: w - 480 });
-    text(g, '15 ANOS DE EXPERIÊNCIA', 434, 300, { size: 80, color: BRAND.deep, maxW: w - 480, track: 1 });
+    // verde escuro (≈ 6:1 sobre o papel); o verde da marca fica só nas barras
+    text(g, '15 ANOS DE EXPERIÊNCIA', 434, 300, { size: 80, color: '#0b6b45', maxW: w - 480, track: 1 });
   },
   b2(g, w, h) { // agende
     bgGreen(g, w, h);
     g.save();
-    g.globalAlpha = 0.12;
+    g.globalAlpha = 0.06;
     g.strokeStyle = '#ffffff';
     g.lineWidth = 40;
     for (let k = 1; k <= 5; k++) { g.beginPath(); g.arc(w * 0.12, h * 0.45, 120 * k, 0, TAU); g.stroke(); }
     g.restore();
-    logo(g, 50, 56, 300, '#ffffff');
-    text(g, 'AGENDE SUA', 410, 118, { size: 104, color: BRAND.bg, maxW: w - 460 });
-    text(g, 'AULA EXPERIMENTAL', 410, 238, { size: 104, color: BRAND.bg, maxW: w - 460 });
+    logo(g, 50, 56, 300, BRAND.bg); // escuro sobre o verde, como na placa h1
+    text(g, 'AGENDE SUA', 410, 112, { size: 104, color: BRAND.bg, maxW: w - 460 });
+    text(g, 'AULA EXPERIMENTAL', 410, 228, { size: 104, color: BRAND.bg, maxW: w - 460 });
+    // chamada: endereço maior, numa pílula escura
     const url = 'quantaaulas.com';
-    const s = 76;
+    const s = fitSize(g, url, 92, w - 410 - 150);
     const tw = textWidth(g, url, s);
     g.fillStyle = BRAND.bg;
-    roundRect(g, 410, 330, tw + 90, 118, 59); g.fill();
-    text(g, url, 455, 389, { size: s, color: BRAND.brand });
+    roundRect(g, 410, 312, tw + 104, 142, 71); g.fill();
+    text(g, url, 462, 383, { size: s, color: BRAND.brand });
   },
   b3(g, w, h) { // lógica
     bgDark(g, w, h, false);
@@ -447,13 +473,17 @@ const PAINT = {
     text(g, 'ALUNOS EM 10+ PAÍSES', w - 230, 440, { size: 40, color: BRAND.dim, align: 'center', maxW: 420 });
   },
 
-  // Dirigível (fundo igual ao envelope)
+  // Dirigível (fundo igual ao envelope): só logo + nome em duas linhas, no maior corpo que cabe
+  // (visto a 100–250 m, lá de baixo)
   blimp(g, w, h) {
     g.fillStyle = ENVELOPE;
     g.fillRect(0, 0, w, h);
-    logo(g, 70, h / 2 - 150, 300, BRAND.logo);
-    const s = text(g, 'QUANTA AULAS', 420, 150, { size: 150, color: '#0b2418', maxW: w - 480, track: 3 });
-    text(g, 'A evolução do aprendizado', 426, 150 + s * 0.95, { size: 70, weight: 700, color: BRAND.deep, maxW: w - 480 });
+    const ls = 334;
+    logo(g, 56, (h - ls) / 2, ls, BRAND.logo);
+    const x = 56 + ls + 56, maxW = w - x - 40;
+    const s = Math.min(fitSize(g, 'QUANTA', 206, maxW, 800, 5), fitSize(g, 'AULAS', 206, maxW, 800, 5));
+    text(g, 'QUANTA', x, h / 2 - s * 0.47, { size: s, color: '#0b2418', track: 5 });
+    text(g, 'AULAS', x, h / 2 + s * 0.47, { size: s, color: '#0b2418', track: 5 });
   },
   // Ponte (faixa entre os arcos)
   bridge(g, w, h) {
@@ -510,30 +540,39 @@ function atlasLayout() {
   return R;
 }
 function buildAtlas(hi) {
-  const S = hi ? 1 : 0.5;
+  // 2048 × 1024 nas duas qualidades: na tela fica igual ao de 4096 (placas a > 5 m, filtro anisotrópico)
+  // e custa 1/4 da memória e do envio. A tinta do chão (vista de perto no acostamento) fica maior na alta.
+  const S = 0.5, SG = hi ? 1 : 0.5;
   const W = 4096 * S, H = 2048 * S;
   const canvas = makeCanvas(W, H);
   const g = canvas.getContext('2d');
   const L = atlasLayout();
-  const grass = makeCanvas(REF.grass[0] * S, REF.grass[1] * S);
-  const draw = () => {
-    g.clearRect(0, 0, W, H);
-    for (const [id, [x, y, w, h, ref]] of Object.entries(L)) {
+  const grass = makeCanvas(REF.grass[0] * SG, REF.grass[1] * SG);
+  // uma tarefa por região (o redesenho tardio roda aos poucos, uma por quadro)
+  const jobs = () => {
+    const list = Object.entries(L).map(([id, [x, y, w, h, ref]]) => () => {
       g.save();
       g.beginPath(); g.rect(x * S, y * S, w * S, h * S); g.clip();
+      g.clearRect(x * S, y * S, w * S, h * S);
       g.translate(x * S, y * S);
-      if (!ref) { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w * S, h * S); g.restore(); continue; }
+      if (!ref) { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w * S, h * S); g.restore(); return; }
       const [rw, rh] = REF[ref];
       g.scale((w * S) / rw, (h * S) / rh);
       PAINT[id](g, rw, rh);
       g.restore();
-    }
-    const q = grass.getContext('2d');
-    q.save();
-    q.scale(S, S);
-    PAINT.grass(q, REF.grass[0], REF.grass[1]);
-    q.restore();
+    });
+    list.push(() => {
+      const q = grass.getContext('2d');
+      q.save();
+      q.scale(SG, SG);
+      PAINT.grass(q, REF.grass[0], REF.grass[1]);
+      q.restore();
+    });
+    // fim: libera os logos recoloridos (≈ 1 MB cada); a próxima pintura os refaz
+    list.push(() => art.tint.clear());
+    return list;
   };
+  const draw = () => { for (const job of jobs()) job(); };
   draw();
   // uv [u0, v0, u1, v1] (canto inferior esquerdo -> superior direito), com meio texel de margem
   const uv = (id) => {
@@ -550,7 +589,8 @@ function buildAtlas(hi) {
   const grassTex = new THREE.CanvasTexture(grass);
   grassTex.anisotropy = hi ? 8 : 2;
   grassTex.premultiplyAlpha = true;
-  return { canvas, grass, tex, grassTex, uv, white, draw };
+  const upload = () => { tex.needsUpdate = true; grassTex.needsUpdate = true; };
+  return { canvas, grass, tex, grassTex, uv, white, draw, jobs, upload };
 }
 
 // ---------------------------------------------------------------------------
@@ -635,22 +675,46 @@ function makeMaterial(map) {
 }
 
 // ---------------------------------------------------------------------------
-export function buildAds(scene, track, quality = {}, env = null) {
+// buildAds(scene, track, quality, env, opts?) → { group, update(dt, t, camera), dispose() }
+// opts.debug guarda volumes, pés e testes de visada para as verificações de dev/ads.html.
+// Os anúncios são opcionais para o jogo: se uma peça falhar (ex.: algo mudou em track.js), só ela
+// fica de fora; se falhar a base, volta um grupo vazio. Nunca trava o carregamento.
+export function buildAds(scene, track, quality = {}, env = null, opts = {}) {
+  const hold = { group: null, disposables: [] };
+  try {
+    return build(scene, track, quality || {}, env, opts || {}, hold);
+  } catch (err) {
+    console.warn('anúncios indisponíveis', err);
+    if (hold.group) scene.remove(hold.group);
+    hold.disposables.forEach((d) => d.dispose && d.dispose());
+    const group = new THREE.Group();
+    group.name = 'anuncios';
+    return { group, update() {}, dispose() {} };
+  }
+}
+
+function build(scene, track, quality, env, opts, hold) {
   const hi = quality.id !== 'baixa';
+  const DEBUG = !!opts.debug;
   const group = new THREE.Group();
   group.name = 'anuncios';
   scene.add(group);
+  hold.group = group;
   const meta = track.meta;
   const { N, ds, WD, FL, K } = meta;
   const LEN = track.length;
   const wrapS = (s) => ((s % LEN) + LEN) % LEN;
-  const disposables = [];
-  const solids = []; // caixas sólidas (verificação de sobreposição)
-  const feet = []; // pés apoiados no chão (verificação)
+  const disposables = hold.disposables;
+  const solids = []; // caixas sólidas (verificação de sobreposição; só com opts.debug)
+  const feet = []; // pés apoiados no chão (idem)
+  const skipped = []; // peças que falharam e ficaram de fora
   let alive = true;
+  const part = (name, fn) => {
+    try { return fn(); } catch (err) { skipped.push(name); console.warn(`anúncios: "${name}" ficou de fora`, err); return null; }
+  };
 
   const fontWasReady = brandFontLoaded();
-  const logoWasReady = !!art.img;
+  const logoWasReady = logoReadyNow();
   const atlas = buildAtlas(hi);
   const mat = makeMaterial(atlas.tex);
   disposables.push(atlas.tex, atlas.grassTex, mat);
@@ -664,7 +728,10 @@ export function buildAds(scene, track, quality = {}, env = null) {
     if (!b) cells.set(k, (b = new Geo(atlas.white)));
     return b;
   };
-  const solid = (tag, c, ax, ay, az, hx, hy, hz) => solids.push({ tag, c: c.clone(), ax: ax.clone(), ay: ay.clone(), az: az.clone(), hx, hy, hz });
+  const solid = (tag, c, ax, ay, az, hx, hy, hz) => {
+    if (DEBUG) solids.push({ tag, c: c.clone(), ax: ax.clone(), ay: ay.clone(), az: az.clone(), hx, hy, hz });
+  };
+  const foot = (f) => { if (DEBUG) feet.push(f); };
 
   // Amostra da pista copiada (track.sample reutiliza o objeto)
   const at = (s) => {
@@ -681,6 +748,7 @@ export function buildAds(scene, track, quality = {}, env = null) {
     return smp.pos.y - 0.02 - 0.88 * ((e - 0.55) / 6.45);
   };
   const terrainY = (x, z) => (env && env.groundAt ? env.groundAt(x, z) : 0);
+  const _gp = new THREE.Vector3();
   const groundAt = (x, z, hintS) => {
     const p = track.project(_gp.set(x, 0, z), hintS);
     const smp = at(p.s);
@@ -688,7 +756,6 @@ export function buildAds(scene, track, quality = {}, env = null) {
     if (Math.abs(p.lateral) < smp.wd + 7.5 && !FL[Math.round(p.s / ds) % N]) g = Math.max(g, skirtY(smp, p.lateral));
     return g;
   };
-  const _gp = new THREE.Vector3();
 
   // Pneus no lado de fora das curvas fechadas (mesma regra de track.js): as placas recuam
   const tires = [new Uint8Array(N), new Uint8Array(N)];
@@ -699,6 +766,7 @@ export function buildAds(scene, track, quality = {}, env = null) {
   }
   const tireAt = (s, side) => tires[side < 0 ? 0 : 1][Math.round(wrapS(s) / ds) % N];
   // Placas de seta (curvas muito fechadas, lado de fora) e pórticos: trechos sem placas
+  const cs = meta.ctrlS, bs = meta.bridgeS, ts = meta.tunnelS;
   const blocked = [[], []];
   {
     let last = -99;
@@ -709,8 +777,7 @@ export function buildAds(scene, track, quality = {}, env = null) {
       last = s;
       blocked[K[i] > 0 ? 0 : 1].push([s - 11, s + 3]);
     }
-    const c = meta.ctrlS;
-    for (const s of [c[2] + 16, c[9] + 16, meta.bridgeS[0] - 26, meta.tunnelS[1] + 50, c[29] + 30]) {
+    for (const s of [cs[2] + 16, cs[9] + 16, bs[0] - 26, ts[1] + 50, cs[29] + 30]) {
       blocked[0].push([s - 1.6, s + 1.6]); blocked[1].push([s - 1.6, s + 1.6]);
     }
     blocked[0].push([-1.2, 1.2]); blocked[1].push([-1.2, 1.2]); // postes do pórtico da largada
@@ -729,6 +796,9 @@ export function buildAds(scene, track, quality = {}, env = null) {
     frame: col(0x1a2621), back: col(0x22302a), leg: col(0x59645e), dark: col(0x0e1d16), steel: col(0x7c8a84),
     lamp: col(0xfff3cf), catwalk: col(0x39443f), green: col(BRAND.deep),
   };
+  // lugares escolhidos na página dev/ads.html (debug.sight e capturas da câmera de perseguição)
+  const B4 = [770, 28, 690, 4.4]; // outdoor b4: s, lateral, s para onde olha, altura livre
+  const RUNOFF = { hairpin: 982, lab: 158 }; // início das faixas pintadas nas áreas de escape
 
   // ------------------------------------------------------------ placas de beira de pista
   const BOARD_H = 1.1, BOARD_Y = 1.0, BOARD_T = 0.12;
@@ -829,30 +899,33 @@ export function buildAds(scene, track, quality = {}, env = null) {
         const bottom = yy - 0.55;
         const top = yy + yb + 0.45;
         const c = new THREE.Vector3(p.x, (bottom + top) / 2, p.z);
-        const gy = groundAt(p.x, p.z, sa);
         g.box(c, along, UP, out, 0.05, (top - bottom) / 2, 0.05, C.leg, { skip: 'b' });
-        // sólido só da parte acima do chão visível (abaixo fica enterrado)
-        const vis = Math.max(bottom, gy);
-        solid('placa-pé', new THREE.Vector3(p.x, (vis + top) / 2, p.z), along, UP, out, 0.05, (top - vis) / 2, 0.05);
-        feet.push({ tag: 'placa', x: p.x, y: bottom, z: p.z, g: gy });
+        if (DEBUG) {
+          // sólido só da parte acima do chão visível (abaixo fica enterrado)
+          const gy = groundAt(p.x, p.z, sa);
+          const vis = Math.max(bottom, gy);
+          solid('placa-pé', new THREE.Vector3(p.x, (vis + top) / 2, p.z), along, UP, out, 0.05, (top - vis) / 2, 0.05);
+          foot({ tag: 'placa', x: p.x, y: bottom, z: p.z, g: gy });
+        }
       }
     }
     // saia (baixa): o sólido começa no chão visível; abaixo dele fica enterrada
-    let lowY = yb;
-    if (!hi) {
-      const p = L0.clone().lerp(L1, 0.5).addScaledVector(o, T);
-      const gy = groundAt(p.x, p.z, sa);
-      feet.push({ tag: 'placa', x: p.x, y: lerp(y0, y1, 0.5) + baseY, z: p.z, g: gy });
-      lowY = Math.max(baseY, gy - (y0 + y1) / 2);
+    if (DEBUG) {
+      let lowY = yb;
+      if (!hi) {
+        const p = L0.clone().lerp(L1, 0.5).addScaledVector(o, T);
+        const gy = groundAt(p.x, p.z, sa);
+        foot({ tag: 'placa', x: p.x, y: lerp(y0, y1, 0.5) + baseY, z: p.z, g: gy });
+        lowY = Math.max(baseY, gy - (y0 + y1) / 2);
+      }
+      const cy = (y0 + y1) / 2 + (lowY + yt) / 2;
+      const hy = (yt - lowY) / 2 + Math.abs(y1 - y0) / 2;
+      solid('placa', new THREE.Vector3(mid.x + o.x * T / 2, cy, mid.z + o.z * T / 2), along, UP, out, lenH / 2, hy, T / 2 + 0.02);
     }
-    const cy = (y0 + y1) / 2 + (lowY + yt) / 2;
-    const hy = (yt - lowY) / 2 + Math.abs(y1 - y0) / 2;
-    solid('placa', new THREE.Vector3(mid.x + o.x * T / 2, cy, mid.z + o.z * T / 2), along, UP, out, lenH / 2, hy, T / 2 + 0.02);
     boardCount++;
   }
 
   // Trechos de placas: [s0, s1, lado (-1 esquerda, 1 direita), sequência, só na alta]
-  const cs = meta.ctrlS, bs = meta.bridgeS, ts = meta.tunnelS;
   const RUNS = [
     [LEN - 82, 128, -1, 'main', false], // reta de largada: lado da universidade (saída da curva final)
     [LEN - 146, 128, 1, 'main', false], // reta de largada: arquibancadas (por dentro da curva final)
@@ -868,17 +941,68 @@ export function buildAds(scene, track, quality = {}, env = null) {
   ];
   RUNS.forEach(([s0, s1, side, seq, onlyHi], r) => {
     if (onlyHi && !hi) return;
-    hoardingRun(s0, s1, side, seq, r * 5 + (side > 0 ? 3 : 0));
+    part(`placas ${Math.round(s0)}–${Math.round(s1)}`, () => hoardingRun(s0, s1, side, seq, r * 5 + (side > 0 ? 3 : 0)));
   });
 
-  // ------------------------------------------------------------ verificação no build: sólidos x cenário
-  // Triângulos do cenário (fora dos anúncios) que entram numa caixa orientada. Usada para os outdoors,
-  // que ficam longe do muro, onde a vegetação (sorteada por qualidade) pode estar. Malhas de chão
-  // são puladas só por desempenho: a caixa começa acima do chão.
+  // ------------------------------------------------------------ triângulos do cenário (fora dos anúncios)
+  // Usados no build pelos outdoors, que ficam longe do muro, onde a vegetação (sorteada por qualidade)
+  // pode estar: para não atravessar nada e para não ficarem escondidos. Malhas de chão ficam de fora
+  // (desempenho); o relevo entra na visada pelo env.groundAt.
   const GROUNDISH = /^(terreno|asfalto|acostamento|decalques|aceleradores|lagoa|ceu|montanhas|nuvens|horizonte|tunel-ceu|luzes-tunel|flores)/;
   let blockers = null;
+  const getBlockers = () => {
+    if (blockers) return blockers;
+    blockers = [];
+    scene.updateMatrixWorld(true);
+    scene.traverse((m) => {
+      // pula chão e objetos animados sem culling (pássaros, bolhas, arcos...): posição do build não vale
+      if (!m.isMesh || !m.visible || !m.frustumCulled || !m.geometry || !m.geometry.attributes.position || GROUNDISH.test(m.name)) return;
+      for (let q = m; q; q = q.parent) if (q === group) return;
+      if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+      blockers.push(m);
+    });
+    return blockers;
+  };
   const _sph = new THREE.Sphere(), _m4 = new THREE.Matrix4(), _mi = new THREE.Matrix4(), IDENT = new THREE.Matrix4();
   const _tv = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  // chama fn(tri, malha) para cada triângulo cujo AABB toca a caixa [x0..x1] × [y0..y1] × [z0..z1];
+  // se fn devolver true, para e devolve o nome da malha
+  function scanTris(x0, y0, z0, x1, y1, z1, fn) {
+    for (const m of getBlockers()) {
+      const P = m.geometry.attributes.position, I = m.geometry.index;
+      const nt = (I ? I.count : P.count) / 3;
+      const inst = m.isInstancedMesh ? m.count : 1;
+      // malhas estáticas já em coordenadas de mundo (matriz identidade): lê o array direto
+      const raw = !m.isInstancedMesh && !P.isInterleavedBufferAttribute && P.itemSize === 3 && m.matrixWorld.equals(IDENT);
+      const A = P.array, X = I ? I.array : null;
+      for (let k = 0; k < inst; k++) {
+        _m4.copy(m.matrixWorld);
+        if (m.isInstancedMesh) { m.getMatrixAt(k, _mi); _m4.multiply(_mi); }
+        _sph.copy(m.geometry.boundingSphere).applyMatrix4(_m4);
+        const sc = _sph.center, sr = _sph.radius;
+        if (sc.x + sr < x0 || sc.x - sr > x1 || sc.z + sr < z0 || sc.z - sr > z1 || sc.y + sr < y0 || sc.y - sr > y1) continue;
+        for (let t = 0; t < nt; t++) {
+          if (raw) {
+            const a = (X ? X[t * 3] : t * 3) * 3, b = (X ? X[t * 3 + 1] : t * 3 + 1) * 3, c = (X ? X[t * 3 + 2] : t * 3 + 2) * 3;
+            // descarte rápido pela caixa
+            if ((A[a] > x1 && A[b] > x1 && A[c] > x1) || (A[a] < x0 && A[b] < x0 && A[c] < x0)) continue;
+            if ((A[a + 2] > z1 && A[b + 2] > z1 && A[c + 2] > z1) || (A[a + 2] < z0 && A[b + 2] < z0 && A[c + 2] < z0)) continue;
+            if ((A[a + 1] > y1 && A[b + 1] > y1 && A[c + 1] > y1) || (A[a + 1] < y0 && A[b + 1] < y0 && A[c + 1] < y0)) continue;
+            _tv[0].set(A[a], A[a + 1], A[a + 2]); _tv[1].set(A[b], A[b + 1], A[b + 2]); _tv[2].set(A[c], A[c + 1], A[c + 2]);
+          } else {
+            for (let j = 0; j < 3; j++) _tv[j].fromBufferAttribute(P, I ? I.getX(t * 3 + j) : t * 3 + j).applyMatrix4(_m4);
+            const a = _tv[0], b = _tv[1], c = _tv[2];
+            if (Math.min(a.x, b.x, c.x) > x1 || Math.max(a.x, b.x, c.x) < x0) continue;
+            if (Math.min(a.z, b.z, c.z) > z1 || Math.max(a.z, b.z, c.z) < z0) continue;
+            if (Math.min(a.y, b.y, c.y) > y1 || Math.max(a.y, b.y, c.y) < y0) continue;
+          }
+          if (fn(_tv, m)) return m.name || 'objeto';
+        }
+      }
+    }
+    return null;
+  }
+  // Caixa orientada x triângulo (eixos separadores)
   const _L = new Float64Array(9), _E = new Float64Array(9);
   const sepAxis = (o, x, y, z) => {
     const r = o.hx * Math.abs(x) + o.hy * Math.abs(y) + o.hz * Math.abs(z);
@@ -901,93 +1025,198 @@ export function buildAds(scene, track, quality = {}, env = null) {
     }
     return true;
   }
-  function sceneHits(o) {
-    if (!blockers) {
-      blockers = [];
-      scene.updateMatrixWorld(true);
-      scene.traverse((m) => {
-        // pula chão (desempenho) e objetos animados sem culling (pássaros, bolhas...): posição do build não vale
-        if (!m.isMesh || !m.visible || !m.frustumCulled || !m.geometry || !m.geometry.attributes.position || GROUNDISH.test(m.name)) return;
-        for (let q = m; q; q = q.parent) if (q === group) return;
-        if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
-        blockers.push(m);
-      });
+  // Outdoors: pedaço do cenário em volta de cada lugar pedido. Câmeras de perseguição (5,7 m atrás do kart,
+  // 2,3 m de altura, na linha de corrida) ao longo da aproximação [faceS - 30, s - 22] e a região que
+  // cobre as câmeras e todos os candidatos (com folga do tamanho do outdoor).
+  const TRIES = [[0, 0], [0, 3], [5, 0], [-5, 0], [0, 6], [5, 3], [-5, 3], [10, 0], [-10, 0], [0, 9], [10, 5], [-10, 5], [15, 0], [-15, 0]];
+  function billSite(s, lat, faceS, o = {}) {
+    const W = BILL_W0 * (o.k || 1);
+    const cams = [];
+    const s0 = faceS - 30, s1 = s - 22 < s0 ? s - 22 + LEN : s - 22;
+    const n = clamp(Math.round((s1 - s0) / 10), 3, 14);
+    for (let k = 0; k <= n; k++) {
+      const cs2 = lerp(s0, s1, k / n);
+      const rl = track.racingLine ? track.racingLine(wrapS(cs2)) : 0;
+      const a = track.sample(cs2 - 5.7);
+      const p = a.pos.clone().addScaledVector(a.right, rl);
+      p.y += 2.3;
+      const b = track.sample(cs2 + 4);
+      const look = b.pos.clone().addScaledVector(b.right, rl);
+      look.y += 1.2;
+      cams.push({ p, f: look.sub(p).normalize() });
     }
-    const R = Math.hypot(o.hx, o.hy, o.hz);
-    const x0 = o.c.x - R, x1 = o.c.x + R, y0 = o.c.y - R, y1 = o.c.y + R, z0 = o.c.z - R, z1 = o.c.z + R;
-    for (const m of blockers) {
-      const P = m.geometry.attributes.position, I = m.geometry.index;
-      const nt = (I ? I.count : P.count) / 3;
-      const inst = m.isInstancedMesh ? m.count : 1;
-      // malhas estáticas já em coordenadas de mundo (matriz identidade): lê o array direto
-      const raw = !m.isInstancedMesh && !P.isInterleavedBufferAttribute && P.itemSize === 3 && m.matrixWorld.equals(IDENT);
-      const A = P.array, X = I ? I.array : null;
-      for (let k = 0; k < inst; k++) {
-        _m4.copy(m.matrixWorld);
-        if (m.isInstancedMesh) { m.getMatrixAt(k, _mi); _m4.multiply(_mi); }
-        _sph.copy(m.geometry.boundingSphere).applyMatrix4(_m4);
-        if (_sph.center.distanceTo(o.c) > _sph.radius + R) continue;
-        for (let t = 0; t < nt; t++) {
-          if (raw) {
-            const a = (X ? X[t * 3] : t * 3) * 3, b = (X ? X[t * 3 + 1] : t * 3 + 1) * 3, c = (X ? X[t * 3 + 2] : t * 3 + 2) * 3;
-            // descarte rápido pela caixa envolvente da esfera
-            if ((A[a] > x1 && A[b] > x1 && A[c] > x1) || (A[a] < x0 && A[b] < x0 && A[c] < x0)) continue;
-            if ((A[a + 2] > z1 && A[b + 2] > z1 && A[c + 2] > z1) || (A[a + 2] < z0 && A[b + 2] < z0 && A[c + 2] < z0)) continue;
-            if ((A[a + 1] > y1 && A[b + 1] > y1 && A[c + 1] > y1) || (A[a + 1] < y0 && A[b + 1] < y0 && A[c + 1] < y0)) continue;
-            _tv[0].set(A[a], A[a + 1], A[a + 2]); _tv[1].set(A[b], A[b + 1], A[b + 2]); _tv[2].set(A[c], A[c + 1], A[c + 2]);
-          } else {
-            for (let j = 0; j < 3; j++) _tv[j].fromBufferAttribute(P, I ? I.getX(t * 3 + j) : t * 3 + j).applyMatrix4(_m4);
-            const a = _tv[0], b = _tv[1], c = _tv[2];
-            if (Math.min(a.x, b.x, c.x) > x1 || Math.max(a.x, b.x, c.x) < x0) continue;
-            if (Math.min(a.z, b.z, c.z) > z1 || Math.max(a.z, b.z, c.z) < z0) continue;
-            if (Math.min(a.y, b.y, c.y) > y1 || Math.max(a.y, b.y, c.y) < y0) continue;
-          }
-          if (triHitsBox(_tv, o)) return m.name || 'objeto';
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    const grow = (x, z, r) => { x0 = Math.min(x0, x - r); x1 = Math.max(x1, x + r); z0 = Math.min(z0, z - r); z1 = Math.max(z1, z + r); };
+    for (const c of cams) grow(c.p.x, c.p.z, 2);
+    const out = Math.sign(lat) || 1;
+    for (const [dS, dL] of TRIES) {
+      const r = track.sample(s + dS);
+      grow(r.pos.x + r.right.x * (lat + out * dL), r.pos.z + r.right.z * (lat + out * dL), W / 2 + 4);
+    }
+    return { cams, x0, z0, x1, z1, T: [], M: [] };
+  }
+  // Uma passada só pelos triângulos do cenário, distribuindo-os entre as regiões dos outdoors
+  function collectSites(sites) {
+    if (!sites.length) return;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const r of sites) { x0 = Math.min(x0, r.x0); x1 = Math.max(x1, r.x1); z0 = Math.min(z0, r.z0); z1 = Math.max(z1, r.z1); }
+    scanTris(x0, -1e9, z0, x1, 1e9, z1, (v, m) => {
+      const ax = Math.min(v[0].x, v[1].x, v[2].x), bx = Math.max(v[0].x, v[1].x, v[2].x);
+      const az = Math.min(v[0].z, v[1].z, v[2].z), bz = Math.max(v[0].z, v[1].z, v[2].z);
+      for (const r of sites) {
+        if (ax > r.x1 || bx < r.x0 || az > r.z1 || bz < r.z0) continue;
+        r.T.push(v[0].x, v[0].y, v[0].z, v[1].x, v[1].y, v[1].z, v[2].x, v[2].y, v[2].z);
+        r.M.push(m);
+      }
+      return false;
+    });
+  }
+  // Grade 2D (8 m) com os triângulos da região: colisão de volumes e linha de visada.
+  // Visada = fração de raios livres (câmeras -> grade 5 × 3 no painel) entre os pontos no campo de
+  // visão (≈ 50° do eixo) e a menos de 230 m, contra os triângulos e o relevo (env.groundAt).
+  function siteTester(site, W, H) {
+    const { cams, x0, z0 } = site;
+    const G = 8, nx = Math.max(1, Math.ceil((site.x1 - x0) / G)), nz = Math.max(1, Math.ceil((site.z1 - z0) / G));
+    const tris = new Float32Array(site.T);
+    const nT = tris.length / 9;
+    const grid = new Array(nx * nz);
+    const cx = (x) => clamp(Math.floor((x - x0) / G), 0, nx - 1), cz = (z) => clamp(Math.floor((z - z0) / G), 0, nz - 1);
+    for (let i = 0; i < nT; i++) {
+      const o = i * 9;
+      const ax = cx(Math.min(tris[o], tris[o + 3], tris[o + 6])), bx = cx(Math.max(tris[o], tris[o + 3], tris[o + 6]));
+      const az = cz(Math.min(tris[o + 2], tris[o + 5], tris[o + 8])), bz = cz(Math.max(tris[o + 2], tris[o + 5], tris[o + 8]));
+      for (let gz = az; gz <= bz; gz++) for (let gx = ax; gx <= bx; gx++) (grid[gz * nx + gx] || (grid[gz * nx + gx] = [])).push(i);
+    }
+    const mark = new Int32Array(nT);
+    let stamp = 0;
+    // caixa orientada x triângulos da região: nome da malha atravessada, ou null
+    const hits = (o) => {
+      const R = Math.hypot(o.hx, o.hy, o.hz);
+      stamp++;
+      for (let gz = cz(o.c.z - R); gz <= cz(o.c.z + R); gz++) for (let gx = cx(o.c.x - R); gx <= cx(o.c.x + R); gx++) {
+        const list = grid[gz * nx + gx];
+        if (!list) continue;
+        for (let k = 0; k < list.length; k++) {
+          const i = list[k];
+          if (mark[i] === stamp) continue;
+          mark[i] = stamp;
+          const q = i * 9;
+          if (Math.min(tris[q + 1], tris[q + 4], tris[q + 7]) > o.c.y + R || Math.max(tris[q + 1], tris[q + 4], tris[q + 7]) < o.c.y - R) continue;
+          _tv[0].set(tris[q], tris[q + 1], tris[q + 2]); _tv[1].set(tris[q + 3], tris[q + 4], tris[q + 5]); _tv[2].set(tris[q + 6], tris[q + 7], tris[q + 8]);
+          if (triHitsBox(_tv, o)) return site.M[i].name || 'objeto';
         }
       }
-    }
-    return null;
+      return null;
+    };
+    // raio x triângulo (Möller–Trumbore), t em (0,3; tmax)
+    const rayTri = (i, ox, oy, oz, dx, dy, dz, tmax) => {
+      const o = i * 9;
+      const e1x = tris[o + 3] - tris[o], e1y = tris[o + 4] - tris[o + 1], e1z = tris[o + 5] - tris[o + 2];
+      const e2x = tris[o + 6] - tris[o], e2y = tris[o + 7] - tris[o + 1], e2z = tris[o + 8] - tris[o + 2];
+      const px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
+      const det = e1x * px + e1y * py + e1z * pz;
+      if (Math.abs(det) < 1e-9) return false;
+      const inv = 1 / det;
+      const sx = ox - tris[o], sy = oy - tris[o + 1], sz = oz - tris[o + 2];
+      const u = (sx * px + sy * py + sz * pz) * inv;
+      if (u < 0 || u > 1) return false;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const v = (dx * qx + dy * qy + dz * qz) * inv;
+      if (v < 0 || u + v > 1) return false;
+      const t = (e2x * qx + e2y * qy + e2z * qz) * inv;
+      return t > 0.3 && t < tmax;
+    };
+    const blockedRay = (ox, oy, oz, dx, dy, dz, len) => {
+      stamp++;
+      let last = -1;
+      for (let t = 0; t <= len + 1.5; t += 1.5) {
+        const tt = Math.min(t, len);
+        const gx = Math.floor((ox + dx * tt - x0) / G), gz = Math.floor((oz + dz * tt - z0) / G);
+        if (gx < 0 || gz < 0 || gx >= nx || gz >= nz) continue;
+        const ci = gz * nx + gx;
+        if (ci === last) continue;
+        last = ci;
+        const list = grid[ci];
+        if (!list) continue;
+        for (let k = 0; k < list.length; k++) {
+          const i = list[k];
+          if (mark[i] === stamp) continue;
+          mark[i] = stamp;
+          if (rayTri(i, ox, oy, oz, dx, dy, dz, len - 0.4)) return true;
+        }
+      }
+      // relevo (morros, cortes)
+      for (let t = 3; t < len - 2; t += 4) if (terrainY(ox + dx * t, oz + dz * t) > oy + dy * t + 0.05) return true;
+      return false;
+    };
+    const sight = (cand) => {
+      const c = new THREE.Vector3(cand.base.x, cand.y0 + H / 2, cand.base.z);
+      let seen = 0, tested = 0;
+      for (const cam of cams) {
+        // só quem vê a frente do painel
+        if ((cam.p.x - c.x) * cand.az.x + (cam.p.z - c.z) * cand.az.z <= 0) continue;
+        for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) {
+          const u = (i / 4 - 0.5) * W * 0.9, w = (j / 2 - 0.5) * H * 0.8;
+          const px = c.x + cand.ax.x * u + cand.az.x * 0.35, py = c.y + w, pz = c.z + cand.ax.z * u + cand.az.z * 0.35;
+          let dx = px - cam.p.x, dy = py - cam.p.y, dz = pz - cam.p.z;
+          const len = Math.hypot(dx, dy, dz);
+          if (len > 230) continue;
+          dx /= len; dy /= len; dz /= len;
+          if (dx * cam.f.x + dy * cam.f.y + dz * cam.f.z < 0.64) continue;
+          tested++;
+          if (!blockedRay(cam.p.x, cam.p.y, cam.p.z, dx, dy, dz, len)) seen++;
+        }
+      }
+      return { sight: tested >= 15 ? seen / tested : 0, tested };
+    };
+    return { hits, sight };
   }
 
   // ------------------------------------------------------------ outdoors sobre pés (12 × 4 m)
   const BILL_W0 = 12, BILL_H0 = 4;
-  const billMoves = [];
-  function billboard(id, s, lat, faceS, { clear = 4.4, yawAdj = 0, k: kk = 1 } = {}) {
+  const billMoves = [], billSight = [];
+  // posição candidata: base, orientação (de frente para o ponto faceS) e chão sob os pés
+  function billLayout(s2, lat2, faceS, { clear = 4.4, yawAdj = 0, k: kk = 1 } = {}) {
     const BILL_W = BILL_W0 * kk, BILL_H = BILL_H0 * kk;
     const target = at(faceS).pos;
     const legX = BILL_W * 0.3;
-    // posição candidata: base, orientação (de frente para o ponto faceS) e chão sob os pés
-    const layout = (s2, lat2) => {
-      const f = at(s2);
-      const base = f.pos.clone().addScaledVector(f.right, lat2);
-      const az = new THREE.Vector3(target.x - base.x, 0, target.z - base.z).normalize();
-      if (yawAdj) az.applyAxisAngle(UP, yawAdj);
-      const ax = new THREE.Vector3(az.z, 0, -az.x); // direita de quem olha (ax × ay = az)
-      const legPos = [-1, 1].map((k) => base.clone().addScaledVector(ax, k * legX).addScaledVector(az, -0.5));
-      const grounds = legPos.map((p) => groundAt(p.x, p.z, s2));
-      const gy = Math.max(...grounds);
-      const y0 = gy + clear;
-      // volume inteiro (pés acima de 0,9 m, painel, refletores), para a verificação
-      const lo = Math.min(...grounds) + 0.9, top = y0 + BILL_H + 0.8;
-      const vol = {
-        c: base.clone().addScaledVector(az, 0.475).setY((lo + top) / 2), ax, ay: UP, az,
-        hx: BILL_W / 2 + 0.35, hy: (top - lo) / 2, hz: 1.275,
-      };
-      return { s: s2, lat: lat2, base, az, ax, legPos, grounds, y0, vol };
+    const f = at(s2);
+    const base = f.pos.clone().addScaledVector(f.right, lat2);
+    const az = new THREE.Vector3(target.x - base.x, 0, target.z - base.z).normalize();
+    if (yawAdj) az.applyAxisAngle(UP, yawAdj);
+    const ax = new THREE.Vector3(az.z, 0, -az.x); // direita de quem olha (ax × ay = az)
+    const legPos = [-1, 1].map((k) => base.clone().addScaledVector(ax, k * legX).addScaledVector(az, -0.5));
+    const grounds = legPos.map((p) => groundAt(p.x, p.z, s2));
+    const gy = Math.max(...grounds);
+    const y0 = gy + clear;
+    // volume inteiro (pés acima de 0,9 m, painel, refletores), para a verificação
+    const lo = Math.min(...grounds) + 0.9, top = y0 + BILL_H + 0.8;
+    const vol = {
+      c: base.clone().addScaledVector(az, 0.475).setY((lo + top) / 2), ax, ay: UP, az,
+      hx: BILL_W / 2 + 0.35, hy: (top - lo) / 2, hz: 1.275,
     };
-    // procura o lugar livre mais próximo do pedido (árvores mudam com a qualidade)
+    return { s: s2, lat: lat2, base, az, ax, legPos, grounds, y0, vol, BILL_W, BILL_H, legX };
+  }
+  function billboard(id, s, lat, faceS, o = {}) {
+    // procura o lugar mais próximo do pedido que não atravesse nada (árvores mudam com a qualidade)
+    // e que as câmeras vejam: aceita o primeiro com visada ≥ 80%; senão, o de melhor visada
     const out = Math.sign(lat) || 1;
     const tries = [[0, 0], [0, 3], [5, 0], [-5, 0], [0, 6], [5, 3], [-5, 3], [10, 0], [-10, 0], [0, 9], [10, 5], [-10, 5], [15, 0], [-15, 0]];
-    let L = null, blockedBy = null;
+    const k = o.k || 1;
+    const sight = sightTester(s, lat, faceS, BILL_W0 * k, BILL_H0 * k);
+    let L = null, best = null, blockedBy = null;
     for (const [dS, dL] of tries) {
-      const cand = layout(s + dS, lat + out * dL);
+      const cand = billLayout(s + dS, lat + out * dL, faceS, o);
       const hit = sceneHits(cand.vol);
-      if (!hit) { L = cand; break; }
-      if (!blockedBy) blockedBy = hit;
+      if (hit) { if (!blockedBy) blockedBy = hit; continue; }
+      Object.assign(cand, sight(cand));
+      if (cand.sight >= 0.8) { L = cand; break; }
+      if (!best || cand.sight > best.sight) best = cand;
     }
-    if (!L) L = layout(s, lat); // nada livre: fica no lugar pedido
-    if (L.s !== s || L.lat !== lat) billMoves.push(`${id}: ${blockedBy} -> s ${L.s.toFixed(0)}, lat ${L.lat.toFixed(0)}`);
-    const { base, az, ax, legPos, grounds, y0 } = L;
+    if (!L) L = best || billLayout(s, lat, faceS, o); // nada livre: fica no lugar pedido
+    if (L.s !== s || L.lat !== lat) billMoves.push(`${id}: ${blockedBy || 'visada'} -> s ${L.s.toFixed(0)}, lat ${L.lat.toFixed(0)}`);
+    billSight.push({ id, s: L.s, lat: L.lat, sight: L.sight === undefined ? null : +L.sight.toFixed(2), rays: L.tested || 0 });
+    const { base, az, ax, legPos, grounds, y0, BILL_W, BILL_H, legX } = L;
     const g = geoAt(base.x, base.z);
     const c = new THREE.Vector3(base.x, y0 + BILL_H / 2, base.z);
     // painel
@@ -1006,16 +1235,16 @@ export function buildAds(scene, track, quality = {}, env = null) {
     const top = c.clone().addScaledVector(UP, BILL_H / 2 + 0.212).addScaledVector(az, 0.08);
     g.box(top, ax, UP, az, BILL_W / 2 + 0.2, 0.012, 0.2, C.green, { skip: 'b' });
     // pés, travessa e mãos-francesas
-    legPos.forEach((p, k) => {
-      const bottom = grounds[k] - 0.6, topY = y0 + BILL_H * 0.85;
+    legPos.forEach((p, k2) => {
+      const bottom = grounds[k2] - 0.6, topY = y0 + BILL_H * 0.85;
       const lc = new THREE.Vector3(p.x, (bottom + topY) / 2, p.z);
       g.box(lc, ax, UP, az, 0.24, (topY - bottom) / 2, 0.24, C.leg, { skip: 'b' });
       solid('outdoor-pé', lc, ax, UP, az, 0.24, (topY - bottom) / 2, 0.24);
-      feet.push({ tag: 'outdoor', x: p.x, y: bottom, z: p.z, g: grounds[k] });
+      foot({ tag: 'outdoor', x: p.x, y: bottom, z: p.z, g: grounds[k2] });
       // sapata de concreto
-      const fc = new THREE.Vector3(p.x, grounds[k] + 0.1, p.z);
+      const fc = new THREE.Vector3(p.x, grounds[k2] + 0.1, p.z);
       g.box(fc, ax, UP, az, 0.55, 0.3, 0.55, col(0xb9bdb6), { skip: 'b' });
-      feet.push({ tag: 'sapata', x: p.x, y: grounds[k] - 0.2, z: p.z, g: grounds[k] });
+      foot({ tag: 'sapata', x: p.x, y: grounds[k2] - 0.2, z: p.z, g: grounds[k2] });
     });
     const beamC = c.clone().addScaledVector(UP, -BILL_H / 2 - 0.45).addScaledVector(az, -0.5);
     g.box(beamC, ax, UP, az, legX + 0.24, 0.14, 0.14, C.leg);
@@ -1023,9 +1252,9 @@ export function buildAds(scene, track, quality = {}, env = null) {
     if (hi) {
       // mãos-francesas em X entre os pés
       const ya = Math.min(...grounds) + 0.9, yb2 = y0 - 0.7;
-      for (const k of [-1, 1]) {
-        const a = base.clone().addScaledVector(ax, -legX * k).addScaledVector(az, -0.5); a.y = ya;
-        const b = base.clone().addScaledVector(ax, legX * k).addScaledVector(az, -0.5); b.y = yb2;
+      for (const k2 of [-1, 1]) {
+        const a = base.clone().addScaledVector(ax, -legX * k2).addScaledVector(az, -0.5); a.y = ya;
+        const b = base.clone().addScaledVector(ax, legX * k2).addScaledVector(az, -0.5); b.y = yb2;
         const d = b.clone().sub(a);
         const len = d.length();
         const dy = d.clone().normalize();
@@ -1051,19 +1280,21 @@ export function buildAds(scene, track, quality = {}, env = null) {
     return { id, base, az, s: L.s, lat: L.lat };
   }
   const bb = [];
+  const addBill = (id, s, lat, faceS, o) => part(`outdoor ${id}`, () => bb.push(billboard(id, s, lat, faceS, o)));
   // Grampo: visto de frente por quem sai da ponte (maior, como nas zonas de frenagem)
-  bb.push(billboard('b0', 978, 26, 895, { k: 1.25 }));
+  addBill('b0', 978, 26, 895, { k: 1.25 });
   // Curva final: fim da reta de Tesla, à esquerda do pórtico
-  bb.push(billboard('b2', 1545, -25, 1450, { k: 1.3 }));
+  addBill('b2', 1545, -25, 1450, { k: 1.3 });
   // Cume: fim da subida do Observatório
-  bb.push(billboard('b1', 616, 30, 520));
+  addBill('b1', 616, 30, 520);
   // Fim da reta de largada (zona de frenagem, por fora), alto para passar por cima da placa F = m·a
-  bb.push(billboard('b3', 132, -30, 10, { clear: 6.2 }));
-  // Reta de Tesla, de frente para quem sai do túnel
-  if (hi) bb.push(billboard('b4', 1402, 26, 1310, { clear: 5 }));
+  addBill('b3', 132, -30, 10, { clear: 6.2 });
+  // Descida do Observatório para a ponte (na reta de Tesla as bobinas escondiam o painel)
+  addBill('b4', B4[0], B4[1], B4[2], { clear: B4[3] });
+  if (!DEBUG) blockers = null; // libera a lista (a página de teste ainda usa)
 
   // ------------------------------------------------------------ faixas nas coberturas das arquibancadas
-  {
+  part('arquibancadas', () => {
     // mesma geometria de environment.js
     const a = at(LEN - 40).pos, b = at(95).pos;
     const dir = b.clone().sub(a).setY(0).normalize();
@@ -1092,50 +1323,60 @@ export function buildAds(scene, track, quality = {}, env = null) {
         solid('faixa-arquibancada', c, ax, UP, az, sl / 2, H / 2, T / 2);
       }
     }
-  }
+  });
 
-  // ------------------------------------------------------------ coroa do pórtico de largada
-  {
-    const f = at(0);
+  // ------------------------------------------------------------ coroas sobre pórticos (arte dos dois lados)
+  const crown = (tag, f, y0, W, H, region) => {
     const az = f.fwd.clone().negate(); // de frente para quem chega
     const ax = new THREE.Vector3(az.z, 0, -az.x);
-    const W = 14, H = 1.75, T = 0.3;
-    const y0 = f.pos.y + 8.4 + 1.3 + 1.75 + 0.45 + 0.12; // topo da faixa quadriculada + folga
+    const T = 0.3;
     const c = f.pos.clone(); c.y = y0 + H / 2;
     const g = geoAt(c.x, c.z);
     // frente e verso com a arte (o verso já lê certo de quem olha de trás)
-    const uvF = atlas.uv('crown');
+    const uvF = atlas.uv(region);
     g.box(c, ax, UP, az, W / 2, H / 2, T / 2, C.frame, { front: uvF, back: uvF, glow: 0.34 });
-    solid('coroa-largada', c, ax, UP, az, W / 2, H / 2, T / 2);
+    solid(tag, c, ax, UP, az, W / 2, H / 2, T / 2);
     for (const k of [-1, 1]) {
       const p = c.clone().addScaledVector(ax, k * W * 0.32); p.y = y0 - 0.06;
       g.box(p, ax, UP, az, 0.18, 0.07, 0.12, C.frame);
     }
-  }
+  };
+  // Largada: sobre a faixa quadriculada do pórtico com luzes
+  part('coroa-largada', () => {
+    const f = at(0);
+    crown('coroa-largada', f, f.pos.y + 8.4 + 1.3 + 1.75 + 0.45 + 0.12, 14, 1.75, 'crown');
+  });
+  // Reta de Tesla: "oferecimento" sobre a viga do pórtico temático, de frente para quem sai do túnel
+  // (viga no topo a h + placa + 0,5 = 10,1 m, como em track.js; os arcos das bobinas passam acima de 12,3 m)
+  part('coroa-tesla', () => {
+    const f = at(ts[1] + 50);
+    crown('coroa-tesla', f, f.pos.y + 7.2 + 2.4 + 0.5 + 0.12, 12, 1.5, 'tunnel');
+  });
 
-  // ------------------------------------------------------------ túnel: "oferecimento" sobre as fachadas
-  {
+  // ------------------------------------------------------------ túnel: "oferecimento" sobre a fachada da entrada
+  // arte dos dois lados: o verso é visto da subida do Observatório, que passa por cima do túnel
+  // (a fachada da saída não recebe placa: fica de costas para quem corre)
+  part('túnel', () => {
     const i0 = Math.ceil(ts[0] / ds) + 1, i1 = Math.floor(ts[1] / ds);
-    for (const [s, dir] of [[ts[0], 1], [ts[1], -1]]) {
-      const i = Math.round(s / ds);
-      const f = at(s);
-      const tp = meta.tunnelProfile(s, WD[i]);
-      const mt = (meta.moundTop && meta.moundTop[clamp(i, i0, i1)]) || tp.top + 1;
-      const Hh = mt + 1.8;
-      const W = 14, H = 1.75, T = 0.3;
-      const az = dir > 0 ? f.fwd.clone().negate() : f.fwd.clone();
-      const ax = new THREE.Vector3(az.z, 0, -az.x);
-      // sobre o topo da fachada, rente à face da frente
-      const c = f.pos.clone().addScaledVector(az, 0.5 - 0.06 - T / 2);
-      c.y = f.pos.y + Hh + 0.02 + H / 2;
-      const g = geoAt(c.x, c.z);
-      g.box(c, ax, UP, az, W / 2, H / 2, T / 2, C.frame, { front: atlas.uv('tunnel'), glow: 0.36, skip: 'b' });
-      solid('faixa-túnel', c, ax, UP, az, W / 2, H / 2 - 0.01, T / 2);
-    }
-  }
+    const s = ts[0];
+    const i = Math.round(s / ds);
+    const f = at(s);
+    const tp = meta.tunnelProfile(s, WD[i]);
+    const mt = (meta.moundTop && meta.moundTop[clamp(i, i0, i1)]) || tp.top + 1;
+    const Hh = mt + 1.8;
+    const W = 14, H = 1.75, T = 0.3;
+    const az = f.fwd.clone().negate();
+    const ax = new THREE.Vector3(az.z, 0, -az.x);
+    // sobre o topo da fachada, rente à face da frente
+    const c = f.pos.clone().addScaledVector(az, 0.5 - 0.06 - T / 2);
+    c.y = f.pos.y + Hh + 0.02 + H / 2;
+    const uvT = atlas.uv('tunnel');
+    geoAt(c.x, c.z).box(c, ax, UP, az, W / 2, H / 2, T / 2, C.frame, { front: uvT, back: uvT, glow: 0.36, skip: 'b' });
+    solid('faixa-túnel', c, ax, UP, az, W / 2, H / 2 - 0.01, T / 2);
+  });
 
   // ------------------------------------------------------------ ponte: faixa entre os tirantes do meio
-  {
+  part('ponte', () => {
     // tirante mais próximo do meio do vão (a cada 6 m a partir da cabeceira)
     const mid = (bs[0] + bs[1]) / 2;
     const s = bs[0] + 6 + Math.round((mid - bs[0] - 6) / 6) * 6;
@@ -1156,7 +1397,7 @@ export function buildAds(scene, track, quality = {}, env = null) {
       const p = c.clone().addScaledVector(ax, k * (W / 2 - 0.12)); p.y += dy;
       g.box(p, ax, UP, az, 0.12, 0.1, 0.12, C.steel);
     }
-  }
+  });
 
   // ------------------------------------------------------------ malhas estáticas
   // a menor célula junta-se à vizinha mais próxima até sobrarem poucos pedaços (menos draw calls;
@@ -1180,7 +1421,6 @@ export function buildAds(scene, track, quality = {}, env = null) {
       cells.delete(k);
     }
   }
-  const statics = [];
   let mk = 0;
   for (const b of cells.values()) {
     if (!b.count) continue;
@@ -1191,59 +1431,78 @@ export function buildAds(scene, track, quality = {}, env = null) {
     m.matrixAutoUpdate = false;
     m.updateMatrix();
     group.add(m);
-    statics.push(m);
     disposables.push(m.geometry);
   }
+  cells.clear(); // arrays de montagem não servem mais
 
-  // ------------------------------------------------------------ tinta no gramado: logo no jardim da universidade
-  // e faixas nos acostamentos da reta de largada (tinta não é sólida: pode ficar dentro do corredor)
-  let lawn = null;
-  {
+  // ------------------------------------------------------------ tinta no chão (não é sólida: pode ficar dentro do corredor)
+  // Logo no jardim da universidade (visto do alto: grua do título, vistas aéreas); faixas nos acostamentos
+  // da reta de largada; e, para quem corre, faixas na área de escape por fora do grampo e da curva do
+  // Laboratório, lidas de frente durante a frenagem (texto correndo ao longo da curva, topo para fora).
+  part('tinta', () => {
     const b = new Geo(atlas.white);
-    const w = col(0xffffff);
-    const V0 = 256 / 1280; // limite entre a marca (em cima) e a faixa (embaixo) no canvas da grama
+    const white = col(0xffffff), mint = col(0x2ee89a);
+    const V0 = 256 / 1280; // limite entre a marca (em cima) e a faixa (embaixo) no canvas da tinta
     // grade n × m de pontos (fn(i/n, j/m) -> [x, y, z]) mapeada em [u0..u1] × [v0..v1]
-    const patch = (n, m, fn, u0, v0, u1, v1) => {
+    const patch = (n, m, fn, u0, v0, u1, v1, color) => {
       const base = b.count;
       for (let j = 0; j <= m; j++) for (let i = 0; i <= n; i++) {
         const [x, y, z] = fn(i / n, j / m);
-        b.vert(x, y, z, 0, 1, 0, w, lerp(u0, u1, i / n), lerp(v0, v1, j / m), 0);
+        b.vert(x, y, z, 0, 1, 0, color, lerp(u0, u1, i / n), lerp(v0, v1, j / m), 0);
       }
       for (let j = 0; j < m; j++) for (let i = 0; i < n; i++) {
         const a = base + j * (n + 1) + i;
         b.idx.push(a, a + 1, a + n + 2, a, a + n + 2, a + n + 1);
       }
     };
-    // jardim: entre a ala oeste do prédio e a pista, longe dos canteiros, árvores e pedras;
-    // lido da pista (topo das letras para -z, leitura para +x)
+    // jardim: entre a ala oeste do prédio e a pista, longe dos canteiros, árvores e pedras
     const cx = -10.2, cz = -36.2, S = 19;
     const n = hi ? 12 : 6;
     patch(n, n, (u, v) => {
       const x = cx - S / 2 + u * S, z = cz + S / 2 - v * S;
       return [x, terrainY(x, z) + 0.04, z];
-    }, 0, V0, 1, 1);
+    }, 0, V0, 1, 1, white);
     solid('gramado-logo', new THREE.Vector3(cx, terrainY(cx, cz) + 0.15, cz), new THREE.Vector3(1, 0, 0), UP, new THREE.Vector3(0, 0, 1), S / 2, 0.1, S / 2);
-    // acostamentos (grama entre a pista e o muro), dos dois lados: topo das letras para fora
-    const s0 = 34, span = 15.6;
-    for (const side of [-1, 1]) {
-      patch(8, 1, (u, v) => {
-        // lado esquerdo lê no sentido da corrida; o direito, ao contrário
-        const s = side < 0 ? s0 + u * span : s0 + span - u * span;
+    // faixa no acostamento a partir de sA, lado side, entre halfWidth + inner e wallDist - 0,45;
+    // comprimento real (medido na linha do meio da faixa) = 3,9 × largura, como a arte.
+    // Lado esquerdo lê no sentido da corrida; o direito, ao contrário (sempre da esquerda para a direita
+    // de quem olha da pista), com o topo das letras para fora.
+    const strip = (sA, side, inner, color, segs) => {
+      const r0 = track.sample(sA);
+      const width = r0.wallDist - 0.45 - (r0.halfWidth + inner);
+      const want = width * 3.9, latM = r0.halfWidth + inner + width / 2;
+      let len = 0, sB = sA;
+      const pa = r0.pos.clone().addScaledVector(r0.right, side * latM), pb = new THREE.Vector3();
+      while (len < want && sB < sA + 60) {
+        sB += 0.25;
+        const r = track.sample(sB);
+        pb.copy(r.pos).addScaledVector(r.right, side * latM);
+        len += Math.hypot(pb.x - pa.x, pb.z - pa.z);
+        pa.copy(pb);
+      }
+      const span = sB - sA;
+      patch(segs, 1, (u, v) => {
+        const s = side < 0 ? sA + u * span : sA + span - u * span;
         const r = track.sample(s);
-        const lat = side * lerp(r.halfWidth + 0.55, r.wallDist - 0.45, v);
+        const lat = side * lerp(r.halfWidth + inner, r.wallDist - 0.45, v);
         return [r.pos.x + r.right.x * lat, r.pos.y + 0.02, r.pos.z + r.right.z * lat];
-      }, 0.01, 0.005, 0.99, V0 - 0.005);
-    }
+      }, 0.01, 0.005, 0.99, V0 - 0.005, color);
+    };
+    for (const side of [-1, 1]) strip(34, side, 0.55, white, 8);
+    // escape do grampo (areia: tinta verde-menta) e da curva do Laboratório (grama: branca);
+    // por dentro das zebras (1,4 m) quando houver
+    strip(RUNOFF.hairpin, 1, 1.85, mint, 16);
+    strip(RUNOFF.lab, -1, 0.55, white, 12);
     const geo = b.build();
     geo.deleteAttribute('glow');
     // tinta: textura pré-multiplicada (sem franja escura nos mipmaps) e mistura "one, 1 - alfa"
     const k = 0.92;
     const m = new THREE.MeshLambertMaterial({
-      map: atlas.grassTex, color: new THREE.Color(k, k, k), transparent: true, opacity: k, depthWrite: false,
+      map: atlas.grassTex, color: new THREE.Color(k, k, k), vertexColors: true, transparent: true, opacity: k, depthWrite: false,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
       polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
     });
-    lawn = new THREE.Mesh(geo, m);
+    const lawn = new THREE.Mesh(geo, m);
     lawn.name = 'gramado-logo';
     lawn.receiveShadow = true;
     lawn.renderOrder = 1;
@@ -1252,25 +1511,10 @@ export function buildAds(scene, track, quality = {}, env = null) {
     lawn.userData.noCorridor = true; // tinta no chão
     group.add(lawn);
     disposables.push(geo, m);
-  }
+  });
 
   // ------------------------------------------------------------ dirigível
-  const blimp = buildBlimp(hi, atlas, C);
-  disposables.push(blimp.mesh.geometry);
-  blimp.mesh.material = mat;
-  blimp.mesh.castShadow = !!quality.shadows;
-  group.add(blimp.mesh);
-  // órbita elíptica alta em volta do circuito
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (let i = 0; i < N; i += 4) {
-    minX = Math.min(minX, meta.X[i]); maxX = Math.max(maxX, meta.X[i]);
-    minZ = Math.min(minZ, meta.Z[i]); maxZ = Math.max(maxZ, meta.Z[i]);
-  }
-  const orbit = {
-    cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2,
-    a: (maxX - minX) / 2 * 0.85, b: (maxZ - minZ) / 2 * 0.8,
-    alt: 58, speed: 7.5, ang: 2.2,
-  };
+  let blimp = null, orbit = null;
   const bp = new THREE.Vector3(), bt = new THREE.Vector3(), bq = new THREE.Quaternion(), be = new THREE.Euler(0, 0, 0, 'YXZ');
   function placeBlimp(t) {
     const { cx, cz, a, b } = orbit;
@@ -1283,30 +1527,71 @@ export function buildAds(scene, track, quality = {}, env = null) {
     blimp.mesh.position.copy(bp);
     blimp.mesh.quaternion.copy(bq);
   }
-  placeBlimp(0);
+  part('dirigível', () => {
+    const bl = buildBlimp(hi, atlas, C);
+    disposables.push(bl.mesh.geometry);
+    bl.mesh.material = mat;
+    bl.mesh.castShadow = !!quality.shadows;
+    // órbita elíptica alta em volta do circuito
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < N; i += 4) {
+      minX = Math.min(minX, meta.X[i]); maxX = Math.max(maxX, meta.X[i]);
+      minZ = Math.min(minZ, meta.Z[i]); maxZ = Math.max(maxZ, meta.Z[i]);
+    }
+    orbit = {
+      cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2,
+      a: (maxX - minX) / 2 * 0.85, b: (maxZ - minZ) / 2 * 0.8,
+      alt: 58, speed: 7.5, ang: 2.2,
+    };
+    blimp = bl;
+    placeBlimp(0);
+    group.add(bl.mesh);
+  });
 
   // ------------------------------------------------------------ fonte e logotipo reais
-  // Desenhado já com a fonte/logo alternativos; redesenha (um envio só, se chegarem juntos) quando carregarem.
-  let pending = 0, redraws = 0;
-  const refresh = () => {
-    if (pending || !alive) return;
-    pending = setTimeout(() => {
-      pending = 0;
-      if (!alive) return;
-      redraws++;
-      atlas.draw();
-      atlas.tex.needsUpdate = true;
-      atlas.grassTex.needsUpdate = true;
-    }, 60);
+  // O atlas nasce com o que já chegou. O que chegar até o prazo (carregamento / título) entra num
+  // redesenho só. Depois do prazo, só a fonte ainda justifica redesenhar (o logo vetorial é quase igual
+  // ao PNG). Com o laço do jogo rodando, o redesenho é pintado aos poucos em update() (≈ 3 ms por quadro)
+  // e vai para a GPU uma vez só, no fim.
+  const DEADLINE = 6000;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const drawn = { font: fontWasReady, logo: logoWasReady };
+  let redraws = 0, jobs = null, lastRun = -Infinity, timer = 0;
+  const redraw = (force) => {
+    redraws++;
+    drawn.font = brandFontLoaded();
+    drawn.logo = logoReadyNow();
+    if (force !== 'jobs' && (force === 'now' || now() - lastRun > 400)) { atlas.draw(); atlas.upload(); jobs = null; }
+    else jobs = atlas.jobs();
   };
-  loadLogo().then((img) => { if (img && !logoWasReady) refresh(); });
-  loadBrandFont().then((ok) => { if (ok && !fontWasReady) refresh(); });
+  const maybeRedraw = (late) => {
+    if (!alive) return;
+    const font = brandFontLoaded() && !drawn.font;
+    const logo = logoReadyNow() && !drawn.logo;
+    if (font || (logo && !late)) redraw();
+  };
+  if (!fontWasReady || !logoWasReady) {
+    const deadline = new Promise((r) => { timer = setTimeout(r, DEADLINE); });
+    Promise.race([Promise.allSettled([loadLogo(), loadBrandFont()]), deadline]).then(() => {
+      clearTimeout(timer);
+      timer = 0;
+      maybeRedraw(false);
+      if (alive && !drawn.font) loadBrandFont().then(() => maybeRedraw(true));
+    });
+  }
 
   // ------------------------------------------------------------ atualização
   let time = 0;
   function update(dt) {
+    if (jobs) {
+      const t0 = now();
+      do { jobs.shift()(); } while (jobs.length && now() - t0 < 3);
+      if (!jobs.length) { jobs = null; atlas.upload(); }
+    }
     if (!dt) return;
+    lastRun = now();
     time += dt;
+    if (!blimp) return;
     // velocidade angular aproximada para velocidade constante na elipse
     const { a, b } = orbit;
     const r = Math.hypot(Math.sin(orbit.ang) * a, Math.cos(orbit.ang) * b);
@@ -1315,23 +1600,36 @@ export function buildAds(scene, track, quality = {}, env = null) {
     blimp.spin(dt);
   }
 
-  return {
+  const handle = {
     group,
-    atlas: atlas.tex,
     update,
     dispose() {
       alive = false;
-      if (pending) clearTimeout(pending);
+      if (timer) clearTimeout(timer);
+      jobs = null;
       scene.remove(group);
       disposables.forEach((d) => d.dispose && d.dispose());
-    },
-    debug: {
-      solids, feet, boards: () => boardCount, billboards: bb,
-      canvases: { atlas: atlas.canvas, grass: atlas.grass },
-      get redraws() { return redraws; }, drawnWithLogo: logoWasReady, drawnWithFont: fontWasReady,
-      orbit, billMoves,
+      art.tint.clear();
     },
   };
+  if (DEBUG) {
+    handle.atlas = atlas.tex; // extras só para a página de teste
+    handle.debug = {
+      solids, feet, boards: () => boardCount, billboards: bb, billMoves, billSight, skipped,
+      canvases: { atlas: atlas.canvas, grass: atlas.grass },
+      get redraws() { return redraws; }, get pending() { return jobs ? jobs.length : 0; },
+      drawnWithLogo: logoWasReady, drawnWithFont: fontWasReady, orbit,
+      // redesenha já ('now') ou aos poucos em update() ('jobs'), como no redesenho tardio
+      redraw: (mode = 'jobs') => redraw(mode),
+      // nota de visada de um outdoor hipotético (para escolher lugares)
+      sight: (s, lat, faceS, o = {}) => {
+        const k = o.k || 1;
+        const L = billLayout(s, lat, faceS, o);
+        return { ...sightTester(s, lat, faceS, BILL_W0 * k, BILL_H0 * k)(L), hit: sceneHits(L.vol) };
+      },
+    };
+  }
+  return handle;
 }
 
 // ---------------------------------------------------------------------------
@@ -1359,7 +1657,8 @@ function buildBlimp(hi, atlas, C) {
   // Gomos em volta (φ a partir do lado +x, subindo): painel com a arte em cada lado,
   // friso verde logo abaixo e barriga escura. O lado -x é o espelho do +x.
   const D = 360 / NS;
-  const jLo = Math.round(-15 / D), jHi = Math.round(60 / D), jSt = Math.round(-35 / D);
+  // faixa da arte de -30° a +45° (alta) ou +30° (baixa): voltada para quem olha lá de baixo, a 100–250 m
+  const jLo = Math.round(-30 / D), jHi = Math.max(jLo + 2, Math.floor(45 / D)), jSt = jLo - 1;
   const mod = (j) => ((j % NS) + NS) % NS;
   const mirror = (j) => mod(NS / 2 - 1 - j);
   const kind = new Array(NS).fill('env');
