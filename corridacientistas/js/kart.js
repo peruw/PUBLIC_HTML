@@ -8,7 +8,7 @@ import { statFactor } from './config.js';
 export const TUNING = {
   // velocidade (m/s) em 100cc com atributo 3; ±por ponto de atributo
   topSpeed: 24,
-  topSpeedPerStat: 0.5,
+  topSpeedPerStat: 0.3, // 0,5 deixava o atributo velocidade decidir a corrida
   // aceleração: a = accel0 * (1 - (v/vmax)²) + accelFloor → ~3 s até a máxima (atributo 3)
   accel0: 16.5,
   accelPerFactor: 0.45, // ±45% com atributo 5/1
@@ -72,7 +72,7 @@ export const TUNING = {
   tumbleTime: 1.6,
   tumbleVy: 8.5,
   tumbleFlip: 0.55, // s da cambalhota (menor que o tempo no ar)
-  hitCooldown: 0.6,
+  hitGrace: 1.0, // s de proteção depois que o kart se recupera de uma batida
   // colisões
   kartRadius: 1.1, // raio do círculo kart×kart (×escala)
   wallRadius: 0.85,
@@ -181,6 +181,7 @@ export class Kart {
     this._maxYaw = T.maxYaw * (1 + T.maxYawPerFactor * statFactor(st.handling));
     this.driftYawFactor = 1 + T.driftYawPerHandling * statFactor(st.handling);
     this.mass = 1 + 0.3 * statFactor(st.weight);
+    this._handF = statFactor(st.handling); // controle: menos perda no acostamento e drift carrega mais rápido
 
     this._ccMult = 1;
     this._boostStrength = 1;
@@ -240,7 +241,7 @@ export class Kart {
     if (this.starTime > 0) v *= T.starMult;
     if (this.shrinkTime > 0) v *= T.shrinkMult;
     if (this.boostTime > 0) v *= 1 + T.boostMult * this._boostStrength;
-    else if (this.offroad && this.starTime <= 0) v *= T.offroadMult;
+    else if (this.offroad && this.starTime <= 0) v *= T.offroadMult + 0.1 * this._handF;
     if (this.drifting) v *= T.driftSpeedMult;
     return v;
   }
@@ -252,6 +253,11 @@ export class Kart {
 
   get invincible() {
     return this.starTime > 0;
+  }
+
+  // proteção logo após uma batida (projéteis e maçãs passam direto)
+  get recovering() {
+    return this._hitCd > 0;
   }
 
   get stunned() {
@@ -319,6 +325,7 @@ export class Kart {
     this._pivotFix.scale.setScalar(1);
     this.body.rotation.set(0, 0, 0);
     this.body.position.y = PIVOT;
+    this.body.visible = true;
   }
 
   update(dt, world) {
@@ -351,7 +358,8 @@ export class Kart {
     this.trickWindow = 0;
     this.boostTime = 0;
     this.hitType = type;
-    this._hitCd = T.hitCooldown;
+    // só pode apanhar de novo depois de se recuperar + um tempinho de proteção
+    this._hitCd = (type === 'tumble' ? T.tumbleTime : type === 'shock' ? T.shockTime : T.spinTime) + T.hitGrace;
     const sp = Math.max(0, this.speed);
     this._spinDir = Math.random() < 0.5 ? -1 : 1;
     if (type === 'tumble') {
@@ -627,7 +635,7 @@ export class Kart {
         const rate = into >= 0
           ? T.driftChargeNeutral + (T.driftChargeIn - T.driftChargeNeutral) * into
           : T.driftChargeNeutral + (T.driftChargeOut - T.driftChargeNeutral) * -into;
-        this.driftCharge += rate * dt;
+        this.driftCharge += rate * dt * (1 + 0.15 * this._handF);
         const th = T.driftCharge;
         const lvl = this.driftCharge >= th[2] ? 3 : this.driftCharge >= th[1] ? 2 : this.driftCharge >= th[0] ? 1 : 0;
         if (lvl > this.driftLevel) {
@@ -810,6 +818,8 @@ export class Kart {
     // visual: escala uniforme (encolhido); o achatamento fica no grupo do modelo, a partir do chão
     this.visual.scale.setScalar(this._scale);
     this._pivotFix.scale.set(sx, sy, sx);
+    // pisca durante a proteção depois de uma batida
+    this.body.visible = !(this._hitCd > 0 && !this.stunned) || Math.sin(this._time * 40) > -0.3;
 
     // inclinação do chão (rampa ao longo da pista + inclinação lateral)
     let pitchT = 0;

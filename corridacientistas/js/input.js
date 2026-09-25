@@ -34,9 +34,9 @@ const CSS = `
 .tc-root.tc-hidden{display:none}
 .tc-zone{position:absolute;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
 .tc-btn{position:absolute;display:grid;place-items:center;border-radius:50%;color:#fff;font-weight:700;
-  letter-spacing:.5px;line-height:1;text-align:center;background:rgba(18,26,60,.38);
+  letter-spacing:.5px;line-height:1;text-align:center;background:rgba(18,26,60,.45);
   border:3px solid rgba(255,255,255,.55);box-shadow:0 4px 14px rgba(0,0,0,.28),inset 0 0 0 2px rgba(255,255,255,.08);
-  text-shadow:0 2px 3px rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+  text-shadow:0 2px 3px rgba(0,0,0,.6);
   transition:transform .06s ease,background .1s ease,border-color .1s ease;pointer-events:none;box-sizing:border-box}
 .tc-btn small{display:block;font-size:11px;text-transform:uppercase;font-weight:600;opacity:.85;margin-top:3px;letter-spacing:0}
 .tc-btn.tc-on{transform:scale(.92);background:rgba(255,255,255,.38);border-color:#fff}
@@ -173,10 +173,10 @@ export class Input {
     if (this._autoAccelerate) {
       const touchVisible = this._touchVisible();
       if (this._countdown) {
-        // na contagem: segurar qualquer botão de toque acelera
-        if (touchVisible && (t.drift || t.item || t.gas || this._steerPointers.length)) throttle = 1;
+        // na contagem: segurar qualquer botão de toque (até o FREIO) acelera
+        if (touchVisible && (t.drift || t.item || t.gas || t.brake || this._steerPointers.length)) throttle = 1;
       } else if (brake < 0.5) throttle = 1;
-      if (brake >= 0.5) throttle = 0;
+      if (brake >= 0.5 && !this._countdown) throttle = 0;
     }
 
     st.throttle = throttle;

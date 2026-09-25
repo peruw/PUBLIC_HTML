@@ -242,9 +242,14 @@ h2 {
 #screen-title {
   background: linear-gradient(90deg, rgba(5, 10, 30, 0.82) 0%, rgba(5, 10, 30, 0.45) 45%, rgba(5, 10, 30, 0) 75%);
   justify-content: flex-start;
+  /* rola se não couber (celular com as barras do navegador) */
+  align-items: flex-start;
+  overflow-y: auto;
+  touch-action: pan-y;
 }
 
 .title-wrap {
+  margin-block: auto;
   display: grid;
   gap: 26px;
   max-width: 560px;
@@ -288,10 +293,11 @@ h2 {
 }
 
 .back-site {
+  display: inline-block;
+  padding: 10px 0;
   color: var(--ink-dim);
   font-size: 14px;
   text-decoration: none;
-  margin-top: 4px;
 }
 
 .back-site:hover {
@@ -362,9 +368,12 @@ h2 {
 }
 
 .char-card span {
-  font-size: 15px;
+  font-size: clamp(11px, 1.6vw, 15px);
   font-weight: 600;
-  white-space: nowrap;
+  /* nome longo (Oswaldo Cruz) quebra em duas linhas em vez de cortar */
+  white-space: normal;
+  line-height: 1.1;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
@@ -374,7 +383,15 @@ h2 {
   position: absolute;
   top: 6px;
   right: 8px;
-  font-size: 15px;
+  display: block;
+  line-height: 0;
+}
+
+.char-card .flag svg {
+  width: 21px;
+  height: 14px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 .char-card:hover {
@@ -680,7 +697,7 @@ kbd {
   top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left));
   display: grid;
-  justify-items: center;
+  justify-items: start;
   gap: 4px;
 }
 
@@ -731,7 +748,7 @@ kbd {
 .hud-item-name {
   font-size: 14px;
   max-width: 130px;
-  text-align: center;
+  text-align: left;
   line-height: 1.1;
 }
 
@@ -782,7 +799,8 @@ kbd {
 
 .hud-time {
   font-size: 18px;
-  color: var(--ink-dim);
+  color: #fff;
+  -webkit-text-stroke: 1px #22306b;
   font-variant-numeric: tabular-nums;
 }
 
@@ -884,6 +902,18 @@ kbd {
   color: var(--yellow);
 }
 
+/* mensagens (VITÓRIA, ÚLTIMA VOLTA…): só a entrada; o hud.js apaga o texto no tempo certo */
+#hud-center.msg.pop span {
+  animation: popIn 0.5s ease both;
+}
+
+@keyframes popIn {
+  0% { transform: scale(2.2); opacity: 0; }
+  40% { transform: scale(0.95); opacity: 1; }
+  70% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 @keyframes pop {
   0% { transform: scale(2.2); opacity: 0; }
   18% { transform: scale(0.95); opacity: 1; }
@@ -942,14 +972,19 @@ body.touch .touch-only {
   .tagline { font-size: 14px; }
   .btn-big { font-size: 21px; padding: 11px 22px; }
   .btn { font-size: 16px; padding: 9px 16px; }
-  .btn-small { font-size: 13px; padding: 7px 11px; }
+  .btn-small { font-size: 13px; padding: 9px 12px; min-height: 38px; }
 
   .select-head { padding: 8px 12px 4px; }
   .select-body { grid-template-columns: 1fr 1fr; gap: 10px; padding: 4px 12px; }
   .char-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .char-card { padding: 3px 2px 4px; }
-  .char-card span { font-size: 12px; }
-  .char-card .flag { font-size: 12px; top: 3px; right: 4px; }
+  .char-card { padding: 3px 0 4px; }
+  .char-card span { font-size: clamp(10px, 1.5vw, 12px); letter-spacing: -0.2px; line-height: 1.05; }
+  .char-card .flag { top: 3px; right: 4px; }
+  .char-card .flag svg { width: 16px; height: 11px; }
+  /* retrato limitado pela altura: as duas fileiras cabem na tela */
+  .char-card img,
+  .char-card .ph { width: auto; height: min(16vh, 64px); margin: 0 auto; }
+  .char-card .ph { font-size: 22px; }
   .char-detail { grid-template-columns: 84px 1fr; gap: 8px; padding: 8px; }
   #detail-portrait { width: 84px; height: 84px; }
   .detail-text h3 { font-size: 18px; }
@@ -957,17 +992,30 @@ body.touch .touch-only {
   .detail-bio { font-size: 12.5px; margin-bottom: 6px; }
   .stat { grid-template-columns: 76px 1fr; font-size: 12px; }
   .stat-bar i { height: 7px; }
-  .select-foot { padding: 6px 12px 10px; gap: 8px 14px; }
-  .seg button { padding: 5px 9px; font-size: 13px; }
+  .select-foot { padding: 6px 12px 10px; gap: 8px 12px; flex-wrap: nowrap; }
+  .opt { gap: 6px; }
+  .btn-go { white-space: nowrap; }
+  .seg button { padding: 5px 9px; font-size: 13px; min-width: 40px; min-height: 36px; }
   .seg button small { font-size: 10px; }
-  .btn-go { font-size: 19px; padding: 9px 20px; }
+  .btn-go { font-size: 19px; padding: 9px 18px; }
 
   .howto-body { grid-template-columns: 1fr 1fr; padding: 4px 12px 12px; gap: 10px; }
   .howto-box ul { font-size: 13px; }
   .item-row p { font-size: 12px; }
 
   .results-wrap { padding: 12px; gap: 8px; }
-  .results-list li { font-size: 14px; padding: 3px 8px; }
+  .results-list li { font-size: 14px; padding: 2px 8px; }
+  /* botões do resultado sempre visíveis, presos no fim do painel */
+  .results-wrap > .row {
+    position: sticky;
+    bottom: -12px;
+    z-index: 1;
+    margin: 0 -12px -12px;
+    padding: 8px 12px 12px;
+    background: rgb(13, 22, 56);
+    flex-wrap: nowrap;
+  }
+  .results-wrap > .row .btn { font-size: 14px; padding: 7px 12px; }
 
   .hud-item-slot { width: 64px; height: 64px; font-size: 34px; border-radius: 16px; border-width: 3px; }
   #hud-item-icon.txt { font-size: 26px; }
@@ -994,14 +1042,57 @@ body.touch #hud-minimap {
 }
 
 @media (max-width: 760px) {
+  #screen-title {
+    background: rgba(5, 10, 30, 0.6);
+  }
+}
+
+/* uma coluna só em tela estreita e alta (celular deitado mantém duas) */
+@media (max-width: 760px) and (min-height: 521px) {
   .select-body,
   .howto-body {
     grid-template-columns: 1fr;
   }
-  #screen-title {
-    background: rgba(5, 10, 30, 0.6);
-  }
   #hud-toasts {
     width: calc(100% - 200px);
   }
+}
+
+/* celular pequeno deitado: rodapé da escolha numa linha só */
+@media (max-height: 520px) and (max-width: 720px) {
+  .seg button small { display: none; }
+  .opt-label { font-size: 14px; }
+  .btn-go { font-size: 17px; padding: 9px 14px; }
+}
+
+/* telas bem baixas: título compacto */
+@media (max-height: 400px) {
+  #screen-title .atom-logo,
+  .tagline { display: none; }
+  .title-wrap { gap: 8px; }
+  .logo h1 { font-size: 34px; }
+  .menu-buttons { gap: 8px; }
+  .btn-big { padding: 8px 20px; font-size: 19px; }
+}
+
+/* sem tela cheia (barras do navegador): minimapa menor para não ficar sob ◀ ▶ */
+@media (max-height: 320px) {
+  body.touch #hud-minimap { width: 84px; height: 84px; top: calc(max(12px, env(safe-area-inset-top)) + 74px); }
+  .hud-item-slot { width: 54px; height: 54px; font-size: 30px; }
+}
+
+/* no celular, a seção "Celular" vem primeiro no Como jogar */
+body.touch .howto-controls .howto-box:nth-child(2) {
+  order: -1;
+}
+
+/* no celular, sem desfoque (caro na GPU) e painel mais opaco */
+body.touch .panel,
+body.touch .screen.dim {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+body.touch {
+  --panel: rgba(13, 22, 56, 0.93);
 }

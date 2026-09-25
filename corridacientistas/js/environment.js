@@ -1,6 +1,7 @@
 // Ambiente do "Campus da Ciência": céu, neblina, luzes, terreno, lagoa, montanhas,
 // nuvens, vegetação e os marcos temáticos (universidade, laboratório, observatório...).
 import * as THREE from './three.js';
+import { splitGeometry, bakeInstances } from './track.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -517,18 +518,21 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       if (HOLE[a] || HOLE[b] || HOLE[c2] || HOLE[d]) continue;
       idx.push(a, c2, b, b, c2, d);
     }
-    const g = keep(new THREE.BufferGeometry());
+    const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     g.setIndex(nx * nz > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
     g.computeVertexNormals();
-    g.computeBoundingSphere();
-    const m = new THREE.Mesh(g, keep(new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true })));
-    m.receiveShadow = true;
-    m.name = 'terreno';
-    m.matrixAutoUpdate = false;
-    group.add(m);
+    // em ladrilhos (normais já calculadas na malha inteira): o culling descarta o que está fora de vista
+    const tMat = keep(new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }));
+    splitGeometry(g, 300, hi ? 3000 : 1500).forEach((tg, k) => {
+      const m = new THREE.Mesh(keep(tg), tMat);
+      m.receiveShadow = true;
+      m.name = 'terreno-' + k;
+      m.matrixAutoUpdate = false;
+      group.add(m);
+    });
   }
 
   // ------------------------------------------------------------ lagoa (água com profundidade)
@@ -822,7 +826,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const stands = [[-36, 40], [44, 108]];
     const seatCols = [col(0xe3262f), col(0x1d7bd8), col(0xffd23f), col(0x2fbf71), col(0x8a3cff)];
     const wd = smp(0).wallDist;
-    for (const [x0, x1] of stands) {
+    for (const [si, [x0, x1]] of stands.entries()) {
       const len = x1 - x0;
       const mid = (x0 + x1) / 2;
       const base = new THREE.Vector3(mid, 0, 0).addScaledVector(right, wd + 5);
@@ -842,7 +846,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
         for (let p = 0.5; p < len - 0.4; p += hi ? 0.78 : 1.3) {
           if (rand() < 0.14) continue;
           const pp = c.clone().addScaledVector(dir, -len / 2 + p + (rand() - 0.5) * 0.15).addScaledVector(faceOut, 0.05);
-          crowdSpots.push([pp.x, base.y + h, pp.z, heading + Math.PI / 2]);
+          crowdSpots.push([pp.x, base.y + h, pp.z, heading + Math.PI / 2, si]);
         }
       }
       // parede de trás, cobertura e pilares
@@ -860,14 +864,14 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       for (let k = -2; k <= 2; k++) reserve(mid + k * len / 5, base.z + 8, 10);
     }
   }
-  let crowd = null;
   const crowdTime = { value: 0 };
   if (crowdSpots.length) {
     const body = keep(new THREE.BoxGeometry(0.46, 0.62, 0.3));
     body.translate(0, 0.35, 0);
     const head = keep(hi ? new THREE.IcosahedronGeometry(0.17, 0) : new THREE.OctahedronGeometry(0.19, 0));
     head.translate(0, 0.86, 0);
-    const mk = (geo, colors) => {
+    // um InstancedMesh por arquibancada (culling separado)
+    const mk = (geo, colors, name) => {
       const mat = keep(new THREE.MeshLambertMaterial({ color: 0xffffff }));
       mat.onBeforeCompile = (sh) => {
         sh.uniforms.uTime = crowdTime;
@@ -883,23 +887,27 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
           #endif
         `);
       };
-      const im = new THREE.InstancedMesh(geo, mat, crowdSpots.length);
       const c = new THREE.Color();
-      crowdSpots.forEach(([x, y, z, h], i) => {
-        im.setMatrixAt(i, mat4(x, y, z, 0, h, 0, 1, 0.9 + rand() * 0.25, 1));
-        im.setColorAt(i, c.copy(colors[Math.floor(rand() * colors.length)]));
-      });
-      im.instanceMatrix.needsUpdate = true;
-      im.castShadow = false;
-      im.receiveShadow = false;
-      im.computeBoundingSphere();
-      group.add(im);
-      return im;
+      for (let si = 0; si < 2; si++) {
+        const spots = crowdSpots.filter((sp) => sp[4] === si);
+        if (!spots.length) continue;
+        const im = new THREE.InstancedMesh(geo, mat, spots.length);
+        spots.forEach(([x, y, z, h], i) => {
+          im.setMatrixAt(i, mat4(x, y, z, 0, h, 0, 1, 0.9 + rand() * 0.25, 1));
+          im.setColorAt(i, c.copy(colors[Math.floor(rand() * colors.length)]));
+        });
+        im.instanceMatrix.needsUpdate = true;
+        im.castShadow = false;
+        im.receiveShadow = false;
+        im.computeBoundingSphere();
+        im.name = name + '-' + si;
+        group.add(im);
+      }
     };
     const shirts = [0xe3262f, 0x1d7bd8, 0xffd23f, 0x2fbf71, 0x8a3cff, 0xff7b29, 0xffffff, 0x17a2b8, 0xff5fa2, 0x009c3b].map(col);
     const skins = [0xf2c9a0, 0xe0ac7e, 0xc68642, 0x8d5524, 0xf6d7b8, 0x6b4226].map(col);
-    crowd = [mk(body, shirts), mk(head, skins)];
-    crowd[0].name = 'torcida'; crowd[1].name = 'torcida-cabecas';
+    mk(body, shirts, 'torcida');
+    mk(head, skins, 'torcida-cabecas');
   }
 
   // ------------------------------------------------------------ Laboratório: vidrarias gigantes, DNA, tabela periódica
@@ -1027,7 +1035,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const pairs = [[col(0xff4a4a), col(0x3cff7a)], [col(0xffd23f), col(0x4a7bff)]];
     for (let k = 0; k <= n; k++) {
       const t = k / n;
-      const a = t * turns * TAU;
+      const a = -t * turns * TAU; // sinal negativo: hélice destra, como o DNA-B real
       const yy = 2.5 + t * Hh;
       for (const [off, cc] of [[0, cA], [Math.PI, cB]]) {
         b.add(sph, mat4(Math.cos(a + off) * R, yy, Math.sin(a + off) * R, 0, 0, 0, 0.62), cc);
@@ -1421,22 +1429,33 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       side = -side;
     }
   }
+  // Objetos repetidos (postes, vegetação): juntados por material e mesclados em pedaços por
+  // célula no fim (flushInstanced), para o culling funcionar; cor da instância vai para o vértice.
+  const bakeBuckets = new Map();
   const instanced = (name, geo, material, spots, colorFn, { cast = true, receive = false } = {}) => {
-    if (!spots.length) return null;
-    const im = new THREE.InstancedMesh(geo, material, spots.length);
+    if (!spots.length) return;
+    const castS = cast && !!quality.shadows;
+    const key = `${material.uuid}|${castS}|${receive}`;
+    let bk = bakeBuckets.get(key);
+    if (!bk) bakeBuckets.set(key, (bk = { name, material, cast: castS, receive, list: [] }));
     const c = new THREE.Color();
     spots.forEach((sp, i) => {
       const [x, y, z, ry = 0, s = 1, sy = s] = sp;
-      im.setMatrixAt(i, mat4(x, y, z, 0, ry, 0, s, sy, s));
-      if (colorFn) im.setColorAt(i, colorFn(c, i));
+      bk.list.push({ geo, m: mat4(x, y, z, 0, ry, 0, s, sy, s).clone(), c: colorFn ? colorFn(c, i).clone() : null });
     });
-    im.instanceMatrix.needsUpdate = true;
-    im.castShadow = cast && !!quality.shadows;
-    im.receiveShadow = receive;
-    im.name = name;
-    im.computeBoundingSphere();
-    group.add(im);
-    return im;
+  };
+  const flushInstanced = () => {
+    for (const bk of bakeBuckets.values()) {
+      bakeInstances(bk.list, 200, hi ? 3000 : 1500).forEach((g, k) => {
+        const m = new THREE.Mesh(keep(g), bk.material);
+        m.castShadow = bk.cast;
+        m.receiveShadow = bk.receive;
+        m.name = `${bk.name}-${k}`;
+        m.matrixAutoUpdate = false;
+        group.add(m);
+      });
+    }
+    bakeBuckets.clear();
   };
   {
     const b = new Merge();
@@ -1638,16 +1657,19 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   instanced('pedras', geoRock, vegMat, lists.rock, (c) => c.setHSL(0.08, 0.1, 0.55 + rand() * 0.3), { cast: false });
   const flowerCols = [0xff4a6e, 0xffd23f, 0xffffff, 0xb388ff, 0xff8a3d, 0xff7eb6].map(col);
   instanced('flores', geoFlower, vegMat, lists.flower, (c) => c.copy(flowerCols[Math.floor(rand() * flowerCols.length)]), { cast: false });
+  flushInstanced();
 
   // ------------------------------------------------------------ malha estática dos marcos
   {
-    const g = keep(st.build(true));
-    const m = new THREE.Mesh(g, matAtlas);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    m.name = 'marcos';
-    m.matrixAutoUpdate = false;
-    group.add(m);
+    // em pedaços por célula para o culling (câmera e sombra)
+    splitGeometry(st.build(true), 150, hi ? 2000 : 1000).forEach((g, k) => {
+      const m = new THREE.Mesh(keep(g), matAtlas);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      m.name = 'marcos-' + k;
+      m.matrixAutoUpdate = false;
+      group.add(m);
+    });
   }
 
   // ------------------------------------------------------------ pássaros (tentilhões) sobre a lagoa

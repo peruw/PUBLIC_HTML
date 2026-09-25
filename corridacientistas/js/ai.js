@@ -23,13 +23,13 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const SCAN = [5, 12, 20, 30, 42];
 
 export class AIDriver {
-  constructor(kart, track, { skill = 0.7 } = {}) {
+  constructor(kart, track, { skill = 0.7, lane } = {}) {
     this.kart = kart;
     this.track = track;
     this.skill = clamp(+skill || 0, 0, 1);
     const sk = this.skill;
-    // cada piloto tem sua própria faixa na pista
-    const golden = ((kart.index + 1) * 0.618034) % 1;
+    // cada piloto tem sua própria faixa na pista (sorteada por corrida via `lane`)
+    const golden = (((lane ?? kart.index) + 1) * 0.618034) % 1;
     this.baseOffset = (golden * 2 - 1) * (1.2 + (1 - sk) * 1.3);
     this._phase = Math.random() * TWO_PI;
     this._t = 0;
@@ -304,7 +304,8 @@ export class AIDriver {
       for (let i = 0; i < pads.length; i++) {
         const p = pads[i];
         const ds = wrapSigned(p.s - k.s, L);
-        if (ds > 3 && ds < 45 && Math.abs((p.lateral || 0) - lat) < 2 + 4 * this.skill) return p.lateral || 0;
+        // compara com a linha sem a faixa pessoal: ninguém fica sempre longe dos aceleradores
+        if (ds > 3 && ds < 45 && Math.abs((p.lateral || 0) - (lat - this.baseOffset)) < 2 + 4 * this.skill) return p.lateral || 0;
       }
     }
     if (!k.item && !k.roulette && track.itemBoxSlots) {
@@ -468,9 +469,11 @@ export class AIDriver {
       const pd = typeof p.distance === 'number' ? p.distance : p.progress;
       const kd = typeof k.distance === 'number' ? k.distance : k.progress;
       const gap = pd - kd; // + = jogador à frente
-      target = 0.93 + 0.07 * sk;
+      const cc = world.cc || {};
+      // ritmo base da classe (aiSpeed) × variação por habilidade
+      target = (cc.aiSpeed ?? 1) * (0.93 + 0.07 * sk);
       if (!p.finished) {
-        if (gap > 0) target *= 1 + 0.1 * clamp((gap - 15) / 120, 0, 1) * (0.5 + 0.5 * sk);
+        if (gap > 0) target *= 1 + (cc.aiCatchUp ?? 0.1) * clamp((gap - 15) / 120, 0, 1) * (0.5 + 0.5 * sk);
         else target *= 1 - 0.07 * clamp((-gap - 25) / 150, 0, 1) * (1.25 - 0.5 * sk);
       }
     }

@@ -40,6 +40,7 @@ export class Hud {
     this.last = {};
     this.active = false;
     this.player = null;
+    this.toastList = []; // toasts ativos com tempo de vida (em ms de jogo)
 
     bus.on('race:countdown', ({ n }) => this.center(String(n), 'pop', RACE_COUNT_MS));
     bus.on('race:go', () => this.center('VAI!', 'pop', 900));
@@ -51,7 +52,8 @@ export class Hud {
       if (kart === this.player) this.center(place === 1 ? 'VITÓRIA! 🏆' : 'CHEGADA!', 'msg pop', 3500);
     });
     bus.on('item:got', ({ kart, item }) => {
-      if (kart === this.player) this.toastItem(item);
+      // só com o HUD visível e antes da chegada (senão a curiosidade se perde escondida)
+      if (kart === this.player && this.active && !kart.finished) this.toastItem(item);
     });
     bus.on('kart:boost', ({ kart, source }) => {
       if (kart !== this.player) return;
@@ -66,6 +68,7 @@ export class Hud {
     this.active = on;
     this.root.classList.toggle('hidden', !on);
     if (!on) {
+      this.toastList = [];
       this.el.toasts.innerHTML = '';
       this.el.center.textContent = '';
     }
@@ -78,6 +81,7 @@ export class Hud {
     this.el.total.textContent = `/${karts.length}`;
     this.last = {};
     this.el.center.textContent = '';
+    this.toastList = [];
     this.el.toasts.innerHTML = '';
     if (track !== this.track) this.prepareMinimap(track);
   }
@@ -161,10 +165,13 @@ export class Hud {
       this.last.item = key;
       this.el.icon.innerHTML = showing ? itemIconHTML(showing) : '';
       this.el.slot.classList.toggle('rolling', !!p.roulette);
-      const showCount = !p.roulette && p.item && p.itemCount > 1;
+      // itens de vários usos (Pilha ×3): contador 3/2/1 e nome sem o "×3"
+      const multi = !!p.item && (ITEMS[p.item].uses || 1) > 1;
+      const showCount = !p.roulette && multi;
       this.el.count.classList.toggle('hidden', !showCount);
       this.el.count.textContent = p.itemCount;
-      this.el.name.textContent = !p.roulette && p.item ? ITEMS[p.item].name : '';
+      const name = p.item ? ITEMS[p.item].name : '';
+      this.el.name.textContent = !p.roulette && p.item ? (multi ? name.replace(/\s*×\d+$/, '') : name) : '';
     }
 
     if (p.place !== this.last.place) {
@@ -187,6 +194,18 @@ export class Hud {
     } else if (!wrong && this.centerSticky) {
       this.centerSticky = false;
       this.el.center.textContent = '';
+    }
+
+    // toasts contam o tempo do jogo (dt = 0 na pausa)
+    if (this.toastList.length) {
+      for (const e of this.toastList) {
+        if ((e.t -= dt * 1000) <= 0 && !e.out) {
+          e.out = true;
+          e.div.classList.add('out');
+          setTimeout(() => e.div.remove(), 450);
+        }
+      }
+      this.toastList = this.toastList.filter((e) => !e.out && e.div.isConnected);
     }
 
     if (this.centerTimer > 0) {
@@ -217,15 +236,14 @@ export class Hud {
 
   toast(html, ms) {
     const box = this.el.toasts;
-    while (box.children.length >= 2) box.firstChild.remove();
+    // tela baixa (celular deitado): um toast por vez para não cobrir a pista
+    const max = innerHeight < 520 ? 1 : 2;
+    while (box.children.length >= max) box.firstChild.remove();
     const div = document.createElement('div');
     div.className = 'toast';
     div.innerHTML = html;
     box.appendChild(div);
-    setTimeout(() => {
-      div.classList.add('out');
-      setTimeout(() => div.remove(), 450);
-    }, ms);
+    this.toastList.push({ div, t: ms, out: false });
   }
 }
 

@@ -20,8 +20,13 @@ const STEP = 1 / 60; // passo fixo da simulação
 const PLAYER_SLOT = 5; // o jogador larga em 6º
 const RESULTS_DELAY = 3.2; // s entre a chegada e a tela de resultado
 
-const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+// Só 'pointer: coarse' conta como celular/tablet (notebooks com tela de toque têm ontouchstart).
+const isTouch = matchMedia('(pointer: coarse)').matches;
 if (isTouch) document.body.classList.add('touch');
+// Quem usar a tela de toque mesmo assim ganha o layout de toque.
+addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch') document.body.classList.add('touch');
+}, true);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 const game = {
@@ -37,7 +42,12 @@ async function init() {
   const menu = new Menu({
     sfx: (n) => audio?.sfx(n),
     onStart: (opts) => startRace(opts),
-    onResume: () => setPaused(false),
+    onResume: () => {
+      setPaused(false);
+      if (isTouch) goFullscreen(); // o clique é um gesto: volta à tela cheia
+    },
+    // 'Trocar cientista' no resultado: volta ao estado de título de verdade
+    onPlay: () => { if (game.state !== 'title') enterTitle(); },
     onRestart: () => startRace(game.opts),
     onQuit: () => enterTitle(),
     onToggleSound: () => toggleSound(),
@@ -65,7 +75,8 @@ async function init() {
   menu.setQualityLabel(quality.id);
 
   const renderer = new THREE.WebGLRenderer({ antialias: quality.antialias, powerPreference: 'high-performance' });
-  let pixelRatio = Math.min(devicePixelRatio || 1, quality.pixelRatio);
+  const maxPR = Math.min(devicePixelRatio || 1, quality.pixelRatio);
+  let pixelRatio = maxPR;
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -73,6 +84,12 @@ async function init() {
   renderer.shadowMap.enabled = quality.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.getElementById('app').appendChild(renderer.domElement);
+  let needsRender = true; // redesenha uma vez mesmo em pausa/menus
+  // Perda do contexto WebGL: pausa em vez de correr às cegas.
+  renderer.domElement.addEventListener('webglcontextlost', () => {
+    if (game.state === 'race' && !game.paused) setPaused(true);
+  });
+  renderer.domElement.addEventListener('webglcontextrestored', () => { needsRender = true; });
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, quality.drawDistance + 400);
@@ -100,7 +117,7 @@ async function init() {
   menu.setLoading(0.85, 'Tirando as fotos oficiais…');
   await nextFrame();
   try {
-    menu.setPortraits(await Promise.resolve(renderPortraits(renderer, 256)));
+    menu.setPortraits(await Promise.resolve(renderPortraits(renderer, 256, { ss: quality.id === 'baixa' ? 1 : 2 })));
   } catch (err) {
     console.warn('retratos indisponíveis', err);
   }
@@ -108,7 +125,15 @@ async function init() {
   const rig = new CameraRig(camera);
   audio = new AudioSystem({ bus });
   input = new Input({ touchLayer: document.getElementById('touch-layer'), bus });
-  document.getElementById('hud-pause').addEventListener('click', () => setPaused(true));
+  // pointerdown: o toque com outro dedo segurando um botão não gera 'click'
+  const pauseBtn = document.getElementById('hud-pause');
+  pauseBtn.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse') {
+      e.preventDefault();
+      setPaused(true);
+    }
+  });
+  pauseBtn.addEventListener('click', () => setPaused(true));
   input.showTouch(false);
   input.setAutoAccelerate(store.get('auto', input.touchEnabled));
   menu.setAutoLabel(input.autoAccelerate);
@@ -125,9 +150,15 @@ async function init() {
   let drivers = new Map(); // kart -> AIDriver
   let playerAI = null;
   let resultsTimer = -1;
+  let pendingUse = false; // aperto de item guardado até o próximo passo (telas > 60 Hz)
 
   // Pré-compila os shaders para evitar travadas na primeira corrida.
-  renderer.compile(scene, camera);
+  try {
+    if (renderer.compileAsync) await renderer.compileAsync(scene, camera);
+    else renderer.compile(scene, camera);
+  } catch (err) {
+    console.warn('pré-compilação falhou', err);
+  }
 
   // ---------- estados ----------
   function setupGrid(order) {
@@ -138,6 +169,10 @@ async function init() {
     game.state = 'title';
     setPaused(false, true);
     world.player = null;
+    hud.player = null; // sem toasts de itens do antigo jogador no demo
+    introTimer = 0;
+    pendingUse = false;
+    bus.emit('race:reset');
     world.karts = karts;
     world.phase = 'title';
     world.cc = CLASSES['100cc'];
@@ -165,6 +200,8 @@ async function init() {
     game.opts = opts;
     game.state = 'race';
     setPaused(false, true);
+    pendingUse = false;
+    bus.emit('race:reset');
     const cc = CLASSES[opts.cc] || CLASSES['100cc'];
     world.cc = cc;
     world.totalLaps = opts.laps;
@@ -180,7 +217,10 @@ async function init() {
     items.reset(karts);
     effects.reset();
     drivers = new Map(
-      others.map((k) => [k, new AIDriver(k, track, { skill: THREE.MathUtils.clamp(cc.aiSkill + (Math.random() - 0.5) * 0.16, 0.2, 1) })]),
+      others.map((k, i) => [k, new AIDriver(k, track, {
+        skill: THREE.MathUtils.clamp(cc.aiSkill + (Math.random() - 0.5) * 0.16, 0.2, 1),
+        lane: i, // faixa sorteada a cada corrida (others já vem embaralhado)
+      })]),
     );
     playerAI = new AIDriver(player, track, { skill: 0.9 });
     race.start(world.karts, { laps: opts.laps, player, track, cc });
@@ -214,6 +254,8 @@ async function init() {
     if (on && game.state !== 'race') return;
     game.paused = on;
     audio.pauseAll?.(on);
+    needsRender = true;
+    if (on) pendingUse = false;
     if (on) {
       input.showTouch(false);
       menu.show('pause');
@@ -237,26 +279,39 @@ async function init() {
     setTimeout(() => location.reload(), 250);
   }
 
-  // Áudio só pode começar depois de um gesto do usuário.
+  // Áudio só pode começar depois de um gesto do usuário. Tenta a cada gesto
+  // até o contexto rodar (iOS só libera em touchend/click).
+  const unlockEvents = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'];
   const unlock = () => {
     audio.unlock();
     if (game.state === 'title') audio.playMusic('menu');
+    if (audio.ctx?.state === 'running') for (const ev of unlockEvents) removeEventListener(ev, unlock, true);
   };
-  addEventListener('pointerdown', unlock, { once: true });
-  addEventListener('keydown', unlock, { once: true });
+  const armUnlock = () => {
+    for (const ev of unlockEvents) addEventListener(ev, unlock, { capture: true, passive: true });
+  };
+  armUnlock();
 
   // Pausa automática ao trocar de aba.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && game.state === 'race' && !game.paused) setPaused(true);
+    // iOS pode deixar o áudio 'interrupted': volta a tentar no próximo gesto
+    if (!document.hidden && audio.ctx) setTimeout(() => { if (audio.ctx.state !== 'running') armUnlock(); }, 300);
+  });
+
+  // Saiu da tela cheia no celular (gesto de voltar): pausa.
+  document.addEventListener('fullscreenchange', () => {
+    if (isTouch && !document.fullscreenElement && game.state === 'race' && !game.paused) setPaused(true);
   });
 
   // ---------- redimensionamento e orientação ----------
   const rotateHint = document.getElementById('rotate-hint');
   function onResize() {
     renderer.setSize(innerWidth, innerHeight);
+    needsRender = true; // setSize limpa o canvas
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
-    const portrait = isTouch && innerHeight > innerWidth;
+    const portrait = isTouch && innerHeight > innerWidth && Math.min(screen.width, screen.height) < 600;
     rotateHint.classList.toggle('hidden', !portrait);
     if (portrait && game.state === 'race' && !game.paused) setPaused(true);
   }
@@ -264,6 +319,7 @@ async function init() {
   onResize();
 
   // ---------- gamepad nos menus ----------
+  // Lido em TODO quadro, para um A segurado (acelerar) não virar um novo "confirmar".
   let padConfirmPrev = false;
   function pollPadConfirm() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -274,15 +330,77 @@ async function init() {
     return edge;
   }
 
+  // Navegação: direcional/analógico escolhe o cientista, LB/RB trocam motor/voltas, B volta.
+  const padPrev = { b: false, lb: false, rb: false };
+  let padDir = null;
+  let padRepeat = 0;
+  function pollPadMenu(dt, act) {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let dx = 0, dy = 0, b = false, lb = false, rb = false;
+    for (const p of pads) {
+      if (!p) continue;
+      const bt = (i) => !!p.buttons[i]?.pressed;
+      const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+      if (bt(14) || ax < -0.5) dx = -1;
+      else if (bt(15) || ax > 0.5) dx = 1;
+      if (bt(12) || ay < -0.5) dy = -1;
+      else if (bt(13) || ay > 0.5) dy = 1;
+      b = b || bt(1);
+      lb = lb || bt(4);
+      rb = rb || bt(5);
+    }
+    const edgeB = b && !padPrev.b, edgeLB = lb && !padPrev.lb, edgeRB = rb && !padPrev.rb;
+    padPrev.b = b;
+    padPrev.lb = lb;
+    padPrev.rb = rb;
+    // direção com repetição ao segurar
+    const dir = dx || dy ? `${dx},${dy}` : null;
+    let move = false;
+    if (dir !== padDir) {
+      padDir = dir;
+      padRepeat = 0.35;
+      move = !!dir;
+    } else if (dir) {
+      padRepeat -= dt;
+      if (padRepeat <= 0) {
+        padRepeat = 0.2;
+        move = true;
+      }
+    }
+    const cur = menu.current;
+    if (!cur || !act) return;
+    if (cur === 'select') {
+      if (move) menu.moveSelection(dx, dy);
+      if (edgeLB || edgeRB) {
+        const o = menu.opts;
+        if (edgeLB) {
+          const ids = Object.keys(CLASSES);
+          o.cc = ids[(ids.indexOf(o.cc) + 1) % ids.length];
+        }
+        if (edgeRB) {
+          const L = RACE.lapOptions;
+          o.laps = L[(L.indexOf(o.laps) + 1) % L.length];
+        }
+        audio.sfx('menuMove');
+        menu.refreshSelect();
+      }
+    }
+    if (edgeB) {
+      if (cur === 'select' || cur === 'howto') menu.action('back');
+      else if (cur === 'pause') menu.action('resume');
+      else if (cur === 'results') menu.action('quit');
+    }
+  }
+
   // ---------- simulação ----------
   let ctrl = null;
-  let firstStep = true;
   function simulate(h) {
     const player = world.player;
     world.time = race.time;
     if (player) {
       if (game.autopilot || player.finished) {
         playerAI.update(h, world);
+        pendingUse = false;
       } else if (ctrl) {
         const c = player.controls;
         c.throttle = ctrl.throttle;
@@ -290,17 +408,21 @@ async function init() {
         c.steer = ctrl.steer;
         c.drift = ctrl.drift;
         c.lookBack = ctrl.lookBack;
-        if (firstStep && ctrl.useItem) c.useItem = true;
+        if (pendingUse) {
+          c.useItem = true;
+          pendingUse = false;
+        }
       }
     }
     for (const [k, ai] of drivers) ai.update(h, world);
+    // Fora da corrida (demo do título, resultado) ninguém usa itens: sem flashes/trovões nos menus.
+    if (game.state !== 'race') for (const k of world.karts) k.controls.useItem = false;
     updateKarts(world.karts, h, world);
     items.update(h, world);
     if (game.state === 'race' || game.state === 'results') {
       race.update(h, world);
       world.phase = race.phase === 'countdown' ? 'countdown' : race.phase === 'finished' ? 'finished' : 'racing';
     }
-    firstStep = false;
   }
 
   bus.on('race:finish', ({ kart }) => {
@@ -311,6 +433,12 @@ async function init() {
   const clock = new THREE.Clock();
   let acc = 0;
   let slowTime = 0;
+  let fastTime = 0;
+  let checkTime = 0; // conferência depois de reduzir a resolução
+  let dtBefore = 0;
+  let prBefore = 0;
+  let noLower = false; // limite de quadros (ex.: 30 Hz) ou CPU: reduzir não adianta
+  let slowWarned = false;
   let dtAvg = 1 / 60;
   function frame() {
     const dt = Math.min(clock.getDelta(), 0.1);
@@ -318,12 +446,16 @@ async function init() {
     ctrl = input.poll();
 
     if (ctrl.mute) toggleSound();
-    if (game.state === 'race' && ctrl.pause) setPaused(!game.paused);
-    if (menu.current && pollPadConfirm()) menu.confirm();
+    const pauseToggled = game.state === 'race' && ctrl.pause;
+    if (pauseToggled) setPaused(!game.paused);
+    const padConfirm = pollPadConfirm();
+    const confirmed = !!menu.current && padConfirm && !pauseToggled;
+    if (confirmed) menu.confirm();
+    pollPadMenu(dt, !confirmed && !pauseToggled);
+    if (ctrl.useItem && game.state === 'race' && !game.paused) pendingUse = true;
 
     if (!game.paused) {
       acc += dt;
-      firstStep = true;
       let n = 0;
       while (acc >= STEP && n < 5) {
         simulate(STEP);
@@ -335,7 +467,7 @@ async function init() {
 
       if (introTimer > 0) {
         introTimer -= dt;
-        if (introTimer <= 0) rig.setMode('chase');
+        if (introTimer <= 0 && game.state === 'race') rig.setMode('chase');
       }
       if (resultsTimer > 0) {
         resultsTimer -= dt;
@@ -346,20 +478,64 @@ async function init() {
     rig.update(dt, world, { lookBack: !!(world.player && !game.autopilot && ctrl.lookBack && game.state === 'race') });
     env.update(dt, t, camera);
     track.update(dt, t);
-    if (game.state === 'race') hud.update(dt, world, race);
+    if (game.state === 'race') hud.update(game.paused ? 0 : dt, world, race);
     if (!game.paused) audio.update(dt, world);
-    renderer.render(scene, camera);
+    // Pausa e telas que cobrem o jogo: não redesenha a cena 3D (economiza bateria).
+    const idle = game.paused || menu.current === 'select' || menu.current === 'howto';
+    if (!idle || needsRender) {
+      renderer.render(scene, camera);
+      needsRender = false;
+    }
 
-    // Resolução adaptativa: se o aparelho não aguenta, reduz a resolução.
+    // Resolução adaptativa: reduz se o aparelho não aguenta e volta a subir quando melhora.
     dtAvg += (dt - dtAvg) * 0.05;
-    if (game.state === 'race' && !game.paused && dtAvg > 1 / 38 && pixelRatio > 0.6) {
+    adaptResolution(dt);
+  }
+
+  const PR_MIN = 0.75;
+  function setPR(r) {
+    pixelRatio = r;
+    renderer.setPixelRatio(r);
+  }
+  function adaptResolution(dt) {
+    if (game.state !== 'race' || game.paused) {
+      slowTime = fastTime = 0;
+      return;
+    }
+    if (checkTime > 0) {
+      // Reduziu e não melhorou pelo menos 8%: volta e para de reduzir.
+      checkTime -= dt;
+      if (checkTime <= 0 && dtAvg > dtBefore * 0.92) {
+        setPR(prBefore);
+        noLower = true;
+      }
+      return;
+    }
+    if (dtAvg > 1 / 28) {
+      fastTime = 0;
       slowTime += dt;
       if (slowTime > 2.5) {
-        pixelRatio = Math.max(0.6, pixelRatio - 0.15);
-        renderer.setPixelRatio(pixelRatio);
         slowTime = 0;
+        if (!noLower && pixelRatio > PR_MIN) {
+          dtBefore = dtAvg;
+          prBefore = pixelRatio;
+          setPR(Math.max(PR_MIN, pixelRatio - 0.15));
+          checkTime = 3;
+        } else if (quality.id === 'alta' && !slowWarned) {
+          // Ainda lento em 'alta' (reduzir não resolve mais): a próxima visita já começa em 'baixa'.
+          slowWarned = true;
+          store.set('quality', 'baixa');
+          hud.toast?.('Jogo lento? Da próxima vez o jogo abre em <b>Qualidade: baixa</b> (dá para trocar no menu inicial).', 6000);
+        }
       }
-    } else slowTime = 0;
+    } else if (dtAvg < 1 / 50 && pixelRatio < maxPR) {
+      slowTime = 0;
+      fastTime += dt;
+      if (fastTime > 5) {
+        setPR(Math.min(maxPR, pixelRatio + 0.1));
+        fastTime = 0;
+      }
+    } else slowTime = fastTime = 0;
   }
   renderer.setAnimationLoop(frame);
 
@@ -392,7 +568,6 @@ async function init() {
     fastForward(seconds) {
       const steps = Math.round(seconds / STEP);
       for (let i = 0; i < steps; i++) {
-        firstStep = true;
         simulate(STEP);
         if (resultsTimer > 0) {
           resultsTimer -= STEP;
@@ -401,8 +576,7 @@ async function init() {
       }
     },
     setPixelRatio(r) {
-      pixelRatio = r;
-      renderer.setPixelRatio(r);
+      setPR(r);
     },
   };
 

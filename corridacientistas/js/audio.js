@@ -695,7 +695,7 @@ export class AudioSystem {
       this._at(name, null, d.kart, name === 'blackhole' ? 1 : 0.9);
     });
     bus.on('item:explode', (d) => this._at('explosion', d && d.pos, null, 1));
-    bus.on('item:lightning', () => this.sfx('lightning'));
+    bus.on('item:lightning', () => { if (this._world?.phase !== 'title') this.sfx('lightning'); });
     bus.on('item:blackhole', (d) => this._at('blackhole', d && d.pos, d && d.target, 1.2));
     bus.on('kart:hit', (d) => this._at('hit', null, d && d.kart, 1));
     bus.on('kart:boost', (d) => { if (isP(d && d.kart)) this.sfx('boost'); });

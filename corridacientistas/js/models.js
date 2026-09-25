@@ -220,7 +220,8 @@ function shared() {
   g.fillRect(0, 0, 64, 64);
   const glow = new THREE.CanvasTexture(gc);
   glow.colorSpace = THREE.SRGBColorSpace;
-  SH = { grad, atlas, mat, glow, geo: new Map(), models: new Map() };
+  // matInst: cópia para o InstancedMesh das rodas (evita trocar de programa a cada kart)
+  SH = { grad, atlas, mat, matInst: mat.clone(), glow, geo: new Map(), models: new Map() };
   return SH;
 }
 
@@ -332,6 +333,7 @@ class Builder {
     this.olMin = olMin; // peças menores que isso (m) ficam sem contorno
     this.dens = detail > 0 ? 1 : 0.72; // densidade de tufos (cabelo/barba)
     this.P = []; this.N = []; this.C = []; this.U = []; this.I = [];
+    this.IO = []; // triângulos dos contornos (ficam no fim do índice)
     this.n = 0;
     this.base = new THREE.Matrix4();
   }
@@ -379,6 +381,7 @@ class Builder {
     _nm.getNormalMatrix(m);
     const flip = outline !== (m.determinant() < 0);
     const base = this.n;
+    const I = outline ? this.IO : this.I;
     for (let i = 0; i < pos.count; i++) {
       _v.fromBufferAttribute(pos, i).applyMatrix4(m);
       this.P.push(_v.x, _v.y, _v.z);
@@ -393,8 +396,8 @@ class Builder {
     const cnt = idx ? idx.count : pos.count;
     for (let i = 0; i < cnt; i += 3) {
       const a = idx ? idx.getX(i) : i, b = idx ? idx.getX(i + 1) : i + 1, c = idx ? idx.getX(i + 2) : i + 2;
-      if (flip) this.I.push(base + a, base + c, base + b);
-      else this.I.push(base + a, base + b, base + c);
+      if (flip) I.push(base + a, base + c, base + b);
+      else I.push(base + a, base + b, base + c);
     }
     this.n += pos.count;
   }
@@ -406,7 +409,7 @@ class Builder {
   }
   // Tufo (icosfera): cabelo, barba, cachos
   blob(color, pos, scl, rot = null, opt) {
-    const geo = this.detail > 0 ? icoG(opt?.fine ? 2 : 1) : sphereG(7, 5);
+    const geo = icoG(this.detail > 0 ? (opt?.fine ? 2 : 1) : 0);
     return this.add(geo, color, pos, rot, scl, opt);
   }
   box(color, pos, size, rad = 0.03, rot = null, opt) {
@@ -450,7 +453,10 @@ class Builder {
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.N, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.C, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.U, 2));
-    g.setIndex(this.n > 65535 ? new THREE.Uint32BufferAttribute(this.I, 1) : new THREE.Uint16BufferAttribute(this.I, 1));
+    const idx = this.I.concat(this.IO);
+    g.setIndex(this.n > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+    // índices das peças sem os contornos: o passe de sombra desenha só essa faixa
+    g.userData.solidCount = this.I.length;
     g.computeBoundingSphere();
     g.computeBoundingBox();
     return g;
@@ -1083,10 +1089,11 @@ function buildParts(id, detail) {
   legs(body, C.id);
   KART_EXTRAS[C.id]?.(body, C, ext);
   // tronco
-  const torso = new Builder({ detail, outline, ol: 0.012, olMin: lo ? 0.05 : 0 });
+  // baixa: só as peças grandes ganham contorno (menos triângulos)
+  const torso = new Builder({ detail, outline, ol: 0.012, olMin: lo ? 0.08 : 0 });
   TORSOS[C.id](torso, L, C);
   // cabeça (origem no pescoço; centro da cabeça em (0, 0.3, 0.03))
-  const head = new Builder({ detail, outline, ol: 0.012, olMin: lo ? 0.03 : 0 });
+  const head = new Builder({ detail, outline, ol: 0.012, olMin: lo ? 0.08 : 0 });
   head.setBase(0, 0.3, 0.03);
   head.ell(L.skin, [0, 0, 0], [HR, HR * 0.97, HR * 0.98], null, { seg: detail > 0 ? [22, 16] : [14, 10] });
   HEADS[C.id](head, L, rng(num * 7919));
@@ -1115,26 +1122,80 @@ const _qY = new THREE.Quaternion(), _qX = new THREE.Quaternion(), _qFlip = new T
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 
+// Junta as peças (só a faixa sem contornos) numa geometria só, com as matrizes dadas.
+function mergeSolid(items) {
+  const P = [], N = [], C = [], U = [], I = [];
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  for (const { geo, m } of items) {
+    const pos = geo.attributes.position, nor = geo.attributes.normal, col = geo.attributes.color, uv = geo.attributes.uv;
+    const idx = geo.index;
+    const n = geo.userData.solidCount ?? idx.count;
+    nm.getNormalMatrix(m);
+    const flip = m.determinant() < 0;
+    const remap = new Map();
+    const vid = (i) => {
+      let j = remap.get(i);
+      if (j === undefined) {
+        j = P.length / 3;
+        remap.set(i, j);
+        v.fromBufferAttribute(pos, i).applyMatrix4(m); P.push(v.x, v.y, v.z);
+        v.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize(); N.push(v.x, v.y, v.z);
+        C.push(col.getX(i), col.getY(i), col.getZ(i));
+        U.push(uv.getX(i), uv.getY(i));
+      }
+      return j;
+    };
+    for (let k = 0; k < n; k += 3) {
+      const a = vid(idx.getX(k)), b = vid(idx.getX(k + 1)), c = vid(idx.getX(k + 2));
+      if (flip) I.push(a, c, b);
+      else I.push(a, b, c);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.setIndex(P.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(I, 1) : new THREE.Uint16BufferAttribute(I, 1));
+  g.computeBoundingSphere();
+  return g;
+}
+
+// Karts mais longe que isso da câmera usam a versão simplificada (1 draw call, sem contornos).
+// A 25 m o contorno tem menos de 1 px; o kart do jogador (câmera a ~6 m) nunca troca.
+const FAR_DIST = 25;
+
 export function createKartModel(characterId, { quality } = {}) {
   const detail = quality && quality.id === 'baixa' ? 0 : 1;
   const shadows = !!(quality && quality.shadows);
   const parts = buildParts(characterId, detail);
   const sh = shared();
   const mat = sh.mat;
-  const group = new THREE.Group();
-  group.name = `kart-${characterId}`;
+  const root = new THREE.Group();
+  root.name = `kart-${characterId}`;
+  const group = new THREE.Group(); // versão detalhada (animada)
 
+  // Sombra sem os contornos: no passe de sombra desenha só a faixa das peças (drawRange);
+  // o passe normal volta a desenhar tudo.
+  const solidShadow = (m) => {
+    const g = m.geometry, n = g.userData.solidCount;
+    if (!m.castShadow || n === undefined || !g.index || n >= g.index.count) return;
+    m.onBeforeShadow = () => { g.drawRange.count = n; };
+    m.onBeforeRender = () => { g.drawRange.count = Infinity; };
+  };
   const mk = (geo, parent, cast) => {
     const m = new THREE.Mesh(geo, mat);
     m.castShadow = shadows && cast;
+    solidShadow(m);
     parent.add(m);
     return m;
   };
-  mk(parts.body, group, true);
+  const bodyMesh = mk(parts.body, group, true);
 
   // rodas (1 draw call)
-  const wheels = new THREE.InstancedMesh(parts.wheel, mat, 4);
+  const wheels = new THREE.InstancedMesh(parts.wheel, sh.matInst, 4);
   wheels.castShadow = shadows;
+  solidShadow(wheels);
   wheels.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   group.add(wheels);
 
@@ -1149,11 +1210,11 @@ export function createKartModel(characterId, { quality } = {}) {
   const lean = new THREE.Group();
   lean.position.copy(LEAN_POS);
   group.add(lean);
-  mk(parts.torso, lean, true);
+  const torsoMesh = mk(parts.torso, lean, true);
   const neck = new THREE.Group();
   neck.position.copy(NECK_POS);
   lean.add(neck);
-  mk(parts.head, neck, true);
+  const headMesh = mk(parts.head, neck, true);
   const arms = [1, -1].map((s) => {
     const a = mk(parts.arm, lean, false);
     a.position.set(s * SHOULDER, 0.46, 0.0);
@@ -1177,11 +1238,11 @@ export function createKartModel(characterId, { quality } = {}) {
     vialMat = new THREE.MeshBasicMaterial({ color: 0x7dff5a });
     vial = new THREE.Mesh(parts.extGeo.vial, vialMat);
     vial.position.fromArray(parts.ext.vial.pos);
-    group.add(vial);
+    root.add(vial); // frasco e brilho ficam visíveis também na versão distante
     glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sh.glow, color: 0x66ff44, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.85 }));
     glow.position.set(vial.position.x, vial.position.y + 0.1, vial.position.z);
     glow.scale.setScalar(0.7);
-    group.add(glow);
+    root.add(glow);
   }
 
   // estado da animação
@@ -1224,6 +1285,34 @@ export function createKartModel(characterId, { quality } = {}) {
   placeWheels();
   aimArms();
 
+  // Versão distante: peças de 'baixa' sem contornos, na pose de repouso, mescladas (cache por personagem)
+  const farKey = `${characterId}:far`;
+  let farGeo = sh.models.get(farKey);
+  if (!farGeo) {
+    const lp = buildParts(characterId, 0);
+    group.updateMatrixWorld(true);
+    const at = (m) => m.matrixWorld.clone();
+    const items = [
+      { geo: lp.body, m: at(bodyMesh) }, { geo: lp.torso, m: at(torsoMesh) }, { geo: lp.head, m: at(headMesh) },
+      { geo: lp.steer, m: at(steerMesh) },
+      ...arms.map((a) => ({ geo: lp.arm, m: at(a) })),
+    ];
+    for (let i = 0; i < 4; i++) {
+      wheels.getMatrixAt(i, _wm);
+      items.push({ geo: lp.wheel, m: _wm.clone().premultiply(wheels.matrixWorld) });
+    }
+    if (propeller && lp.extGeo.propeller) items.push({ geo: lp.extGeo.propeller, m: at(propeller) });
+    if (finch && lp.extGeo.finch) items.push({ geo: lp.extGeo.finch, m: at(finch) });
+    farGeo = mergeSolid(items);
+    sh.models.set(farKey, farGeo);
+  }
+  const far = new THREE.Mesh(farGeo, mat);
+  far.castShadow = shadows;
+  const lod = new THREE.LOD();
+  lod.addLevel(group, 0);
+  lod.addLevel(far, FAR_DIST, 0.12); // volta ao detalhado a 22 m
+  root.add(lod);
+
   function update(dt, st = {}) {
     dt = Math.min(dt || 0, 0.1);
     t += dt;
@@ -1239,7 +1328,8 @@ export function createKartModel(characterId, { quality } = {}) {
     if (spinF > TAU * 100 || spinF < -TAU * 100) spinF %= TAU;
     if (spinR > TAU * 100 || spinR < -TAU * 100) spinR %= TAU;
     steerV = damp(steerV, steer, 14, dt);
-    placeWheels();
+    const near = group.visible; // longe: a versão simplificada não anima rodas/braços
+    if (near) placeWheels();
     steerMesh.rotation.z = steerV * 0.85;
     // corpo do piloto: inclina na curva, recua no turbo, balança
     leanZ = damp(leanZ, steer * 0.1 + dd * 0.12, 8, dt);
@@ -1255,7 +1345,7 @@ export function createKartModel(characterId, { quality } = {}) {
     } else {
       neck.rotation.set(-leanX * 0.5 + Math.sin(time * 2.1) * 0.02, headY, -leanZ * 0.4);
     }
-    aimArms();
+    if (near) aimArms();
     // acessórios
     if (propeller) {
       propA += (5 + aspd * 1.6) * dt;
@@ -1290,15 +1380,18 @@ export function createKartModel(characterId, { quality } = {}) {
     if (glow) glow.material.dispose();
     wheels.dispose();
   };
-  return { group, update, stats, anchors, dispose };
+  return { group: root, update, stats, anchors, dispose };
 }
 
 // ---------------------------------------------------------------------------
 // Retratos (busto 3/4) renderizados fora da tela: { id: dataURL }
 // ---------------------------------------------------------------------------
 const _portraitCache = new Map();
-export function renderPortraits(renderer, size = 256) {
-  if (_portraitCache.has(size)) return _portraitCache.get(size);
+// ss: supersampling (1 em 'baixa'). Todos os bustos vão para um só alvo (grade 4 x 2) e uma
+// só leitura de pixels; depois cada célula é recortada no seu canvas.
+export function renderPortraits(renderer, size = 256, { ss = 2 } = {}) {
+  const ckey = `${size}:${ss}`;
+  if (_portraitCache.has(ckey)) return _portraitCache.get(ckey);
   const sh = shared();
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xffffff, 0x7a8398, 1.05));
@@ -1309,13 +1402,15 @@ export function renderPortraits(renderer, size = 256) {
   rim.position.set(-3, 2, -3);
   scene.add(rim);
   const cam = new THREE.PerspectiveCamera(24, 1, 0.1, 20);
-  const ss = 2; // supersampling
-  const rt = new THREE.WebGLRenderTarget(size * ss, size * ss, { colorSpace: THREE.SRGBColorSpace, depthBuffer: true });
-  const buf = new Uint8Array(size * ss * size * ss * 4);
+  const cs = size * ss; // lado de cada célula
+  const cols = 4, rows = Math.ceil(CHARACTERS.length / cols);
+  const W = cols * cs, H = rows * cs;
+  const rt = new THREE.WebGLRenderTarget(W, H, { colorSpace: THREE.SRGBColorSpace, depthBuffer: true });
+  const buf = new Uint8Array(W * H * 4);
   const big = document.createElement('canvas');
-  big.width = big.height = size * ss;
+  big.width = W; big.height = H;
   const bctx = big.getContext('2d');
-  const img = bctx.createImageData(size * ss, size * ss);
+  const img = bctx.createImageData(W, H);
   const out = {};
 
   // estado anterior do renderer
@@ -1331,8 +1426,12 @@ export function renderPortraits(renderer, size = 256) {
   try {
     renderer.autoClear = true;
     renderer.setClearColor(0x000000, 0);
-    for (const C of CHARACTERS) {
+    rt.scissorTest = false;
+    renderer.setRenderTarget(rt);
+    renderer.clear();
+    CHARACTERS.forEach((C, i) => {
       const parts = buildParts(C.id, 1);
+      parts.torso.drawRange.count = parts.head.drawRange.count = Infinity;
       const bust = new THREE.Group();
       const torso = new THREE.Mesh(parts.torso, sh.mat);
       bust.add(torso);
@@ -1355,23 +1454,29 @@ export function renderPortraits(renderer, size = 256) {
       const yaw = 0.5;
       cam.position.set(Math.sin(yaw) * dist, cy + 0.12, Math.cos(yaw) * dist + 0.03);
       cam.lookAt(0, cy, 0.03);
+      // célula i: coluna i % cols, linha i / cols (linha 0 no alto da imagem; o GL conta de baixo)
+      const x = (i % cols) * cs, y = (rows - 1 - Math.floor(i / cols)) * cs;
+      rt.viewport.set(x, y, cs, cs);
+      rt.scissor.set(x, y, cs, cs);
+      rt.scissorTest = true;
       renderer.setRenderTarget(rt);
-      renderer.clear();
       renderer.render(scene, cam);
-      renderer.readRenderTargetPixels(rt, 0, 0, size * ss, size * ss, buf);
-      // inverte verticalmente (WebGL lê de baixo para cima)
-      const row = size * ss * 4;
-      for (let y = 0; y < size * ss; y++) img.data.set(buf.subarray((size * ss - 1 - y) * row, (size * ss - y) * row), y * row);
-      bctx.putImageData(img, 0, 0);
+      scene.remove(bust);
+    });
+    renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+    // inverte verticalmente (WebGL lê de baixo para cima)
+    const row = W * 4;
+    for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * row, (H - y) * row), y * row);
+    bctx.putImageData(img, 0, 0);
+    CHARACTERS.forEach((C, i) => {
       const cv = document.createElement('canvas');
       cv.width = cv.height = size;
       const c2 = cv.getContext('2d');
       c2.imageSmoothingEnabled = true;
       c2.imageSmoothingQuality = 'high';
-      c2.drawImage(big, 0, 0, size, size);
+      c2.drawImage(big, (i % cols) * cs, Math.floor(i / cols) * cs, cs, cs, 0, 0, size, size);
       out[C.id] = cv.toDataURL('image/png');
-      scene.remove(bust);
-    }
+    });
   } finally {
     renderer.setRenderTarget(prevRT);
     renderer.setClearColor(prevColor, prevAlpha);
@@ -1380,6 +1485,6 @@ export function renderPortraits(renderer, size = 256) {
     renderer.shadowMap.enabled = prevShadow;
     rt.dispose();
   }
-  _portraitCache.set(size, out);
+  _portraitCache.set(ckey, out);
   return out;
 }

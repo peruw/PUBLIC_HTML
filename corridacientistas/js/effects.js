@@ -541,6 +541,7 @@ class BoltBatch {
     this.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
       vertexShader: BOLT_VS, fragmentShader: BOLT_FS,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      forceSinglePass: true, // aditivo: uma passada basta
     }));
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = false;
@@ -908,7 +909,7 @@ export class Effects {
     // chamas de turbo (cones instanciados)
     this.flames = new THREE.InstancedMesh(
       buildFlameGeometry(),
-      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, forceSinglePass: true }),
       16,
     );
     for (let i = 0; i < 16; i++) this.flames.setColorAt(i, PAL.white);
@@ -923,7 +924,7 @@ export class Effects {
     const ringTex = ringTexture();
     this.rings = [];
     for (let i = 0; i < 10; i++) {
-      const mat = new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      const mat = new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, forceSinglePass: true });
       const mesh = new THREE.Mesh(ringGeo, mat);
       mesh.visible = false;
       mesh.renderOrder = 10;
@@ -1004,7 +1005,7 @@ export class Effects {
     on('item:lightning', (e) => this._lightning(e?.by));
     on('item:blackhole', (e) => {
       if (!e?.pos) return;
-      this.flash(0x6a2cbf, 0.45, 0.35);
+      if (this._canFlash()) this.flash(0x6a2cbf, 0.45, 0.35);
       this._ring(e.pos, 0.2, PAL.purple0, 1, 12, 0.7, 0.9);
     });
     on('race:finish', (e) => {
@@ -1038,6 +1039,11 @@ export class Effects {
   }
 
   // Flash de tela: overlay DOM #flash com opacidade que some.
+  // Sem clarão de tela na corrida de demonstração da tela de título (fica por cima dos menus).
+  _canFlash() {
+    return !!this.world && this.world.phase !== 'title';
+  }
+
   flash(color = 0xffffff, duration = 0.3, strength = 0.6) {
     if (typeof document === 'undefined') return;
     let el = this._flashEl || document.getElementById('flash');
@@ -1733,7 +1739,7 @@ export class Effects {
 
   // Raio da Bobina de Tesla em cada adversário atingido.
   _lightning(by) {
-    this.flash(0xd0b8ff, 0.35, 0.45);
+    if (this._canFlash()) this.flash(0xd0b8ff, 0.35, 0.45);
     const karts = this.world?.karts;
     if (!karts) return;
     for (const k of karts) {

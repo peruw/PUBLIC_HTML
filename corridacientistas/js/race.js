@@ -69,7 +69,7 @@ export class RaceManager {
       this._lastCount = n;
       this.bus.emit('race:countdown', { n });
     }
-    // Largada-foguete do jogador: acelerar logo depois do "2" (entre 1,5 e 2,6 passos).
+    // Largada-foguete do jogador: acelerar logo depois do "2" (entre 1,0 e 2,6 passos).
     if (this.player) {
       const held = this.player.controls.throttle > 0.5;
       if (held && this._throttleStart < 0) this._throttleStart = this.countdown;
@@ -80,7 +80,7 @@ export class RaceManager {
       this.time = 0;
       for (const k of this.karts) k.frozen = false;
       this.bus.emit('race:go', {});
-      if (this.player && this._throttleStart >= step * 1.5 && this._throttleStart <= step * 2.6) {
+      if (this.player && this._throttleStart >= step * 1.0 && this._throttleStart <= step * 2.6) {
         this.player.applyBoost(1.1, 1, 'rocket');
       }
       for (const k of this.karts) if (k._aiRocket) k.applyBoost(0.8 + Math.random() * 0.3, 1, 'rocket');
@@ -169,7 +169,9 @@ export class RaceManager {
 
 export function formatTime(t) {
   if (!isFinite(t)) return '--:--.--';
-  const m = Math.floor(t / 60);
-  const s = t - m * 60;
+  // arredonda em centésimos antes de separar os minutos (evita '0:60.00')
+  const cs = Math.round(t * 100);
+  const m = Math.floor(cs / 6000);
+  const s = (cs % 6000) / 100;
   return `${m}:${s.toFixed(2).padStart(5, '0')}`;
 }

@@ -19,12 +19,13 @@ export const CHARACTERS = [
       skin: 0xf2c9a0, hair: 0xf1eee6, hairStyle: 'peruca longa branca cacheada até os ombros',
       outfit: 0x5b3a29, outfitAccent: 0xf5f0e1, extras: 'casaca marrom com gola de renda branca; maçã vermelha no painel do kart',
     },
-    bio: 'Formulou as três leis do movimento e a lei da gravitação universal. Também criou o cálculo (junto com Leibniz) e mostrou que a luz branca é a mistura de todas as cores.',
+    bio: 'Formulou as três leis do movimento e a lei da gravitação universal. Também desenvolveu o cálculo (na mesma época que Leibniz, mas de forma independente) e mostrou que a luz branca é a mistura de todas as cores.',
     fact: 'Newton construiu o primeiro telescópio refletor que funcionava, em 1668.',
   },
   {
     id: 'curie',
     name: 'Marie Curie',
+    gender: 'f', // texto dos resultados: 'a vencedora'
     fullName: 'Marie Skłodowska-Curie',
     years: '1867–1934',
     country: 'Polônia / França',
@@ -35,7 +36,7 @@ export const CHARACTERS = [
       skin: 0xf3d2b8, hair: 0x5a3d2b, hairStyle: 'cabelo castanho preso em coque alto',
       outfit: 0x1c1c22, outfitAccent: 0xffffff, extras: 'vestido preto de gola alta; frasco com líquido verde brilhante (rádio) no kart',
     },
-    bio: 'Descobriu os elementos polônio e rádio e criou o termo "radioatividade". Foi a primeira pessoa a ganhar dois Prêmios Nobel e é a única premiada em duas ciências diferentes: Física (1903) e Química (1911).',
+    bio: 'Descobriu, com o marido Pierre Curie, os elementos polônio e rádio, e criou o termo “radioatividade”. Foi a primeira pessoa a ganhar dois Prêmios Nobel e é a única premiada em duas ciências diferentes: Física (1903) e Química (1911).',
     fact: 'Os cadernos de Marie Curie ainda são radioativos e ficam guardados em caixas forradas de chumbo.',
   },
   {
@@ -87,7 +88,7 @@ export const CHARACTERS = [
       hat: 'gorro preto baixo',
       outfit: 0x1f1f1f, outfitAccent: 0xf1ede4, extras: 'roupa preta com gola branca; luneta dourada presa no kart',
     },
-    bio: 'Aperfeiçoou a luneta e descobriu as quatro maiores luas de Júpiter, as fases de Vênus e as manchas solares. É considerado um dos pais do método científico moderno.',
+    bio: 'Aperfeiçoou a luneta e descobriu as quatro maiores luas de Júpiter. Também observou as fases de Vênus e estudou as manchas solares. É considerado um dos pais do método científico moderno.',
     fact: 'Galileu mostrou que, sem a resistência do ar, objetos pesados e leves caem juntos.',
   },
   {
@@ -104,7 +105,7 @@ export const CHARACTERS = [
       beard: 'barba branca enorme e cheia',
       outfit: 0x3b2f2f, outfitAccent: 0xd9cbb0, extras: 'casaco marrom-escuro; tentilhão (passarinho) empoleirado no kart',
     },
-    bio: 'Propôs a teoria da evolução por seleção natural no livro "A Origem das Espécies" (1859), depois de quase 5 anos de viagem ao redor do mundo a bordo do navio HMS Beagle.',
+    bio: 'Propôs a teoria da evolução por seleção natural no livro “A Origem das Espécies” (1859), depois de quase cinco anos de viagem ao redor do mundo a bordo do navio HMS Beagle.',
     fact: 'O Beagle passou pelo Brasil: Darwin visitou Salvador e o Rio de Janeiro em 1832.',
   },
   {
@@ -159,7 +160,7 @@ export const ITEMS = {
   },
   pilha3: {
     id: 'pilha3', name: 'Pilha de Volta ×3', icon: '🔋', color: 0x3ddc84, uses: 3,
-    effect: 'Três turbos seguidos.', // (cogumelo triplo)
+    effect: 'Três turbos: aperte o botão de item uma vez para cada pilha.', // (cogumelo triplo)
     fact: 'Em 1800, Alessandro Volta empilhou discos de zinco e cobre separados por pano molhado em água salgada e criou a primeira pilha elétrica.',
     weights: [0, 5, 10, 15, 20, 25, 25, 20],
   },
@@ -171,7 +172,7 @@ export const ITEMS = {
   },
   alfa: {
     id: 'alfa', name: 'Partícula Alfa', icon: 'α', color: 0xffd23f,
-    effect: 'Disparo em linha reta que ricocheteia nos muros.', // (casco verde)
+    effect: 'Disparo em linha reta que ricocheteia nos muros. Segurando “olhar para trás” (C), sai para trás.', // (casco verde)
     fact: 'Em 1909, a equipe de Rutherford disparou partículas alfa contra uma folha de ouro. Algumas ricochetearam: o átomo tem um núcleo pequeno e denso!',
     weights: [40, 25, 20, 15, 10, 5, 0, 0],
   },
@@ -183,36 +184,37 @@ export const ITEMS = {
   },
   faraday: {
     id: 'faraday', name: 'Gaiola de Faraday', icon: '🛡️', color: 0xc0c7d1,
-    effect: 'Invencível e mais rápido por alguns segundos.', // (estrela)
+    effect: 'Por 7 segundos: invencível e mais rápido. Quem você encostar capota!', // (estrela)
     fact: 'Numa casca de metal, a carga elétrica fica do lado de fora e protege quem está dentro. Por isso um carro fechado é um lugar seguro durante uma tempestade de raios.',
     weights: [0, 0, 0, 5, 10, 15, 25, 30],
   },
   tesla: {
     id: 'tesla', name: 'Bobina de Tesla', icon: '⚡', color: 0xb388ff,
-    effect: 'Um raio atinge todos os adversários: eles encolhem e ficam lentos.', // (raio)
+    effect: 'Um raio atinge todos os adversários: eles rodopiam, encolhem e ficam lentos. Quem está na Gaiola de Faraday fica protegido!', // (raio)
     fact: 'Nikola Tesla criou a bobina que gera faíscas de alta tensão. Um raio de verdade aquece o ar a cerca de 30.000 °C, cinco vezes a temperatura da superfície do Sol.',
-    weights: [0, 0, 0, 0, 0, 5, 10, 15],
+    weights: [0, 0, 0, 0, 0, 2, 5, 8], // só um por vez e 30 s de intervalo (items.js)
   },
   buraco: {
     id: 'buraco', name: 'Buraco Negro', icon: '🕳️', color: 0x7b2cbf,
-    effect: 'Voa até o 1º colocado e o engole.', // (casco azul)
+    effect: 'Voa até o 1º colocado e o derruba, junto com quem estiver perto dele.', // (casco azul)
     fact: 'A gravidade de um buraco negro é tão forte que nem a luz escapa. Em 2019, foi divulgada a primeira imagem de um, na galáxia M87.',
-    weights: [0, 0, 5, 5, 5, 5, 5, 5],
+    weights: [0, 0, 2, 3, 3, 4, 4, 4], // só um por vez e 25 s de intervalo (items.js)
   },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS);
 
 // Classes de motor. speedMult multiplica a velocidade máxima; aiSkill vai de 0 a 1.
+// aiSpeed multiplica o ritmo da IA; aiCatchUp = quanto a IA de trás acelera para alcançar o jogador.
 export const CLASSES = {
-  '50cc': { id: '50cc', label: '50cc', hint: 'Tranquilo', speedMult: 0.8, aiSkill: 0.45 },
-  '100cc': { id: '100cc', label: '100cc', hint: 'Normal', speedMult: 1.0, aiSkill: 0.72 },
-  '150cc': { id: '150cc', label: '150cc', hint: 'Rápido', speedMult: 1.18, aiSkill: 0.95 },
+  '50cc': { id: '50cc', label: '50cc', hint: 'Tranquilo', speedMult: 0.8, aiSkill: 0.35, aiSpeed: 0.95, aiCatchUp: 0.05 },
+  '100cc': { id: '100cc', label: '100cc', hint: 'Normal', speedMult: 1.0, aiSkill: 0.65, aiSpeed: 0.98, aiCatchUp: 0.08 },
+  '150cc': { id: '150cc', label: '150cc', hint: 'Rápido', speedMult: 1.18, aiSkill: 0.92, aiSpeed: 0.99, aiCatchUp: 0.10 },
 };
 
 export const RACE = {
   kartCount: 8,
-  defaultLaps: 3,
+  defaultLaps: 2,
   lapOptions: [1, 2, 3, 5],
   countdownStep: 1.0, // segundos entre 3, 2, 1, VAI!
   rouletteTime: 1.6,
@@ -223,7 +225,7 @@ export const RACE = {
 export const QUALITY = {
   alta: {
     id: 'alta',
-    pixelRatio: 2,
+    pixelRatio: 1.5, // com MSAA, 2x custa quase o dobro sem ganho visível
     antialias: true,
     shadows: true,
     shadowMapSize: 2048,

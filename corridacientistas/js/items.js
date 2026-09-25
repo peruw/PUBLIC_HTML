@@ -22,6 +22,8 @@ const BOX_SIZE = 1.3;
 const BOX_RADIUS = 1.8; // raio de coleta
 const APPLE_HIT = 1.3;
 const PROJ_HIT = 1.5;
+// itens fortes: intervalo mínimo (s) entre um uso e o próximo sorteio, e só um por vez na pista
+const ITEM_COOLDOWN = { tesla: 30, buraco: 25 };
 
 // temporários (sem alocação por quadro)
 const _v = new THREE.Vector3();
@@ -329,6 +331,7 @@ export class ItemSystem {
     this.hazards = [];
     this._warm = false;
     this._viewH = 720;
+    this._lastUse = {}; // id -> this.time do último uso (itens com intervalo)
 
     // brilhos aditivos (núcleos, elétrons, projéteis) num único draw call
     this.glows = new SpriteBatch(360, { additive: true, renderOrder: 13 });
@@ -360,7 +363,7 @@ export class ItemSystem {
       pos: sl.pos.clone(), s: sl.s, alive: true, timer: 0, pop: 1, phase: i * 1.713,
     }));
     const N = this.boxes.length;
-    const shellGeo = roundedBox(0.2, this.lowQ ? 6 : 8);
+    const shellGeo = roundedBox(0.2, this.lowQ ? 4 : 8);
     const mk = (back) => new THREE.ShaderMaterial({
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uBack: { value: back ? 1 : 0 } }]),
       vertexShader: BOX_VS, fragmentShader: BOX_FS,
@@ -372,8 +375,8 @@ export class ItemSystem {
     this.boxFront = this._instanced(shellGeo, this.boxMats[1], N, 3);
     this.boxFront.instanceMatrix = this.boxBack.instanceMatrix; // mesma matriz para as duas faces
     const glowMat = (c) => new THREE.MeshBasicMaterial({ color: c });
-    this.boxNucleus = this._instanced(nucleusGeometry(0.075, 0.12, this.lowQ ? 7 : 9), new THREE.MeshBasicMaterial({ vertexColors: true }), N);
-    this.boxOrbits = this._instanced(new THREE.TorusGeometry(0.4, 0.018, 4, this.lowQ ? 28 : 40), glowMat(0x8fe4ff), N * 3);
+    this.boxNucleus = this._instanced(nucleusGeometry(0.075, 0.12, this.lowQ ? 5 : 9), new THREE.MeshBasicMaterial({ vertexColors: true }), N);
+    this.boxOrbits = this._instanced((this.lowQ ? new THREE.TorusGeometry(0.4, 0.018, 3, 16) : new THREE.TorusGeometry(0.4, 0.018, 4, 40)), glowMat(0x8fe4ff), N * 3);
     this.boxElectrons = this._instanced(new THREE.SphereGeometry(0.06, 8, 6), glowMat(0xeafcff), N * 3);
     // rotações fixas das 3 órbitas (60° entre si)
     this._orbitQ = [0, 1, 2].map((k) => new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, (k * Math.PI) / 3)));
@@ -439,7 +442,7 @@ export class ItemSystem {
       const diskMat = new THREE.ShaderMaterial({
         uniforms: { uTime: { value: 0 }, uAlpha: { value: 1 } },
         vertexShader: DISK_VS, fragmentShader: DISK_FS,
-        transparent: true, depthWrite: false, side: THREE.DoubleSide,
+        transparent: true, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true, // anel plano: 1 passada basta
       });
       const disk = new THREE.Mesh(diskGeo, diskMat);
       disk.renderOrder = 12;
@@ -470,6 +473,7 @@ export class ItemSystem {
     const flameGeo = buildFlameGeometry();
     const flameMat = new THREE.MeshBasicMaterial({
       vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      forceSinglePass: true, // aditivo: a ordem não importa
     });
     for (let i = 0; i < 8; i++) {
       const group = new THREE.Group();
@@ -496,6 +500,7 @@ export class ItemSystem {
   // ------------------------------------------------------------ API pública
   reset(karts) {
     this.karts = karts || [];
+    this._lastUse = {};
     for (const a of this.apples) a.active = false;
     for (const p of this.projs) p.active = false;
     for (const h of this.holes) { h.active = false; h.group.visible = false; }
@@ -525,21 +530,33 @@ export class ItemSystem {
   rollItem(kart) {
     if (!kart || kart.item || kart.roulette) return;
     const i = (Math.random() * ITEM_IDS.length) | 0;
-    kart.roulette = { time: RACE.rouletteTime, showing: ITEM_IDS[i], _i: i, _tick: 0.07 };
+    // o prêmio é sorteado já na coleta (posição de agora); a roleta para nele
+    kart.roulette = { time: RACE.rouletteTime, showing: ITEM_IDS[i], _i: i, _tick: 0.07, result: this.pickItem(kart.place) };
   }
 
   // Sorteio ponderado pela posição (1..8). Público para testes.
   pickItem(place) {
     const p = clamp(Math.round(place || 4), 1, 8) - 1;
+    // itens com intervalo: fora se usados há pouco, se alguém já tem (ou vai ganhar) um, ou se há buraco ativo
+    const ok = (id) => !(id in ITEM_COOLDOWN) || (
+      this.time - (this._lastUse[id] ?? -1e9) >= ITEM_COOLDOWN[id] &&
+      !this.karts.some((k) => k.item === id || k.roulette?.result === id) &&
+      !(id === 'buraco' && this.holes.some((h) => h.active)));
     let total = 0;
-    for (const id of ITEM_IDS) total += ITEMS[id].weights[p] || 0;
+    let last = 'foguete';
+    for (const id of ITEM_IDS) {
+      if (!ok(id)) continue;
+      total += ITEMS[id].weights[p] || 0;
+      if (ITEMS[id].weights[p]) last = id;
+    }
     if (total <= 0) return 'foguete';
     let r = Math.random() * total;
     for (const id of ITEM_IDS) {
+      if (!ok(id)) continue;
       r -= ITEMS[id].weights[p] || 0;
       if (r < 0) return id;
     }
-    return ITEM_IDS[ITEM_IDS.length - 1];
+    return last;
   }
 
   // ------------------------------------------------------------ update
@@ -556,7 +573,7 @@ export class ItemSystem {
       this._viewH = world.renderer.getDrawingBufferSize(_v2d).y || 720;
     }
     this.glows.begin();
-    this._updateBoxes(dt, karts);
+    this._updateBoxes(dt, karts, world?.camera);
     for (let i = 0; i < karts.length; i++) {
       const k = karts[i];
       if (k.roulette) this._updateRoulette(k, dt);
@@ -572,14 +589,21 @@ export class ItemSystem {
   }
 
   // ------------------------------------------------------------ caixas
-  _updateBoxes(dt, karts) {
+  _updateBoxes(dt, karts, camera) {
     const t = this.time;
     const boxes = this.boxes;
     const n = boxes.length;
     if (!n) return;
     this.boxMats[0].uniforms.uTime.value = t;
     this.boxMats[1].uniforms.uTime.value = t;
-    let visible = 0;
+    // só desenha as caixas perto e à frente da câmera (as outras ficam só com o brilho)
+    let cx = 0, cy = 0, cz = 0, fx = 0, fy = 0, fz = 0;
+    if (camera) {
+      const me = camera.matrixWorld.elements;
+      cx = me[12]; cy = me[13]; cz = me[14];
+      fx = -me[8]; fy = -me[9]; fz = -me[10];
+    }
+    let j = 0; // próximo índice livre nas instâncias (compactado)
     for (let i = 0; i < n; i++) {
       const b = boxes[i];
       if (!b.alive) {
@@ -587,7 +611,11 @@ export class ItemSystem {
         if (b.timer <= 0) { b.alive = true; b.pop = 0; }
       } else if (b.pop < 1) b.pop = Math.min(1, b.pop + dt / 0.45);
       const sc = b.alive ? Math.max(0, easeOutBack(b.pop)) : 0;
-      if (sc > 0) visible++;
+      let draw = sc > 0;
+      if (draw && camera) {
+        const dx = b.pos.x - cx, dy = b.pos.y - cy, dz = b.pos.z - cz;
+        draw = dx * fx + dy * fy + dz * fz > -2 && dx * dx + dy * dy + dz * dz < 150 * 150;
+      }
       // casca
       _v.copy(b.pos);
       _v.y += Math.sin(t * 2.1 + b.phase) * 0.13;
@@ -595,25 +623,26 @@ export class ItemSystem {
       _q.setFromEuler(_e);
       _s.setScalar(BOX_SIZE * sc);
       _m.compose(_v, _q, _s);
-      this.boxBack.setMatrixAt(i, _m);
+      if (draw) this.boxBack.setMatrixAt(j, _m);
       // átomo interno
       _e.set(t * 1.1 + b.phase, t * 1.7, t * 0.6);
       _q.setFromEuler(_e);
       _s.setScalar(sc);
       _m.compose(_v, _q, _s);
-      this.boxNucleus.setMatrixAt(i, _m);
+      if (draw) this.boxNucleus.setMatrixAt(j, _m);
       for (let k = 0; k < 3; k++) {
         _q2.multiplyQuaternions(_q, this._orbitQ[k]);
         _s.set(sc, sc * 0.4, sc);
         _m.compose(_v, _q2, _s);
-        this.boxOrbits.setMatrixAt(i * 3 + k, _m);
+        if (draw) this.boxOrbits.setMatrixAt(j * 3 + k, _m);
         const th = t * (3.4 + k * 0.5) + k * 2.1 + b.phase;
         _v2.set(Math.cos(th) * 0.4 * sc, Math.sin(th) * 0.4 * 0.4 * sc, 0).applyQuaternion(_q2).add(_v);
         _s.setScalar(sc);
         _m.compose(_v2, _q2, _s);
-        this.boxElectrons.setMatrixAt(i * 3 + k, _m);
+        if (draw) this.boxElectrons.setMatrixAt(j * 3 + k, _m);
         if (sc > 0) this.glows.push(_v2.x, _v2.y, _v2.z, 0, 0, 0, 0.3, 0.8, 1, 1, 0.42 * sc, 0, SHAPE.GLOW, 0.7);
       }
+      if (draw) j++;
       if (sc > 0) {
         const pulse = 1 + Math.sin(t * 5 + b.phase) * 0.12;
         this.glows.push(_v.x, _v.y, _v.z, 0, 0, 0, 1, 0.55, 0.35, 0.85, 1.05 * sc * pulse, 0, SHAPE.GLOW, 0.8);
@@ -635,11 +664,11 @@ export class ItemSystem {
         }
       }
     }
-    this.boxBack.count = this.boxFront.count = this.boxNucleus.count = n;
-    this.boxBack.visible = this.boxFront.visible = this.boxNucleus.visible = visible > 0;
-    this.boxOrbits.count = n * 3;
-    this.boxElectrons.count = n * 3;
-    this.boxOrbits.visible = this.boxElectrons.visible = visible > 0;
+    this.boxBack.count = this.boxFront.count = this.boxNucleus.count = j;
+    this.boxBack.visible = this.boxFront.visible = this.boxNucleus.visible = j > 0;
+    this.boxOrbits.count = j * 3;
+    this.boxElectrons.count = j * 3;
+    this.boxOrbits.visible = this.boxElectrons.visible = j > 0;
     this.boxBack.instanceMatrix.needsUpdate = true;
     this.boxNucleus.instanceMatrix.needsUpdate = true;
     this.boxOrbits.instanceMatrix.needsUpdate = true;
@@ -663,9 +692,10 @@ export class ItemSystem {
       r.showing = ITEM_IDS[r._i];
       const frac = 1 - Math.max(0, r.time) / RACE.rouletteTime;
       r._tick += 0.07 + 0.16 * frac * frac; // desacelera no fim
+      if (r.time <= r._tick) r.showing = r.result || r.showing; // último giro: para no prêmio
     }
     if (r.time <= 0) {
-      const id = this.pickItem(k.place);
+      const id = r.result || this.pickItem(k.place);
       k.item = id;
       k.itemCount = ITEMS[id].uses || 1;
       k.roulette = null;
@@ -683,6 +713,7 @@ export class ItemSystem {
 
   _use(k) {
     const id = k.item;
+    if (id in ITEM_COOLDOWN) this._lastUse[id] = this.time;
     switch (id) {
       case 'foguete':
         k.applyBoost(1.3, 1, 'item');
@@ -901,7 +932,7 @@ export class ItemSystem {
           const dz = k.position.z - a.pos.z;
           const dy = k.position.y - a.ground;
           if (dx * dx + dz * dz > APPLE_HIT * APPLE_HIT || dy > 1.3 || dy < -1.2) continue;
-          if (k.stunned) continue;
+          if (k.stunned || k.recovering) continue; // protegido logo após uma batida
           if (!k.invincible) k.hit('spin', a.owner);
           hit = true;
           break;
@@ -970,8 +1001,9 @@ export class ItemSystem {
       p.life = 12;
       p.speed = 52;
       const place = k.place || 0;
+      // persegue o kart logo à frente que ainda está correndo
       if (place > 1) {
-        for (const o of this.karts) if (o !== k && o.place === place - 1) { p.target = o; break; }
+        p.target = this.karts.filter((o) => o !== k && !o.finished && o.place < place).sort((a, b) => b.place - a.place)[0] || null;
       }
       p.mode = p.target ? 'track' : 'straight';
     }
@@ -1005,12 +1037,13 @@ export class ItemSystem {
         p.pos.copy(smp.pos).addScaledVector(smp.right, p.lateral);
         p.pos.y += p.h;
         _v.copy(tg.position).addScaledVector(UP, 0.6);
-        if (_v.distanceToSquared(p.pos) < 20 * 20) p.mode = 'home';
+        // só mira direto se o alvo estiver no mesmo nível (no viaduto do 8 os níveis ficam a 13,5 m)
+        if (_v.distanceToSquared(p.pos) < 20 * 20 && Math.abs(_v.y - p.pos.y) < 4) p.mode = 'home';
       } else if (p.mode === 'home' && p.target) {
         const tg = p.target;
         _v.copy(tg.position).addScaledVector(UP, 0.6).sub(p.pos);
         const d = _v.length();
-        if (d > 45) {
+        if (d > 45 || Math.abs(_v.y) > 4) {
           p.mode = 'track';
         } else {
           const sp = Math.max(p.speed, (tg.speed || 0) + 14);
@@ -1060,7 +1093,7 @@ export class ItemSystem {
         const dz = k.position.z - p.pos.z;
         if (dx * dx + dy * dy + dz * dz > PROJ_HIT * PROJ_HIT) continue;
         if (k.invincible) { dead = true; break; } // quebra na gaiola, sem efeito
-        if (k.stunned) continue;
+        if (k.stunned || k.recovering) continue; // passa direto por quem acabou de apanhar
         k.hit('spin', p.owner);
         dead = true;
         break;
@@ -1127,7 +1160,7 @@ export class ItemSystem {
   // ------------------------------------------------------------ Tesla
   _tesla(k) {
     for (const o of this.karts) {
-      if (o === k || o.invincible) continue;
+      if (o === k || o.invincible || o.finished) continue;
       const pl = clamp(o.place || 4, 1, 8);
       o.shrink(3.5 + (8 - pl) * 0.35);
       o.hit('shock', k);
@@ -1137,15 +1170,8 @@ export class ItemSystem {
 
   // ------------------------------------------------------------ buraco negro
   _launchHole(k) {
-    let target = null;
-    for (const o of this.karts) if (o !== k && o.place === 1) target = o;
-    if (!target) for (const o of this.karts) if (o !== k && o.place === 2) target = o;
-    if (!target) {
-      for (const o of this.karts) {
-        if (o === k) continue;
-        if (!target || (o.place || 99) < (target.place || 99)) target = o;
-      }
-    }
+    // o primeiro colocado que ainda não cruzou a chegada
+    const target = this.karts.filter((o) => o !== k && !o.finished).sort((a, b) => (a.place || 99) - (b.place || 99))[0];
     if (!target) return false;
     let h = this.holes.find((x) => !x.active);
     if (!h) {

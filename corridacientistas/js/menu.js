@@ -5,7 +5,26 @@ import { formatTime } from './race.js';
 
 const $ = (id) => document.getElementById(id);
 const SCREENS = ['loading', 'title', 'select', 'howto', 'pause', 'results', 'error'];
-const FLAGS = { Inglaterra: '🇬🇧', 'Polônia / França': '🇵🇱', Rússia: '🇷🇺', Alemanha: '🇩🇪', Itália: '🇮🇹', Brasil: '🇧🇷' };
+// Bandeiras em SVG (emoji de bandeira vira letras no Windows).
+const svgFlag = (body, vb = '0 0 30 20') => `<svg viewBox="${vb}" preserveAspectRatio="none" aria-hidden="true">${body}</svg>`;
+const hStripes = (...cs) => cs.map((c, i) => `<rect y="${(i * 20) / cs.length}" width="30" height="${20 / cs.length}" fill="${c}"/>`).join('');
+const vStripes = (...cs) => cs.map((c, i) => `<rect x="${i * 10}" width="10" height="20" fill="${c}"/>`).join('');
+const FLAGS = {
+  Inglaterra: svgFlag(
+    '<rect width="60" height="30" fill="#012169"/><path d="M0 0L60 30M60 0L0 30" stroke="#fff" stroke-width="6"/>' +
+      '<path d="M0 0L60 30M60 0L0 30" stroke="#c8102e" stroke-width="2"/><path d="M30 0V30M0 15H60" stroke="#fff" stroke-width="10"/>' +
+      '<path d="M30 0V30M0 15H60" stroke="#c8102e" stroke-width="6"/>',
+    '0 0 60 30',
+  ),
+  'Polônia / França': svgFlag(hStripes('#fff', '#dc143c')),
+  Rússia: svgFlag(hStripes('#fff', '#0039a6', '#d52b1e')),
+  Alemanha: svgFlag(hStripes('#000', '#dd0000', '#ffce00')),
+  Itália: svgFlag(vStripes('#009246', '#fff', '#ce2b37')),
+  Brasil: svgFlag(
+    '<rect width="30" height="20" fill="#009c3b"/><path d="M15 2L27.5 10L15 18L2.5 10Z" fill="#ffdf00"/>' +
+      '<circle cx="15" cy="10" r="4.6" fill="#002776"/><path d="M10.6 9.2Q15 7.6 19.5 10.8" stroke="#fff" stroke-width="1" fill="none"/>',
+  ),
+};
 const STAT_LABELS = [['speed', 'Velocidade'], ['accel', 'Aceleração'], ['handling', 'Controle'], ['weight', 'Peso']];
 
 const store = {
@@ -43,9 +62,11 @@ export class Menu {
     if (!CLASSES[this.opts.cc]) this.opts.cc = '100cc';
     if (!RACE.lapOptions.includes(this.opts.laps)) this.opts.laps = RACE.defaultLaps;
 
+    this.tabNav = false; // foco veio do Tab (não do mouse/toque)
     this.buildSelect();
     this.buildHowto();
 
+    document.addEventListener('pointerdown', () => { this.tabNav = false; }, { capture: true, passive: true });
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
@@ -109,6 +130,8 @@ export class Menu {
 
   hideAll() {
     this.current = null;
+    // tira o foco do botão clicado (senão Enter/Espaço o aciona de novo no meio da corrida)
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     for (const s of SCREENS) $('screen-' + s)?.classList.add('hidden');
   }
 
@@ -124,7 +147,7 @@ export class Menu {
   }
 
   setQualityLabel(q) {
-    $('btn-quality').textContent = `⚙️ Gráficos: ${q}`;
+    $('btn-quality').textContent = `⚙️ Qualidade: ${q}`;
   }
 
   setAutoLabel(on) {
@@ -160,6 +183,14 @@ export class Menu {
     });
     this.grid.addEventListener('dblclick', (e) => {
       if (e.target.closest('.char-card')) this.action('start');
+    });
+    // Tab num cartão já escolhe o cientista (a ficha acompanha o foco)
+    this.grid.addEventListener('focusin', (e) => {
+      const card = e.target.closest('.char-card');
+      if (!card || !this.tabNav || card.dataset.id === this.opts.character) return;
+      this.opts.character = card.dataset.id;
+      this.h.sfx('menuMove');
+      this.refreshSelect();
     });
 
     const cc = $('opt-cc');
@@ -201,7 +232,7 @@ export class Menu {
       img.style.visibility = 'hidden';
     }
     $('detail-name').textContent = c.fullName;
-    $('detail-meta').textContent = `${c.years} · ${FLAGS[c.country] || ''} ${c.country} · ${c.field}`;
+    $('detail-meta').textContent = `${c.years} · ${c.country} · ${c.field}`;
     $('detail-bio').textContent = c.bio;
     $('detail-stats').innerHTML = STAT_LABELS.map(
       ([k, label]) =>
@@ -219,6 +250,10 @@ export class Menu {
     this.opts.character = CHARACTERS[n].id;
     this.h.sfx('menuMove');
     this.refreshSelect();
+    // com foco de Tab num cartão, o foco acompanha a seleção
+    if (this.tabNav && document.activeElement?.classList.contains('char-card')) {
+      this.grid.querySelector(`[data-id="${this.opts.character}"]`)?.focus();
+    }
   }
 
   buildHowto() {
@@ -247,7 +282,8 @@ export class Menu {
       .join('');
     const winner = results[0].kart.character;
     const mine = player.character;
-    let html = `<b>Você sabia? Sobre ${winner.name}, o vencedor:</b> ${winner.fact}`;
+    const art = winner.gender === 'f' ? 'a vencedora' : 'o vencedor';
+    let html = `<b>Você sabia? Sobre ${winner.name}, ${art}:</b> ${winner.fact}`;
     if (mine.id !== winner.id) html += `<br><br><b>E sobre ${mine.name}:</b> ${mine.fact}`;
     $('results-fact').innerHTML = html;
     this.show('results');
@@ -255,8 +291,19 @@ export class Menu {
 
   // ---------- teclado nos menus ----------
   onKey(e) {
+    if (e.key === 'Tab') this.tabNav = true;
     if (e.repeat) return;
     const k = e.key;
+    // botão focado pelo Tab: Enter/Espaço acionam o próprio botão
+    // (no cartão do cientista, Enter continua sendo "correr")
+    const f = document.activeElement;
+    if ((k === 'Enter' || k === ' ') && this.tabNav && f && f.matches('button, a[href]') && !f.classList.contains('char-card') && f.closest('#screen-' + this.current)) {
+      if (k === ' ') {
+        e.preventDefault(); // o input.js bloqueia o Espaço nativo: clica aqui
+        f.click();
+      }
+      return;
+    }
     if (this.current === 'title' && (k === 'Enter' || k === ' ')) {
       e.preventDefault();
       this.action('play');

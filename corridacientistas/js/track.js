@@ -149,6 +149,117 @@ const WHITE_COL = new THREE.Color(1, 1, 1);
 const col = (hex) => new THREE.Color(hex);
 
 // ---------------------------------------------------------------------------
+// Pedaços por célula (x, z): malhas grandes divididas para o frustum culling
+// (e a câmera de sombra) descartarem o que está fora de vista. Aparência idêntica.
+const cellKey = (x, z, cell) => (Math.floor(x / cell) + 512) * 1024 + (Math.floor(z / cell) + 512);
+
+// Células com menos de minTris triângulos vão todas para um pedaço só (menos draw calls).
+function mergeSmall(cells, minTris, size) {
+  if (!minTris) return [...cells.values()];
+  const out = [], rest = [];
+  for (const L of cells.values()) {
+    if (size(L) >= minTris) out.push(L);
+    else rest.push(...L);
+  }
+  if (rest.length) out.push(rest);
+  return out;
+}
+
+// Divide uma geometria (indexada ou não) pelo centróide de cada triângulo.
+export function splitGeometry(geo, cell, minTris = 0) {
+  const P = geo.attributes.position, I = geo.index;
+  const nt = Math.floor((I ? I.count : P.count) / 3);
+  const vi = I ? (k) => I.getX(k) : (k) => k;
+  const cells = new Map();
+  for (let t = 0; t < nt; t++) {
+    const a = vi(t * 3), b = vi(t * 3 + 1), c = vi(t * 3 + 2);
+    const key = cellKey((P.getX(a) + P.getX(b) + P.getX(c)) / 3, (P.getZ(a) + P.getZ(b) + P.getZ(c)) / 3, cell);
+    let L = cells.get(key);
+    if (!L) cells.set(key, (L = []));
+    L.push(t);
+  }
+  const groups = mergeSmall(cells, minTris, (L) => L.length);
+  if (groups.length <= 1) return [geo];
+  const names = Object.keys(geo.attributes);
+  const remap = new Int32Array(P.count).fill(-1);
+  const out = [];
+  for (const tris of groups) {
+    const used = [];
+    const idx = new Array(tris.length * 3);
+    for (let k = 0; k < tris.length; k++) {
+      for (let j = 0; j < 3; j++) {
+        const v = vi(tris[k] * 3 + j);
+        if (remap[v] < 0) { remap[v] = used.length; used.push(v); }
+        idx[k * 3 + j] = remap[v];
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    for (const n of names) {
+      const A = geo.attributes[n], s = A.itemSize;
+      const arr = new A.array.constructor(used.length * s);
+      for (let k = 0; k < used.length; k++) for (let j = 0; j < s; j++) arr[k * s + j] = A.array[used[k] * s + j];
+      g.setAttribute(n, new THREE.BufferAttribute(arr, s, A.normalized));
+    }
+    g.setIndex(used.length > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+    g.computeBoundingSphere();
+    for (const v of used) remap[v] = -1;
+    out.push(g);
+  }
+  return out;
+}
+
+// Junta instâncias { geo, m (Matrix4), c (Color ou null) } em geometrias estáticas por célula,
+// com a cor da instância multiplicada pela cor do vértice (como no InstancedMesh).
+export function bakeInstances(list, cell, minTris = 0) {
+  const cells = new Map();
+  for (const it of list) {
+    const e = it.m.elements;
+    const key = cellKey(e[12], e[14], cell);
+    let L = cells.get(key);
+    if (!L) cells.set(key, (L = []));
+    L.push(it);
+  }
+  const out = [];
+  const v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
+  const triCount = (L) => L.reduce((a, { geo }) => a + (geo.index ? geo.index.count : geo.attributes.position.count) / 3, 0);
+  for (const L of mergeSmall(cells, minTris, triCount)) {
+    let nv = 0, ni = 0;
+    for (const { geo } of L) {
+      nv += geo.attributes.position.count;
+      ni += geo.index ? geo.index.count : geo.attributes.position.count;
+    }
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), cols = new Float32Array(nv * 3);
+    const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    let o = 0, oi = 0;
+    for (const { geo, m, c } of L) {
+      const P = geo.attributes.position, N = geo.attributes.normal, C = geo.attributes.color;
+      nm.getNormalMatrix(m);
+      for (let i = 0; i < P.count; i++) {
+        v.fromBufferAttribute(P, i).applyMatrix4(m);
+        pos[(o + i) * 3] = v.x; pos[(o + i) * 3 + 1] = v.y; pos[(o + i) * 3 + 2] = v.z;
+        if (N) {
+          n.fromBufferAttribute(N, i).applyMatrix3(nm).normalize();
+          nor[(o + i) * 3] = n.x; nor[(o + i) * 3 + 1] = n.y; nor[(o + i) * 3 + 2] = n.z;
+        }
+        const r = C ? C.getX(i) : 1, gg = C ? C.getY(i) : 1, b = C ? C.getZ(i) : 1;
+        cols[(o + i) * 3] = r * (c ? c.r : 1); cols[(o + i) * 3 + 1] = gg * (c ? c.g : 1); cols[(o + i) * 3 + 2] = b * (c ? c.b : 1);
+      }
+      if (geo.index) for (let i = 0; i < geo.index.count; i++) idx[oi++] = o + geo.index.getX(i);
+      else for (let i = 0; i < P.count; i++) idx[oi++] = o + i;
+      o += P.count;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeBoundingSphere();
+    out.push(g);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Texturas procedurais
 function makeCanvas(w, h) {
   const c = document.createElement('canvas');
@@ -926,16 +1037,25 @@ export function buildTrack(scene, quality = {}) {
   const matGlow = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
   const disposables = [asphalt, grass, atlas.tex, matRoad, matGround, matAtlas, matDecal, matGlow];
 
-  const mkMesh = (geo, mat, { cast = false, receive = true, name = '' } = {}) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.castShadow = cast;
-    m.receiveShadow = receive;
-    m.name = name;
-    m.matrixAutoUpdate = false;
-    m.updateMatrix();
-    group.add(m);
-    disposables.push(geo);
-    return m;
+  // split: tamanho da célula (m) para dividir a malha em pedaços que o culling descarta;
+  // células pequenas (< SPLIT_MIN triângulos) ficam juntas num pedaço só
+  const SPLIT = 140, SPLIT_MIN = hi ? 1500 : 800;
+  const mkMesh = (geo, mat, { cast = false, receive = true, name = '', split = 0 } = {}) => {
+    const geos = split ? splitGeometry(geo, split, SPLIT_MIN) : [geo];
+    if (geos[0] !== geo) geo.dispose();
+    let first = null;
+    geos.forEach((g, k) => {
+      const m = new THREE.Mesh(g, mat);
+      m.castShadow = cast;
+      m.receiveShadow = receive;
+      m.name = geos.length > 1 ? `${name}-${k}` : name;
+      m.matrixAutoUpdate = false;
+      m.updateMatrix();
+      group.add(m);
+      disposables.push(g);
+      first = first || m;
+    });
+    return first;
   };
 
   // Paletas por setor
@@ -1112,7 +1232,7 @@ export function buildTrack(scene, quality = {}) {
       }
     }
   }
-  mkMesh(gb.build(), matGround, { name: 'acostamento' });
+  mkMesh(gb.build(), matGround, { name: 'acostamento', split: SPLIT });
 
   // ------------------------------------------------------------ decalques: zebras, chegada, grid
   {
@@ -1464,6 +1584,8 @@ export function buildTrack(scene, quality = {}) {
   const offs = [
     bus.on('race:countdown', ({ n }) => setLights(4 - n)),
     bus.on('race:go', () => { setLights(4); startLights.timer = 3; }),
+    // saiu da corrida (menu/nova largada): apaga o semáforo
+    bus.on('race:reset', () => { setLights(-1); startLights.timer = 0; }),
   ];
 
   // ------------------------------------------------------------ bandeirolas sobre a reta de largada (vão livre > 7 m)
@@ -1626,11 +1748,9 @@ export function buildTrack(scene, quality = {}) {
   }
 
   // ------------------------------------------------------------ malha das estruturas
-  const structures = mkMesh(sb.build(), matAtlas, { cast: true, receive: true, name: 'estruturas' });
-  structures.frustumCulled = true;
+  mkMesh(sb.build(), matAtlas, { cast: true, receive: true, name: 'estruturas', split: SPLIT });
 
-  // ------------------------------------------------------------ pilhas de pneus (instanciadas)
-  let tires = null;
+  // ------------------------------------------------------------ pilhas de pneus (mescladas por célula)
   {
     // pilha de 3 pneus: cilindro aberto com "gomos" + tampa escura
     const seg = hi ? 7 : 6;
@@ -1657,24 +1777,15 @@ export function buildTrack(scene, quality = {}) {
     disposables.push(geo);
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
     disposables.push(mat);
-    const count = tireSpots.length;
-    tires = new THREE.InstancedMesh(geo, mat, Math.max(1, count));
+    // pilhas mescladas em pedaços por célula (culling); sem sombra: baixas e junto aos muros
     const palette = [col(0x1e1e22), col(0xe3262f), col(0x1e1e22), col(0xffffff), col(0x1e1e22), col(0x1d7bd8), col(0x1e1e22), col(0xffd23f)];
-    tireSpots.forEach(([s, side], k) => {
+    const list = tireSpots.map(([s, side], k) => {
       const smp = sample(s);
       const p = smp.pos.clone().addScaledVector(smp.right, side * (smp.wallDist + 0.42));
       p.y -= 0.02;
-      m4.makeTranslation(p.x, p.y, p.z);
-      tires.setMatrixAt(k, m4);
-      tires.setColorAt(k, palette[k % palette.length]);
+      return { geo, m: new THREE.Matrix4().makeTranslation(p.x, p.y, p.z), c: palette[k % palette.length] };
     });
-    tires.count = count;
-    tires.castShadow = true;
-    tires.receiveShadow = true;
-    tires.instanceMatrix.needsUpdate = true;
-    if (tires.instanceColor) tires.instanceColor.needsUpdate = true;
-    tires.computeBoundingSphere();
-    group.add(tires);
+    for (const g of bakeInstances(list, SPLIT, SPLIT_MIN)) mkMesh(g, mat, { cast: false, receive: true, name: 'pneus' });
   }
 
   // ------------------------------------------------------------ interior do túnel (céu estrelado)
@@ -2020,6 +2131,7 @@ export function buildTrack(scene, quality = {}) {
     const mat = new THREE.MeshBasicMaterial({
       color: 0xd9c8ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending,
       depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false,
+      forceSinglePass: true, // aditivo: uma passada só já fica igual
     });
     disposables.push(g, mat);
     arcMesh = new THREE.Mesh(g, mat);
@@ -2200,7 +2312,6 @@ export function buildTrack(scene, quality = {}) {
       offs.forEach((off) => off());
       scene.remove(group);
       disposables.forEach((d) => d.dispose && d.dispose());
-      if (tires) tires.dispose();
     },
   };
   return track;
