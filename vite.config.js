@@ -44,6 +44,7 @@ export default defineConfig({
         supervovoeve: resolve(__dirname, 'supervovoeve/index.html'),
         aventura2: resolve(__dirname, 'aventura2/index.html'),
         aventurailhavoadora: resolve(__dirname, 'aventurailhavoadora/index.html'),
+        corridacientistas: resolve(__dirname, 'corridacientistas/index.html'),
       },
     },
   },
