@@ -52,7 +52,7 @@
     if (r) return r;
     const c = rgbOf(key);
     r = [mix(c, WHITE, 0.85), mix(c, WHITE, 0.55), mix(c, WHITE, 0.25), c, c, mix(c, BLACK, 0.22), mix(c, BLACK, 0.42), mix(c, BLACK, 0.6)].map(hex);
-    r.glow = rgba(c, 0.2);
+    r.glow = rgba(c, 0.38);
     rampCache.set(key, r);
     return r;
   }
@@ -70,11 +70,11 @@
     return r;
   }
   const FIRE_R = ['#ffffff', '#fff6c8', '#ffe066', '#ffc233', '#ff9a1f', '#ff6a14', '#e8401a', '#b82a12', '#7a1c10', 'rgba(70,40,36,0.55)', 'rgba(46,32,32,0.3)'];
-  FIRE_R.glow = 'rgba(255,120,30,0.22)';
+  FIRE_R.glow = 'rgba(255,120,30,0.35)';
   const EMBER_R = ['#fff6c8', '#ffe066', '#ffc233', '#ff9a1f', '#ff6a14', '#e8401a', '#b82a12'];
-  EMBER_R.glow = 'rgba(255,150,40,0.25)';
+  EMBER_R.glow = 'rgba(255,150,40,0.4)';
   const FLASH_R = ['#ffffff', '#ffffff', '#fff6c8', '#ffe066'];
-  FLASH_R.glow = 'rgba(255,255,220,0.25)';
+  FLASH_R.glow = 'rgba(255,255,220,0.4)';
 
   const FW_COLORS = ['#ffd23f', '#1fd685', '#4fc3ff', '#c07bff', '#ff4d5e', '#ffb238', '#7dffc0', '#ff7ad0'];
   const FW_TYPES = ['peony', 'peony', 'ring', 'ring', 'double', 'willow', 'crackle'];
@@ -114,7 +114,7 @@
     if (l) return l;
     const c = rgbOf(key);
     const d = (t) => mix(c, BLACK, t), w = (t) => mix(c, WHITE, t);
-    const cols = [BLACK, d(0.82), d(0.65), d(0.45), d(0.25), c, w(0.22), w(0.42), w(0.62), w(0.82), WHITE];
+    const cols = [BLACK, d(0.75), d(0.55), d(0.35), d(0.15), c, c, w(0.2), w(0.4), w(0.7), WHITE];
     l = lutFrom(FIRE_STOPS.map((s, i) => [s[0], byte(cols[i][0]), byte(cols[i][1]), byte(cols[i][2]), s[4]]));
     lutCache.set(key, l);
     return l;
@@ -210,7 +210,7 @@
 
     let S = 3, W = 1, H = 1, cssW = 0, cssH = 0, dpr = 0, sized = false;
     let raf = 0, last = 0, clock = 0, fireAcc = 0, frames = 0, parity = 0;
-    let dead = false, shown = false, q = 1, workEma = 0;
+    let dead = false, shown = false, q = 1, workEma = 0, updEma = 0, drawEma = 0;
     const mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     let reduced = !!(mq && mq.matches);
     const onMq = () => { reduced = !!mq.matches; };
@@ -264,6 +264,11 @@
       if (!b) { b = []; map.set(c, b); }
       b.push(x, y, w, h);
     }
+    // brilho em cruz: vira uma estrelinha de pixel, em vez de um quadrado borrado
+    function halo(c, x, y, s, arm) {
+      put(glow, c, x - arm, y, s + arm * 2, s);
+      put(glow, c, x, y - arm, s, s + arm * 2);
+    }
     function flush(map) {
       for (const [c, b] of map) {
         if (!b.length) continue;
@@ -288,8 +293,8 @@
     function spark(x, y, vx, vy, rp) {
       const p = spawn(x, y, vx, vy, rand(0.9, 1.4), rp);
       if (!p) return null;
-      p.g = 26; p.drag = 1.9; p.tw = true; p.trail = 2; p.glow = 0.4; p.shrink = true;
-      p.size = Math.random() < 0.28 ? 2 : 1;
+      p.g = 30; p.drag = 1.7; p.tw = true; p.trail = 2; p.glow = 0.45; p.shrink = true;
+      p.size = Math.random() < 0.4 ? 2 : 1;
       return p;
     }
     // esfera 3D projetada: concentra faíscas na borda, parece um fogo de verdade
@@ -305,7 +310,11 @@
       }
     }
     function mkWave(x, y, r0, r1, th, life, rp, delay) {
-      waves.push({ x, y, r0, r1, th, life, rp, age: -(delay || 0) });
+      waves.push({ x, y, r0, r1, th, life, rp, age: -(delay || 0), star: false });
+    }
+    // brilho em cruz no centro de uma explosão (encolhe)
+    function mkStar(x, y, len, life, rp) {
+      waves.push({ x, y, r0: len, r1: 0, th: 0, life, rp, age: 0, star: true });
     }
     function ember(x, y, vx, vy, life, rp) {
       const p = spawn(x, y, vx, vy, life, rp);
@@ -352,7 +361,7 @@
         let s = p.size;
         if (p.shrink && s > 1) s = Math.max(1, Math.round(s * (1 - k) + 0.5));
         const x = Math.round(p.x - s * 0.5), y = Math.round(p.y - s * 0.5);
-        if (p.glow && k < p.glow) put(glow, rp.glow, x - 1, y - 1, s + 2, s + 2);
+        if (p.glow && k < p.glow) halo(rp.glow, x, y, s, s > 1 ? 2 : 1);
         if (p.trail) {
           const tx = Math.round(p.x - p.vx * 0.03), ty = Math.round(p.y - p.vy * 0.03);
           if (tx !== x || ty !== y) put(main, rp[Math.min(n - 1, ci + 2)], tx, ty, 1, 1);
@@ -370,9 +379,9 @@
       const rp = p.ramp;
       const f = (((p.age * p.d + p.ph) / TAU) * 4) & 3;
       const x = Math.round(p.x), y = Math.round(p.y);
-      if (f === 0) put(main, rp[3], x, y, 2, 2);
+      if (f === 0) put(main, rp[3], x - 1, y, 3, 2);
       else if (f === 1) put(main, rp[2], x - 1, y, 3, 1);
-      else if (f === 2) put(main, rp[5], x, y, 2, 2);
+      else if (f === 2) put(main, rp[5], x, y - 1, 2, 3);
       else put(main, rp[6], x, y - 1, 1, 3);
     }
 
@@ -391,6 +400,17 @@
         const k = w.age / w.life, rp = w.rp, n = rp.length;
         const R = Math.round(w.r0 + (w.r1 - w.r0) * ease3(k));
         const c = rp[Math.min(n - 1, (k * n) | 0)];
+        if (w.star) {
+          const cx = Math.round(w.x), cy = Math.round(w.y), L = Math.round(w.r0 * (1 - k));
+          put(main, c, cx - L, cy, L * 2 + 1, 1);
+          put(main, c, cx, cy - L, 1, L * 2 + 1);
+          const d = Math.round(L * 0.45);
+          if (d > 1) for (let i = 1; i <= d; i += 2) {
+            put(main, c, cx - i, cy - i, 1, 1); put(main, c, cx + i, cy - i, 1, 1);
+            put(main, c, cx - i, cy + i, 1, 1); put(main, c, cx + i, cy + i, 1, 1);
+          }
+          continue;
+        }
         const th = w.th ? Math.max(1, Math.round(w.th * (1 - k * 0.5))) : 0;
         const ri = th ? R - th : -1;
         const dither = w.th && k > 0.6;
@@ -439,16 +459,17 @@
     function drawRockets() {
       for (const r of rockets) {
         const x = Math.round(r.x), y = Math.round(r.y);
-        put(glow, EMBER_R.glow, x - 1, y - 1, 3, 4);
+        halo(EMBER_R.glow, x, y, 1, 2);
         put(main, '#ffffff', x, y, 1, 2);
       }
     }
     function explode(r) {
       const x = r.x, y = r.y, A = ramp(r.cA), B = ramp(r.cB);
-      const spd = clamp(Math.min(W, H) * 0.24, 40, 100) * rand(0.85, 1.15);
-      const n = amount(46 + W * 0.05);
-      mkWave(x, y, 1, 7, 0, 0.16, FLASH_R);
-      mkWave(x, y, 2, spd * 0.5, 1, 0.3, A);
+      const spd = clamp(Math.min(W, H) * 0.42, 60, 150) * rand(0.85, 1.15);
+      const n = amount(60 + W * 0.07);
+      mkWave(x, y, 1, 4, 0, 0.12, FLASH_R);
+      mkStar(x, y, 14, 0.26, FLASH_R);
+      mkWave(x, y, 2, spd * 0.42, 1, 0.3, A);
       if (r.type === 'ring') {
         const tilt = rand(0, TAU), sq = rand(0.35, 1), ct = Math.cos(tilt), st = Math.sin(tilt);
         const m = Math.max(8, (n * 0.7) | 0);
@@ -529,7 +550,7 @@
         put(main, rp[6], Math.round(tr[4]), Math.round(tr[5]), 1, 1);
         put(main, rp[4], Math.round(tr[2]), Math.round(tr[3]), 1, 1);
         put(main, rp[2], Math.round(tr[0]), Math.round(tr[1]), 1, 1);
-        put(glow, rp.glow, x - 2, y - 2, 5, 5);
+        halo(rp.glow, x, y, 1, 3);
         if (Math.cos(c.t * 16 + c.spin) > -0.35) {
           put(main, rp[3], x - 1, y, 3, 1);
           put(main, rp[3], x, y - 1, 1, 3);
@@ -576,7 +597,7 @@
           if (Math.random() < 0.06) lv *= 0.3;
           src[x] = hm * lv;
         }
-        const dec = hm / tH, lean = 0.07 * Math.sin(t * 1.7);
+        const dec = hm / (tH + off * 0.9), lean = 0.07 * Math.sin(t * 1.7);
         for (let s = 0; s < steps; s++) g.step(dec, lean);
         g.render(f.lut);
       }
@@ -614,10 +635,10 @@
       ctx.drawImage(f.grid.cv, f.gx, f.gy);
       // contorno em brasa: o elemento parece "quente"
       const I = f.I;
-      if (I > 0.12 && f.boxy) {
-        const a = Math.round(clamp(I * (0.45 + 0.35 * Math.random()), 0, 0.85) * 10) / 10;
+      if (I > 0.3 && f.boxy) {
+        const a = Math.round(clamp(0.2 + I * (0.35 + 0.35 * Math.random()), 0, 0.9) * 10) / 10;
         if (a > 0) {
-          ctx.fillStyle = rgba(f.color ? rgbOf(f.color) : [255, 150, 40], a);
+          ctx.fillStyle = rgba(f.color ? rgbOf(f.color) : I > 0.7 ? [255, 200, 70] : [255, 140, 30], a);
           const x = f.ex - 1, y = f.ey - 1, w = f.ew + 2, h = f.eh + 2;
           ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + h - 1, w, 1);
           ctx.fillRect(x, y + 1, 1, h - 2); ctx.fillRect(x + w - 1, y + 1, 1, h - 2);
@@ -729,9 +750,13 @@
       measure();
       clock += dt; parity ^= 1; frames++;
       update(dt);
+      const t1 = performance.now();
       render();
+      const t2 = performance.now();
+      updEma += (t1 - t0 - updEma) * 0.1;
+      drawEma += (t2 - t1 - drawEma) * 0.1;
       // qualidade adaptativa: se o quadro pesar, solta menos partículas
-      workEma += (performance.now() - t0 - workEma) * 0.1;
+      workEma += (t2 - t0 - workEma) * 0.1;
       if (workEma > 6) q = Math.max(0.35, q - 0.02);
       else if (workEma < 3) q = Math.min(1, q + 0.004);
       if (busy()) raf = requestAnimationFrame(frame);
@@ -811,7 +836,7 @@
       measure();
       const rp = ramp(color || '#ffd23f');
       const n = amount(count == null ? 24 : +count || 0);
-      const sp = clamp(Math.min(W, H) * 0.3, 50, 130);
+      const sp = clamp(Math.min(W, H) * 0.45, 60, 160);
       for (let i = 0; i < n; i++) {
         const a = rand(0, TAU), v = sp * rand(0.3, 1);
         const p = spawn(x / S, y / S, Math.cos(a) * v, Math.sin(a) * v, rand(0.25, 0.55), rp);
@@ -888,7 +913,7 @@
     }
     // diagnóstico (testes / console)
     function stats() {
-      return { running: !!raf, frames, parts: parts.length, coins: coins.length, flames: flames.size, edge: edge.cur, work: workEma, quality: q, scale: S, w: W, h: H, reduced };
+      return { running: !!raf, frames, parts: parts.length, coins: coins.length, flames: flames.size, edge: edge.cur, work: workEma, update: updEma, draw: drawEma, quality: q, scale: S, w: W, h: H, reduced };
     }
 
     const fx = { flames: flamesApi, fireworks, confetti, sparks, fly, edge: edgeApi, shockwave, clear, destroy, stats, canvas: cv };

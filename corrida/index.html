@@ -405,7 +405,7 @@
   .board .nm { font-family: var(--pixel-text); font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .board .nm small { display: block; font-family: var(--body); font-weight: 500; font-size: 11px; color: var(--ink-dim); }
   .board .sc { font-family: var(--pixel); font-size: 12px; color: var(--brand); font-variant-numeric: tabular-nums; }
-  .board-msg { padding: 18px 8px; color: var(--ink-dim); font-size: 14px; text-align: center; }
+  .board li.board-msg { display: block; padding: 18px 8px; color: var(--ink-dim); font-size: 14px; text-align: center; background: none; }
 
   /* Apelido */
   .field {
@@ -1214,6 +1214,7 @@
   // ================= Fluxo =================
   function startGame() {
     audio();
+    baseScreen = null;
     closePanel();
     if (S.gate) { removeGate(S.gate); S.gate = null; }
     Object.assign(S, {
@@ -1432,10 +1433,13 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') togglePause(); });
 
   // ================= Telas: skins, ranking, apelido =================
-  let openPanel = null;
+  let openPanel = null, baseScreen = null;
   function openScreen(id) {
     closePanel();
     openPanel = id;
+    // esconde a tela de início/fim enquanto o painel está aberto
+    baseScreen = ['startScreen', 'overScreen'].find((x) => $(x).classList.contains('show')) || null;
+    if (baseScreen) $(baseScreen).classList.remove('show');
     $(id).classList.add('show');
     if (id === 'lockerScreen') { S.lockerOn = true; S.preview = null; renderLocker(); }
     if (id === 'rankScreen') loadBoard(boardPeriod);
@@ -1451,6 +1455,8 @@
     $(openPanel).classList.remove('show');
     if (openPanel === 'lockerScreen') { S.lockerOn = false; S.preview = null; useSkin(P.data.skin); }
     openPanel = null;
+    if (baseScreen && (S.mode === 'menu' || S.mode === 'over')) $(baseScreen).classList.add('show');
+    baseScreen = null;
   }
   $$('[data-open]').forEach((b) => b.addEventListener('click', () => openScreen(b.dataset.open === 'locker' ? 'lockerScreen' : 'rankScreen')));
   $$('[data-close]').forEach((b) => b.addEventListener('click', closePanel));

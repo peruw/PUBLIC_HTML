@@ -34,7 +34,7 @@
   const DEFS = [
     { // 0 ─ chiptune alegre em Dó maior
       id: 'cidade', name: 'Cidade Quanta', bpm: 128,
-      lv: { lead: 0.9, bass: 0.3, drums: 0.56, pad: 1.9, cnt: 1 },
+      lv: { lead: 0.9, bass: 0.3, drums: 0.56, pad: 1.9, cnt: 1, arp: 3.2 },
       ins: {
         lead: { w: 'pulse', duty: 0.25, a: 0.004, d: 0.2, s: 0.55, r: 0.06, cut: 4200, g: 0.12, vib: 10 },
         bass: { w: 'triangle', a: 0.002, d: 0.08, s: 0.9, r: 0.03, g: 0.34, lo: 48 },
@@ -77,7 +77,7 @@
     },
     { // 1 ─ synthwave em Lá menor, baixo em semicolcheias
       id: 'neon', name: 'Pôr do Sol Neon', bpm: 112,
-      lv: { lead: 0.92, bass: 0.63, drums: 0.41, pad: 1.15, cnt: 0.86 },
+      lv: { lead: 0.92, bass: 0.63, drums: 0.41, pad: 1.15, cnt: 0.86, arp: 1.4 },
       ins: {
         lead: { w: 'sawtooth', det: 7, a: 0.012, d: 0.3, s: 0.7, r: 0.18, cut: 2300, q: 2, fe: 1.2, fd: 0.25, g: 0.085, vib: 14 },
         bass: { w: 'sawtooth', a: 0.003, d: 0.12, s: 0.35, r: 0.04, cut: 600, q: 5, fe: 3, fd: 0.08, g: 0.2, lo: 36 },
@@ -120,7 +120,7 @@
     },
     { // 2 ─ sonhadora, arpejos que fluem
       id: 'oceano', name: 'Oceano Digital', bpm: 120,
-      lv: { lead: 0.46, bass: 0.39, drums: 0.51, pad: 0.74, cnt: 1 },
+      lv: { lead: 0.46, bass: 0.39, drums: 0.51, pad: 0.74, cnt: 1, arp: 0.9 },
       ins: {
         lead: { w: 'triangle', a: 0.03, d: 0.4, s: 0.7, r: 0.3, cut: 3000, g: 0.15, vib: 16, vibRate: 4.5 },
         bass: { w: 'sawtooth', a: 0.01, d: 0.3, s: 0.7, r: 0.15, cut: 380, q: 1, g: 0.26, lo: 36 },
@@ -163,7 +163,7 @@
     },
     { // 3 ─ tensa, Lá menor harmônico, baixo galopando
       id: 'meteoros', name: 'Chuva de Meteoros', bpm: 136,
-      lv: { lead: 1.17, bass: 0.64, drums: 0.36, pad: 1.04, cnt: 0.86 },
+      lv: { lead: 1.17, bass: 0.64, drums: 0.36, pad: 1.04, cnt: 0.86, arp: 3 },
       ins: {
         lead: { w: 'sawtooth', det: 5, a: 0.006, d: 0.15, s: 0.6, r: 0.08, cut: 2100, q: 3, fe: 1, fd: 0.12, g: 0.08, vib: 8 },
         bass: { w: 'square', a: 0.002, d: 0.09, s: 0.3, r: 0.03, cut: 800, q: 4, fe: 2, fd: 0.06, g: 0.15, lo: 36 },
@@ -188,7 +188,7 @@
         A2: { base: 'A', dr: 'aaaf', x: 0, lead: [
           'A.A.A.G.A---E---',
           'A.A.A.G.A---E-C-',
-          'F.F.F.G.A---C---',
+          'F.F.F.G.A-G-F-A-',
           'B---G#---E---D---'] },
         B: { ch: 'Dm Am E Am', dr: 'bbbf', x: 1, bass: 'R.RRR.RRR.RRR.RR', arp: '0.1.2.1.3.1.2.1.', lead: [
           'D-.D.F.A-.F.D.F.',
@@ -205,7 +205,7 @@
     },
     { // 4 ─ pesada: baixo grave com drive, bumbo que soca
       id: 'vulcao', name: 'Vulcão', bpm: 140,
-      lv: { lead: 0.76, bass: 0.23, drums: 0.21, pad: 1.06, cnt: 1.28 },
+      lv: { lead: 0.76, bass: 0.23, drums: 0.21, pad: 1.06, cnt: 1.28, arp: 3 },
       ins: {
         lead: { w: 'square', harm: -12, a: 0.005, d: 0.2, s: 0.6, r: 0.08, cut: 1900, q: 2, fe: 0.8, fd: 0.15, g: 0.075, vib: 8 },
         bass: { w: 'sawtooth', det: 8, a: 0.002, d: 0.12, s: 0.5, r: 0.04, cut: 520, q: 3, fe: 2.2, fd: 0.07, g: 0.2, lo: 33 },
@@ -248,7 +248,7 @@
     },
     { // 5 ─ saltitante e brincalhona, com swing
       id: 'doces', name: 'Terra dos Doces', bpm: 132, swing: 0.14,
-      lv: { lead: 0.94, bass: 0.62, drums: 0.75, pad: 1.8, cnt: 0.86 },
+      lv: { lead: 0.94, bass: 0.62, drums: 0.75, pad: 1.8, cnt: 0.86, arp: 0.85 },
       ins: {
         lead: { w: 'square', a: 0.003, d: 0.1, s: 0.25, r: 0.04, cut: 3200, g: 0.11 },
         bass: { w: 'triangle', a: 0.002, d: 0.12, s: 0.4, r: 0.04, g: 0.34, lo: 43 },
@@ -274,7 +274,7 @@
           'E.G.E.C.D.E.C...',
           'C.E.C.a.b.C.a...',
           'D.F.A.F.E.D.C.b.',
-          'b.D.G.F.E.D.C---'] },
+          'b.D.G.F.E.C.D---'] },
         B: { ch: 'F G C Am', dr: 'bbbf', x: 1, arp: '0...2...4...2...', lead: [
           'F.a.C.a.F.a.C.F.',
           'G.b.D.b.G.b.D.G.',
@@ -290,7 +290,7 @@
     },
     { // 6 ─ sinos (FM) e ar, Fá lídio
       id: 'aurora', name: 'Aurora Polar', bpm: 118,
-      lv: { lead: 0.58, bass: 0.27, drums: 0.56, pad: 0.54, cnt: 1.25 },
+      lv: { lead: 0.58, bass: 0.27, drums: 0.56, pad: 0.54, cnt: 1.25, arp: 1.15 },
       ins: {
         lead: { w: 'sine', fm: 3.5, idx: 2.2, fmd: 0.12, a: 0.003, d: 0.9, s: 0, r: 0.5, cut: 5000, g: 0.16, oct: 1 },
         bass: { w: 'triangle', a: 0.01, d: 0.3, s: 0.8, r: 0.2, g: 0.3, lo: 36 },
@@ -326,14 +326,14 @@
         C: { ch: 'Am7 G Fmaj7 Fmaj7', dr: 'cccf', arp: '0123432101234321', lead: [
           'e-------........',
           'd-------........',
-          'c-------b-------',
-          'a---------------'] },
+          'c-------<b-------',
+          'a--------------->'] },
       },
       form: ['A', 'A2', 'B', 'C'],
     },
     { // 7 ─ espacial: arpejos rápidos, solo desafinado
       id: 'galaxia', name: 'Galáxia', bpm: 144,
-      lv: { lead: 1.1, bass: 0.6, drums: 0.34, pad: 0.86, cnt: 1 },
+      lv: { lead: 1.1, bass: 0.6, drums: 0.34, pad: 0.86, cnt: 1, arp: 2.3 },
       ins: {
         lead: { w: 'sawtooth', det: 16, a: 0.02, d: 0.3, s: 0.7, r: 0.25, cut: 2600, q: 1.5, g: 0.075, vib: 18, vibRate: 5 },
         bass: { w: 'square', a: 0.002, d: 0.1, s: 0.4, r: 0.04, cut: 700, fe: 2, fd: 0.07, q: 3, g: 0.17, lo: 36 },

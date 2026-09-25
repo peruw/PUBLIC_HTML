@@ -397,10 +397,10 @@
           const hw = 1.5 + 6.5 * (y / (h - 1));
           const x0 = Math.round(8 - hw), x1 = Math.round(8 + hw);
           const k = 1 - y / h;
-          const band = (y + i * 2) % 6 < 2 ? 0.25 : 0;
-          g.fillStyle = `rgba(190,255,140,${(0.22 + 0.63 * k + band).toFixed(2)})`;
+          const ring = (y + i * 3) % 9 === 0 ? 0.3 : 0; // anéis descendo
+          g.fillStyle = `rgba(210,255,150,${(0.12 + 0.55 * k + ring).toFixed(2)})`;
           g.fillRect(x0, y, x1 - x0, 1);
-          g.fillStyle = `rgba(255,255,220,${(0.5 + 0.5 * k).toFixed(2)})`;
+          g.fillStyle = `rgba(255,255,220,${(0.35 + 0.6 * k).toFixed(2)})`;
           g.fillRect(x0, y, 1, 1); g.fillRect(x1 - 1, y, 1, 1);
         }
       }),
@@ -532,13 +532,14 @@
       ripple: { life: [0.6, 0.9], size: 0.55, grow: 0.4, colors: [0xffffff, 0x8ff3ff], a: 0.9, drag: 2 },
       starHead: { glow: 1, life: [0.05, 0.08], size: 1.5, c0: 0xffffff },
       starTrail: { glow: 1, life: [0.25, 0.4], size: 0.8, grow: 0.2, c0: 0xffffff, c1: 0x6ab8ff, fp: 1 },
-      cometTail: { glow: 1, life: [1.4, 2.0], size: 2.6, sizeJ: 0.25, grow: 0.35, c0: 0x9fe8ff, c1: 0x5a2aff, a: 0.75, fp: 1, drag: 0.4, spread: 0.7 },
-      cometCore: { glow: 1, life: [0.5, 0.8], size: 1.3, grow: 0.5, c0: 0xffffff, c1: 0x9fe8ff, a: 0.9, fp: 1.5 },
+      cometTail: { glow: 1, life: [1.4, 2.0], size: 3.2, sizeJ: 0.25, grow: 0.35, c0: 0x9fe8ff, c1: 0x5a2aff, a: 0.75, fp: 1, drag: 0.4, spread: 0.7 },
+      cometCore: { glow: 1, life: [0.5, 0.8], size: 1.8, grow: 0.5, c0: 0xffffff, c1: 0x9fe8ff, a: 0.9, fp: 1.5 },
       dragonFire: { glow: 1, life: [0.35, 0.55], size: 1.0, grow: 2.2, c0: 0xffe070, c1: 0xff2a0a, a: 0.85, spread: 2, drag: 3 },
+      beamDot: { glow: 1, life: [0.8, 1.2], size: 0.5, colors: [0xffffff, 0xd8ffa0], a: 0.9, fp: 3 },
       sparkle: { glow: 1, life: [0.5, 0.9], size: 1.1, shape: 4, colors: [0xffffff, 0xffd23f, 0xff8fd0, 0x8ff3ff], grav: 4, drag: 2 },
       heart: { life: [0.7, 1.1], size: 1.2, shape: 6, colors: [0xff8fd0, 0xff4d5e, 0xffffff], grav: -2, drag: 2 },
       bubble: { life: [5, 8], size: 1.0, sizeJ: 0.4, grow: 1, c0: 0xbff6ff, a: 0.9, shape: 2, wob: 0.8 },
-      ember: { glow: 1, life: [2.2, 4], size: 0.55, sizeJ: 0.4, grow: 0.4, colors: [0xfff0a0, 0xffb040, 0xff6a1a], c1: 0xff2a0a, shape: 5, wob: 0.6, flick: 14, fp: 1.5 },
+      ember: { glow: 1, life: [2.2, 4], size: 0.7, sizeJ: 0.4, grow: 0.4, colors: [0xfff0a0, 0xffb040, 0xff6a1a], c1: 0xff2a0a, shape: 5, wob: 0.6, flick: 14, fp: 1.5 },
       snow: { life: [7, 10], size: 0.9, sizeJ: 0.35, colors: [0xffffff, 0xe0f4ff, 0xc8e8ff], a: 0.95, shape: 3, wob: 0.9 },
       firework: { glow: 1, life: [0.8, 1.2], size: 0.9, colors: [0xffd23f, 0xff8fd0, 0x7dffc0, 0x8ff3ff, 0xffffff], grav: 6, drag: 1.6 },
     };
@@ -688,8 +689,8 @@
         c.z = cele ? rnd(-52, -75) : rnd(-65, -110);
         const hw = halfW(c.z), top = topY(c.z);
         c.x = c.side * rnd(9, Math.max(10, hw * 0.75));
-        c.y = cele ? top - rnd(2, 7) : top + 4;
-        const sp = rnd(16, 24), ang = rnd(0.95, 1.3);
+        c.y = cele ? top - rnd(1, 4) - k * 2.5 : top + 4;
+        const sp = rnd(13, 19), ang = rnd(0.95, 1.3);
         c.vx = c.side * Math.cos(ang) * sp; c.vy = -Math.sin(ang) * sp; c.vz = -rnd(0, 5);
         c.anchor = 0.2;
         c.sp.material.rotation = Math.atan2(c.vy, c.vx);
@@ -883,7 +884,9 @@
           c.beam.visible = true;
           c.beam.scale.set(7.5 * on, c.beamLen, 1);
           c.beam.material.opacity = 0.8 + Math.sin(t * 23) * 0.12;
-          setMap(c.beam, TEX.beam(Math.floor(c.age * 10) % 3));
+          setMap(c.beam, TEX.beam(Math.floor(c.age * 12) % 3));
+          c.acc += dt * 14 * on;
+          while (c.acc >= 1) { c.acc--; emit(FX.beamDot, c.x + rnd(-2.6, 2.6), rnd(-2, c.hy - 4), c.z + 0.2, 0, rnd(3, 6), 0, c.anchor); }
           const endT = c.withCow ? 3.6 : 2.2;
           if (c.withCow) {
             const k = clamp((c.pt - 0.3) / 2.8, 0, 1);
@@ -951,9 +954,9 @@
         c.sp.material.map = v === 'candy' ? TEX.candy() : v === 'lolly' ? TEX.lolly() : TEX.donut(Math.random() < 0.6 ? 0 : Math.random() < 0.5 ? 1 : 2);
         c.sp.scale.set(w, h, 1);
         c.z = cele ? rnd(-45, -62) : rnd(-50, -92);
-        const hw = halfW(c.z), top = topY(c.z), lo = 9 + Math.max(w, h) / 2;
+        const hw = halfW(c.z), top = topY(c.z), lo = 9.4 + Math.hypot(w, h) / 2 * 1.12; // gira e dá pulinho ao nascer
         c.x = cele ? (k % 2 ? 1 : -1) * rnd(0.12, 0.75) * hw : rnd(-hw * 0.85, hw * 0.85);
-        c.y = rnd(lo, Math.max(lo, top - h / 2 - 1));
+        c.y = rnd(lo, Math.max(lo, Math.min(lo + 7, top - h / 2 - 2)));
         c.vx = rnd(-2.5, 2.5); c.spin = rnd(0.8, 1.8) * coin(); c.rot = rnd(0, 6.28);
         c.life = rnd(5, 7); c.anchor = 0.25; c.popped = false;
         c.g.scale.setScalar(0.01);
@@ -983,7 +986,7 @@
         c.side = sideFor(cele, k);
         c.z = cele ? rnd(-45, -60) - k * 6 : rnd(-50, -100);
         const hw = halfW(c.z);
-        c.x = c.side * rnd(11.5, Math.max(12, Math.min(30, hw * 0.85)));
+        c.x = cele ? c.side * Math.min(hw * 0.85, 12 + (k >> 1) * 7 + rnd(0, 4)) : c.side * rnd(11.5, Math.max(12, Math.min(30, hw * 0.85)));
         c.y = cele ? rnd(4, 12) : -9;
         c.vy = cele ? rnd(3, 4.5) : rnd(2.2, 3.5);
         c.sp.material.map = TEX.balloon(cele && k === 0 ? 2 : Math.random() < 0.4 ? 2 : Math.random() < 0.5 ? 0 : 1);
@@ -1034,7 +1037,7 @@
       make() { const c = inst(); c.sp = spr(c, TEX.duck().r[0], 20, 15.8, true); return c; },
       start(c, cele, k) {
         c.side = sideFor(cele, k);
-        c.x = c.side * rnd(19, 23);
+        c.x = c.side * clamp(rnd(19, 23), 16.5, Math.max(16.5, halfW(-40) * 0.9));
         c.vz = -Math.min(curSpeed * 0.35, 10);
         c.z = cele ? rnd(-30, -38) - k * 14 : -118;
         c.sp.material.map = TEX.duck()[c.side > 0 ? 'l' : 'r'][0]; // olha para a pista
@@ -1056,23 +1059,23 @@
     // ---------- cometa ----------
     DEF.comet = {
       cap: 1, cele: 1, every: [14, 22],
-      make() { const c = inst(); c.sp = glowSpr(c, TEX.comet(), 6, 6); return c; },
+      make() { const c = inst(); c.sp = glowSpr(c, TEX.comet(), 7.5, 7.5); return c; },
       start(c, cele) {
         c.dir = coin(); c.z = rnd(-105, -118);
         const hw = halfW(c.z), top = topY(c.z);
-        c.y = clamp(rnd(top * 0.34, top * 0.5), 14, 60);
+        c.y = clamp(rnd(top * 0.3, top * 0.42), 14, 60);
         c.x = cele ? -c.dir * rnd(0.45, 0.7) * hw : -c.dir * (hw + 4);
         c.vx = c.dir * 2 * (hw + 4) / rnd(7, 9); c.vy = -rnd(0.4, 1.2);
       },
       step(c, dt) {
         c.x += c.vx * dt; c.y += c.vy * dt;
-        const s = 6 + Math.sin(c.age * 9) * 0.6;
+        const s = 7.5 + Math.sin(c.age * 9) * 0.7;
         c.sp.scale.set(s, s, 1);
         c.g.position.set(c.x, c.y, c.z);
         c.acc += dt * 70;
         while (c.acc >= 1) {
           c.acc--;
-          emit(FX.cometTail, c.x - c.dir * 1.5, c.y + rnd(-0.9, 0.9), c.z - 0.2, -c.dir * rnd(1, 3), rnd(-0.6, 0.6), 0, 0);
+          emit(FX.cometTail, c.x - c.dir * 2, c.y + rnd(-1.2, 1.2), c.z - 0.2, -c.dir * rnd(1, 3), rnd(-0.6, 0.6), 0, 0);
           emit(FX.cometCore, c.x - c.dir * 1.2, c.y + rnd(-0.3, 0.3), c.z - 0.1, -c.dir * rnd(0.5, 1.5), 0, 0, 0);
         }
         if (Math.random() < dt * 8) emit(FX.sparkle, c.x - c.dir * rnd(3, 16), c.y + rnd(-2, 2), c.z, 0, 0, 0, 0);
