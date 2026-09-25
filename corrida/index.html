@@ -67,7 +67,7 @@
 
   /* ===== HUD ===== */
   .hud {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 2;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 5;
     padding: max(10px, env(safe-area-inset-top)) 12px 0;
     display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
     pointer-events: none;
@@ -83,7 +83,7 @@
   .box {
     font-family: var(--pixel); font-size: 11px; line-height: 1;
     padding: 8px 10px;
-    background: rgba(4, 16, 11, 0.82);
+    background: rgba(4, 16, 11, 0.94);
     border: 2px solid var(--brand-deep);
     box-shadow: 3px 3px 0 #000;
     white-space: nowrap;
@@ -104,7 +104,7 @@
 
   /* Pergunta + opções (sempre legíveis, na ordem das pistas) */
   .question {
-    position: fixed; left: 50%; z-index: 2;
+    position: fixed; left: 50%; z-index: 5;
     top: calc(max(10px, env(safe-area-inset-top)) + 54px);
     transform: translateX(-50%);
     pointer-events: none;
@@ -151,7 +151,7 @@
 
   /* rodapé: velocidade e sequência */
   .bottom {
-    position: fixed; left: 0; right: 0; z-index: 2; pointer-events: none;
+    position: fixed; left: 0; right: 0; z-index: 5; pointer-events: none;
     bottom: max(12px, env(safe-area-inset-bottom));
     display: flex; justify-content: space-between; align-items: flex-end; padding: 0 12px;
   }
@@ -173,7 +173,7 @@
 
   /* medidor de combo: cresce, muda de cor e pega fogo */
   .combo-meter {
-    position: fixed; right: max(14px, env(safe-area-inset-right)); top: 50%; z-index: 3;
+    position: fixed; right: max(14px, env(safe-area-inset-right)); top: 50%; z-index: 5;
     transform: translateY(-50%); pointer-events: none; text-align: center;
     opacity: 0; transition: opacity .15s;
     --c: var(--ink);
@@ -228,7 +228,7 @@
 
   /* botão de dash: só em telas de toque */
   .dash-btn {
-    position: fixed; left: 50%; z-index: 3; display: none;
+    position: fixed; left: 50%; z-index: 5; display: none;
     bottom: calc(max(12px, env(safe-area-inset-bottom)) + 6px);
     transform: translateX(-50%);
     width: 64px; height: 64px; padding: 0; cursor: pointer;
@@ -242,7 +242,7 @@
   @media (pointer: coarse) { body.playing .dash-btn { display: block; } }
 
   /* textos que saltam */
-  #fx { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+  #fx { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
   .pop {
     position: absolute; left: 50%; transform: translate(-50%, -50%);
     font-family: var(--pixel); white-space: nowrap; text-align: center;
@@ -1178,7 +1178,7 @@
     if (punch) { num.classList.remove('punch'); void num.offsetWidth; num.classList.add('punch'); }
     // fogo no número e no placar conforme a sequência cresce
     const heat = [0, 0.3, 0.55, 0.8, 1, 1][tier];
-    fxCall('flames', num, S.mode === 'play' ? heat : 0);
+    fxCall('flames', m, S.mode === 'play' ? heat : 0);
     fxCall('flames', $('hudScore'), S.mode === 'play' ? Math.max(0, heat - 0.25) : 0);
     fxCall('edge', S.fever && S.mode === 'play' ? 0.8 : 0);
     $('feverEdge').classList.toggle('on', S.fever && S.mode === 'play');
