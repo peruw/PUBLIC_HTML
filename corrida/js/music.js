@@ -15,6 +15,7 @@
   const TICK_MS = 25;
   const MAX_LAG = 0.25;   // atraso maior que isso (aba em segundo plano): pula em vez de despejar notas
   const VOLUME = 0.35;
+  const BED = 0.5;        // a trilha fica abaixo dos efeitos do jogo (as vinhetas não passam por aqui)
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
@@ -544,7 +545,8 @@
     this.master = ctx.createGain(); this.master.gain.value = vol;
     this.master.connect(comp); comp.connect(out);
     this.music = ctx.createGain(); this.music.connect(this.master); // pausa / parada
-    this.duck = ctx.createGain(); this.duck.connect(this.music);    // abaixa sob as vinhetas
+    const bed = ctx.createGain(); bed.gain.value = BED; bed.connect(this.music);
+    this.duck = ctx.createGain(); this.duck.connect(bed);           // abaixa sob as vinhetas
     this.sting = ctx.createGain(); this.sting.connect(this.master);
     // eco com realimentação filtrada
     this.dIn = ctx.createGain();
@@ -780,6 +782,7 @@
     this.idx = -1; this.song = null; this.pending = -1; this.bus = null;
     this.pos = 0; this.next = 0; this.fCur = 1; this.fTarget = 1; this.intensity = 0;
     this.muted = false; this.mutedAt = 0; this.paused = false; this.rose = false; this.timer = null;
+    this.fillAt = 0; this.hist = [];
   }
   const PP = Player.prototype;
   PP.play = function (i) {
@@ -787,19 +790,19 @@
     i = ((Math.floor(Number(i)) || 0) % N + N) % N;
     if (this.song) {
       if (i === this.idx) this.pending = -1; // já está tocando: nada muda (cancela troca pendente)
-      else if (i !== this.pending) { this.pending = i; this.rose = false; } // troca na próxima barra
+      else if (i !== this.pending) { this.pending = i; this.rose = false; this.fillAt = this.pos; } // troca na próxima barra
       return;
     }
     const now = this.clock();
     this.idx = i; this.song = prep(DEFS[i]); this.pending = -1;
-    this.pos = 0; this.paused = false; this.fCur = this.fTarget;
+    this.pos = 0; this.paused = false; this.fCur = this.fTarget; this.hist = [];
     this.next = now + 0.05;
     this.bus = new Bus(this, this.next);
     ramp(this.E.music.gain, 1, now, 0.01);
     if (!this.offline && !this.timer) this.timer = setInterval(() => this.safeTick(), TICK_MS);
   };
   PP.setSpeed = function (mult) {
-    const m = clamp(Number(mult) || 1, 0.5, 3.5);
+    const m = clamp(Number(mult) || 1, 1, 2.9);
     this.fTarget = 1 + (m - 1) * 0.35;
     if (!this.song) this.fCur = this.fTarget;
   };
@@ -815,6 +818,10 @@
     if (!this.song || this.paused) return;
     const now = this.clock();
     this.paused = true;
+    // passos já agendados que ainda não soaram serão tocados na retomada
+    const h = this.hist.find((e) => e[0] > now + 0.005);
+    if (h) this.pos = h[1];
+    this.hist = []; this.rose = false;
     if (this.bus) { this.bus.retire(now, 0.06); this.bus = null; }
     ramp(this.E.music.gain, 0, now, 0.02);
   };
@@ -864,9 +871,12 @@
     while (this.next < now + LOOKAHEAD) this.advance(this.next, false);
   };
   PP.advance = function (t, silent) {
-    if (this.pending >= 0 && this.pos % 16 === 0) this.swap(t);
+    // troca na barra; pedido colado na barra espera a seguinte para sempre haver virada
+    if (this.pending >= 0 && this.pos % 16 === 0 && this.pos > this.fillAt) this.swap(t);
     this.fCur += (this.fTarget - this.fCur) * 0.18; // andamento desliza até o alvo, passo a passo
     const sd = 15 / (this.song.bpm * this.fCur);    // duração da semicolcheia
+    this.hist.push([t, this.pos]);
+    if (this.hist.length > 12) this.hist.shift();
     if (!silent && this.bus && !(this.muted && t > this.mutedAt + 0.25)) {
       const c0 = this.E.count;
       this.render(t, sd);
@@ -878,7 +888,7 @@
   PP.swap = function (t) {
     if (this.bus) this.bus.retire(t, 0.25);
     this.idx = this.pending; this.pending = -1; this.rose = false;
-    this.song = prep(DEFS[this.idx]); this.pos = 0;
+    this.song = prep(DEFS[this.idx]); this.pos = 0; this.hist = [];
     this.bus = new Bus(this, t);
     this.crashAt = t;
   };
