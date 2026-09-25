@@ -850,15 +850,15 @@ begin
   perform tests.login('teresa');
   perform tests.eq(public.unread_count()::text, '1', 'unread_count: professor tem 1 conversa não lida');
   select * into r from public.list_conversations();
-  perform tests.eq(r.other_name, 'Paula Oliveira', 'list_conversations: nome do outro lado');
+  perform tests.eq(r.other_name, 'Paula O.', 'list_conversations: professor vê o aluno com nome abreviado');
   perform tests.eq(r.i_am, 'tutor', 'list_conversations: papel do usuário');
   perform tests.ok(r.other_slug is null, 'list_conversations: aluno não tem slug');
   perform tests.ok(r.unread, 'list_conversations: marca não lida');
   perform tests.eq(r.last_body, 'Tenho horário à noite.', 'list_conversations: prévia da última mensagem');
   perform public.mark_read(v_conv);
   perform tests.eq(public.unread_count()::text, '0', 'mark_read: zera não lidas');
-  perform tests.eq((select count(*) from public.profiles where id = tests.uid('paula'))::text, '1',
-                   'profiles: professor lê perfil do aluno com quem conversa');
+  perform tests.eq((select count(*) from public.profiles where id = tests.uid('paula'))::text, '0',
+                   'profiles: professor não lê a linha do aluno (privacidade)');
   insert into public.messages (conversation_id, body) values (v_conv, 'Oi, Paula! Podemos começar terça.');
   perform tests.eq((select sender_id from public.messages where conversation_id = v_conv order by id desc limit 1)::text,
                    tests.uid('teresa')::text, 'messages: sender_id preenchido pelo banco');

@@ -1289,3 +1289,16 @@ html.lang-en [data-lang-inline="pt"] {
 @media (min-width: 901px) and (max-width: 1080px) {
   .nav-links a.nav-link[href$="#depoimentos"] { display: none; }
 }
+
+/* Menu mobile: o .nav tem backdrop-filter, que vira o bloco de contenção do painel fixo;
+   sem altura explícita o painel ficava sem fundo sobre a página */
+@media (max-width: 900px) {
+  .nav .mobile-panel {
+    bottom: auto;
+    height: calc(100vh - 72px);
+    height: calc(100dvh - 72px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--bg);
+  }
+}
