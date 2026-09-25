@@ -344,6 +344,7 @@
   @keyframes blink { 50% { opacity: 0.25; } }
   .rec { font-family: var(--pixel); font-size: 9px; color: var(--ink-dim); margin-top: 16px; line-height: 1.8; }
   .rec b { color: var(--gold); font-weight: 400; }
+  .ver { margin-top: 10px; font-family: var(--pixel-text); font-weight: 700; font-size: 12px; letter-spacing: 1px; color: var(--ink-dim); opacity: 0.75; }
   .link { background: none; border: 0; padding: 0; color: var(--brand); font: inherit; text-decoration: underline; cursor: pointer; }
   a.link { display: inline-block; margin-top: 14px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; }
 
@@ -560,6 +561,8 @@
       <button class="btn alt" type="button" data-open="rank">RANKING</button>
     </div>
     <div class="rec">RECORDE <b id="bestStart">0</b> · XP <b id="xpStart">0</b> · SKINS <b id="skinCount">1/10</b></div>
+    <!-- Versão do jogo: troque a cada publicação (o mesmo número vai no ?v= dos scripts abaixo) -->
+    <div class="ver">VERSÃO <span id="gameVersion">2026.09.25-5</span></div>
   </div>
 </div>
 
@@ -647,13 +650,13 @@
 
 <noscript><p style="position:fixed;inset:auto 16px 16px;z-index:9">Ative o JavaScript para jogar.</p></noscript>
 
-<script src="js/themes.js?v=20260925b"></script>
-<script src="js/skins.js?v=20260925b"></script>
-<script src="js/creatures.js?v=20260925b"></script>
-<script src="js/music.js?v=20260925b"></script>
-<script src="js/fx2d.js?v=20260925b"></script>
-<script src="js/progress.js?v=20260925b"></script>
-<script src="js/online.js?v=20260925b"></script>
+<script src="js/themes.js?v=2026.09.25-5"></script>
+<script src="js/skins.js?v=2026.09.25-5"></script>
+<script src="js/creatures.js?v=2026.09.25-5"></script>
+<script src="js/music.js?v=2026.09.25-5"></script>
+<script src="js/fx2d.js?v=2026.09.25-5"></script>
+<script src="js/progress.js?v=2026.09.25-5"></script>
+<script src="js/online.js?v=2026.09.25-5"></script>
 <script>
 (() => {
   'use strict';
