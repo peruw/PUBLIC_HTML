@@ -617,6 +617,7 @@
       const ins = f.ins, mi = (k, n) => (ins ? Math.max(0, Math.round(ins[k] * n) - 1) : 0);
       g.mx0 = pad + mi(3, ew); g.mx1 = pad + ew - mi(1, ew);
       g.my0 = ey - f.gy + mi(0, eh); g.my1 = ey + eh - f.gy - mi(2, eh);
+      f.mx = f.gx + g.mx0; f.my = f.gy + g.my0; f.mw = g.mx1 - g.mx0; f.mh = g.my1 - g.my0;
       f.ex = ex; f.ey = ey; f.ew = ew; f.eh = eh; f.I = I;
       const tH = Math.max(3, maxH * (0.2 + 0.8 * Math.pow(I, 1.15)));
       if (steps) {
@@ -759,6 +760,7 @@
       if (e.bottom) ctx.drawImage(e.bottom.cv, 0, H - e.bottom.h);
       if (e.left) ctx.drawImage(e.left.cv, 0, 0);
       if (e.right) ctx.drawImage(e.right.cv, W - e.right.h, 0);
+      return I > 0.01 || !!e.bottom;
     }
 
     // ---------- laço ----------
@@ -781,7 +783,10 @@
     }
     function render() {
       ctx.clearRect(0, 0, W, H);
-      drawEdge();
+      if (drawEdge()) {
+        // a borda da FEBRE não passa por cima do número/placar em chamas
+        flames.forEach((f) => { if (f.I > 0 && f.mw > 0 && f.mh > 0) ctx.clearRect(f.mx, f.my, f.mw, f.mh); });
+      }
       flames.forEach(drawFlame);
       drawParts();
       drawWaves();
@@ -870,7 +875,7 @@
         const pv = (a, b) => (parseFloat(cs[a]) || 0) + (parseFloat(cs[b]) || 0);
         const ins = w0 > 0 && h0 > 0 ? [pv('borderTopWidth', 'paddingTop') / h0, pv('borderRightWidth', 'paddingRight') / w0,
           pv('borderBottomWidth', 'paddingBottom') / h0, pv('borderLeftWidth', 'paddingLeft') / w0].map((v) => clamp(v, 0, 0.4)) : null;
-        f = { el, boxy, ins, target: 0, cur: 0, I: 0, grid: null, color: undefined, lut: FIRE_LUT, fr: FIRE_R, er: EMBER_R, ea: 0, la: 0, side: 0, sx: rand(0, 100), gx: 0, gy: 0, ex: 0, ey: 0, ew: 0, eh: 0 };
+        f = { el, boxy, ins, target: 0, cur: 0, I: 0, mx: 0, my: 0, mw: 0, mh: 0, grid: null, color: undefined, lut: FIRE_LUT, fr: FIRE_R, er: EMBER_R, ea: 0, la: 0, side: 0, sx: rand(0, 100), gx: 0, gy: 0, ex: 0, ey: 0, ew: 0, eh: 0 };
         flames.set(el, f);
       }
       // apagou com o fogo alto (errou): baforada de fumaça e brasas
