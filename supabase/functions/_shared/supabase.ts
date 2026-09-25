@@ -4,11 +4,22 @@ import { createClient, type SupabaseClient, type User } from 'npm:@supabase/supa
 // Cliente com a service_role (ignora RLS): usar só no servidor, com filtros explícitos por usuário
 export function adminClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL');
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  // Chave legada (service_role) ou, após a migração de chaves, a secret key padrão
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || secretKey();
   if (!url || !key) throw new Error('SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY ausentes');
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
+}
+
+// SUPABASE_SECRET_KEYS é um JSON { "default": "sb_secret_..." } injetado nas funções
+function secretKey(): string | undefined {
+  try {
+    const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}');
+    return typeof keys?.default === 'string' ? keys.default : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // Usuário dono do token em "Authorization: Bearer <jwt>" (validado no Auth do Supabase).

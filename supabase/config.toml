@@ -6,14 +6,13 @@
 # SITE_URL, ALLOWED_ORIGINS, RESEND_API_KEY, EMAIL_FROM, NOTIFY_WEBHOOK_SECRET.
 project_id = "quanta-professores"
 
-# Chamadas pelo site com o token do usuário (a função também valida o token com auth.getUser).
-# Se o gateway recusar tokens válidos (projeto com as novas chaves de assinatura JWT), publique estas
-# duas com verify_jwt = false: é seguro, pois cada função já exige um usuário válido (getCaller).
+# Chamadas pelo site com o token do usuário. verify_jwt = false porque o projeto usa as novas
+# chaves (publishable/secret); cada função valida o usuário no código (getCaller → auth.getUser).
 [functions.create-checkout]
-verify_jwt = true
+verify_jwt = false
 
 [functions.delete-account]
-verify_jwt = true
+verify_jwt = false
 
 # Chamada pelo Mercado Pago (sem JWT): autenticada pela assinatura x-signature
 [functions.mp-webhook]
