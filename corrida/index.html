@@ -1224,6 +1224,8 @@
     fxCall('clear');
     useSkin(P.data.skin);
     setTrackLanes(2);
+    runId = null;
+    if (onlineReady && !embedded && QC.Online.user) { const me = ++runReq; QC.Online.startRun().then((id) => { if (me === runReq) runId = id; }); }
     if (themeIdx !== 0) applyTheme(1, false);
     if (creatures) creatures.clear();
     if (music) { try { music.resume(); music.play(0); } catch (e) {} }
@@ -1365,8 +1367,9 @@
     if (music) { try { music.stop(); } catch (e) {} }
     const run = {
       score: S.score, hits: S.hits, maxLevel: S.level, maxCombo: S.maxCombo,
-      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin,
+      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, runId,
     };
+    runId = null;
     const res = P.applyRun(run);
     stinger(res.record ? 'record' : 'gameover');
 
@@ -1590,6 +1593,7 @@
       for (let attempt = 0; attempt < 3; attempt++) {
         const r = await QC.Online.saveProgress(P.data, cloud.revision);
         if (r && r.ok) { cloud.revision = r.revision; break; }
+        if (r && r.error === 'too_fast') { setTimeout(pushProgressSoon, 2500); break; }
         if (r && r.conflict) {
           const me = await QC.Online.getMe();
           if (!me) break;
@@ -1605,6 +1609,7 @@
   }
 
   let pendingRun = null;
+  let runId = null, runReq = 0;
   async function submitOnline(run) {
     const line = $('onlineLine');
     if (!onlineReady || embedded) { line.textContent = ''; return; }
@@ -1618,10 +1623,16 @@
     }
     line.textContent = 'Enviando para o ranking...';
     const r = await QC.Online.submitRun(run);
-    if (r && r.ok) {
+    if (r && r.ok && r.rank_week) {
       line.innerHTML = `Ranking da semana: <b>#${r.rank_week}</b> · Geral: <b>#${r.rank_all}</b>`;
+    } else if (r && r.ok) {
+      line.textContent = 'Corrida salva.';
     } else {
-      line.textContent = r && r.error === 'too_fast' ? 'Corrida muito rápida para o ranking.' : 'Não deu para enviar ao ranking agora.';
+      line.textContent = {
+        too_fast: 'Espere alguns segundos entre uma corrida e outra para contar no ranking.',
+        no_run: 'Esta corrida começou antes do login, então não conta no ranking.',
+        invalid: 'Esta corrida não pôde ser validada para o ranking.',
+      }[r && r.error] || 'Não deu para enviar ao ranking agora.';
     }
   }
 

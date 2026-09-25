@@ -318,7 +318,7 @@
     '  gl_PointSize = ps;',
     '  vColor = aColor;',
     // pontinhos pequenos viram quadrados cheios (a forma não caberia)
-    '  vShape = ps < 4.0 ? 0.0 : aShape;',
+    '  vShape = aShape < 0.5 ? 0.0 : ps < 3.0 ? 0.0 : ps < 6.0 ? 7.0 : aShape;',
     '}',
   ].join('\n');
   const FS = [
@@ -394,12 +394,13 @@
       duck: () => frames('duck', ART.duck, PALS.duck),
       beam: (i) => proc('beam' + i, 16, 32, (g, w, h) => {
         for (let y = 0; y < h; y++) {
-          const hw = 2 + 6 * (y / (h - 1));
+          const hw = 1.5 + 6.5 * (y / (h - 1));
           const x0 = Math.round(8 - hw), x1 = Math.round(8 + hw);
-          const stripe = (y + i * 2) % 4 < 2;
-          g.fillStyle = stripe ? 'rgba(220,255,170,0.85)' : 'rgba(170,255,140,0.45)';
+          const k = 1 - y / h;
+          const band = (y + i * 2) % 6 < 2 ? 0.25 : 0;
+          g.fillStyle = `rgba(190,255,140,${(0.22 + 0.63 * k + band).toFixed(2)})`;
           g.fillRect(x0, y, x1 - x0, 1);
-          g.fillStyle = 'rgba(255,255,220,1)';
+          g.fillStyle = `rgba(255,255,220,${(0.5 + 0.5 * k).toFixed(2)})`;
           g.fillRect(x0, y, 1, 1); g.fillRect(x1 - 1, y, 1, 1);
         }
       }),
@@ -519,9 +520,9 @@
     };
 
     const FX = {
-      rainbow: { life: [0.7, 0.8], size: 0.8, grow: 0.6, a: 1, fp: 3 },
+      rainbow: { life: [0.5, 0.85], size: 1.05, a: 1, fp: 8 },
       spark: { glow: 1, life: [0.4, 0.8], size: 0.7, sizeJ: 0.3, grow: 0.3, c0: 0xfff6b0, c1: 0xff4d5e, grav: 16, drag: 1.5 },
-      fire: { glow: 1, life: [0.3, 0.55], size: 1.1, sizeJ: 0.3, grow: 0.25, c0: 0xfff0a0, c1: 0xff3a1a, spread: 1.2, drag: 2 },
+      fire: { glow: 1, life: [0.3, 0.55], size: 1.3, sizeJ: 0.3, grow: 0.25, c0: 0xffd070, c1: 0xff2a0a, a: 0.8, spread: 1.2, drag: 2 },
       smoke: { life: [0.8, 1.3], size: 1.0, sizeJ: 0.3, grow: 2.4, c0: 0xa89cb8, c1: 0x3a3448, a: 0.6, shape: 1, spread: 0.8, drag: 1 },
       rsmoke: { life: [1.2, 1.9], size: 1.0, sizeJ: 0.3, grow: 2.8, c0: 0xf2f4ff, c1: 0x6a7088, a: 0.75, shape: 1, spread: 1.1, drag: 1.5 },
       flame: { glow: 1, life: [0.15, 0.3], size: 0.9, grow: 0.3, c0: 0xfff6b0, c1: 0xff5a1a, spread: 0.6 },
@@ -531,8 +532,9 @@
       ripple: { life: [0.6, 0.9], size: 0.55, grow: 0.4, colors: [0xffffff, 0x8ff3ff], a: 0.9, drag: 2 },
       starHead: { glow: 1, life: [0.05, 0.08], size: 1.5, c0: 0xffffff },
       starTrail: { glow: 1, life: [0.25, 0.4], size: 0.8, grow: 0.2, c0: 0xffffff, c1: 0x6ab8ff, fp: 1 },
-      cometTail: { glow: 1, life: [1.5, 2.1], size: 2.0, sizeJ: 0.3, grow: 0.15, c0: 0xe8ffff, c1: 0x7a4aff, a: 0.9, fp: 1.2, drag: 0.5, spread: 0.5 },
-      dragonFire: { glow: 1, life: [0.35, 0.55], size: 0.8, grow: 2.0, c0: 0xfff6b0, c1: 0xff3a1a, spread: 2, drag: 3 },
+      cometTail: { glow: 1, life: [1.4, 2.0], size: 2.6, sizeJ: 0.25, grow: 0.35, c0: 0x9fe8ff, c1: 0x5a2aff, a: 0.75, fp: 1, drag: 0.4, spread: 0.7 },
+      cometCore: { glow: 1, life: [0.5, 0.8], size: 1.3, grow: 0.5, c0: 0xffffff, c1: 0x9fe8ff, a: 0.9, fp: 1.5 },
+      dragonFire: { glow: 1, life: [0.35, 0.55], size: 1.0, grow: 2.2, c0: 0xffe070, c1: 0xff2a0a, a: 0.85, spread: 2, drag: 3 },
       sparkle: { glow: 1, life: [0.5, 0.9], size: 1.1, shape: 4, colors: [0xffffff, 0xffd23f, 0xff8fd0, 0x8ff3ff], grav: 4, drag: 2 },
       heart: { life: [0.7, 1.1], size: 1.2, shape: 6, colors: [0xff8fd0, 0xff4d5e, 0xffffff], grav: -2, drag: 2 },
       bubble: { life: [5, 8], size: 1.0, sizeJ: 0.4, grow: 1, c0: 0xbff6ff, a: 0.9, shape: 2, wob: 0.8 },
@@ -633,14 +635,15 @@
     // rotação do sprite para apontar na direção (vx, vy); arte desenhada virada para a direita
     const faceRot = (dir, vx, vy) => (dir > 0 ? Math.atan2(vy, vx) : Math.atan2(-vy, -vx));
 
-    // voo lateral pelo céu: entra por um lado e sai pelo outro
-    function crossStart(c, cele, z0, z1, y0, y1, d0, d1, anchor, w, h) {
-      c.dir = coin(); c.w = w;
-      c.z = cele ? rnd(-52, -70) : rnd(z0, z1);
+    // voo lateral pelo céu: entra por um lado e sai pelo outro.
+    // Na comemoração (k = quantos do mesmo tipo já saíram) nasce já na tela, em faixas alternadas.
+    function crossStart(c, cele, k, z0, z1, y0, y1, d0, d1, anchor, w, h) {
+      c.dir = cele ? (k % 2 ? 1 : -1) : coin(); c.w = w;
+      c.z = cele ? rnd(-55, -66) - k * 7 : rnd(z0, z1);
       const hw = halfW(c.z) + w;
-      const lo = 8.5 + h / 2;
-      c.y = clamp(cele ? rnd(lo + 1, lo + 8) : rnd(y0, y1), lo, Math.max(lo, topY(c.z) - h / 2 - 1));
-      c.x = cele ? -c.dir * rnd(0.05, 0.6) * (hw - w) : -c.dir * hw;
+      const lo = 9.3 + h / 2, hi = Math.max(lo, topY(c.z) - h / 2 - 1); // folga para o balanço
+      c.y = clamp(cele ? lo + 0.5 + (k % 2) * Math.min(h * 0.6, 4) + rnd(0, 1) : rnd(y0, y1), lo, hi);
+      c.x = cele ? -c.dir * rnd(0.45, 0.8) * (hw - w) : -c.dir * hw;
       c.vx = c.dir * 2 * hw / rnd(d0, d1);
       c.anchor = anchor;
     }
@@ -648,28 +651,29 @@
       c.x += c.vx * dt; c.z += dz * c.anchor;
       return c.dir * c.x < halfW(c.z) + c.w + 1 && c.z < -22 && c.age < 25;
     }
+    const sideFor = (cele, k) => (cele ? (k % 2 ? 1 : -1) : coin());
 
     let curSpeed = 16;
     const DEF = {};
 
     // ---------- unicórnio com arco-íris ----------
     DEF.unicorn = {
-      cap: 2, every: [6, 11],
-      make() { const c = inst(); c.sp = spr(c, TEX.unicorn().r[0], 8, 5.33); return c; },
-      start(c, cele) {
-        crossStart(c, cele, -60, -95, 12, 21, 4.5, 6.5, 0.12, 8, 5.33);
+      cap: 2, cele: 2, every: [6, 11],
+      make() { const c = inst(); c.sp = spr(c, TEX.unicorn().r[0], 12, 8); return c; },
+      start(c, cele, k) {
+        crossStart(c, cele, k, -60, -92, 13, 19, 4.5, 6.5, 0.12, 12, 8);
         c.tex = TEX.unicorn()[c.dir > 0 ? 'r' : 'l']; c.trail = 0;
       },
       step(c, dt, dz) {
         const alive = crossStep(c, dt, dz);
         setMap(c.sp, c.tex[Math.floor(c.age * 7) % 2]);
-        const bob = Math.sin(c.age * 7) * 0.3;
+        const bob = Math.sin(c.age * 7) * 0.35;
         c.g.position.set(c.x, c.y + bob, c.z);
         c.trail += Math.abs(c.vx) * dt;
-        while (c.trail > 0.7) {
-          c.trail -= 0.7;
-          const tx = c.x - c.dir * (3.3 + c.trail);
-          for (let b = 0; b < 6; b++) emit(FX.rainbow, tx, c.y + bob + 1.3 - b * 0.62, c.z + 0.2, 0, 0, 0, c.anchor, RAIN[b]);
+        while (c.trail > 0.8) {
+          c.trail -= 0.8;
+          const tx = c.x - c.dir * (4.4 + c.trail), yc = c.y + bob - 0.7;
+          for (let b = 0; b < 6; b++) emit(FX.rainbow, tx, yc + (2.5 - b) * 0.8, c.z + 0.2, 0, 0, 0, c.anchor, RAIN[b]);
         }
         return alive;
       },
@@ -677,30 +681,31 @@
 
     // ---------- meteoro ----------
     DEF.meteor = {
-      cap: 3, every: [2.2, 4.5],
-      make() { const c = inst(); c.sp = spr(c, TEX.meteor().r[0], 4.6, 3.1); return c; },
-      start(c, cele, idx) {
-        c.side = cele ? (idx % 2 ? 1 : -1) : coin();
+      cap: 3, cele: 4, every: [2.2, 4.5],
+      make() { const c = inst(); c.sp = spr(c, TEX.meteor().r[0], 6.4, 4.27); return c; },
+      start(c, cele, k) {
+        c.side = sideFor(cele, k);
         c.z = cele ? rnd(-52, -75) : rnd(-65, -110);
         const hw = halfW(c.z), top = topY(c.z);
         c.x = c.side * rnd(9, Math.max(10, hw * 0.75));
-        c.y = cele ? top - rnd(2, 7) : top + 3;
+        c.y = cele ? top - rnd(2, 7) : top + 4;
         const sp = rnd(16, 24), ang = rnd(0.95, 1.3);
         c.vx = c.side * Math.cos(ang) * sp; c.vy = -Math.sin(ang) * sp; c.vz = -rnd(0, 5);
         c.anchor = 0.2;
         c.sp.material.rotation = Math.atan2(c.vy, c.vx);
-        c.g.scale.setScalar(cele ? 1.25 : rnd(0.85, 1.15));
-        c.tex = TEX.meteor().r; c.acc = 0; c.acc2 = 0;
+        c.sc = cele ? 1.2 : rnd(0.85, 1.15);
+        c.g.scale.setScalar(c.sc);
+        c.tex = TEX.meteor().r; c.acc2 = 0;
       },
       step(c, dt, dz) {
         c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt + dz * c.anchor;
         setMap(c.sp, c.tex[Math.floor(c.age * 12) % 2]);
         c.g.position.set(c.x, c.y, c.z);
-        const len = Math.hypot(c.vx, c.vy), ux = c.vx / len, uy = c.vy / len;
-        c.acc += dt * 70;
-        while (c.acc >= 1) { c.acc--; emit(FX.fire, c.x - ux * 1.2, c.y - uy * 1.2, c.z, -c.vx * 0.15, -c.vy * 0.15, 0, c.anchor); }
+        const len = Math.hypot(c.vx, c.vy), ux = c.vx / len, uy = c.vy / len, o = 1.4 * c.sc;
+        c.acc += dt * 50;
+        while (c.acc >= 1) { c.acc--; emit(FX.fire, c.x - ux * o, c.y - uy * o, c.z, -c.vx * 0.15, -c.vy * 0.15, 0, c.anchor); }
         c.acc2 += dt * 22;
-        while (c.acc2 >= 1) { c.acc2--; emit(FX.smoke, c.x - ux * 2, c.y - uy * 2, c.z - 0.3, 0, 0.6, 0, c.anchor); }
+        while (c.acc2 >= 1) { c.acc2--; emit(FX.smoke, c.x - ux * o * 1.8, c.y - uy * o * 1.8, c.z - 0.3, 0, 0.6, 0, c.anchor); }
         if (c.y < -8) {
           emit(FX.flash, c.x, -8, c.z, 0, 0, 0, c.anchor);
           for (let i = 0; i < 18; i++) emit(FX.spark, c.x, -8, c.z, rnd(-7, 7), rnd(4, 13), rnd(-3, 3), c.anchor);
@@ -712,24 +717,26 @@
 
     // ---------- estrela cadente ----------
     DEF['shooting-star'] = {
-      cap: 3, every: [2.5, 6],
+      cap: 3, cele: 3, every: [2.5, 6],
       make() { return inst(); },
-      start(c, cele) {
-        c.dir = coin(); c.z = rnd(-95, -122);
+      start(c, cele, k) {
+        c.dir = sideFor(cele, k); c.z = rnd(-95, -122);
         const hw = halfW(c.z), top = topY(c.z);
         c.x = -c.dir * rnd(0.1, 0.9) * hw;
-        c.y = rnd(Math.max(14, top * 0.55), Math.max(15, top - 2));
+        c.y = rnd(Math.max(14, top * 0.5), Math.max(15, top - 3));
         const sp = hw * rnd(0.9, 1.3);
         c.vx = c.dir * sp; c.vy = -sp * rnd(0.1, 0.28);
         c.life = cele ? rnd(0.9, 1.2) : rnd(0.6, 0.9);
+        c.age = cele ? -k * 0.25 : 0; // uma atrás da outra
       },
       step(c, dt) {
+        if (c.age < 0) return true;
         const px = c.x, py = c.y;
         c.x += c.vx * dt; c.y += c.vy * dt;
         if (c.age < c.life) {
           emit(FX.starHead, c.x, c.y, c.z, 0, 0, 0, 0);
           const n = Math.min(40, Math.ceil(Math.hypot(c.x - px, c.y - py) / 0.55));
-          for (let k = 0; k < n; k++) { const f = k / n; emit(FX.starTrail, px + (c.x - px) * f, py + (c.y - py) * f, c.z, 0, 0, 0, 0); }
+          for (let i = 0; i < n; i++) { const f = i / n; emit(FX.starTrail, px + (c.x - px) * f, py + (c.y - py) * f, c.z, 0, 0, 0, 0); }
         }
         return c.age < c.life + 0.4;
       },
@@ -737,14 +744,14 @@
 
     // ---------- baleia saltando do oceano ----------
     DEF.whale = {
-      cap: 1, every: [6, 11],
-      make() { const c = inst(); c.sp = spr(c, TEX.whale().r[0], 10, 5, true); return c; },
-      start(c, cele, idx) {
-        c.side = cele ? (idx % 2 ? 1 : -1) : coin();
-        c.dur = rnd(2.4, 3.0); c.apex = rnd(2.5, 6);
-        c.x0 = c.side * rnd(9.5, 11.5); c.x1 = c.x0 + c.side * rnd(8, 11);
+      cap: 1, cele: 2, every: [6, 11],
+      make() { const c = inst(); c.sp = spr(c, TEX.whale().r[0], 14, 7, true); return c; },
+      start(c, cele, k) {
+        c.side = sideFor(cele, k);
+        c.dur = rnd(2.4, 3.0); c.apex = rnd(3, 7);
+        c.x0 = c.side * rnd(11.8, 13.5); c.x1 = c.x0 + c.side * rnd(9, 12);
         c.vz = -Math.min(curSpeed * 0.45, 14);
-        c.z = cele ? rnd(-40, -56) : -48 - (curSpeed + c.vz) * c.dur * 0.5;
+        c.z = cele ? rnd(-40, -52) - k * 8 : -48 - (curSpeed + c.vz) * c.dur * 0.5;
         c.s = cele ? 0.14 : 0; c.out = false;
         c.sp.material.map = TEX.whale()[c.side > 0 ? 'r' : 'l'][0];
       },
@@ -753,35 +760,35 @@
         c.z += c.vz * dt + dz;
         const s = Math.min(c.s, 1), H = c.apex + 12;
         const x = c.x0 + (c.x1 - c.x0) * s, y = -12 + H * 4 * s * (1 - s);
-        c.sp.material.rotation = faceRot(c.side, c.x1 - c.x0, H * 4 * (1 - 2 * s)) * 0.85;
+        c.sp.material.rotation = faceRot(c.side, c.x1 - c.x0, H * 4 * (1 - 2 * s)) * 0.8;
         c.g.position.set(x, y, c.z);
-        if (!c.out && y > -9.5) { c.out = true; splash(x, -9.5, c.z, 16, 1); }
-        if (y > -6 && Math.random() < dt * 14) emit(FX.drip, x - c.side * rnd(0, 3), y - 1, c.z, 0, 0, 0, 1);
-        if (c.s >= 1) { splash(x, -9.5, c.z, 24, 1); return false; }
+        if (!c.out && y > -9.5) { c.out = true; splash(x, -9.5, c.z, 18, 1); }
+        if (y > -6 && Math.random() < dt * 16) emit(FX.drip, x - c.side * rnd(0, 4), y - 1.5, c.z, 0, 0, 0, 1);
+        if (c.s >= 1) { splash(x, -9.5, c.z, 26, 1); return false; }
         return c.z < 10;
       },
     };
 
     // ---------- cardume de peixes ----------
     DEF.fish = {
-      cap: 2, every: [4, 8],
+      cap: 2, cele: 2, every: [4, 8],
       make() {
         const c = inst(); c.fish = [];
-        for (let i = 0; i < 7; i++) { const s = spr(c, TEX.fish('fishOrange').r[0], 2.1, 1.17, true); s.userData = { d: 0, dx: 0, dz: 0, ap: 0, len: 0, st: 0 }; c.fish.push(s); }
+        for (let i = 0; i < 7; i++) { const s = spr(c, TEX.fish('fishOrange').r[0], 3, 1.67, true); s.userData = { d: 0, dx: 0, dz: 0, ap: 0, len: 0, st: 0, tex: null }; c.fish.push(s); }
         return c;
       },
-      start(c, cele, idx) {
-        c.side = cele ? (idx % 2 ? 1 : -1) : coin();
-        c.n = 4 + Math.floor(Math.random() * 4);
-        c.dur = rnd(1.1, 1.4);
+      start(c, cele, k) {
+        c.side = sideFor(cele, k);
+        c.n = 5 + Math.floor(Math.random() * 3);
+        c.dur = rnd(1.2, 1.5);
         c.vz = -Math.min(curSpeed * 0.4, 10);
-        c.z = cele ? rnd(-34, -48) : -38 - (curSpeed + c.vz) * 1.1;
-        c.x0 = c.side * rnd(9, 11);
+        c.z = cele ? rnd(-34, -46) - k * 6 : -38 - (curSpeed + c.vz) * 1.1;
+        c.x0 = c.side * rnd(10, 12);
         const vs = ['fishOrange', 'fishCyan', 'fishPink'], mix = Math.random() < 0.35, v0 = pick(vs);
         c.fish.forEach((f, i) => {
           const u = f.userData;
-          u.d = i * rnd(0.1, 0.16); u.dx = rnd(-0.8, 0.8); u.dz = -i * 0.9 + rnd(-0.3, 0.3);
-          u.ap = rnd(-0.5, 3.5); u.len = rnd(5, 7.5); u.st = 0;
+          u.d = i * rnd(0.1, 0.15); u.dx = rnd(-0.8, 0.8); u.dz = -i * 0.9 + rnd(-0.3, 0.3);
+          u.ap = rnd(1.5, 5); u.len = rnd(6, 9); u.st = 0;
           u.tex = TEX.fish(mix ? pick(vs) : v0)[c.side > 0 ? 'r' : 'l'];
           f.visible = false;
         });
@@ -803,7 +810,7 @@
           const x = c.x0 + u.dx + c.side * u.len * s, y = -11 + H * 4 * s * (1 - s);
           if (u.st === 0 && y > -9.5) { u.st = 1; splash(x, -9.5, c.z + u.dz, 4, 1); }
           f.position.set(x, y, u.dz);
-          f.material.rotation = faceRot(c.side, c.side * u.len, H * 4 * (1 - 2 * s)) * 0.8;
+          f.material.rotation = faceRot(c.side, c.side * u.len, H * 4 * (1 - 2 * s)) * 0.5;
           setMap(f, u.tex[Math.floor(c.age * 10 + i) % 2]);
         }
         for (let i = c.n; i < c.fish.length; i++) c.fish[i].visible = false;
@@ -813,27 +820,27 @@
 
     // ---------- dragão ----------
     DEF.dragon = {
-      cap: 1, every: [7, 12],
-      make() { const c = inst(); c.sp = spr(c, TEX.dragon('dragonGreen').r[0], 10, 6.43); return c; },
-      start(c, cele) {
-        crossStart(c, cele, -62, -95, 12.5, 21, 5, 7, 0.1, 10, 6.43);
-        c.tex = TEX.dragon(Math.random() < 0.5 ? 'dragonGreen' : 'dragonRed')[c.dir > 0 ? 'r' : 'l'];
-        c.fire = cele ? 0.3 : rnd(0.6, 1.4); c.puff = 0;
+      cap: 1, cele: 2, every: [7, 12],
+      make() { const c = inst(); c.sp = spr(c, TEX.dragon('dragonGreen').r[0], 14, 9); return c; },
+      start(c, cele, k) {
+        crossStart(c, cele, k, -62, -92, 14, 20, 5, 7, 0.1, 14, 9);
+        c.tex = TEX.dragon((cele ? k % 2 : Math.random() < 0.5) ? 'dragonRed' : 'dragonGreen')[c.dir > 0 ? 'r' : 'l'];
+        c.fire = cele ? 0.2 + k * 0.4 : rnd(0.6, 1.4); c.puff = 0;
       },
       step(c, dt, dz) {
         const alive = crossStep(c, dt, dz);
         const f = [0, 1, 2, 1][Math.floor(c.age * 8) % 4];
         setMap(c.sp, c.tex[f]);
-        const bob = Math.sin(c.age * 4) * 0.6 + (f === 2 ? 0.25 : 0);
+        const bob = Math.sin(c.age * 4) * 0.7 + (f === 2 ? 0.35 : 0);
         c.g.position.set(c.x, c.y + bob, c.z);
         c.fire -= dt;
         if (c.fire <= 0) { c.fire = rnd(1.1, 2.4); c.puff = 0.5; }
         if (c.puff > 0) {
           c.puff -= dt;
-          c.acc += dt * 60;
+          c.acc += dt * 45;
           while (c.acc >= 1) {
             c.acc--;
-            emit(FX.dragonFire, c.x + c.dir * 4.9, c.y + bob + 0.9, c.z + 0.2, c.vx + c.dir * rnd(8, 13), rnd(-2.5, 0.5), 0, c.anchor);
+            emit(FX.dragonFire, c.x + c.dir * 6.9, c.y + bob + 1.7, c.z + 0.2, c.vx + c.dir * rnd(9, 14), rnd(-2.5, 0.5), 0, c.anchor);
           }
         }
         return alive;
@@ -842,24 +849,24 @@
 
     // ---------- OVNI abduzindo uma vaca ----------
     DEF.ufo = {
-      cap: 1, every: [9, 15],
+      cap: 1, cele: 2, every: [9, 15],
       make() {
         const c = inst();
-        c.beam = glowSpr(c, TEX.beam(0), 6, 16); c.beam.center.set(0.5, 1); c.beam.position.set(0, -0.9, -0.05);
-        c.cow = spr(c, TEX.cow().r[0], 3.1, 1.91);
-        c.sp = spr(c, TEX.ufo().r[0], 6.4, 2.9);
+        c.beam = glowSpr(c, TEX.beam(0), 7.5, 16); c.beam.center.set(0.5, 1); c.beam.position.set(0, -1.2, -0.05);
+        c.cow = spr(c, TEX.cow().r[0], 4.2, 2.58);
+        c.sp = spr(c, TEX.ufo().r[0], 8.5, 3.83);
         return c;
       },
-      start(c, cele, idx) {
-        c.side = cele ? (idx % 2 ? 1 : -1) : coin();
-        c.z = cele ? rnd(-48, -60) : rnd(-52, -78);
+      start(c, cele, k) {
+        c.side = sideFor(cele, k);
+        c.z = cele ? rnd(-48, -58) - k * 8 : rnd(-52, -78);
         const hw = halfW(c.z);
-        c.x = c.side * rnd(13, Math.max(13.5, Math.min(24, hw * 0.72)));
+        c.x = c.side * rnd(13.5, Math.max(14, Math.min(24, hw * 0.72)));
         c.hy = clamp(rnd(12, 16), 11, Math.max(11, topY(c.z) - 3));
         c.y = cele ? c.hy : topY(c.z) + 4;
         c.phase = cele ? 1 : 0; c.pt = 0; c.vx = 0; c.vy = 0;
-        c.withCow = Math.random() < 0.7;
-        c.beamLen = c.hy + 3.1;
+        c.withCow = cele || Math.random() < 0.7;
+        c.beamLen = c.hy + 2.8;
         c.cow.visible = false; c.beam.visible = false;
         c.cow.material.map = TEX.cow()[c.side > 0 ? 'l' : 'r'][0];
         c.anchor = 0.15;
@@ -874,22 +881,22 @@
         } else if (c.phase === 1) {
           const on = Math.min(1, c.pt / 0.25);
           c.beam.visible = true;
-          c.beam.scale.set(6 * on, c.beamLen, 1);
-          c.beam.material.opacity = 0.5 + Math.sin(t * 23) * 0.12;
-          setMap(c.beam, TEX.beam(Math.floor(c.age * 10) % 2));
+          c.beam.scale.set(7.5 * on, c.beamLen, 1);
+          c.beam.material.opacity = 0.8 + Math.sin(t * 23) * 0.12;
+          setMap(c.beam, TEX.beam(Math.floor(c.age * 10) % 3));
           const endT = c.withCow ? 3.6 : 2.2;
           if (c.withCow) {
-            const k = clamp((c.pt - 0.35) / 2.7, 0, 1);
+            const k = clamp((c.pt - 0.3) / 2.8, 0, 1);
             if (k > 0 && k < 1) {
               c.cow.visible = true;
-              const wy = -3.2 + (c.hy - 1.6 + 3.2) * smooth(k);
-              c.cow.position.set(Math.sin(c.pt * 2.3) * 0.4, wy - c.y - bob, 0.05);
+              const wy = -2.5 + (c.hy - 2.4 + 2.5) * smooth(k);
+              c.cow.position.set(Math.sin(c.pt * 2.3) * 0.5, wy - c.y - bob, 0.05);
               c.cow.material.rotation = Math.sin(c.pt * 4.5) * 0.55;
               const sc = k > 0.85 ? 1 - (k - 0.85) / 0.15 * 0.7 : 1;
-              c.cow.scale.set(3.1 * sc, 1.91 * sc, 1);
+              c.cow.scale.set(4.2 * sc, 2.58 * sc, 1);
             } else if (k >= 1 && c.cow.visible) {
               c.cow.visible = false;
-              sparkleAt(c.x, c.y - 0.8, c.z + 0.3, 14, c.anchor);
+              sparkleAt(c.x, c.y - 1, c.z + 0.3, 16, c.anchor);
             }
           }
           if (c.pt > endT) { c.phase = 2; c.pt = 0; c.beam.visible = false; c.cow.visible = false; }
@@ -906,11 +913,11 @@
 
     // ---------- foguete ----------
     DEF.rocket = {
-      cap: 2, every: [4, 8],
-      make() { const c = inst(); c.sp = spr(c, TEX.rocket().r[0], 2.2, 4.95); return c; },
-      start(c, cele, idx) {
-        c.side = cele ? (idx % 2 ? 1 : -1) : coin();
-        c.z = cele ? rnd(-48, -62) : rnd(-55, -95);
+      cap: 2, cele: 3, every: [4, 8],
+      make() { const c = inst(); c.sp = spr(c, TEX.rocket().r[0], 3, 6.75); return c; },
+      start(c, cele, k) {
+        c.side = sideFor(cele, k);
+        c.z = cele ? rnd(-48, -60) - k * 6 : rnd(-55, -95);
         const hw = halfW(c.z);
         c.x = c.side * rnd(12, Math.max(12.5, Math.min(30, hw * 0.85)));
         c.y = cele ? rnd(1, 6) : -7; c.vy = cele ? 9 : 1.5; c.vx = c.side * rnd(0.5, 2);
@@ -923,29 +930,29 @@
         c.y += c.vy * dt; c.x += c.vx * dt; c.z += dz * c.anchor;
         setMap(c.sp, TEX.rocket().r[Math.floor(c.age * 16) % 2]);
         c.g.position.set(c.x, c.y, c.z);
-        const nx = c.x + Math.sin(c.sp.material.rotation) * 1.6, ny = c.y - 2.4;
+        const nx = c.x + Math.sin(c.sp.material.rotation) * 2.8, ny = c.y - 2.8;
         c.acc += dt * 45;
         while (c.acc >= 1) { c.acc--; emit(FX.flame, nx, ny, c.z + 0.1, 0, -rnd(6, 10), 0, c.anchor); }
         c.acc2 += dt * 26;
-        while (c.acc2 >= 1) { c.acc2--; emit(FX.rsmoke, nx, ny - 0.8, c.z - 0.2, 0, rnd(-1, 0.3), 0, c.anchor); }
-        return c.y < topY(c.z) + 6 && c.age < 9;
+        while (c.acc2 >= 1) { c.acc2--; emit(FX.rsmoke, nx, ny - 1, c.z - 0.2, 0, rnd(-1, 0.3), 0, c.anchor); }
+        return c.y < topY(c.z) + 7 && c.age < 9;
       },
     };
 
     // ---------- doces flutuando ----------
     DEF.donut = {
-      cap: 4, every: [1.8, 3.6],
-      make() { const c = inst(); c.sp = spr(c, TEX.donut(0), 5, 5); return c; },
-      start(c, cele) {
+      cap: 4, cele: 4, every: [1.8, 3.6],
+      make() { const c = inst(); c.sp = spr(c, TEX.donut(0), 6.5, 6.5); return c; },
+      start(c, cele, k) {
         const v = pick(['donut', 'donut', 'donut', 'candy', 'lolly']);
         c.kind = v;
-        const w = v === 'candy' ? 6 : v === 'lolly' ? 3.3 : rnd(4.4, 5.6);
-        const h = v === 'candy' ? 3 : v === 'lolly' ? 5.5 : w;
+        const w = v === 'candy' ? 8 : v === 'lolly' ? 4.4 : rnd(6, 7.5);
+        const h = v === 'candy' ? 4 : v === 'lolly' ? 7.3 : w;
         c.sp.material.map = v === 'candy' ? TEX.candy() : v === 'lolly' ? TEX.lolly() : TEX.donut(Math.random() < 0.6 ? 0 : Math.random() < 0.5 ? 1 : 2);
         c.sp.scale.set(w, h, 1);
         c.z = cele ? rnd(-45, -62) : rnd(-50, -92);
         const hw = halfW(c.z), top = topY(c.z), lo = 9 + Math.max(w, h) / 2;
-        c.x = rnd(-hw * 0.85, hw * 0.85);
+        c.x = cele ? (k % 2 ? 1 : -1) * rnd(0.12, 0.75) * hw : rnd(-hw * 0.85, hw * 0.85);
         c.y = rnd(lo, Math.max(lo, top - h / 2 - 1));
         c.vx = rnd(-2.5, 2.5); c.spin = rnd(0.8, 1.8) * coin(); c.rot = rnd(0, 6.28);
         c.life = rnd(5, 7); c.anchor = 0.25; c.popped = false;
@@ -970,41 +977,41 @@
 
     // ---------- balões de ar quente ----------
     DEF.balloon = {
-      cap: 3, every: [2.5, 5],
-      make() { const c = inst(); c.sp = spr(c, TEX.balloon(0), 4.6, 6.57); return c; },
-      start(c, cele, idx) {
-        c.side = cele ? (idx % 2 ? 1 : -1) : coin();
-        c.z = cele ? rnd(-45, -62) : rnd(-50, -100);
+      cap: 3, cele: 3, every: [2.5, 5],
+      make() { const c = inst(); c.sp = spr(c, TEX.balloon(0), 6.3, 9); return c; },
+      start(c, cele, k) {
+        c.side = sideFor(cele, k);
+        c.z = cele ? rnd(-45, -60) - k * 6 : rnd(-50, -100);
         const hw = halfW(c.z);
-        c.x = c.side * rnd(10.5, Math.max(11, Math.min(30, hw * 0.88)));
-        c.y = cele ? rnd(4, 12) : -8;
+        c.x = c.side * rnd(11.5, Math.max(12, Math.min(30, hw * 0.85)));
+        c.y = cele ? rnd(4, 12) : -9;
         c.vy = cele ? rnd(3, 4.5) : rnd(2.2, 3.5);
-        c.sp.material.map = TEX.balloon(Math.random() < 0.4 ? 2 : Math.random() < 0.5 ? 0 : 1);
+        c.sp.material.map = TEX.balloon(cele && k === 0 ? 2 : Math.random() < 0.4 ? 2 : Math.random() < 0.5 ? 0 : 1);
         c.anchor = 0.3; c.ph = rnd(0, 6);
       },
       step(c, dt, dz) {
         c.y += c.vy * dt; c.z += dz * c.anchor;
         c.g.position.set(c.x + Math.sin(c.age * 0.9 + c.ph) * 0.6, c.y, c.z);
         c.sp.material.rotation = Math.sin(c.age * 1.3 + c.ph) * 0.06;
-        return c.y < topY(c.z) + 6 && c.z < -22 && c.age < 30;
+        return c.y < topY(c.z) + 7 && c.z < -22 && c.age < 30;
       },
     };
 
     // ---------- bando de pássaros em V ----------
     DEF.bird = {
-      cap: 1, every: [6, 11],
+      cap: 1, cele: 2, every: [6, 11],
       make() {
         const c = inst(); c.birds = [];
-        for (let i = 0; i < 9; i++) { const s = spr(c, TEX.bird('gull').r[0], 2.6, 1.45); s.userData = { dx: 0, dy: 0, dz: 0, tex: null }; c.birds.push(s); }
+        for (let i = 0; i < 9; i++) { const s = spr(c, TEX.bird('gull').r[0], 3.4, 1.9); s.userData = { dx: 0, dy: 0, dz: 0, tex: null }; c.birds.push(s); }
         return c;
       },
-      start(c, cele) {
-        crossStart(c, cele, -48, -85, 13, 21, 5.5, 7.5, 0.12, 12, 6);
+      start(c, cele, k) {
+        crossStart(c, cele, k, -48, -85, 15, 20, 5.5, 7.5, 0.12, 16, 12.5);
         c.n = pick([5, 7, 9]);
-        const variant = pick(['gull', 'gull', 'flamingo', 'parrot']);
+        const variant = cele ? (k % 2 ? 'parrot' : 'gull') : pick(['gull', 'gull', 'flamingo', 'parrot']);
         c.birds.forEach((b, i) => {
           const u = b.userData, rank = Math.ceil(i / 2), up = i % 2 ? 1 : -1;
-          u.dx = -c.dir * rank * 2.3; u.dy = up * rank * 1.05; u.dz = rank * 0.4;
+          u.dx = -c.dir * rank * 3; u.dy = up * rank * 1.35; u.dz = rank * 0.4;
           u.tex = TEX.bird(variant === 'parrot' ? pick(['parrotR', 'parrotB', 'parrotY']) : variant).r;
           b.visible = i < c.n;
         });
@@ -1014,7 +1021,7 @@
         c.g.position.set(c.x, c.y + Math.sin(c.age * 1.6) * 0.5, c.z);
         for (let i = 0; i < c.n; i++) {
           const b = c.birds[i], u = b.userData;
-          b.position.set(u.dx, u.dy + Math.sin(c.age * 3 + i) * 0.15, u.dz);
+          b.position.set(u.dx, u.dy + Math.sin(c.age * 3 + i) * 0.2, u.dz);
           setMap(b, u.tex[Math.floor(c.age * 6 + i * 0.5) % 2]);
         }
         return alive;
@@ -1023,24 +1030,24 @@
 
     // ---------- pato de borracha gigante ----------
     DEF.duck = {
-      cap: 1, every: [9, 15],
-      make() { const c = inst(); c.sp = spr(c, TEX.duck().r[0], 13, 10.3, true); return c; },
-      start(c, cele, idx) {
-        c.side = cele ? (idx % 2 ? 1 : -1) : coin();
-        c.x = c.side * rnd(14, 17);
+      cap: 1, cele: 2, every: [9, 15],
+      make() { const c = inst(); c.sp = spr(c, TEX.duck().r[0], 20, 15.8, true); return c; },
+      start(c, cele, k) {
+        c.side = sideFor(cele, k);
+        c.x = c.side * rnd(19, 23);
         c.vz = -Math.min(curSpeed * 0.35, 10);
-        c.z = cele ? rnd(-52, -62) : -118;
+        c.z = cele ? rnd(-30, -38) - k * 14 : -118;
         c.sp.material.map = TEX.duck()[c.side > 0 ? 'l' : 'r'][0]; // olha para a pista
       },
       step(c, dt, dz) {
         c.z += c.vz * dt + dz;
-        c.g.position.set(c.x, -10 + 5.15 - 1.5 + Math.sin(c.age * 2.4) * 0.35, c.z);
-        c.sp.material.rotation = Math.sin(c.age * 1.9) * 0.09;
+        c.g.position.set(c.x, -10 + 7.9 - 2.2 + Math.sin(c.age * 2.4) * 0.4, c.z);
+        c.sp.material.rotation = Math.sin(c.age * 1.9) * 0.08;
         c.acc += dt * 16;
         while (c.acc >= 1) {
           c.acc--;
           const sx = coin();
-          emit(FX.ripple, c.x + sx * rnd(3.5, 6), -9.7, c.z + rnd(-1, 1), sx * rnd(1.5, 3), 0, rnd(-0.8, 0.8), 1);
+          emit(FX.ripple, c.x + sx * rnd(6, 10), -9.7, c.z + rnd(-1, 1), sx * rnd(1.5, 3), 0, rnd(-0.8, 0.8), 1);
         }
         return c.z < 6;
       },
@@ -1048,26 +1055,27 @@
 
     // ---------- cometa ----------
     DEF.comet = {
-      cap: 1, every: [14, 22],
-      make() { const c = inst(); c.sp = glowSpr(c, TEX.comet(), 3.4, 3.4); return c; },
+      cap: 1, cele: 1, every: [14, 22],
+      make() { const c = inst(); c.sp = glowSpr(c, TEX.comet(), 6, 6); return c; },
       start(c, cele) {
-        c.dir = coin(); c.z = rnd(-110, -124);
+        c.dir = coin(); c.z = rnd(-105, -118);
         const hw = halfW(c.z), top = topY(c.z);
-        c.y = clamp(rnd(top * 0.62, top - 5), 16, 70);
-        c.x = cele ? -c.dir * rnd(0.2, 0.6) * hw : -c.dir * (hw + 4);
+        c.y = clamp(rnd(top * 0.34, top * 0.5), 14, 60);
+        c.x = cele ? -c.dir * rnd(0.45, 0.7) * hw : -c.dir * (hw + 4);
         c.vx = c.dir * 2 * (hw + 4) / rnd(7, 9); c.vy = -rnd(0.4, 1.2);
       },
       step(c, dt) {
         c.x += c.vx * dt; c.y += c.vy * dt;
-        const s = 3.4 + Math.sin(c.age * 9) * 0.35;
+        const s = 6 + Math.sin(c.age * 9) * 0.6;
         c.sp.scale.set(s, s, 1);
         c.g.position.set(c.x, c.y, c.z);
-        c.acc += dt * 110;
+        c.acc += dt * 70;
         while (c.acc >= 1) {
           c.acc--;
-          emit(FX.cometTail, c.x - c.dir * 0.6, c.y + rnd(-0.5, 0.5), c.z - 0.2, -c.dir * rnd(1, 3), rnd(-0.4, 0.4), 0, 0);
+          emit(FX.cometTail, c.x - c.dir * 1.5, c.y + rnd(-0.9, 0.9), c.z - 0.2, -c.dir * rnd(1, 3), rnd(-0.6, 0.6), 0, 0);
+          emit(FX.cometCore, c.x - c.dir * 1.2, c.y + rnd(-0.3, 0.3), c.z - 0.1, -c.dir * rnd(0.5, 1.5), 0, 0, 0);
         }
-        if (Math.random() < dt * 6) emit(FX.sparkle, c.x - c.dir * rnd(2, 12), c.y + rnd(-1.5, 1.5), c.z, 0, 0, 0, 0);
+        if (Math.random() < dt * 8) emit(FX.sparkle, c.x - c.dir * rnd(3, 16), c.y + rnd(-2, 2), c.z, 0, 0, 0, 0);
         return c.dir * c.x < halfW(c.z) + 8 && c.age < 20;
       },
     };
@@ -1179,16 +1187,18 @@
       celebrate() {
         const list = types.slice().sort(() => Math.random() - 0.5);
         if (!list.length) { fireworks(); return; }
-        const n = clamp(list.length + 2, 3, 5);
-        for (let i = 0; i < n; i++) {
-          const id = list[i % list.length];
-          if (AMB[id]) {
-            if (i < list.length) for (let k = 0; k < AMB[id].burst; k++) AMB[id].spawn(true);
-            continue;
+        for (const id of list) if (AMB[id]) for (let k = 0; k < AMB[id].burst; k++) AMB[id].spawn(true);
+        const crea = list.filter((id) => DEF[id]);
+        const want = clamp(crea.length + 2, 3, 5), made = {};
+        let n = 0;
+        for (let round = 0; round < 5 && n < want; round++) {
+          for (const id of crea) {
+            const k = made[id] || 0;
+            if (n >= want || k >= DEF[id].cele || active.length >= MAX_ACTIVE + CELE_EXTRA) continue;
+            spawn(id, true, k); made[id] = k + 1; n++;
+            // os próximos naturais demoram um pouco para não entupir o céu
+            timers[id] = Math.max(timers[id], rnd(2, 4));
           }
-          if (counts[id] < DEF[id].cap + 3 && active.length < MAX_ACTIVE + CELE_EXTRA) spawn(id, true, i);
-          // os próximos naturais demoram um pouco para não entupir o céu
-          timers[id] = Math.max(timers[id], rnd(2, 4));
         }
       },
       clear() {

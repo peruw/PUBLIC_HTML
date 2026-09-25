@@ -1,31 +1,43 @@
 // Corrida Quanta — skins do corredor (cosméticos desbloqueáveis).
 // QC.Skins.build(T, id) monta o boneco voxel com as MESMAS proporções do corredor original:
 // quadris em (±0.22, 1.02), ombros em (±0.58, 1.92), tronco 0.9 x 1.0 x 0.52 em y=1.5 e cabeça em y=2.36.
-// O jogo anima pernas/braços/corpo; update() mexe só nos acessórios (capas, faixas, chamas...).
+// O jogo anima pernas/braços/corpo; update(dt, t, speedFactor) mexe só nos acessórios (capas, faixas, chamas...),
+// com speedFactor = velocidade / velocidade inicial (1 no menu e na largada).
+// swatch: cores mostradas no armário.
 (() => {
   'use strict';
   window.QC = window.QC || {};
 
   const LIST = [
     { id: 'quanta', name: 'Quanta', desc: 'O uniforme clássico: boné virado e o alvo da Quanta nas costas.', rarity: 'comum', color: '#1fd685',
+      swatch: ['#1fd685', '#0b5a38', '#f2c29b', '#eafff3'],
       unlock: { type: 'default', value: 0, label: 'Inicial' } },
     { id: 'noturno', name: 'Noturno', desc: 'Moletom preto com faixas neon e capuz. Brilha no escuro.', rarity: 'comum', color: '#7dffc0',
+      swatch: ['#1d2328', '#7dffc0', '#1fd685', '#0d1411'],
       unlock: { type: 'xp', value: 300, label: 'Acumule 300 pontos' } },
     { id: 'ninja', name: 'Ninja', desc: 'Silencioso e veloz, com a faixa vermelha ao vento.', rarity: 'rara', color: '#ff3b4e',
+      swatch: ['#23253a', '#e0283a', '#30334f', '#d8b24a'],
       unlock: { type: 'combo', value: 8, label: 'Acerte 8 seguidas' } },
     { id: 'robo', name: 'Robô Q-8', desc: 'Calcula mais rápido que a própria sombra. Bip bop.', rarity: 'rara', color: '#46e8ff',
+      swatch: ['#9aa4ae', '#4b5461', '#46e8ff', '#ff3b4e'],
       unlock: { type: 'xp', value: 1500, label: 'Acumule 1.500 pontos' } },
     { id: 'astronauta', name: 'Astronauta', desc: 'Traje espacial completo, com capacete de visor dourado.', rarity: 'rara', color: '#ff8a2a',
+      swatch: ['#eef2f5', '#ff7a1a', '#ffc23a', '#8a94a1'],
       unlock: { type: 'level', value: 4, label: 'Chegue ao nível 4' } },
     { id: 'unicornio', name: 'Unicórnio', desc: 'Crina de arco-íris e chifre de ouro. Pura magia.', rarity: 'épica', color: '#ff9ad5',
+      swatch: ['#fbf7ff', '#ff9ad0', '#c2a6ff', '#ffd23f'],
       unlock: { type: 'level', value: 6, label: 'Chegue ao nível 6' } },
     { id: 'dourado', name: 'Dourado', desc: 'Ouro maciço da cabeça aos pés. Brilha a cada passo.', rarity: 'épica', color: '#ffd23f',
+      swatch: ['#ffc933', '#c98a12', '#fff3b0', '#a86c0c'],
       unlock: { type: 'best', value: 500, label: 'Faça 500 pontos numa corrida' } },
     { id: 'lava', name: 'Lava', desc: 'Rocha vulcânica rachada e cabelo de fogo.', rarity: 'épica', color: '#ff6a1a',
+      swatch: ['#2b2426', '#ff6a1a', '#ffd23f', '#ff4a1a'],
       unlock: { type: 'speed', value: 2, label: 'Alcance velocidade x2.0' } },
     { id: 'professor', name: 'Dr. Quanta', desc: 'Jaleco, óculos e gravata-borboleta. Homenagem ao professor.', rarity: 'lendária', color: '#eafff3',
+      swatch: ['#f2f6f4', '#1fd685', '#384050', '#241810'],
       unlock: { type: 'xp', value: 5000, label: 'Acumule 5.000 pontos' } },
     { id: 'arcoiris', name: 'Arco-íris', desc: 'Capa de arco-íris que tremula e cintila com a velocidade.', rarity: 'lendária', color: '#b58cff',
+      swatch: ['#ff4f6a', '#ffe14a', '#4fe08a', '#4fb4ff'],
       unlock: { type: 'xp', value: 10000, label: 'Acumule 10.000 pontos' } },
   ];
   const RARITY_COLORS = { comum: '#9fc2b0', rara: '#46b8ff', 'épica': '#c77dff', 'lendária': '#ffd23f' };
@@ -357,6 +369,7 @@
       for (const p of tails) {
         p.a.rotation.x = droop + Math.sin(t * f + p.ph) * amp;
         p.b.rotation.x = Math.sin(t * f + p.ph - 1.3) * amp * 1.5;
+        p.a.rotation.y = p.s * (0.28 + sf * 0.3);                     // abre para os lados: visível de trás
         p.b.rotation.y = p.s * 0.12 * Math.sin(t * f * 0.5 + p.ph);
       }
     };
@@ -444,11 +457,11 @@
     const suit = k.lam(0xeef2f5), shade = k.lam(0xc7cfd8), orange = k.lam(0xff7a1a), gray = k.lam(0x8a94a1), dark = k.lam(0x3a4250);
     r.legs.forEach((hip) => {
       k.box(0.34, 0.62, 0.36, suit, 0, -0.3, 0, hip);
-      k.box(0.36, 0.07, 0.38, orange, 0, -0.5, 0, hip);             // faixa do joelho
+      k.box(0.32, 0.07, 0.34, orange, 0, -0.62, 0, hip);            // faixa do joelho (rente à canela: sem moldura vista por baixo)
       k.box(0.3, 0.3, 0.32, suit, 0, -0.74, 0, hip);
       k.box(0.42, 0.26, 0.56, shade, 0, -0.97, -0.05, hip);          // bota
       k.box(0.44, 0.05, 0.58, dark, 0, -1.1, -0.05, hip);
-      k.box(0.43, 0.05, 0.57, orange, 0, -0.86, -0.05, hip);
+      k.box(0.43, 0.05, 0.57, orange, 0, -0.91, -0.05, hip);          // faixa da bota (abaixo do topo, que fica cinza)
     });
     stdArms(k, r, { sleeve: suit, fore: suit, hand: gray }, (sh) => {
       k.box(0.3, 0.07, 0.32, orange, 0, -0.12, 0, sh);
@@ -537,9 +550,9 @@
     // rabinho
     const tail = [];
     let par = r.body, z0 = 0.3, y0 = 1.1;
-    ['#ff7ab8', '#a27bff', '#4fb4ff'].forEach((c, i) => {
+    ['#ff9ad0', '#c2a6ff', '#9fd8ff'].forEach((c, i) => {
       const p = k.pivot(0, y0, z0, par);
-      k.box(0.2 - i * 0.03, 0.22 - i * 0.03, 0.26, k.lam(parseInt(c.slice(1), 16)), 0, 0, 0.13, p);
+      k.box(0.24 - i * 0.03, 0.22 - i * 0.02, 0.26, k.lam(parseInt(c.slice(1), 16), 0x201020), 0, 0, 0.13, p);
       tail.push(p); par = p; z0 = 0.26; y0 = 0;
     });
     return (dt, t, sf) => {
@@ -706,14 +719,19 @@
     for (let i = 0; i < 3; i++) k.box(0.18, 0.14, 0.22, k.lam(0x3a2414), -0.2 + i * 0.2, 0.36, -0.12 + i * 0.12, r.head);
     const band = k.painted(12, 2, (g) => { P(g, '#ffffff', 0, 0, 12, 2); RAINBOW.forEach((c, i) => P(g, c, i * 2, 1, 2, 1)); });
     k.box(0.74, 0.12, 0.72, band, 0, 0.2, 0.04, r.head);                 // faixa na testa
-    // capa de arco-íris em 3 segmentos encadeados; listras correm e cintilam
-    const capeTex = k.tex(12, 1, (g) => RAINBOW.forEach((c, i) => P(g, c, i * 2, 0, 2, 1)));
-    capeTex.wrapS = T.RepeatWrapping;
-    const hemTex = k.tex(12, 8, (g) => {
-      for (let y = 0; y < 8; y++) RAINBOW.forEach((c, i) => P(g, c, i * 2, y, 2, 1));
-      for (let x = 0; x < 12; x++) { const d = (x % 4 < 2 ? x % 4 : 3 - x % 4) + 1; g.clearRect(x, 8 - d * 2 + 1, 1, d * 2); }
+    // capa de arco-íris em 3 segmentos encadeados; listras correm e cintilam.
+    // Cada faixa horizontal do atlas é um passo da listra deslocada 1 pixel: o update só troca offset.y
+    // (sem RepeatWrapping, que em WebGL1 reduziria a textura de 12 px para 8 e perderia cores).
+    const N = 12;
+    const stripe = (g, y, sh) => { for (let x = 0; x < N; x++) P(g, RAINBOW[Math.floor(((x + sh) % N) / 2)], x, y); };
+    const capeTex = k.tex(N, N, (g) => { for (let s = 0; s < N; s++) stripe(g, s, s); });
+    const hemTex = k.tex(N, N * 8, (g) => {
+      for (let s = 0; s < N; s++) {
+        for (let y = 0; y < 8; y++) stripe(g, s * 8 + y, s);
+        for (let x = 0; x < N; x++) { const d = (x % 4 < 2 ? x % 4 : 3 - x % 4) + 1; g.clearRect(x, s * 8 + 9 - d * 2, 1, d * 2 - 1); } // barra em zigue-zague
+      }
     });
-    hemTex.wrapS = T.RepeatWrapping;
+    capeTex.repeat.set(1, 1 / N); hemTex.repeat.set(1, 1 / N);
     const segs = [];
     let par = r.body, y = 2.0, z = 0.3;
     for (let i = 0; i < 3; i++) {
@@ -733,21 +751,30 @@
         const b = 0.82 + 0.18 * Math.sin(t * 6 - i * 1.4);
         segs[i].mat.color.setRGB(b, b, b);
       }
-      capeTex.offset.x = hemTex.offset.x = Math.floor(t * (3 + sf * 6)) / 12;  // desliza de pixel em pixel
+      capeTex.offset.y = hemTex.offset.y = 1 - ((Math.floor(t * (3 + sf * 6)) % N + N) % N + 1) / N;  // desliza de pixel em pixel
     };
   };
 
   // ================= API =================
+  // speedFactor chega como no jogo: velocidade / velocidade inicial (1 no menu e na largada, ~2.9 no máximo).
+  // Internamente vira 0..1: ~0.2 na largada, 1 na velocidade máxima.
+  const speedNorm = (v) => clamp01(((typeof v === 'number' && isFinite(v) ? v : 1) - 0.5) / 2.3);
+
   function build(T, id) {
     const def = byId(id);
     const k = kit(T);
     const r = rig(T);
     const anim = BUILD[def.id](k, r) || null;
+    let alive = true;
     return {
       id: def.id,
       group: r.group, body: r.body, legs: r.legs, arms: r.arms, head: r.head,
-      update(dt, t, speedFactor) { if (anim) anim(Math.min(dt || 0, 0.1), t || 0, clamp01(speedFactor || 0)); },
+      update(dt, t, speedFactor) {
+        if (!anim || !alive) return;
+        anim(dt > 0 ? Math.min(dt, 0.1) : 0, isFinite(t) ? t : 0, speedNorm(speedFactor));
+      },
       dispose() {
+        alive = false;
         if (r.group.parent) r.group.parent.remove(r.group);
         k.dispose();
       },

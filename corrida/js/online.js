@@ -104,10 +104,18 @@
       return r.error ? { ok: false, error: r.error } : r.data;
     },
 
-    // run: { score, hits, maxLevel, maxCombo, maxSpeed, durationMs, skin }
+    // bilhete de uso único pedido no início de cada corrida (o servidor marca a hora)
+    async startRun() {
+      if (!user) return null;
+      const r = await rpc('corrida_start_run');
+      return r.error ? null : r.data;
+    },
+
+    // run: { runId, score, hits, maxLevel, maxCombo, maxSpeed, durationMs, skin }
     async submitRun(run) {
+      if (!run.runId) return { ok: false, error: 'no_run' };
       const r = await rpc('corrida_submit_run', {
-        p_score: run.score, p_hits: run.hits, p_max_level: run.maxLevel, p_max_combo: run.maxCombo,
+        p_run_id: run.runId, p_score: run.score, p_hits: run.hits, p_max_level: run.maxLevel, p_max_combo: run.maxCombo,
         p_max_speed: Math.round(run.maxSpeed * 100) / 100, p_duration_ms: Math.round(run.durationMs), p_skin: run.skin,
       });
       return r.error ? { ok: false, error: r.error } : r.data;
