@@ -1125,10 +1125,11 @@
     mode: 'menu', score: 0, lives: CFG.lives, hits: 0, combo: 0, maxCombo: 0, level: 1,
     speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, x: -2.1, horizon: 0,
     gate: null, gap: 0, t: 0, phase: 0, shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0,
-    playMs: 0, locker: 0, lockerOn: false, preview: null, shown: 0, fever: false, dash: 0, dashCd: 0, spin: 0,
+    playMs: 0, locker: 0, lockerOn: false, preview: null, shown: 0, fever: false, dash: 0, dashCd: 0, dashHeld: false, lunge: 0, spin: 0,
   };
-  // dash: cada toque dá um arranque; segurando, o mundo corre até 2,5x (o servidor do ranking conta com esse limite)
-  const DASH_MAX = 1.5, DASH_DECAY = 0.4, DASH_CD = 0.22;
+  // dash: cada toque soma até DASH_V unidades/s à corrida e cai em DASH_DECAY s (~18 u = 18% do caminho até o portal);
+  // segurando, repete a cada DASH_CD s. O servidor do ranking conta com esse limite (velocidade + 80).
+  const DASH_V = 80, DASH_DECAY = 0.45, DASH_CD = 0.18;
   // pontuação: 10 por acerto (20 se respondeu rápido) x multiplicador do combo (até x10) x2 na febre
   const multFor = (combo) => Math.min(10, 1 + Math.floor(combo / 3));
   const FEVER_AT = 15;
@@ -1252,12 +1253,16 @@
       if (S.gate && S.gate.state === 'coming') { S.gate.decidedFrac = S.gate.frac; paintOptions(); }
     }
   }
+  window.addEventListener('keyup', (e) => {
+    const k = (e.key || '').toLowerCase();
+    if (k === 'arrowup' || k === 'w') S.dashHeld = false;
+  });
   window.addEventListener('keydown', (e) => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     const k = e.key.toLowerCase();
     if (k === 'arrowleft' || k === 'a') { setLane(S.lane - 1); e.preventDefault(); }
     else if (k === 'arrowright' || k === 'd') { setLane(S.lane + 1); e.preventDefault(); }
-    else if (k === 'arrowup' || k === 'w') { dash(); e.preventDefault(); }
+    else if (k === 'arrowup' || k === 'w') { if (!e.repeat) dash(); S.dashHeld = true; e.preventDefault(); }
     else if (k === 'p') togglePause();
     else if (k === 'escape') { if (openPanel) closePanel(); else togglePause(); }
     else if ((k === 'enter' || k === ' ') && !openPanel && (S.mode === 'menu' || S.mode === 'over') && ready) { startGame(); e.preventDefault(); }
@@ -1273,17 +1278,18 @@
   });
   // botão ▲ (toque): segurar mantém o dash
   const dashBtn = $('btnDash');
-  let dashHold = 0;
-  const dashDown = (e) => { e.preventDefault(); dash(); dashBtn.classList.add('on'); clearInterval(dashHold); dashHold = setInterval(dash, DASH_CD * 1000 + 10); };
-  const dashUp = () => { clearInterval(dashHold); dashHold = 0; dashBtn.classList.remove('on'); };
+  const dashDown = (e) => { e.preventDefault(); dash(); S.dashHeld = true; dashBtn.classList.add('on'); };
+  const dashUp = () => { S.dashHeld = false; dashBtn.classList.remove('on'); };
   dashBtn.addEventListener('pointerdown', dashDown);
   ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => dashBtn.addEventListener(ev, dashUp));
   window.addEventListener('blur', dashUp);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) dashUp(); });
 
   function dash() {
     if (S.mode !== 'play' || S.stumble > 0 || S.dashCd > 0) return;
     S.dash = 1;
     S.dashCd = DASH_CD;
+    S.lunge = 1;
     S.fovKick = Math.max(S.fovKick, 5);
     sfx.dash();
     if (R) {
@@ -1309,7 +1315,7 @@
       mode: 'play', score: 0, lives: CFG.lives, hits: 0, combo: 0, maxCombo: 0, level: 1,
       speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, gap: 0.8,
       shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0, playMs: 0, preview: null, shown: 0, fever: false,
-      dash: 0, dashCd: 0,
+      dash: 0, dashCd: 0, dashHeld: false, lunge: 0,
     });
     fxCall('clear');
     useSkin(P.data.skin);
@@ -1822,8 +1828,12 @@
     const playing = S.mode === 'play';
     const frozen = S.mode === 'pause';
     if (playing) S.playMs += dt * 1000;
-    let v = playing ? S.speed * (1 + DASH_MAX * S.dash) : frozen ? 0 : 11 * (1 - S.locker * 0.85);
-    if (!frozen) { S.dash = Math.max(0, S.dash - dt / DASH_DECAY); S.dashCd = Math.max(0, S.dashCd - dt); }
+    if (!frozen) {
+      S.dash = Math.max(0, S.dash - dt / DASH_DECAY); S.dashCd = Math.max(0, S.dashCd - dt);
+      S.lunge = Math.max(0, (S.lunge || 0) - dt * 3);
+      if (S.dashHeld && S.dashCd <= 0) dash();
+    }
+    let v = playing ? S.speed + DASH_V * S.dash : frozen ? 0 : 11 * (1 - S.locker * 0.85);
     if (S.stumble > 0) v *= 0.12;
     const dz = v * dt;
 
@@ -1850,12 +1860,12 @@
 
     // linhas de velocidade: mais visíveis quanto mais rápido; arco-íris na febre
     const sf = clamp((S.speed - CFG.startSpeed) / (CFG.maxSpeed - CFG.startSpeed), 0, 1);
-    streakMat.opacity = playing ? Math.min(1, 0.12 + sf * 0.55 + (S.fever ? 0.25 : 0) + S.dash * 0.5) : 0.06;
+    streakMat.opacity = playing ? Math.min(1, 0.12 + sf * 0.55 + (S.fever ? 0.25 : 0) + S.dash * 0.7) : 0.06;
     if (S.fever && playing) streakMat.color.setHSL((S.t * 1.5) % 1, 1, 0.6);
     else if (tintT >= 1 && themeIdx >= 0) streakMat.color.setHex(QC.THEMES[themeIdx].streak);
     for (const s of streaks) {
       s.position.z += dz * 1.6;
-      s.scale.z = 1 + sf * 2.5;
+      s.scale.z = 1 + sf * 2.5 + S.dash * 3;
       if (s.position.z > 12) s.position.z -= 72;
     }
 
@@ -1874,8 +1884,8 @@
       R.arms[0].rotation.x = -sw * 0.85 * run + lkp * Math.sin(S.t * 2) * 0.12; R.arms[1].rotation.x = sw * 0.85 * run - lkp * Math.sin(S.t * 2) * 0.12;
       R.body.position.y = 0.12 + Math.abs(Math.cos(S.phase)) * 0.14 * run + lkp * Math.sin(S.t * 2.4) * 0.03 + S.jump;
       R.body.rotation.z = (S.x - lx) * 0.18;
-      R.body.rotation.x = (S.stumble > 0 ? -0.35 : -0.12 - sf * 0.1 - S.dash * 0.28) * run;
-      R.group.position.z = S.stumble > 0 ? Math.sin(S.stumble * Math.PI) * 1.2 : 0;
+      R.body.rotation.x = (S.stumble > 0 ? -0.35 : -0.12 - sf * 0.1 - S.dash * 0.4) * run;
+      R.group.position.z = S.stumble > 0 ? Math.sin(S.stumble * Math.PI) * 1.2 : -Math.sin((S.lunge || 0) * Math.PI) * 0.6 * run;
       R.body.visible = !(S.stumble > 0 && Math.floor(S.t * 16) % 2 === 0);
       // vestiário: de frente para a câmera, balançando devagar; ao trocar de roupa dá um giro
       S.spin = Math.max(0, S.spin - dt * 2.2);
@@ -1911,7 +1921,7 @@
     S.fovKick *= Math.pow(0.02, dt);
     const shk = S.shake * 1.2;
     const lk = S.locker;
-    const gameFov = CAM.baseFov + (playing ? sf * 10 + S.dash * 6 : 0) + S.fovKick;
+    const gameFov = CAM.baseFov + (playing ? sf * 10 + S.dash * 11 : 0) + S.fovKick;
     const LFOV = 34;
     const fov = gameFov + (LFOV - gameFov) * lk;
     if (lk > 0.001) {
@@ -1952,7 +1962,7 @@
 
     const g = S.gate;
     if (!g) {
-      S.gap -= dt * (1 + DASH_MAX * S.dash);
+      S.gap -= dt * (v / S.speed);
       if (S.gap <= 0) spawnGate();
       return;
     }
