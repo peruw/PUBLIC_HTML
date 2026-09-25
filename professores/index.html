@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Encontre professores particulares — Professores | Quanta Aulas</title>
+  <meta name="description" content="Busque professores particulares por matéria e cidade, online ou presencial. Compare preços e avaliações e fale direto com o professor." />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://quantaaulas.com/professores/" />
+  <meta property="og:title" content="Encontre o professor particular ideal — Quanta Aulas" />
+  <meta property="og:description" content="Professores particulares de todas as matérias, online ou perto de você. Compare preços e avaliações." />
+  <meta property="og:image" content="https://quantaaulas.com/assets/preview.jpg" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="Quanta Aulas" />
+
+  <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
+  <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/professores/css/professores.css" />
+</head>
+
+<body>
+  <div class="bg-ambient"></div>
+  <div class="bg-grid"></div>
+
+  <!-- @include professores/partials/nav.html -->
+
+  <main id="app" class="pf-main" data-page="busca">
+    <!-- ============== HERO + BUSCA ============== -->
+    <section class="pf-hero">
+      <div class="container">
+        <div class="eyebrow">Professores particulares</div>
+        <h1 class="pf-hero-title">Encontre o professor particular <span class="grad-text">ideal</span></h1>
+        <p class="lead pf-hero-lead">
+          Aulas de todas as matérias, online ou perto de você. Compare preços e avaliações e converse direto com o professor.
+        </p>
+
+        <!-- Sem JS, o formulário funciona via GET (?q=&modo=&materia=...) -->
+        <form id="buscaForm" class="pf-search" role="search" action="/professores/" method="get">
+          <div class="pf-field pf-search-q">
+            <label class="pf-label" for="fQ">O que você quer aprender?</label>
+            <input id="fQ" name="q" type="search" class="pf-input" maxlength="80" autocomplete="off"
+                   placeholder="Ex.: matemática, violão, inglês" />
+          </div>
+          <div class="pf-field pf-search-modo">
+            <label class="pf-label" for="fModo">Modalidade</label>
+            <select id="fModo" name="modo" class="pf-select">
+              <option value="">Online ou presencial</option>
+              <option value="online">Online</option>
+              <option value="presencial">Presencial</option>
+            </select>
+          </div>
+          <!-- municipios.js#cityPicker() é montado aqui (UF + cidade) -->
+          <div id="fLocal" class="pf-search-local"></div>
+          <button type="submit" class="btn btn-primary pf-search-btn">
+            Buscar
+            <svg class="btn-arrow" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </form>
+
+        <nav class="pf-chips pf-hero-chips" id="atalhosMaterias" aria-label="Matérias populares">
+          <a class="pf-chip" href="/professores/?materia=matematica">Matemática</a>
+          <a class="pf-chip" href="/professores/?materia=ingles">Inglês</a>
+          <a class="pf-chip" href="/professores/?materia=fisica">Física</a>
+          <a class="pf-chip" href="/professores/?materia=quimica">Química</a>
+          <a class="pf-chip" href="/professores/?materia=portugues">Português</a>
+          <a class="pf-chip" href="/professores/?materia=redacao">Redação</a>
+          <a class="pf-chip" href="/professores/?materia=programacao">Programação</a>
+          <a class="pf-chip" href="/professores/?materia=violao">Violão</a>
+          <a class="pf-chip" href="/professores/?materia=enem">ENEM</a>
+        </nav>
+      </div>
+    </section>
+
+    <!-- ============== RESULTADOS ============== -->
+    <section class="pf-results-section" id="resultadosSec" aria-labelledby="resultadosTitulo">
+      <div class="container pf-layout-sidebar">
+        <aside class="pf-filters" id="filtros" aria-label="Filtros">
+          <h2 class="pf-filters-title">Filtros</h2>
+          <div class="pf-field">
+            <label class="pf-label" for="fMateria">Matéria</label>
+            <select id="fMateria" name="materia" class="pf-select" form="buscaForm">
+              <option value="">Todas as matérias</option>
+            </select>
+          </div>
+          <fieldset class="pf-fieldset">
+            <legend class="pf-label">Preço por hora (R$)</legend>
+            <div class="pf-row">
+              <div class="pf-field">
+                <label class="pf-label pf-label-sm" for="fPrecoMin">Mínimo</label>
+                <input id="fPrecoMin" name="preco_min" type="number" min="0" max="1000" step="5" inputmode="numeric" class="pf-input" form="buscaForm" />
+              </div>
+              <div class="pf-field">
+                <label class="pf-label pf-label-sm" for="fPrecoMax">Máximo</label>
+                <input id="fPrecoMax" name="preco_max" type="number" min="0" max="1000" step="5" inputmode="numeric" class="pf-input" form="buscaForm" />
+              </div>
+            </div>
+          </fieldset>
+          <button type="submit" class="btn btn-ghost btn-sm btn-block" form="buscaForm">Aplicar filtros</button>
+        </aside>
+
+        <div class="pf-results-col">
+          <div class="pf-results-head">
+            <h2 id="resultadosTitulo" class="pf-results-title">Professores</h2>
+            <p id="resultCount" class="pf-muted" role="status" aria-live="polite"></p>
+            <div class="pf-field pf-field-inline">
+              <label class="pf-label pf-label-sm" for="fOrdem">Ordenar por</label>
+              <select id="fOrdem" name="ordem" class="pf-select" form="buscaForm">
+                <option value="relevancia">Relevância</option>
+                <option value="preco_asc">Menor preço</option>
+                <option value="preco_desc">Maior preço</option>
+                <option value="avaliacao">Melhor avaliação</option>
+              </select>
+            </div>
+          </div>
+          <!-- Cards montados por /professores/js/pages/busca.js -->
+          <div id="resultados" class="pf-results" aria-busy="false"></div>
+          <nav id="paginacao" class="pf-pagination" aria-label="Paginação"></nav>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== COMO FUNCIONA ============== -->
+    <section class="section pf-how" aria-labelledby="comoFunciona">
+      <div class="container">
+        <div class="eyebrow">Como funciona</div>
+        <h2 id="comoFunciona" class="h-section pf-how-title">Simples para o aluno, justo para o professor.</h2>
+        <ol class="pf-steps">
+          <li class="pf-step reveal">
+            <span class="pf-step-num" aria-hidden="true">01</span>
+            <h3 class="h-card">Busque</h3>
+            <p>Filtre por matéria, cidade, modalidade e preço. Veja avaliações de outros alunos.</p>
+          </li>
+          <li class="pf-step reveal">
+            <span class="pf-step-num" aria-hidden="true">02</span>
+            <h3 class="h-card">Converse</h3>
+            <p>Envie uma mensagem pelo portal e combine horário, conteúdo e valor direto com o professor.</p>
+          </li>
+          <li class="pf-step reveal">
+            <span class="pf-step-num" aria-hidden="true">03</span>
+            <h3 class="h-card">Aprenda e avalie</h3>
+            <p>Depois das aulas, deixe sua avaliação e ajude outros alunos a escolher.</p>
+          </li>
+        </ol>
+
+        <div class="cta-strip reveal pf-cta">
+          <div>
+            <div class="eyebrow" style="margin-bottom:16px;">Para professores</div>
+            <h2 class="h-section" style="max-width:18ch;">Dá aulas particulares? Divulgue seu perfil grátis.</h2>
+          </div>
+          <a class="btn btn-primary" href="/professores/entrar.html?modo=cadastro&amp;tipo=professor" style="position:relative;z-index:1;">
+            Quero ser professor
+            <svg class="btn-arrow" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- @include professores/partials/footer.html -->
+
+  <script type="module" src="/professores/js/pages/busca.js"></script>
+</body>
+</html>
