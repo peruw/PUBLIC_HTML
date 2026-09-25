@@ -28,7 +28,7 @@ export function isValidMonths(months: unknown): boolean {
 }
 
 export function planRank(plan: unknown): number {
-  return typeof plan === 'string' && plan in PLAN_RANK ? PLAN_RANK[plan] : 0;
+  return typeof plan === 'string' && Object.hasOwn(PLAN_RANK, plan) ? PLAN_RANK[plan] : 0;
 }
 
 // true se comprar `requested` seria rebaixar o plano ativo `current` (já efetivo, via effective_plan)
@@ -37,7 +37,7 @@ export function isDowngrade(current: unknown, requested: unknown): boolean {
 }
 
 export function planName(plan: string): string {
-  return PLAN_NAMES[plan] ?? plan;
+  return Object.hasOwn(PLAN_NAMES, plan) ? PLAN_NAMES[plan] : plan;
 }
 
 // Título do item exibido no checkout do Mercado Pago

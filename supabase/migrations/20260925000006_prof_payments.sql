@@ -53,6 +53,11 @@ begin
     return 'conflict';
   end if;
 
+  -- estornado/contestado é final: nunca reaplica o plano
+  if v_pay.status in ('refunded', 'charged_back') then
+    return 'ignored';
+  end if;
+
   if v_pay.status = 'approved' then
     if p_status in ('refunded', 'charged_back', 'cancelled') then
       -- estorno: registra e devolve os meses concedidos (se o plano ainda é o mesmo)

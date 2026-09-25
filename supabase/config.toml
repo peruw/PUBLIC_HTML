@@ -1,0 +1,22 @@
+# Configuração do Supabase CLI para o portal /professores/.
+# project_id é só o nome local do projeto no CLI; o projeto hospedado é ligado com
+#   npx supabase link --project-ref <ref-do-projeto>
+# Deploy das funções: npx supabase functions deploy <nome>
+# Segredos (Painel > Edge Functions > Secrets): MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, MP_SANDBOX,
+# SITE_URL, ALLOWED_ORIGINS, RESEND_API_KEY, EMAIL_FROM, NOTIFY_WEBHOOK_SECRET.
+project_id = "quanta-professores"
+
+# Chamadas pelo site com o token do usuário (a função também valida o token com auth.getUser)
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
+
+# Chamada pelo Mercado Pago (sem JWT): autenticada pela assinatura x-signature
+[functions.mp-webhook]
+verify_jwt = false
+
+# Chamada pelo Database Webhook (sem JWT): autenticada pelo cabeçalho x-webhook-secret
+[functions.notify-message]
+verify_jwt = false

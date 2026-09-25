@@ -35,7 +35,7 @@ create index if not exists messages_sender_idx on public.messages (sender_id, cr
 -- Realtime (postgres_changes respeita o RLS de messages)
 do $$
 begin
-  if exists (select 1 from pg_catalog.pg_publication where pubname = 'supabase_realtime')
+  if exists (select 1 from pg_catalog.pg_publication where pubname = 'supabase_realtime' and not puballtables)
      and not exists (select 1 from pg_catalog.pg_publication_tables
                      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages') then
     alter publication supabase_realtime add table public.messages;

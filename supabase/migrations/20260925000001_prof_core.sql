@@ -258,6 +258,11 @@ declare
   v_max int;
   v_count int;
 begin
+  -- matéria já cadastrada: deixa o ON CONFLICT/unique resolver (upsert no limite não falha)
+  if exists (select 1 from public.tutor_subjects ts
+             where ts.tutor_id = new.tutor_id and ts.subject_id = new.subject_id) then
+    return new;
+  end if;
   -- trava o anúncio: inserções concorrentes não furam o limite
   select pl.max_subjects into v_max
     from public.tutor_profiles tp
@@ -319,7 +324,8 @@ as $$
 declare
   v_meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
   v_role text := case when v_meta ->> 'role' = 'tutor' then 'tutor' else 'student' end;
-  v_name text := left(btrim(regexp_replace(coalesce(v_meta ->> 'full_name', ''), '\s+', ' ', 'g')), 80);
+  -- full_name do formulário; "name" vem de login social (Google)
+  v_name text := left(btrim(regexp_replace(coalesce(v_meta ->> 'full_name', v_meta ->> 'name', ''), '\s+', ' ', 'g')), 80);
 begin
   if v_name = '' then
     v_name := 'Usuário';
@@ -455,8 +461,8 @@ as $$
                where ts.tutor_id = t.user_id order by s.name),
          count(*) over ()
   from t
-  order by case when p_ordem = 'relevancia' then t.rank_tier end desc nulls last,
-           case when p_ordem = 'relevancia' then t.is_local end desc nulls last,
+  order by case when coalesce(p_ordem, 'relevancia') = 'relevancia' then t.rank_tier end desc nulls last,
+           case when coalesce(p_ordem, 'relevancia') = 'relevancia' then t.is_local end desc nulls last,
            case when p_ordem = 'preco_asc' then t.hourly_rate_cents end asc nulls last,
            case when p_ordem = 'preco_desc' then t.hourly_rate_cents end desc nulls last,
            case when p_ordem = 'avaliacao' then t.bayes end desc nulls last,
