@@ -713,9 +713,15 @@ function build(scene, track, quality, env, opts, hold) {
     try { return fn(); } catch (err) { skipped.push(name); console.warn(`anúncios: "${name}" ficou de fora`, err); return null; }
   };
 
+  // tempos de cada etapa (ms), para a página de teste
+  const clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const times = {};
+  let tMark = clock();
+  const lap = (name) => { const t = clock(); times[name] = Math.round(t - tMark); tMark = t; };
   const fontWasReady = brandFontLoaded();
   const logoWasReady = logoReadyNow();
   const atlas = buildAtlas(hi);
+  lap('atlas');
   const mat = makeMaterial(atlas.tex);
   disposables.push(atlas.tex, atlas.grassTex, mat);
 
@@ -943,6 +949,7 @@ function build(scene, track, quality, env, opts, hold) {
     if (onlyHi && !hi) return;
     part(`placas ${Math.round(s0)}–${Math.round(s1)}`, () => hoardingRun(s0, s1, side, seq, r * 5 + (side > 0 ? 3 : 0)));
   });
+  lap('placas');
 
   // ------------------------------------------------------------ triângulos do cenário (fora dos anúncios)
   // Usados no build pelos outdoors, que ficam longe do muro, onde a vegetação (sorteada por qualidade)
@@ -965,43 +972,6 @@ function build(scene, track, quality, env, opts, hold) {
   };
   const _sph = new THREE.Sphere(), _m4 = new THREE.Matrix4(), _mi = new THREE.Matrix4(), IDENT = new THREE.Matrix4();
   const _tv = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-  // chama fn(tri, malha) para cada triângulo cujo AABB toca a caixa [x0..x1] × [y0..y1] × [z0..z1];
-  // se fn devolver true, para e devolve o nome da malha
-  function scanTris(x0, y0, z0, x1, y1, z1, fn) {
-    for (const m of getBlockers()) {
-      const P = m.geometry.attributes.position, I = m.geometry.index;
-      const nt = (I ? I.count : P.count) / 3;
-      const inst = m.isInstancedMesh ? m.count : 1;
-      // malhas estáticas já em coordenadas de mundo (matriz identidade): lê o array direto
-      const raw = !m.isInstancedMesh && !P.isInterleavedBufferAttribute && P.itemSize === 3 && m.matrixWorld.equals(IDENT);
-      const A = P.array, X = I ? I.array : null;
-      for (let k = 0; k < inst; k++) {
-        _m4.copy(m.matrixWorld);
-        if (m.isInstancedMesh) { m.getMatrixAt(k, _mi); _m4.multiply(_mi); }
-        _sph.copy(m.geometry.boundingSphere).applyMatrix4(_m4);
-        const sc = _sph.center, sr = _sph.radius;
-        if (sc.x + sr < x0 || sc.x - sr > x1 || sc.z + sr < z0 || sc.z - sr > z1 || sc.y + sr < y0 || sc.y - sr > y1) continue;
-        for (let t = 0; t < nt; t++) {
-          if (raw) {
-            const a = (X ? X[t * 3] : t * 3) * 3, b = (X ? X[t * 3 + 1] : t * 3 + 1) * 3, c = (X ? X[t * 3 + 2] : t * 3 + 2) * 3;
-            // descarte rápido pela caixa
-            if ((A[a] > x1 && A[b] > x1 && A[c] > x1) || (A[a] < x0 && A[b] < x0 && A[c] < x0)) continue;
-            if ((A[a + 2] > z1 && A[b + 2] > z1 && A[c + 2] > z1) || (A[a + 2] < z0 && A[b + 2] < z0 && A[c + 2] < z0)) continue;
-            if ((A[a + 1] > y1 && A[b + 1] > y1 && A[c + 1] > y1) || (A[a + 1] < y0 && A[b + 1] < y0 && A[c + 1] < y0)) continue;
-            _tv[0].set(A[a], A[a + 1], A[a + 2]); _tv[1].set(A[b], A[b + 1], A[b + 2]); _tv[2].set(A[c], A[c + 1], A[c + 2]);
-          } else {
-            for (let j = 0; j < 3; j++) _tv[j].fromBufferAttribute(P, I ? I.getX(t * 3 + j) : t * 3 + j).applyMatrix4(_m4);
-            const a = _tv[0], b = _tv[1], c = _tv[2];
-            if (Math.min(a.x, b.x, c.x) > x1 || Math.max(a.x, b.x, c.x) < x0) continue;
-            if (Math.min(a.z, b.z, c.z) > z1 || Math.max(a.z, b.z, c.z) < z0) continue;
-            if (Math.min(a.y, b.y, c.y) > y1 || Math.max(a.y, b.y, c.y) < y0) continue;
-          }
-          if (fn(_tv, m)) return m.name || 'objeto';
-        }
-      }
-    }
-    return null;
-  }
   // Caixa orientada x triângulo (eixos separadores)
   const _L = new Float64Array(9), _E = new Float64Array(9);
   const sepAxis = (o, x, y, z) => {
@@ -1048,28 +1018,64 @@ function build(scene, track, quality, env, opts, hold) {
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     const grow = (x, z, r) => { x0 = Math.min(x0, x - r); x1 = Math.max(x1, x + r); z0 = Math.min(z0, z - r); z1 = Math.max(z1, z + r); };
     for (const c of cams) grow(c.p.x, c.p.z, 2);
+    // piso: abaixo dele nada toca o volume do outdoor (pés a partir de 0,9 m) nem os raios
+    // (que saem a 2,3 m da pista e sobem até o painel)
+    let yFloor = Infinity;
+    for (const c of cams) yFloor = Math.min(yFloor, c.p.y);
     const out = Math.sign(lat) || 1;
     for (const [dS, dL] of TRIES) {
       const r = track.sample(s + dS);
-      grow(r.pos.x + r.right.x * (lat + out * dL), r.pos.z + r.right.z * (lat + out * dL), W / 2 + 4);
+      const x = r.pos.x + r.right.x * (lat + out * dL), z = r.pos.z + r.right.z * (lat + out * dL);
+      grow(x, z, W / 2 + 4);
+      yFloor = Math.min(yFloor, terrainY(x, z) + 0.4);
     }
-    return { cams, x0, z0, x1, z1, T: [], M: [] };
+    return { cams, x0, z0, x1, z1, yFloor, T: new Float32Array(0), n: 0, M: [] };
   }
-  // Uma passada só pelos triângulos do cenário, distribuindo-os entre as regiões dos outdoors
+  // Uma passada só pelos triângulos do cenário, distribuindo-os entre as regiões dos outdoors.
+  // Cada malha (ou instância) é descartada pela esfera envolvente região a região; os vértices de
+  // uma instância são transformados uma vez só.
+  let _V = new Float32Array(0);
   function collectSites(sites) {
     if (!sites.length) return;
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-    for (const r of sites) { x0 = Math.min(x0, r.x0); x1 = Math.max(x1, r.x1); z0 = Math.min(z0, r.z0); z1 = Math.max(z1, r.z1); }
-    scanTris(x0, -1e9, z0, x1, 1e9, z1, (v, m) => {
-      const ax = Math.min(v[0].x, v[1].x, v[2].x), bx = Math.max(v[0].x, v[1].x, v[2].x);
-      const az = Math.min(v[0].z, v[1].z, v[2].z), bz = Math.max(v[0].z, v[1].z, v[2].z);
-      for (const r of sites) {
-        if (ax > r.x1 || bx < r.x0 || az > r.z1 || bz < r.z0) continue;
-        r.T.push(v[0].x, v[0].y, v[0].z, v[1].x, v[1].y, v[1].z, v[2].x, v[2].y, v[2].z);
-        r.M.push(m);
+    const near = [];
+    for (const m of getBlockers()) {
+      const P = m.geometry.attributes.position, I = m.geometry.index;
+      const nt = (I ? I.count : P.count) / 3;
+      const inst = m.isInstancedMesh ? m.count : 1;
+      // malhas estáticas já em coordenadas de mundo (matriz identidade): lê o array direto
+      const raw = !m.isInstancedMesh && !P.isInterleavedBufferAttribute && P.itemSize === 3 && m.matrixWorld.equals(IDENT);
+      let X = null;
+      for (let k = 0; k < inst; k++) {
+        _m4.copy(m.matrixWorld);
+        if (m.isInstancedMesh) { m.getMatrixAt(k, _mi); _m4.multiply(_mi); }
+        _sph.copy(m.geometry.boundingSphere).applyMatrix4(_m4);
+        const sc = _sph.center, sr = _sph.radius;
+        near.length = 0;
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, y0 = Infinity;
+        for (const r of sites) {
+          if (sc.x + sr < r.x0 || sc.x - sr > r.x1 || sc.z + sr < r.z0 || sc.z - sr > r.z1 || sc.y + sr < r.yFloor) continue;
+          near.push(r);
+          x0 = Math.min(x0, r.x0); x1 = Math.max(x1, r.x1); z0 = Math.min(z0, r.z0); z1 = Math.max(z1, r.z1); y0 = Math.min(y0, r.yFloor);
+        }
+        if (!near.length) continue;
+        // índices sempre em Uint32Array: o laço quente (gatherTris) fica com um tipo só e é otimizado
+        if (!X) X = I ? (I.array instanceof Uint32Array ? I.array : Uint32Array.from(I.array)) : Uint32Array.from({ length: P.count }, (_, i) => i);
+        let A = P.array;
+        if (!raw) {
+          if (_V.length < P.count * 3) _V = new Float32Array(P.count * 3);
+          const e = _m4.elements;
+          for (let v = 0; v < P.count; v++) {
+            const x = P.getX(v), y = P.getY(v), z = P.getZ(v);
+            _V[v * 3] = e[0] * x + e[4] * y + e[8] * z + e[12];
+            _V[v * 3 + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
+            _V[v * 3 + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+          }
+          A = _V;
+        }
+        gatherTris(A, X, nt, near, x0, x1, z0, z1, y0, m);
       }
-      return false;
-    });
+    }
+    _V = new Float32Array(0);
   }
   // Grade 2D (8 m) com os triângulos da região: colisão de volumes e linha de visada.
   // Visada = fração de raios livres (câmeras -> grade 5 × 3 no painel) entre os pontos no campo de
@@ -1077,7 +1083,7 @@ function build(scene, track, quality, env, opts, hold) {
   function siteTester(site, W, H) {
     const { cams, x0, z0 } = site;
     const G = 8, nx = Math.max(1, Math.ceil((site.x1 - x0) / G)), nz = Math.max(1, Math.ceil((site.z1 - z0) / G));
-    const tris = new Float32Array(site.T);
+    const tris = site.T.subarray(0, site.n);
     const nT = tris.length / 9;
     const grid = new Array(nx * nz);
     const cx = (x) => clamp(Math.floor((x - x0) / G), 0, nx - 1), cz = (z) => clamp(Math.floor((z - z0) / G), 0, nz - 1);
@@ -1197,19 +1203,18 @@ function build(scene, track, quality, env, opts, hold) {
     };
     return { s: s2, lat: lat2, base, az, ax, legPos, grounds, y0, vol, BILL_W, BILL_H, legX };
   }
-  function billboard(id, s, lat, faceS, o = {}) {
+  function billboard(id, s, lat, faceS, o, site) {
     // procura o lugar mais próximo do pedido que não atravesse nada (árvores mudam com a qualidade)
     // e que as câmeras vejam: aceita o primeiro com visada ≥ 80%; senão, o de melhor visada
     const out = Math.sign(lat) || 1;
-    const tries = [[0, 0], [0, 3], [5, 0], [-5, 0], [0, 6], [5, 3], [-5, 3], [10, 0], [-10, 0], [0, 9], [10, 5], [-10, 5], [15, 0], [-15, 0]];
     const k = o.k || 1;
-    const sight = sightTester(s, lat, faceS, BILL_W0 * k, BILL_H0 * k);
+    const test = siteTester(site, BILL_W0 * k, BILL_H0 * k);
     let L = null, best = null, blockedBy = null;
-    for (const [dS, dL] of tries) {
+    for (const [dS, dL] of TRIES) {
       const cand = billLayout(s + dS, lat + out * dL, faceS, o);
-      const hit = sceneHits(cand.vol);
+      const hit = test.hits(cand.vol);
       if (hit) { if (!blockedBy) blockedBy = hit; continue; }
-      Object.assign(cand, sight(cand));
+      Object.assign(cand, test.sight(cand));
       if (cand.sight >= 0.8) { L = cand; break; }
       if (!best || cand.sight > best.sight) best = cand;
     }
@@ -1279,18 +1284,29 @@ function build(scene, track, quality, env, opts, hold) {
     }
     return { id, base, az, s: L.s, lat: L.lat };
   }
+  // [id, s, lateral, s para onde olha, opções]
+  const BILLS = [
+    // Grampo: visto de frente por quem sai da ponte (maior, como nas zonas de frenagem)
+    ['b0', 978, 26, 895, { k: 1.25 }],
+    // Curva final: fim da reta de Tesla, à esquerda do pórtico
+    ['b2', 1545, -25, 1450, { k: 1.3 }],
+    // Cume: fim da subida do Observatório
+    ['b1', 616, 30, 520, {}],
+    // Fim da reta de largada (zona de frenagem, por fora), alto para passar por cima da placa F = m·a
+    ['b3', 132, -30, 10, { clear: 6.2 }],
+    // Descida do Observatório para a ponte (na reta de Tesla as bobinas escondiam o painel)
+    ['b4', B4[0], B4[1], B4[2], { clear: B4[3] }],
+  ];
   const bb = [];
-  const addBill = (id, s, lat, faceS, o) => part(`outdoor ${id}`, () => bb.push(billboard(id, s, lat, faceS, o)));
-  // Grampo: visto de frente por quem sai da ponte (maior, como nas zonas de frenagem)
-  addBill('b0', 978, 26, 895, { k: 1.25 });
-  // Curva final: fim da reta de Tesla, à esquerda do pórtico
-  addBill('b2', 1545, -25, 1450, { k: 1.3 });
-  // Cume: fim da subida do Observatório
-  addBill('b1', 616, 30, 520);
-  // Fim da reta de largada (zona de frenagem, por fora), alto para passar por cima da placa F = m·a
-  addBill('b3', 132, -30, 10, { clear: 6.2 });
-  // Descida do Observatório para a ponte (na reta de Tesla as bobinas escondiam o painel)
-  addBill('b4', B4[0], B4[1], B4[2], { clear: B4[3] });
+  {
+    const sites = BILLS.map(([id, s, lat, faceS, o]) => part(`outdoor ${id}`, () => billSite(s, lat, faceS, o)));
+    part('outdoors: cenário', () => collectSites(sites.filter(Boolean)));
+    lap('outdoors-cenario');
+    BILLS.forEach(([id, s, lat, faceS, o], i) => {
+      if (sites[i]) part(`outdoor ${id}`, () => bb.push(billboard(id, s, lat, faceS, o, sites[i])));
+    });
+  }
+  lap('outdoors');
   if (!DEBUG) blockers = null; // libera a lista (a página de teste ainda usa)
 
   // ------------------------------------------------------------ faixas nas coberturas das arquibancadas
@@ -1434,6 +1450,7 @@ function build(scene, track, quality, env, opts, hold) {
     disposables.push(m.geometry);
   }
   cells.clear(); // arrays de montagem não servem mais
+  lap('faixas+malhas');
 
   // ------------------------------------------------------------ tinta no chão (não é sólida: pode ficar dentro do corredor)
   // Logo no jardim da universidade (visto do alto: grua do título, vistas aéreas); faixas nos acostamentos
@@ -1548,13 +1565,15 @@ function build(scene, track, quality, env, opts, hold) {
     group.add(bl.mesh);
   });
 
+  lap('tinta+dirigivel');
+
   // ------------------------------------------------------------ fonte e logotipo reais
   // O atlas nasce com o que já chegou. O que chegar até o prazo (carregamento / título) entra num
   // redesenho só. Depois do prazo, só a fonte ainda justifica redesenhar (o logo vetorial é quase igual
   // ao PNG). Com o laço do jogo rodando, o redesenho é pintado aos poucos em update() (≈ 3 ms por quadro)
   // e vai para a GPU uma vez só, no fim.
   const DEADLINE = 6000;
-  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const now = clock;
   const drawn = { font: fontWasReady, logo: logoWasReady };
   let redraws = 0, jobs = null, lastRun = -Infinity, timer = 0;
   const redraw = (force) => {
@@ -1615,7 +1634,7 @@ function build(scene, track, quality, env, opts, hold) {
   if (DEBUG) {
     handle.atlas = atlas.tex; // extras só para a página de teste
     handle.debug = {
-      solids, feet, boards: () => boardCount, billboards: bb, billMoves, billSight, skipped,
+      solids, feet, boards: () => boardCount, billboards: bb, billMoves, billSight, skipped, times,
       canvases: { atlas: atlas.canvas, grass: atlas.grass },
       get redraws() { return redraws; }, get pending() { return jobs ? jobs.length : 0; },
       drawnWithLogo: logoWasReady, drawnWithFont: fontWasReady, orbit,
@@ -1624,12 +1643,43 @@ function build(scene, track, quality, env, opts, hold) {
       // nota de visada de um outdoor hipotético (para escolher lugares)
       sight: (s, lat, faceS, o = {}) => {
         const k = o.k || 1;
+        const site = billSite(s, lat, faceS, o);
+        collectSites([site]);
+        const test = siteTester(site, BILL_W0 * k, BILL_H0 * k);
         const L = billLayout(s, lat, faceS, o);
-        return { ...sightTester(s, lat, faceS, BILL_W0 * k, BILL_H0 * k)(L), hit: sceneHits(L.vol) };
+        return { ...test.sight(L), hit: test.hits(L.vol) };
       },
     };
   }
   return handle;
+}
+
+
+// Laço quente da coleta (fora do closure; índices sempre em Uint32Array)
+function gatherTris(A, X, nt, near, x0, x1, z0, z1, y0, m) {
+  for (let t = 0; t < nt; t++) {
+    const a = X[t * 3] * 3, b = X[t * 3 + 1] * 3, c = X[t * 3 + 2] * 3;
+    const ax0 = A[a], bx0 = A[b], cx0 = A[c];
+    if ((ax0 > x1 && bx0 > x1 && cx0 > x1) || (ax0 < x0 && bx0 < x0 && cx0 < x0)) continue;
+    const az0 = A[a + 2], bz0 = A[b + 2], cz0 = A[c + 2];
+    if ((az0 > z1 && bz0 > z1 && cz0 > z1) || (az0 < z0 && bz0 < z0 && cz0 < z0)) continue;
+    const ay0 = A[a + 1], by0 = A[b + 1], cy0 = A[c + 1];
+    if (ay0 < y0 && by0 < y0 && cy0 < y0) continue;
+    const mnx = ax0 < bx0 ? (ax0 < cx0 ? ax0 : cx0) : (bx0 < cx0 ? bx0 : cx0);
+    const mxx = ax0 > bx0 ? (ax0 > cx0 ? ax0 : cx0) : (bx0 > cx0 ? bx0 : cx0);
+    const mnz = az0 < bz0 ? (az0 < cz0 ? az0 : cz0) : (bz0 < cz0 ? bz0 : cz0);
+    const mxz = az0 > bz0 ? (az0 > cz0 ? az0 : cz0) : (bz0 > cz0 ? bz0 : cz0);
+    const mxy = ay0 > by0 ? (ay0 > cy0 ? ay0 : cy0) : (by0 > cy0 ? by0 : cy0);
+    for (let q = 0; q < near.length; q++) {
+      const r = near[q];
+      if (mnx > r.x1 || mxx < r.x0 || mnz > r.z1 || mxz < r.z0 || mxy < r.yFloor) continue;
+      if (r.n + 9 > r.T.length) { const nb = new Float32Array(r.T.length * 2 + 9 * 1024); nb.set(r.T); r.T = nb; }
+      const T = r.T, o = r.n;
+      r.M[o / 9] = m;
+      T[o] = ax0; T[o + 1] = ay0; T[o + 2] = az0; T[o + 3] = bx0; T[o + 4] = by0; T[o + 5] = bz0; T[o + 6] = cx0; T[o + 7] = cy0; T[o + 8] = cz0;
+      r.n = o + 9;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
