@@ -203,6 +203,25 @@ export function normalizeStatus(status: unknown): string {
   }
 }
 
+// Status que desfazem um plano já concedido (apply_payment devolve os meses)
+export const REVERSAL_STATUSES = ['refunded', 'charged_back', 'cancelled'];
+
+// Uma preferência (external_reference) pode ter VÁRIOS pagamentos no MP: Pix abandonado que expira
+// ('cancelled') depois do cartão aprovado, pagamento duplicado estornado etc. Só o pagamento que
+// quitou a referência (payments.mp_payment_id) pode desfazer o plano.
+// true => ignorar a notificação sem chamar apply_payment.
+export function isStaleReversal(
+  row: { status?: unknown; mp_payment_id?: unknown } | null | undefined,
+  mpPaymentId: string,
+  status: string,
+): boolean {
+  if (!REVERSAL_STATUSES.includes(status)) return false;
+  if (!row || row.status !== 'approved') return false; // nada concedido ainda: apply_payment decide
+  if (status === 'cancelled') return true; // pagamento aprovado no MP nunca vira 'cancelled'
+  const applied = row.mp_payment_id === null || row.mp_payment_id === undefined ? '' : String(row.mp_payment_id);
+  return applied === '' || applied !== mpPaymentId;
+}
+
 // Reais (29.9 ou "29.90") -> centavos inteiros. null se inválido/negativo.
 export function toCents(amount: unknown): number | null {
   const n = typeof amount === 'string' && amount.trim() !== '' ? Number(amount) : amount;
