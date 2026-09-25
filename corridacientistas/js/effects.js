@@ -202,7 +202,7 @@ varying float vHot;
 #include <fog_pars_vertex>
 void main() {
   vec4 mvPosition = modelViewMatrix * vec4(iPos, 1.0);
-  float size = iPar.x;
+  float size = abs(iPar.x); // tamanho negativo = sem deslocamento de profundidade
   float shape = iPar.z;
   vec2 c = position.xy;
   bool done = false;
@@ -228,6 +228,11 @@ void main() {
     float cs = cos(r);
     float sn = sin(r);
     mvPosition.xy += vec2(cs * c.x - sn * c.y, sn * c.x + cs * c.y) * size;
+    // puxa o sprite para a câmera (mesmo tamanho na tela) para não ser cortado pelo chão
+    float zo = iPar.x < 0.0 ? 0.0 : min(size * 0.45, max(0.0, -mvPosition.z - 0.6));
+    float zn = mvPosition.z + zo;
+    mvPosition.xy *= zn / mvPosition.z;
+    mvPosition.z = zn;
   }
   vec2 cell = vec2(mod(shape, 4.0), floor(shape / 4.0 + 0.01));
   vUv = (cell + vec2(position.x + 0.5, 0.5 - position.y) * 0.97 + 0.015) / vec2(4.0, 2.0);
@@ -548,8 +553,13 @@ class BoltBatch {
 
   // o: { a, b, follow, parent, parentIdx, freeEnd, life, amp, wGlow, wCore, glow, core, alpha, taper }
   spawn(o) {
-    if (this.n >= this.max) return null;
-    const bl = this.bolts[this.n++];
+    let bl;
+    if (this.n < this.max) bl = this.bolts[this.n++];
+    else if (o.force) {
+      // pool cheio: reaproveita o raio mais adiantado na vida
+      bl = this.bolts[0];
+      for (let i = 1; i < this.n; i++) if (this.bolts[i].age / this.bolts[i].life > bl.age / bl.life) bl = this.bolts[i];
+    } else return null;
     bl.follow = o.follow || null;
     bl.parent = o.parent || null;
     bl.parentIdx = o.parentIdx || 0;
@@ -692,7 +702,7 @@ class BoltBatch {
 // ---------------------------------------------------------------------------
 
 // Chama do escapamento: dois cones (externo laranja, interno branco) apontando para -Z.
-function buildFlameGeometry() {
+export function buildFlameGeometry() {
   const cone = (r, len, cBase, cTip) => {
     const g = new THREE.ConeGeometry(r, len, 12, 3, true);
     g.rotateX(-Math.PI / 2); // ponta para -Z
@@ -798,8 +808,8 @@ const PAL = {
   smokeDark: C(0x2c2c30),
   smokeMid: C(0x6d6d72),
   smokeLight: C(0xb9b9be),
-  dust: C(0xb89a6a),
-  dust2: C(0xd8c49a),
+  dust: C(0x8f6d45),
+  dust2: C(0xc9a877),
   fire0: C(0xfff0b0),
   fire1: C(0xff5a14),
   fire2: C(0x9a1c00),
@@ -815,6 +825,23 @@ const PAL = {
   leaf: C(0x47b53a),
   confetti: [0xff3b3b, 0xffd23f, 0x3ddc84, 0x4cc9f0, 0xb388ff, 0xff7bd5, 0xff9f1c, 0xffffff].map(C),
   flameTint: C(0xffffff),
+  atomIcon: C(0x3fa9ff),
+  flameHot: C(0xffc458),
+};
+const H = (h, k) => new THREE.Color(h).multiplyScalar(k); // cor "HDR" (> 1)
+const EXP = {
+  fire: {
+    flash: C(0xffd890), core: H(0xffa52e, 1.45), mid: C(0xb52200), glow: C(0xff6a10),
+    spark0: C(0xffd060), spark1: C(0xff4000), ring: C(0xff7a1a), smoke0: C(0x3a3a3e), smoke1: C(0x7a7a80),
+  },
+  purple: {
+    flash: C(0xd9a6ff), core: H(0xa35cff, 1.15), mid: C(0x33096e), glow: C(0x7a2cff),
+    spark0: C(0xffc6ff), spark1: C(0xff7a1a), ring: C(0xb266ff), smoke0: C(0x2a1840), smoke1: C(0x5d4b70),
+  },
+  blue: {
+    flash: C(0xb8e8ff), core: H(0x74d2ff, 1.3), mid: C(0x1640b8), glow: C(0x2f8dff),
+    spark0: C(0xd8f4ff), spark1: C(0x2f8dff), ring: C(0x5cc0ff), smoke0: C(0x3a4450), smoke1: C(0x7a8490),
+  },
 };
 
 // temporários
@@ -864,7 +891,7 @@ export class Effects {
     this.alpha = new ParticlePool(Math.round(1400 * this.q), false, 11);
     this.add = new ParticlePool(Math.round(2800 * this.q), true, 12);
     this.root.add(this.alpha.batch.mesh, this.add.batch.mesh);
-    this.bolts = new BoltBatch(lowQ ? 20 : 32, lowQ ? 9 : 12);
+    this.bolts = new BoltBatch(lowQ ? 32 : 48, lowQ ? 9 : 12);
     this.root.add(this.bolts.mesh);
     this._e = new Emit();
 
@@ -939,7 +966,7 @@ export class Effects {
       if (!e?.kart) return;
       const k = e.kart;
       _v.copy(k.position).addScaledVector(UP, 1.3 * this._scaleOf(k));
-      if (e.type === 'shock') this.burst('electric', _v, { kart: k, scale: 0.9 });
+      if (e.type === 'shock') this.burst('electric', _v, { kart: k, scale: 0.9, bolts: 0 });
       else {
         this.burst('stars', _v, { scale: e.type === 'tumble' ? 1.4 : 1 });
         _v.copy(k.position).addScaledVector(UP, 0.6);
@@ -952,14 +979,14 @@ export class Effects {
       this.burst('dust', e.kart.position, { scale: clamp(0.7 + e.airTime * 0.4, 0.7, 1.6) });
     });
     on('kart:driftLevel', (e) => e?.kart && e.level > 0 && this._driftLevelUp(e.kart, e.level));
-    on('item:pickup', (e) => e?.pos && this.burst('pickup', e.pos));
+    on('item:pickup', (e) => e?.pos && this.burst('pickup', e.pos, { vel: e.kart?.velocity }));
     on('item:explode', (e) => {
       if (!e?.pos) return;
       switch (e.item) {
         case 'maca': this.burst('apple', e.pos); break;
         case 'alfa': this.burst('explosion', e.pos, { scale: 0.75 }); break;
         case 'eletron': this.burst('explosion', e.pos, { scale: 0.8, palette: 'blue' }); break;
-        case 'buraco': this.burst('explosion', e.pos, { scale: 1.9, palette: 'purple' }); break;
+        case 'buraco': this.burst('explosion', e.pos, { scale: 1.45, palette: 'purple' }); break;
         case 'break': this.burst('sparks', e.pos, { count: 14 }); break;
         default: this.burst('explosion', e.pos, { scale: 0.8 });
       }
@@ -1023,33 +1050,35 @@ export class Effects {
   confetti(kart) {
     this.confettiKart = kart;
     this.confettiT = 3.2;
-    // canhões de confete dos dois lados
+    // canhões de confete dos dois lados (acompanham o kart)
     const e = this._e;
     const o = kart.object3d;
-    const n = Math.round(90 * this.q);
+    const kv = kart.velocity;
+    const n = Math.round(80 * this.q);
     for (const side of [-1, 1]) {
-      this._lw(o, 1, side * 1.1, 0.9, 0.2, _v);
+      this._lw(o, 1, side * 0.9, 1.0, 0.3, _v);
       _right.set(side, 0, 0).applyQuaternion(o.quaternion);
       for (let i = 0; i < n; i++) {
         e.reset().at(_v);
-        e.vel(_right.x * rand(2, 6) + rand(-2.5, 2.5), rand(9, 16), _right.z * rand(2, 6) + rand(-2.5, 2.5));
-        e.vx += kart.velocity ? kart.velocity.x * 0.6 : 0;
-        e.vz += kart.velocity ? kart.velocity.z * 0.6 : 0;
+        e.vel(_right.x * rand(1, 4) + rand(-1.5, 1.5), rand(5, 9), _right.z * rand(1, 4) + rand(-1.5, 1.5));
+        if (kv) { e.vx += kv.x; e.vz += kv.z; }
         this._confettiP(e);
+        e.grav = 6; e.drag = 0; e.life = rand(1.2, 1.8);
+        this.alpha.spawn(e);
       }
     }
   }
 
+  // parâmetros comuns do confete (sem arrasto: acompanha o kart; cai devagar e balança)
   _confettiP(e) {
     e.col(PAL.confetti[(Math.random() * PAL.confetti.length) | 0]);
-    e.life = rand(2.2, 3.4);
-    e.s0 = rand(0.16, 0.26);
-    e.drag = 1.7;
-    e.grav = 3.4;
-    e.wob = 4;
+    e.life = rand(2.2, 3.2);
+    e.s0 = rand(0.2, 0.3);
+    e.drag = 0;
+    e.grav = 1.1;
+    e.wob = 5;
     e.spin = rand(-9, 9);
     e.shape = Math.random() < 0.8 ? SHAPE.SQUARE : SHAPE.SHARD;
-    this.alpha.spawn(e);
   }
 
   // Explosões e outros efeitos pontuais.
@@ -1062,58 +1091,60 @@ export class Effects {
     const cnt = (n) => Math.max(1, Math.round(n * q * (opts.countMul ?? 1)));
     switch (type) {
       case 'explosion': {
-        const pal = opts.palette;
-        const c0 = pal === 'purple' ? PAL.purple0 : pal === 'blue' ? PAL.blue0 : PAL.fire0;
-        const c1 = pal === 'purple' ? PAL.purple1 : pal === 'blue' ? PAL.blue1 : PAL.fire1;
-        const c2 = pal === 'purple' ? PAL.orangeHot : pal === 'blue' ? PAL.electric : PAL.sparkWarm2;
+        const P = opts.palette === 'purple' ? EXP.purple : opts.palette === 'blue' ? EXP.blue : EXP.fire;
+        const k = Math.min(sc, 1.7);
         // clarão
-        e.reset().at(pos).col(PAL.white, c0);
-        e.life = 0.2; e.s0 = 5 * sc; e.s1 = 8 * sc; e.hot = 1;
+        e.reset().at(pos).col(P.flash);
+        e.life = 0.14; e.s0 = 3 * sc; e.s1 = 5 * sc; e.hot = 0.6; e.a = 0.6;
         this.add.spawn(e);
-        // bola de fogo
-        for (let i = 0, n = cnt(26 * Math.min(sc, 1.6)); i < n; i++) {
+        // bola de fogo (mistura normal: lê bem contra o céu claro)
+        for (let i = 0, n = cnt(20 * k); i < n; i++) {
           _v.randomDirection();
-          const sp = rand(3, 9) * sc;
-          e.reset().at(pos).vel(_v.x * sp, _v.y * sp * 0.7 + 2 * sc, _v.z * sp);
-          e.x += _v.x * 0.4 * sc; e.y += _v.y * 0.4 * sc; e.z += _v.z * 0.4 * sc;
-          e.col(c0, c1);
-          e.life = rand(0.45, 0.85);
-          e.s0 = rand(1.2, 1.9) * sc; e.s1 = rand(2.4, 3.4) * sc;
-          e.drag = 3.2; e.grav = -2; e.hot = 0.55; e.a = 0.85;
-          e.shape = Math.random() < 0.6 ? SHAPE.SMOKE : SHAPE.GLOW;
-          e.spin = rand(-2, 2);
+          const sp = rand(2, 7) * sc;
+          e.reset().at(pos).vel(_v.x * sp, _v.y * sp * 0.6 + 1.5 * sc, _v.z * sp);
+          e.x += _v.x * 0.5 * sc; e.y += _v.y * 0.35 * sc; e.z += _v.z * 0.5 * sc;
+          e.col(P.core, P.mid);
+          e.life = rand(0.4, 0.75); e.s0 = rand(1.1, 1.7) * sc; e.s1 = rand(2.4, 3.4) * sc;
+          e.drag = 4; e.grav = -3; e.hot = 0.15; e.shape = SHAPE.SMOKE; e.spin = rand(-2, 2);
+          this.alpha.spawn(e);
+        }
+        // brilho aditivo por cima
+        for (let i = 0, n = Math.max(2, Math.round(5 * k)); i < n; i++) {
+          _v.randomDirection();
+          e.reset().at(pos).vel(_v.x * 3 * sc, _v.y * 2 * sc + 1, _v.z * 3 * sc).col(P.glow);
+          e.life = rand(0.25, 0.4); e.s0 = 2.6 * sc; e.s1 = 4 * sc; e.a = 0.28; e.hot = 0; e.drag = 3;
           this.add.spawn(e);
         }
         // faíscas
-        for (let i = 0, n = cnt(34 * Math.min(sc, 1.6)); i < n; i++) {
+        for (let i = 0, n = cnt(30 * k); i < n; i++) {
           _v.randomDirection();
           if (_v.y < -0.2) _v.y = -_v.y;
           const sp = rand(9, 22) * sc;
-          e.reset().at(pos).vel(_v.x * sp, _v.y * sp + 3, _v.z * sp).col(c0, c2);
-          e.life = rand(0.45, 1.0); e.s0 = 0.13 * Math.sqrt(sc); e.s1 = 0.05;
-          e.drag = 1.2; e.grav = 14; e.stretch = 0.045; e.hot = 0.8; e.shape = SHAPE.SPARK;
+          e.reset().at(pos).vel(_v.x * sp, _v.y * sp + 3, _v.z * sp).col(P.spark0, P.spark1);
+          e.life = rand(0.4, 0.9); e.s0 = 0.14 * Math.sqrt(sc); e.s1 = 0.05;
+          e.drag = 1.2; e.grav = 14; e.stretch = 0.045; e.hot = 0.2; e.shape = SHAPE.SPARK;
           this.add.spawn(e);
         }
-        // fumaça
-        for (let i = 0, n = cnt(14 * Math.min(sc, 1.6)); i < n; i++) {
+        // fumaça que aparece depois do fogo
+        for (let i = 0, n = cnt(12 * k); i < n; i++) {
           _v.randomDirection();
-          e.reset().at(pos).vel(_v.x * 2.5 * sc, rand(1.5, 4) * sc, _v.z * 2.5 * sc);
-          e.col(pal === 'purple' ? PAL.purple1 : PAL.smokeDark, PAL.smokeMid);
-          e.life = rand(1.1, 1.9); e.s0 = 1.2 * sc; e.s1 = rand(3, 4.2) * sc;
-          e.drag = 1.6; e.grav = -0.6; e.a = 0.5; e.fadeIn = 0.18; e.shape = SHAPE.SMOKE; e.spin = rand(-0.8, 0.8);
+          e.reset().at(pos).vel(_v.x * 2.5 * sc, rand(1.5, 3.5) * sc, _v.z * 2.5 * sc);
+          e.col(P.smoke0, P.smoke1);
+          e.life = rand(1.2, 2.0); e.s0 = 1.3 * Math.min(sc, 1.2); e.s1 = rand(3.0, 4.0) * Math.min(sc, 1.2);
+          e.drag = 1.6; e.grav = -0.7; e.a = sc > 1.2 ? 0.4 : 0.55; e.fadeIn = 0.3; e.shape = SHAPE.SMOKE; e.spin = rand(-0.8, 0.8);
           this.alpha.spawn(e);
         }
         // detritos escuros
-        for (let i = 0, n = cnt(8 * sc); i < n; i++) {
+        for (let i = 0, n = cnt(8 * k); i < n; i++) {
           _v.randomDirection();
           e.reset().at(pos).vel(_v.x * 9 * sc, rand(5, 11), _v.z * 9 * sc).col(0x241a14);
-          e.life = rand(0.6, 1.0); e.s0 = rand(0.12, 0.22) * sc; e.grav = 20; e.drag = 0.6;
+          e.life = rand(0.6, 1.0); e.s0 = rand(0.12, 0.22) * Math.min(sc, 1.1); e.grav = 20; e.drag = 0.6;
           e.shape = SHAPE.SHARD; e.spin = rand(-12, 12);
           this.alpha.spawn(e);
         }
         _v.copy(pos); _v.y -= 0.45;
-        this._ring(_v, 0.4 * sc, c2, 0.5, 7.5 * sc, 0.5, 0.9);
-        if (sc > 1.2) this._ring(_v, 0.4 * sc, c0, 0.8, 11 * sc, 0.8, 0.5);
+        this._ring(_v, 0.4 * sc, P.ring, 0.5, 7.5 * sc, 0.55);
+        if (sc > 1.2) this._ring(_v, 0.4 * sc, P.flash, 0.8, 11 * sc, 0.4);
         break;
       }
       case 'sparks': {
@@ -1142,8 +1173,11 @@ export class Effects {
         const n = cnt(opts.count ?? 120);
         for (let i = 0; i < n; i++) {
           _v.randomDirection();
-          e.reset().at(pos).vel(_v.x * 5 * sc, rand(6, 13) * sc, _v.z * 5 * sc);
+          e.reset().at(pos).vel(_v.x * 5 * sc, rand(4, 8) * sc, _v.z * 5 * sc);
+          if (opts.vel) { e.vx += opts.vel.x; e.vz += opts.vel.z; }
           this._confettiP(e);
+          e.grav = 5; e.life = rand(1.5, 2.5);
+          this.alpha.spawn(e);
         }
         break;
       }
@@ -1161,7 +1195,7 @@ export class Effects {
       }
       case 'electric': {
         const k = opts.kart || null;
-        const nb = Math.max(2, Math.round((opts.bolts ?? 5) * Math.min(1.5, sc)));
+        const nb = Math.round((opts.bolts ?? 5) * Math.min(1.5, sc));
         for (let i = 0; i < nb; i++) {
           _v.randomDirection().multiplyScalar(rand(0.9, 1.7) * sc).add(pos);
           this.bolts.spawn({
@@ -1191,9 +1225,9 @@ export class Effects {
           const sp = rand(4, 10);
           e.reset().at(pos).vel(_v.x * sp, _v.y * sp * 0.7 + 3.5, _v.z * sp);
           if (opts.vel) { e.vx += opts.vel.x * 0.7; e.vz += opts.vel.z * 0.7; }
-          _col.setHSL(Math.random(), 0.95, 0.6);
+          _col.setHSL(Math.random(), 1, 0.5);
           e.c0.copy(_col);
-          e.life = rand(0.55, 0.95); e.s0 = rand(0.22, 0.36); e.s1 = 0.06;
+          e.life = rand(0.55, 0.95); e.s0 = rand(0.24, 0.38); e.s1 = 0.06;
           e.grav = 13; e.drag = 1.4; e.spin = rand(-14, 14); e.shape = SHAPE.SHARD;
           this.alpha.spawn(e);
         }
@@ -1201,14 +1235,14 @@ export class Effects {
           _v.randomDirection();
           const sp = rand(2, 6);
           e.reset().at(pos).vel(_v.x * sp, _v.y * sp + 2, _v.z * sp);
-          _col.setHSL(Math.random(), 1, 0.7);
+          _col.setHSL(Math.random(), 1, 0.55);
           e.c0.copy(_col);
           e.life = rand(0.4, 0.7); e.s0 = rand(0.3, 0.5); e.s1 = 0.05; e.drag = 2.5; e.grav = 2;
-          e.shape = SHAPE.STAR; e.hot = 0.7; e.spin = rand(-4, 4);
+          e.shape = SHAPE.STAR; e.hot = 0.25; e.spin = rand(-4, 4);
           this.add.spawn(e);
         }
         e.reset().at(pos).col(PAL.white);
-        e.life = 0.16; e.s0 = 3.2; e.s1 = 4.2; e.hot = 1; e.a = 0.9;
+        e.life = 0.16; e.s0 = 2.8; e.s1 = 3.8; e.hot = 0.6; e.a = 0.7;
         this.add.spawn(e);
         break;
       }
@@ -1230,11 +1264,14 @@ export class Effects {
         const n = Math.max(4, Math.round(7 * sc));
         for (let i = 0; i < n; i++) {
           const a = (i / n) * TAU;
-          e.reset().at(pos).vel(Math.cos(a) * 3.5, rand(3, 6), Math.sin(a) * 3.5).col(PAL.star, 0xffffff);
-          e.life = rand(0.6, 0.85); e.s0 = 0.5; e.s1 = 0.2; e.grav = 9; e.drag = 1;
-          e.shape = SHAPE.STAR; e.hot = 0.6; e.spin = rand(-6, 6);
-          this.add.spawn(e);
+          e.reset().at(pos).vel(Math.cos(a) * 3.5, rand(3, 6), Math.sin(a) * 3.5).col(PAL.star);
+          e.life = rand(0.6, 0.85); e.s0 = 0.55; e.s1 = 0.25; e.grav = 9; e.drag = 1;
+          e.shape = SHAPE.STAR; e.spin = rand(-6, 6);
+          this.alpha.spawn(e);
         }
+        e.reset().at(pos).col(0xfff2a0);
+        e.life = 0.15; e.s0 = 1.8; e.s1 = 2.4; e.hot = 0.8; e.a = 0.7;
+        this.add.spawn(e);
         break;
       }
       case 'flame': {
@@ -1270,16 +1307,16 @@ export class Effects {
       }
       case 'implosion': {
         // partículas caindo para o centro
-        for (let i = 0, n = cnt(60 * sc); i < n; i++) {
+        for (let i = 0, n = cnt(40 * sc); i < n; i++) {
           _v.randomDirection();
-          const r = rand(4, 8) * sc;
+          const r = rand(2.5, 5.5) * sc;
           const life = rand(0.25, 0.4);
           e.reset().vel(-_v.x * r / life, -_v.y * r / life, -_v.z * r / life);
           e.x = pos.x + _v.x * r; e.y = pos.y + _v.y * r; e.z = pos.z + _v.z * r;
           if (opts.vel) { e.vx += opts.vel.x; e.vy += opts.vel.y; e.vz += opts.vel.z; }
-          e.col(Math.random() < 0.5 ? PAL.purple0 : PAL.orangeHot, PAL.purple1);
-          e.life = life; e.s0 = 0.18; e.s1 = 0.08; e.stretch = 0.05; e.hot = 0.8; e.shape = SHAPE.SPARK;
-          e.fadeIn = 0.08;
+          e.col(Math.random() < 0.5 ? PAL.purple1 : PAL.orangeHot, PAL.purple0);
+          e.life = life; e.s0 = 0.1; e.s1 = 0.05; e.stretch = 0.03; e.hot = 0.2; e.a = 0.8; e.shape = SHAPE.SPARK;
+          e.fadeIn = 0.1;
           this.add.spawn(e);
         }
         break;
@@ -1289,7 +1326,7 @@ export class Effects {
         const from = opts.from || pos;
         const dist = from.distanceTo(pos);
         const spacing = opts.spacing ?? 0.45;
-        const n = Math.min(8, Math.max(1, Math.ceil(dist / spacing)));
+        const n = Math.min(10, Math.max(1, Math.ceil(dist / spacing)));
         const life = opts.life ?? 0.3;
         const size = opts.size ?? 0.5;
         const c0 = opts.color ?? 0xffffff;
@@ -1300,7 +1337,7 @@ export class Effects {
           e.x = from.x + (pos.x - from.x) * f + rand(-0.06, 0.06);
           e.y = from.y + (pos.y - from.y) * f + rand(-0.06, 0.06);
           e.z = from.z + (pos.z - from.z) * f + rand(-0.06, 0.06);
-          e.life = life * rand(0.8, 1.1); e.s0 = size; e.s1 = size * 0.15; e.hot = opts.hot ?? 0.4;
+          e.life = life * rand(0.8, 1.1); e.s0 = size; e.s1 = size * 0.3; e.hot = opts.hot ?? 0.4;
           e.a = opts.alpha ?? 0.8;
           e.vel(rand(-0.3, 0.3), rand(-0.1, 0.4), rand(-0.3, 0.3));
           this.add.spawn(e);
@@ -1391,7 +1428,7 @@ export class Effects {
     if (k.drifting && onGround && !stunned) {
       const lvl = clamp(k.driftLevel | 0, 0, 3);
       st.lastLevel = lvl;
-      const rate = [34, 95, 115, 135][lvl] * q;
+      const rate = [40, 130, 150, 170][lvl] * q;
       const c0 = PAL.drift[lvl];
       const c1 = PAL.driftEnd[lvl];
       for (let w = 0; w < 2; w++) {
@@ -1402,29 +1439,29 @@ export class Effects {
           st.wheel[w] -= 1;
           const out = w === 0 ? -1 : 1; // lado de fora da roda
           e.reset().at(_v);
-          const sp = rand(2.5, 6);
+          const sp = rand(1.5, 4.5);
           e.vel(
-            _back.x * sp + _right.x * out * rand(0.5, 2.5) + rand(-0.8, 0.8),
-            rand(1.5, 4.5),
-            _back.z * sp + _right.z * out * rand(0.5, 2.5) + rand(-0.8, 0.8),
+            _back.x * sp + _right.x * out * rand(0.3, 2.2) + rand(-0.6, 0.6),
+            rand(1.2, 4),
+            _back.z * sp + _right.z * out * rand(0.3, 2.2) + rand(-0.6, 0.6),
           );
-          if (vel) { e.vx += vel.x * 0.82; e.vy += vel.y * 0.5; e.vz += vel.z * 0.82; }
+          if (vel) { e.vx += vel.x * 0.93; e.vy += vel.y * 0.5; e.vz += vel.z * 0.93; }
           e.col(c0, c1);
-          e.life = rand(0.18, lvl ? 0.42 : 0.3);
-          e.s0 = (lvl ? rand(0.09, 0.15) : rand(0.06, 0.1)) * sc;
+          e.life = rand(0.14, lvl ? 0.32 : 0.24);
+          e.s0 = (lvl ? rand(0.12, 0.19) : rand(0.07, 0.11)) * sc;
           e.s1 = 0.03;
-          e.grav = 16; e.drag = 2; e.stretch = 0.035; e.hot = lvl ? 0.85 : 1; e.shape = SHAPE.SPARK;
+          e.grav = 16; e.drag = 2; e.stretch = 0.014; e.hot = lvl ? 0.22 : 0.6; e.shape = SHAPE.SPARK;
           this.add.spawn(e);
         }
         // clarão na roda (1 quadro)
         e.reset().at(_v).col(c0);
         e.life = -1;
-        e.s0 = (lvl ? 0.75 + lvl * 0.18 : 0.4) * sc * rand(0.8, 1.15);
-        e.hot = lvl ? 0.9 : 0.6; e.a = lvl ? 0.95 : 0.55;
+        e.s0 = (lvl ? 0.62 + lvl * 0.16 : 0.4) * sc * rand(0.85, 1.15);
+        e.hot = lvl ? 0.3 : 0.5; e.a = lvl ? 0.95 : 0.5;
         this.add.spawn(e);
         if (lvl === 3 && Math.random() < 10 * dt * q) {
           e.reset().at(_v).vel(rand(-2, 2) + (vel ? vel.x * 0.8 : 0), rand(2, 4), rand(-2, 2) + (vel ? vel.z * 0.8 : 0));
-          e.col(PAL.purple0, c1); e.life = 0.5; e.s0 = 0.35 * sc; e.s1 = 0.05; e.shape = SHAPE.STAR; e.hot = 0.8;
+          e.col(c0, c1); e.life = 0.45; e.s0 = 0.38 * sc; e.s1 = 0.05; e.shape = SHAPE.STAR; e.hot = 0.15;
           e.grav = 4; e.drag = 2; e.spin = rand(-6, 6);
           this.add.spawn(e);
         }
@@ -1459,15 +1496,15 @@ export class Effects {
             const sp = rand(3.5, 7);
             e.vel(_back.x * sp + rand(-0.5, 0.5), rand(0.1, 0.9), _back.z * sp + rand(-0.5, 0.5));
             if (vel) { e.vx += vel.x * 0.9; e.vy += vel.y * 0.9; e.vz += vel.z * 0.9; }
-            e.c0.copy(PAL.flame0).lerp(st.tint, 0.35);
-            e.c1.copy(st.tint).multiplyScalar(0.8); e.useC1 = true;
+            e.c0.copy(PAL.flameHot).lerp(st.tint, 0.4);
+            e.c1.copy(st.tint).multiplyScalar(0.75); e.useC1 = true;
             e.life = rand(0.12, 0.24); e.s0 = rand(0.35, 0.5) * sc; e.s1 = 0.1 * sc;
-            e.drag = 2; e.hot = 0.8; e.a = 0.9; e.shape = SHAPE.GLOW;
+            e.drag = 2; e.hot = 0.25; e.a = 0.75; e.shape = SHAPE.GLOW;
             this.add.spawn(e);
           }
           // brilho quente na saída
           e.reset().at(_v).col(st.tint);
-          e.life = -1; e.s0 = 0.9 * sc * fl; e.hot = 0.9; e.a = 0.8;
+          e.life = -1; e.s0 = 0.65 * sc * fl; e.hot = 0.3; e.a = 0.6;
           this.add.spawn(e);
         }
       }
@@ -1498,7 +1535,7 @@ export class Effects {
         e.reset().at(_v).vel(_back.x * rand(1, 3) + rand(-1, 1), rand(0.8, 2.2), _back.z * rand(1, 3) + rand(-1, 1));
         if (vel) { e.vx += vel.x * 0.35; e.vz += vel.z * 0.35; }
         e.col(PAL.dust2, PAL.dust);
-        e.life = rand(0.5, 0.85); e.s0 = 0.45 * sc; e.s1 = rand(1.3, 1.9) * sc; e.drag = 2.5; e.a = 0.5;
+        e.life = rand(0.5, 0.85); e.s0 = 0.45 * sc; e.s1 = rand(1.3, 1.9) * sc; e.drag = 2.5; e.a = 0.62;
         e.fadeIn = 0.05; e.shape = SHAPE.SMOKE; e.spin = rand(-1.5, 1.5);
         this.alpha.spawn(e);
       }
@@ -1566,10 +1603,10 @@ export class Effects {
         e.x = _v2.x + Math.cos(a) * 0.6 * sc;
         e.y = _v2.y + (2.0 + Math.sin(a * 2) * 0.08) * sc;
         e.z = _v2.z + Math.sin(a) * 0.6 * sc;
-        e.col(i === 0 ? PAL.blue0 : PAL.star);
-        e.life = -1; e.s0 = (i === 0 ? 0.5 : 0.36) * sc; e.shape = i === 0 ? SHAPE.ATOM : SHAPE.STAR;
-        e.rot = -a * 0.7; e.hot = 0.5;
-        this.add.spawn(e);
+        e.col(i === 0 ? PAL.atomIcon : PAL.star);
+        e.life = -1; e.s0 = (i === 0 ? 0.55 : 0.4) * sc; e.shape = i === 0 ? SHAPE.ATOM : SHAPE.STAR;
+        e.rot = -a * 0.7;
+        this.alpha.spawn(e);
       }
     }
 
@@ -1609,20 +1646,21 @@ export class Effects {
     for (let p = 0; p < 2; p++) {
       const pp = PIPES[p];
       this._lw(o, sc, pp[0], pp[1], pp[2], _v);
-      const n = Math.round(12 * this.q);
+      const n = Math.round(14 * this.q);
       for (let i = 0; i < n; i++) {
-        const a = (i / n) * TAU;
-        _v2.set(Math.cos(a), Math.sin(a), 0).applyQuaternion(o.quaternion);
-        e.reset().at(_v).vel(_v2.x * 3 + _back.x * 4, _v2.y * 3 + _back.y * 4 + 0.5, _v2.z * 3 + _back.z * 4);
+        _v2.randomDirection().multiplyScalar(0.55).add(_back).normalize();
+        const sp = rand(3, 8);
+        e.reset().at(_v).vel(_v2.x * sp, _v2.y * sp + 0.6, _v2.z * sp);
         if (vel) { e.vx += vel.x * 0.85; e.vy += vel.y * 0.85; e.vz += vel.z * 0.85; }
-        e.c0.copy(PAL.flame0).lerp(st.tint, 0.5);
-        e.c1.copy(st.tint); e.useC1 = true;
-        e.life = rand(0.2, 0.32); e.s0 = 0.45 * sc; e.s1 = 0.12; e.drag = 3; e.hot = 0.7; e.shape = SHAPE.GLOW;
+        e.c0.copy(PAL.flameHot).lerp(st.tint, 0.45);
+        e.c1.copy(st.tint).multiplyScalar(0.7); e.useC1 = true;
+        e.life = rand(0.18, 0.32); e.s0 = rand(0.35, 0.6) * sc; e.s1 = 0.1; e.drag = 3; e.hot = 0.35; e.a = 0.8;
+        e.shape = Math.random() < 0.5 ? SHAPE.GLOW : SHAPE.SMOKE; e.spin = rand(-3, 3);
         this.add.spawn(e);
       }
       e.reset().at(_v).col(st.tint);
       if (vel) e.vel(vel.x, vel.y, vel.z);
-      e.life = 0.16; e.s0 = 1.8 * sc; e.s1 = 2.4 * sc; e.hot = 1;
+      e.life = 0.16; e.s0 = 1.3 * sc; e.s1 = 1.9 * sc; e.hot = 0.5; e.a = 0.65;
       this.add.spawn(e);
     }
   }
@@ -1651,17 +1689,38 @@ export class Effects {
     }
   }
 
+  // Raspão no muro: faíscas saindo do lado do muro, jogadas para trás e para cima.
   _wallSparks(k, strength) {
     const o = k.object3d;
     if (!o) return;
     const s = clamp(strength > 1.5 ? strength / 20 : strength, 0.15, 1);
-    // lado do muro: sinal da lateral (positivo = direita)
-    const side = (k.lateral ?? 0) >= 0 ? 1 : -1;
+    const side = (k.lateral ?? 0) >= 0 ? 1 : -1; // lado do muro (positivo = direita)
+    const sc = this._scaleOf(k);
+    const e = this._e;
+    const vel = k.velocity;
+    _back.set(0, 0, -1).applyQuaternion(o.quaternion);
     _right.set(-1, 0, 0).applyQuaternion(o.quaternion);
-    _v.copy(o.position).addScaledVector(_right, side * 0.75 * this._scaleOf(k));
-    _v.y += 0.35;
-    _v2.copy(_right).multiplyScalar(-side); // para dentro da pista
-    this.burst('sparks', _v, { count: 10 + 26 * s, dir: _v2, scale: 0.8 + s * 0.5, vel: k.velocity });
+    const n = Math.round((20 + 40 * s) * this.q);
+    for (let i = 0; i < n; i++) {
+      this._lw(o, sc, -side * 0.68, rand(0.15, 0.55), rand(-0.8, 0.7), _v); // local -X = direita
+      const sp = rand(4, 11) * (0.7 + s * 0.6);
+      const inward = rand(0.1, 0.7);
+      e.reset().at(_v).vel(
+        (_back.x * rand(0.6, 1) - _right.x * side * inward) * sp,
+        rand(1.5, 5),
+        (_back.z * rand(0.6, 1) - _right.z * side * inward) * sp,
+      );
+      if (vel) { e.vx += vel.x * 0.7; e.vy += vel.y * 0.5; e.vz += vel.z * 0.7; }
+      e.col(PAL.sparkWarm, PAL.sparkWarm2);
+      e.life = rand(0.25, 0.55); e.s0 = rand(0.12, 0.18); e.s1 = 0.04;
+      e.grav = 15; e.drag = 1.5; e.stretch = 0.03; e.hot = 0.45; e.shape = SHAPE.SPARK;
+      this.add.spawn(e);
+    }
+    this._lw(o, sc, -side * 0.7, 0.35, 0, _v);
+    e.reset().at(_v).col(PAL.sparkWarm2);
+    if (vel) e.vel(vel.x, vel.y, vel.z);
+    e.life = 0.14; e.s0 = 2.2 * (0.6 + s * 0.6); e.s1 = 0.6; e.hot = 0.5; e.a = 0.8;
+    this.add.spawn(e);
     if (s > 0.5) this.burst('smoke', _v, { scale: 0.5 });
   }
 
@@ -1682,15 +1741,15 @@ export class Effects {
     const pos = o.position;
     _v.set(pos.x + rand(-6, 6), pos.y + 38, pos.z + rand(-6, 6));
     _v2.copy(pos).addScaledVector(UP, 0.9);
-    const main = this.bolts.spawn({ a: _v, b: _v2, follow: k, life: 0.5, amp: 2.6, wGlow: 2.4, wCore: 0.32, glow: 0x9a6bff, core: 0xfaf5ff, taper: 0.3 });
+    const main = this.bolts.spawn({ a: _v, b: _v2, follow: k, life: 0.5, amp: 2.6, wGlow: 3.2, wCore: 0.5, glow: 0x8a55ff, core: 0xf6f0ff, taper: 0.35, force: true });
     if (main) {
       for (let i = 0; i < 2; i++) {
         const idx = 3 + i * 3 + ((Math.random() * 2) | 0);
         _v3.set(pos.x + rand(-7, 7), pos.y + rand(8, 20), pos.z + rand(-7, 7));
-        this.bolts.spawn({ a: _v, b: _v3, follow: k, parent: main, parentIdx: idx, freeEnd: true, life: 0.3, amp: 1.3, wGlow: 1.2, wCore: 0.14, glow: 0x8a5cff, core: 0xeee6ff, taper: 0.8 });
+        this.bolts.spawn({ a: _v, b: _v3, follow: k, parent: main, parentIdx: idx, freeEnd: true, life: 0.3, amp: 1.3, wGlow: 1.4, wCore: 0.18, glow: 0x8a5cff, core: 0xeee6ff, taper: 0.8, force: true });
       }
     }
-    this.burst('electric', _v2, { kart: k, scale: 1.1, bolts: 5 });
+    this.burst('electric', _v2, { kart: k, scale: 1.1, bolts: 3 });
     this._ring(pos, 0.3, PAL.purple0, 0.4, 5, 0.9);
     this._ring(pos, 0.3, PAL.electric, 0.6, 3, 0.6);
   }
@@ -1732,21 +1791,19 @@ export class Effects {
     if (this.confettiT <= 0 || !this.confettiKart) return;
     this.confettiT -= dt;
     const k = this.confettiKart;
-    const pos = k.object3d ? k.object3d.position : k.position;
+    const o = k.object3d;
+    const kv = k.velocity;
     const e = this._e;
-    const rate = 70 * this.q;
-    this._confAcc += rate * dt;
+    this._confAcc += 90 * this.q * dt;
     while (this._confAcc >= 1) {
       this._confAcc -= 1;
-      const a = Math.random() * TAU;
-      const r = rand(0.5, 4.5);
-      e.reset();
-      e.x = pos.x + Math.cos(a) * r;
-      e.y = pos.y + rand(4, 7);
-      e.z = pos.z + Math.sin(a) * r;
-      e.vel(rand(-1, 1), rand(-1, 1), rand(-1, 1));
-      if (k.velocity) { e.vx += k.velocity.x * 0.8; e.vz += k.velocity.z * 0.8; }
+      // chuva à frente e em volta do kart, na altura que a câmera vê
+      this._lw(o, 1, rand(-4.5, 4.5), rand(2.5, 5.5), rand(-2, 9), _v);
+      e.reset().at(_v).vel(rand(-0.6, 0.6), rand(-0.8, 0), rand(-0.6, 0.6));
+      if (kv) { e.vx += kv.x; e.vz += kv.z; }
       this._confettiP(e);
+      e.fadeIn = 0.15;
+      this.alpha.spawn(e);
     }
   }
 

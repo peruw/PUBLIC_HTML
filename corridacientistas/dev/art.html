@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arte: karts e retratos</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #8fd3ff; font-family: system-ui, sans-serif; }
+  #hud { position: fixed; left: 8px; top: 8px; background: rgba(0,0,0,.55); color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+  #hud button { margin: 2px; }
+  #portraits { position: fixed; inset: 0; display: none; background: radial-gradient(#3a4a6a, #121826); align-content: center; justify-content: center;
+    grid-template-columns: repeat(4, auto); gap: 14px; padding: 20px; }
+  #portraits figure { margin: 0; text-align: center; color: #fff; font-size: 14px; }
+  #portraits img { width: 200px; height: 200px; border-radius: 16px; background: rgba(255,255,255,.12); display: block; }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<div id="portraits"></div>
+<script type="module">
+import * as THREE from '../js/three.js';
+import { CHARACTERS, QUALITY } from '../js/config.js';
+import { createKartModel, renderPortraits } from '../js/models.js';
+import { stubLights } from './stubs.js';
+
+const P = new URLSearchParams(location.search);
+const quality = QUALITY[P.get('q') || 'alta'];
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = quality.shadows;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+stubLights(scene);
+const sun = scene.children.find((o) => o.isDirectionalLight);
+if (quality.shadows) {
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 1, far: 250 });
+  sun.shadow.bias = -0.0005;
+}
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 500);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 48), new THREE.MeshLambertMaterial({ color: 0x5da545 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+const road = new THREE.Mesh(new THREE.PlaneGeometry(26, 60), new THREE.MeshLambertMaterial({ color: 0x555a60 }));
+road.rotation.x = -Math.PI / 2; road.position.y = 0.01; road.receiveShadow = true;
+scene.add(road);
+
+// 8 karts em fila, cada um num "prato giratório"
+const karts = CHARACTERS.map((c, i) => {
+  const m = createKartModel(c.id, { quality });
+  const holder = new THREE.Group();
+  holder.add(m.group);
+  scene.add(holder);
+  return { c, m, holder };
+});
+
+let view = P.get('view') || 'lineup';
+let spin = P.get('spin') === '1';
+let only = P.get('char') || 'einstein';
+let angle = parseFloat(P.get('angle') || '0.6');
+let steer = parseFloat(P.get('steer') || '0');
+let speed = parseFloat(P.get('speed') || '0');
+let drift = parseInt(P.get('drift') || '0', 10);
+
+function layout() {
+  karts.forEach((k, i) => {
+    k.holder.visible = true;
+    k.holder.rotation.set(0, 0, 0);
+    if (view === 'single' || view === 'face') {
+      k.holder.visible = k.c.id === only;
+      k.holder.position.set(0, 0, 0);
+    } else if (view === 'grid') {
+      k.holder.position.set((i % 4 - 1.5) * 1.5, 0, Math.floor(i / 4) * -2.6);
+    } else if (view === 'race') {
+      k.holder.visible = i < 4;
+      k.holder.position.set([0, -3.5, 3.2, 0.5][i] || 0, 0, [0, 12, 20, 32][i] || 0);
+    } else {
+      k.holder.position.set((i - 3.5) * 1.9, 0, 0);
+      if (view === 'lineup') k.holder.rotation.y = 0.5;
+    }
+  });
+  const d = 3.5;
+  if (view === 'lineup') { camera.fov = 30; camera.position.set(0, 3.4, 15.5); camera.lookAt(0, 0.8, 0); }
+  else if (view === 'front') { camera.fov = 34; camera.position.set(0, 2.2, 14); camera.lookAt(0, 0.8, 0); }
+  else if (view === 'back') { camera.fov = 34; camera.position.set(0, 2.6, -14); camera.lookAt(0, 0.8, 0); }
+  else if (view === 'side') { karts.forEach((k) => (k.holder.rotation.y = Math.PI / 2)); camera.fov = 34; camera.position.set(0, 2.0, 14); camera.lookAt(0, 0.8, 0); }
+  else if (view === 'grid') { camera.fov = 30; camera.position.set(-2.5, 3.2, 8.5); camera.lookAt(0, 0.9, -1.2); }
+  else if (view === 'single') { camera.fov = 30; camera.position.set(Math.sin(angle) * d * 1.5, 1.9, Math.cos(angle) * d * 1.5); camera.lookAt(0, 0.75, 0); }
+  else if (view === 'face') { camera.fov = 30; camera.position.set(Math.sin(angle) * 1.9, 1.45, -0.25 + Math.cos(angle) * 1.9); camera.lookAt(0, 1.22, -0.25); }
+  else if (view === 'race') { camera.fov = 68; camera.position.set(0, 2.5, -6.2); camera.lookAt(0, 1, 4); }
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+layout();
+
+// Mede draw calls e triângulos de 1 kart (renderizando 0 e 1 kart)
+function drawCalls(id = 'einstein') {
+  const vis = karts.map((k) => k.holder.visible);
+  const gv = ground.visible, rv = road.visible;
+  ground.visible = road.visible = false;
+  karts.forEach((k) => (k.holder.visible = false));
+  renderer.render(scene, camera);
+  const c0 = renderer.info.render.calls, t0 = renderer.info.render.triangles;
+  const res = {};
+  for (const k of karts) {
+    if (id !== 'all' && k.c.id !== id) continue;
+    k.holder.visible = true;
+    const pos = k.holder.position.clone();
+    k.holder.position.set(0, 0, 0);
+    camera.position.set(3, 2, 4); camera.lookAt(0, 0.7, 0);
+    renderer.render(scene, camera);
+    res[k.c.id] = { calls: renderer.info.render.calls - c0, tris: renderer.info.render.triangles - t0 };
+    k.holder.visible = false;
+    k.holder.position.copy(pos);
+  }
+  karts.forEach((k, i) => (k.holder.visible = vis[i]));
+  ground.visible = gv; road.visible = rv;
+  layout();
+  return res;
+}
+
+function showPortraits(on = true) {
+  const box = document.getElementById('portraits');
+  box.style.display = on ? 'grid' : 'none';
+  if (!on) return;
+  const t0 = performance.now();
+  const imgs = renderPortraits(renderer, 256);
+  window.portraitMs = Math.round(performance.now() - t0);
+  box.innerHTML = CHARACTERS.map((c) => `<figure><img src="${imgs[c.id]}" alt="${c.name}"><figcaption>${c.name}</figcaption></figure>`).join('');
+  return Object.keys(imgs).length;
+}
+
+function hud() {
+  const views = ['lineup', 'front', 'back', 'side', 'grid', 'single', 'face', 'race'];
+  document.getElementById('hud').innerHTML = views.map((v) => `<button data-v="${v}">${v}</button>`).join('') +
+    `<br>${CHARACTERS.map((c) => `<button data-c="${c.id}">${c.name}</button>`).join('')}` +
+    `<br><button data-p="1">retratos</button><button data-s="1">girar</button>`;
+}
+hud();
+document.getElementById('hud').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.v) { view = b.dataset.v; layout(); }
+  if (b.dataset.c) { only = b.dataset.c; if (view !== 'face') view = 'single'; layout(); }
+  if (b.dataset.p) showPortraits(document.getElementById('portraits').style.display !== 'grid');
+  if (b.dataset.s) spin = !spin;
+});
+
+window.setView = (v, o = {}) => { view = v; if (o.char) only = o.char; if (o.angle !== undefined) angle = o.angle; if (o.spin !== undefined) spin = o.spin;
+  if (o.steer !== undefined) steer = o.steer; if (o.speed !== undefined) speed = o.speed; if (o.drift !== undefined) drift = o.drift; layout(); return v; };
+window.drawCalls = drawCalls;
+window.showPortraits = showPortraits;
+window.hideHud = () => { document.getElementById('hud').style.display = 'none'; return true; };
+if (P.get('hud') === '0') window.hideHud();
+if (P.get('portraits') === '1') showPortraits(true);
+
+const clock = new THREE.Clock();
+let time = 0;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  time += dt;
+  for (const k of karts) {
+    if (spin) k.holder.rotation.y += dt * 0.6;
+    k.m.update(dt, { speed, steer, drifting: drift !== 0, driftDir: drift, onGround: true, boosting: false, stunned: false, time });
+  }
+  renderer.render(scene, camera);
+});
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); layout(); });
+window.ready = true;
+</script>
+</body>
+</html>

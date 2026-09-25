@@ -37,6 +37,8 @@ export class AIDriver {
     this._noise = 0;
     this._noiseTarget = 0;
     this._noiseT = 0;
+    this._avoidT = 0;
+    this._rampAhead = false;
     // drift
     this._driftDir = 0; // direção pretendida durante o pulo
     this._hopT = 0;
@@ -131,13 +133,16 @@ export class AIDriver {
     let lat = track.racingLine(ts) * (0.55 + 0.45 * sk) + this.baseOffset + wander;
     lat = this._attract(lat, k, track, L);
     lat = this._avoidKarts(lat, k, world, L);
-    lat = this._avoidHazards(lat, k, track, world, L);
+    this._avoidT -= dt;
+    lat = this._avoidHazards(lat, k, track, world, L, ahead);
     const lim = Math.max(1, hw - 1.3);
     lat = clamp(lat, -lim, lim);
-    this._lat = damp(this._lat, lat, 4, dt);
+    this._lat = damp(this._lat, lat, this._avoidT > 0 ? 14 : 4, dt);
 
     // ---------- perseguição pura ----------
-    const tp = track.sample(ts);
+    // desviando: mira mais perto para mudar de faixa mais rápido
+    const avoiding = this._avoidT > 0;
+    const tp = track.sample(avoiding ? k.s + ahead * 0.65 : ts);
     const tx = tp.pos.x + tp.right.x * this._lat;
     const tz = tp.pos.z + tp.right.z * this._lat;
     const dx = tx - k.position.x;
@@ -188,14 +193,16 @@ export class AIDriver {
       const into = (need / base - T.driftYawBase) / T.driftYawMod;
       steer = clamp(into, -1, 1) * dir;
       const minYaw = base * (T.driftYawBase - T.driftYawMod);
-      if (need < minYaw * 0.85) this._wideT += dt;
-      else this._wideT = Math.max(0, this._wideT - dt);
-      const outside = k.lateral * dir < -(hw - 0.4);
-      const inside = k.lateral * dir > hw - 0.2;
+      // curva acabando: o drift gira mais do que o necessário
+      if (need < minYaw * 0.45) this._wideT += dt;
+      else this._wideT = Math.max(0, this._wideT - dt * 0.5);
+      const outside = k.lateral * dir < -(hw - 1.1);
+      const inside = k.lateral * dir > hw - 0.8;
       const release =
         k.driftLevel >= this._driftTarget ||
-        this._wideT > 0.22 ||
-        need < -0.25 ||
+        this._wideT > 0.3 ||
+        need < -0.2 ||
+        (avoiding && need < minYaw) ||
         outside ||
         inside ||
         this._driftT > 5;
@@ -205,13 +212,14 @@ export class AIDriver {
       // no pulo: segura o drift e aponta para o lado da curva
       this._hopT += dt;
       drift = true;
-      steer = this._driftDir * Math.max(Math.abs(clamp(steer, -1, 1)), 0.7);
+      // só o suficiente para o drift começar para o lado certo ao pousar
+      steer = this._driftDir * Math.max(this._driftDir * clamp(steer, -1, 1), 0.4);
       if (k.onGround && this._hopT > 0.05) {
         // pousou sem começar o drift
         drift = false;
         this._endDriftPlan();
       }
-    } else if (this._driftCd <= 0 && k.onGround && v > 14 && !k.offroad) {
+    } else if (this._driftCd <= 0 && k.onGround && v > 14 && !k.offroad && !avoiding && !this._rampAhead) {
       const dir = this._curveAhead(k, track);
       if (dir !== 0) {
         if (Math.random() < 0.35 + 0.65 * sk) {
@@ -221,7 +229,7 @@ export class AIDriver {
           this._wideT = 0;
           this._driftTarget = this._pickTarget();
           drift = true;
-          steer = dir * Math.max(Math.abs(clamp(steer, -1, 1)), 0.7);
+          steer = dir * Math.max(dir * clamp(steer, -1, 1), 0.4);
         } else {
           this._driftCd = 2; // desiste desta curva
         }
@@ -276,8 +284,21 @@ export class AIDriver {
     return run >= 40 - 12 * this.skill ? dir : 0;
   }
 
-  // Aceleradores e caixas de item puxam a linha.
+  // Aceleradores, rampas e caixas de item puxam a linha.
   _attract(lat, k, track, L) {
+    this._rampAhead = false;
+    const ramps = track.ramps;
+    if (ramps) {
+      for (let i = 0; i < ramps.length; i++) {
+        const r = ramps[i];
+        const ds = wrapSigned(r.s - k.s, L);
+        if (ds < -2 || ds > 40) continue;
+        this._rampAhead = true;
+        const half = Math.max(0.5, r.width / 2 - 1.5);
+        const rl = r.lateral || 0;
+        if (Math.abs(lat - rl) < half + 4) return clamp(lat, rl - half, rl + half);
+      }
+    }
     if (this.skill > 0.35 && track.boostPads) {
       const pads = track.boostPads;
       for (let i = 0; i < pads.length; i++) {
@@ -330,28 +351,32 @@ export class AIDriver {
     return lat;
   }
 
-  // Desvia de maçãs, buracos e projéteis à frente.
-  _avoidHazards(lat, k, track, world, L) {
+  // Desvia de maçãs, buracos e projéteis à frente: prevê a posição lateral ao passar
+  // pelo perigo e corrige o alvo para passar com folga.
+  _avoidHazards(lat, k, track, world, L, ahead) {
     const hz = world.items?.hazards;
     if (!hz || !hz.length) return lat;
-    const range = 18 + 17 * this.skill;
+    const range = 22 + 18 * this.skill;
     const lim = (k.halfWidth || 9) - 1.0;
     for (let i = 0; i < hz.length; i++) {
       const h = hz[i];
       if (!h || !h.position || typeof h.s !== 'number') continue;
       const ds = wrapSigned(h.s - k.s, L);
-      if (ds < 0.5 || ds > range) continue;
+      if (ds < 2 || ds > range) continue;
       const hs = track.sample(h.s);
       const hl = (h.position.x - hs.pos.x) * hs.right.x + (h.position.z - hs.pos.z) * hs.right.z;
-      const clear = (h.radius || 1) + 1.8;
-      if (Math.abs(lat - hl) >= clear) continue;
-      let side = lat >= hl ? 1 : -1;
-      let nl = hl + side * clear;
-      if (Math.abs(nl) > lim) {
+      const clear = (h.radius || 1) + 1.9;
+      const f = Math.max(0.3, Math.min(1, ds / ahead));
+      const pred = k.lateral + (lat - k.lateral) * f; // lateral previsto ao chegar no perigo
+      if (Math.abs(pred - hl) >= clear) continue;
+      let side = pred >= hl ? 1 : -1;
+      let want = hl + side * clear;
+      if (Math.abs(want) > lim) {
         side = -side;
-        nl = hl + side * clear;
+        want = hl + side * clear;
       }
-      lat = nl;
+      lat = k.lateral + (want - k.lateral) / f;
+      this._avoidT = 0.35;
     }
     return lat;
   }
@@ -367,7 +392,11 @@ export class AIDriver {
       this._itemCnt = k.itemCount;
       this._itemT = 0;
       this._itemDelay =
-        k.item === 'maca' ? rand(4, 10) : k.item === 'tesla' ? rand(1, 4) : k.item === 'faraday' || k.item === 'buraco' ? rand(1, 3) : 0;
+        k.item === 'maca' ? rand(4, 10)
+          : k.item === 'tesla' ? rand(1, 4)
+            : k.item === 'faraday' || k.item === 'buraco' ? rand(1, 3)
+              : k.item === 'pilha3' ? rand(0.8, 1.2)
+                : 0;
     }
     this._itemT += dt;
     const t = this._itemT;
@@ -377,7 +406,7 @@ export class AIDriver {
         use = (t > 0.6 && (k.offroad || this._straightAhead(k))) || t > 12;
         break;
       case 'pilha3':
-        use = t > 1.0 && (k.offroad || this._straightAhead(k) || t > 2.5);
+        use = t > this._itemDelay;
         break;
       case 'maca':
         use = (t > 0.5 && this._kartNear(k, world, L, -25, -1.5, false)) || t > this._itemDelay;

@@ -18,6 +18,8 @@ const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Spa
 const DEADZONE = 0.2;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const btnOn = (b, n) => !!(b[n] && b[n].pressed);
+const btnVal = (b, n) => (b[n] ? (typeof b[n].value === 'number' && b[n].value > 0 ? b[n].value : b[n].pressed ? 1 : 0) : 0);
 
 function isEditable(el) {
   if (!el) return false;
@@ -36,7 +38,7 @@ const CSS = `
   border:3px solid rgba(255,255,255,.55);box-shadow:0 4px 14px rgba(0,0,0,.28),inset 0 0 0 2px rgba(255,255,255,.08);
   text-shadow:0 2px 3px rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
   transition:transform .06s ease,background .1s ease,border-color .1s ease;pointer-events:none;box-sizing:border-box}
-.tc-btn small{display:block;font-size:11px;font-weight:600;opacity:.85;margin-top:3px;letter-spacing:0}
+.tc-btn small{display:block;font-size:11px;text-transform:uppercase;font-weight:600;opacity:.85;margin-top:3px;letter-spacing:0}
 .tc-btn.tc-on{transform:scale(.92);background:rgba(255,255,255,.38);border-color:#fff}
 .tc-steer{width:clamp(78px,22vmin,94px);height:clamp(78px,22vmin,94px);font-size:clamp(34px,10vmin,44px);border-radius:26px}
 .tc-drift{width:clamp(88px,25vmin,104px);height:clamp(88px,25vmin,104px);font-size:clamp(17px,5vmin,21px);
@@ -48,7 +50,7 @@ const CSS = `
 .tc-brake{width:clamp(56px,16vmin,66px);height:clamp(56px,16vmin,66px);font-size:clamp(12px,3.6vmin,14px);
   border-color:rgba(255,120,120,.8);background:rgba(110,20,20,.32)}
 .tc-brake.tc-on{background:rgba(255,80,80,.55)}
-.tc-gas{width:clamp(70px,20vmin,84px);height:clamp(70px,20vmin,84px);font-size:clamp(12px,3.6vmin,14px);
+.tc-gas{width:clamp(70px,20vmin,84px);height:clamp(70px,20vmin,84px);font-size:clamp(24px,7vmin,30px);
   border-color:rgba(120,255,160,.8);background:rgba(10,90,40,.32)}
 .tc-gas.tc-on{background:rgba(90,230,130,.55)}
 `;
@@ -267,18 +269,16 @@ export class Input {
       const p = pads[i];
       if (!p || !p.connected) continue;
       const b = p.buttons;
-      const val = (n) => (b[n] ? (typeof b[n].value === 'number' && b[n].value > 0 ? b[n].value : b[n].pressed ? 1 : 0) : 0);
-      const pr = (n) => !!(b[n] && b[n].pressed);
       let ax = p.axes[0] || 0;
       ax = Math.abs(ax) < DEADZONE ? 0 : Math.sign(ax) * ((Math.abs(ax) - DEADZONE) / (1 - DEADZONE));
-      if (pr(14)) ax = -1;
-      if (pr(15)) ax = 1;
-      const thr = Math.max(pr(0) ? 1 : 0, val(7), pr(12) ? 1 : 0);
-      const brk = Math.max(pr(1) ? 1 : 0, val(6), pr(13) ? 1 : 0);
-      const drift = pr(5) || pr(2);
-      const look = pr(11) || (p.axes[3] || 0) > 0.7;
+      if (btnOn(b, 14)) ax = -1;
+      if (btnOn(b, 15)) ax = 1;
+      const thr = Math.max(btnOn(b, 0) ? 1 : 0, btnVal(b, 7), btnOn(b, 12) ? 1 : 0);
+      const brk = Math.max(btnOn(b, 1) ? 1 : 0, btnVal(b, 6), btnOn(b, 13) ? 1 : 0);
+      const drift = btnOn(b, 5) || btnOn(b, 2);
+      const look = btnOn(b, 11) || (p.axes[3] || 0) > 0.7;
       // bits de borda: 0 A (confirmar), 1 item (LB/Y), 2 Start, 3 Select
-      const mask = (pr(0) ? 1 : 0) | (pr(4) || pr(3) ? 2 : 0) | (pr(9) ? 4 : 0) | (pr(8) ? 8 : 0);
+      const mask = (btnOn(b, 0) ? 1 : 0) | (btnOn(b, 4) || btnOn(b, 3) ? 2 : 0) | (btnOn(b, 9) ? 4 : 0) | (btnOn(b, 8) ? 8 : 0);
       const prev = this._padPrev.get(p.index) || 0;
       const edge = mask & ~prev;
       this._padPrev.set(p.index, mask);
@@ -323,7 +323,7 @@ export class Input {
       drift: mk('tc-drift', '<span>DRIFT<small>pular</small></span>'),
       item: mk('tc-item', 'ITEM'),
       brake: mk('tc-brake', 'FREIO'),
-      gas: mk('tc-gas', 'ACELERAR'),
+      gas: mk('tc-gas', '<span>▲<small>acelerar</small></span>'),
     };
     this._gasBtn = this._btn.gas;
     this._gasBtn.style.display = this._autoAccelerate ? 'none' : '';

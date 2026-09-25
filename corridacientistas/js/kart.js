@@ -23,6 +23,7 @@ export const TUNING = {
   maxYaw: 1.8, // rad/s com esterço total (handling 3)
   maxYawPerFactor: 0.2,
   turnFullSpeed: 5.5, // abaixo disso a curva é proporcional à velocidade
+  pivotSpeed: 3.5, // giro mínimo (como se andasse a 3,5 m/s) ao acelerar parado
   turnHighSpeedLoss: 0.15, // perda de giro em velocidade muito alta
   yawResponse: 15, // 1/s: rapidez com que a guinada alcança o alvo
   steerRate: 8, // 1/s: suavização do esterço digital
@@ -31,12 +32,13 @@ export const TUNING = {
   driftGrip: 4,
   driftSlip: 1.6, // m/s de deslize para fora durante o drift
   gravity: 28,
+  crestGap: 0.04, // m que o chão precisa cair num passo para o kart decolar
   hopVy: 4.5,
   // drift
   driftMinSpeed: 9,
   driftSteerMin: 0.3,
   driftArmTime: 0.22, // tolerância para escolher a direção logo após pousar
-  driftYawBase: 0.74, // giro no drift = base + mod * (esterço para dentro)
+  driftYawBase: 0.6, // giro no drift = base + mod * (esterço para dentro)
   driftYawMod: 0.5,
   driftYawPerHandling: 0.12,
   driftSpeedMult: 0.985,
@@ -69,6 +71,7 @@ export const TUNING = {
   shockTime: 0.8,
   tumbleTime: 1.6,
   tumbleVy: 8.5,
+  tumbleFlip: 0.55, // s da cambalhota (menor que o tempo no ar)
   hitCooldown: 0.6,
   // colisões
   kartRadius: 1.1, // raio do círculo kart×kart (×escala)
@@ -183,6 +186,7 @@ export class Kart {
     this._boostStrength = 1;
     this._mstate = { speed: 0, steer: 0, drifting: false, driftDir: 0, driftLevel: 0, onGround: true, boosting: false, stunned: false, time: 0, rev: 0 };
     this._track = null;
+    this._distInit = false;
     this._padCd = null;
     this._rampCd = null;
     this._resetInternals();
@@ -209,6 +213,7 @@ export class Kart {
     this._spinDir = 1;
     this._tumbleTotal = 1;
     this._flat = 0;
+    this._prevGy = this.position ? this.position.y : 0;
     this._rx = 1;
     this._rz = 0;
     this._tx = 0;
@@ -267,7 +272,8 @@ export class Kart {
     this.heading = slot.heading;
     const L = this._track?.length;
     this.s = L ? ((slot.s % L) + L) % L : slot.s;
-    this.distance = L ? wrapSigned(this.s, L) : slot.s;
+    this.distance = L ? wrapSigned(this.s, L) : 0;
+    this._distInit = !!L;
     this.lateral = 0;
     this.speed = 0;
     this.slip = 0;
@@ -305,10 +311,12 @@ export class Kart {
       this.groundY = p.groundY;
       this.position.y = p.groundY;
     }
+    this._prevGy = this.position.y;
     this.object3d.position.copy(this.position);
     this.object3d.rotation.y = this.heading;
     this.visual.rotation.set(0, 0, 0);
     this.visual.scale.setScalar(1);
+    this._pivotFix.scale.setScalar(1);
     this.body.rotation.set(0, 0, 0);
     this.body.position.y = PIVOT;
   }
@@ -429,7 +437,7 @@ export class Kart {
     // pulo / manobra
     if (pressed && !stunned) {
       if (this.onGround) {
-        this.vy = T.hopVy;
+        this.vy = Math.max(0, this.vy) + T.hopVy;
         this.onGround = false;
         this.airTime = 0;
         this._airKind = 'hop';
@@ -488,7 +496,17 @@ export class Kart {
         const into = this.steer * this.driftDir;
         yawT = this.driftDir * this.turnRate(va) * this.driftYawFactor * (T.driftYawBase + T.driftYawMod * into);
       } else {
-        yawT = this.steer * this.turnRate(va) * (v < 0 ? -1 : 1);
+        // quase parado (ex.: de frente para o muro) ainda gira com acelerador/freio
+        let vt = va;
+        let sign = v < 0 ? -1 : 1;
+        if (this.onGround && va < T.pivotSpeed) {
+          const push = Math.max(thr, brk);
+          if (push > 0.05) {
+            vt = Math.max(va, push * T.pivotSpeed);
+            if (va < 0.5) sign = brk > thr ? -1 : 1;
+          }
+        }
+        yawT = this.steer * this.turnRate(vt) * sign;
       }
       if (!this.onGround) yawT *= this.drifting ? 0.85 : T.airSteer;
     }
@@ -509,6 +527,10 @@ export class Kart {
     // ---------- projeção na pista ----------
     const L = track.length;
     const oldS = this.s;
+    if (!this._distInit) {
+      this.distance = wrapSigned(oldS, L);
+      this._distInit = true;
+    }
     const p = track.project(this.position, this.s);
     this.s = p.s;
     this.lateral = p.lateral;
@@ -517,7 +539,8 @@ export class Kart {
     if (p.normal) this.normal.copy(p.normal);
     if (p.halfWidth) this.halfWidth = p.halfWidth;
     if (p.wallDist) this.wallDist = p.wallDist;
-    this.distance += wrapSigned(this.s - oldS, L);
+    const dS = wrapSigned(this.s - oldS, L);
+    if (Math.abs(dS) < 30) this.distance += dS; // ignora saltos de projeção
     const smp = track.sample(this.s);
     this._rx = smp.right.x;
     this._rz = smp.right.z;
@@ -530,17 +553,19 @@ export class Kart {
     if (Math.abs(this.lateral) > limit) this._hitWall(limit);
 
     // ---------- vertical ----------
+    const gvy = clamp((gy - this._prevGy) / dt, -15, 15); // velocidade vertical do chão sob o kart
+    this._prevGy = gy;
     if (this.onGround) {
       const ballistic = this.position.y + this.vy * dt - 0.5 * T.gravity * dt * dt;
-      if (gy < ballistic - 0.002 && va > 10) {
-        // crista: o chão cai mais rápido que a gravidade
+      if (va > 10 && gy < ballistic - T.crestGap) {
+        // crista: o chão some sob o kart mais rápido do que a gravidade o puxa
         this.onGround = false;
         this.vy -= T.gravity * dt;
         this.position.y = ballistic;
         this.airTime = 0;
         this._airKind = 'crest';
       } else {
-        this.vy = clamp((gy - this.position.y) / dt, -20, 20);
+        this.vy = gvy;
         this.position.y = gy;
       }
     } else {
@@ -549,7 +574,7 @@ export class Kart {
       this.airTime += dt;
       if (this.position.y <= gy) {
         this.position.y = gy;
-        this._land();
+        this._land(gvy);
       }
     }
     this.offroad = !!p.offroad && this.onGround;
@@ -583,7 +608,9 @@ export class Kart {
         }
         const rp = ramps[i];
         if (!nearGround || this.speed < 4 || this.vy >= rp.launch) continue;
-        if (Math.abs(wrapSigned(this.s - rp.s, L)) > rp.length * 0.5 + 0.5) continue;
+        // dispara na borda final da rampa (o kart sobe a cunha e decola na ponta)
+        const dsr = wrapSigned(this.s - rp.s, L);
+        if (dsr < rp.length * 0.5 - 2 || dsr > rp.length * 0.5 + 1) continue;
         if (Math.abs(this.lateral - (rp.lateral || 0)) > rp.width * 0.5 + 0.5) continue;
         this._rampCd[i] = T.rampCooldown;
         this._launch(rp.launch);
@@ -650,7 +677,7 @@ export class Kart {
     this._setVelXZ(vx, vz);
     if (vn > 1.5 && this._wallCd <= 0) {
       this._wallCd = 0.35;
-      this._suspVel -= Math.min(1.2, vn * 0.08);
+      this._jolt(-nx, -nz, Math.min(0.2, vn * 0.015));
       this.bus?.emit('kart:wall', { kart: this, strength: clamp(vn / 16, 0.1, 1) });
     }
   }
@@ -663,6 +690,14 @@ export class Kart {
     this.slip = -vx * ch + vz * sh;
     this.velocity.x = vx;
     this.velocity.z = vz;
+  }
+
+  // Solavanco visual: inclina o corpo para o lado oposto ao impacto (dx, dz = direção do golpe).
+  _jolt(dx, dz, amount) {
+    const side = dx * -Math.cos(this.heading) + dz * Math.sin(this.heading); // + = empurrado para a direita
+    // a carroceria "fica para trás": empurrado para a direita, inclina para a esquerda
+    this._visRoll = clamp(this._visRoll - side * amount, -0.35, 0.35);
+    this._suspVel -= amount * 2;
   }
 
   // Empurrão (colisão kart×kart) sem atravessar o muro.
@@ -700,9 +735,9 @@ export class Kart {
     this.bus?.emit('kart:trick', { kart: this });
   }
 
-  _land() {
-    const impact = -this.vy;
-    this.vy = 0;
+  _land(gvy = 0) {
+    const impact = gvy - this.vy; // velocidade de impacto relativa ao chão
+    this.vy = gvy;
     this.onGround = true;
     const air = this.airTime;
     this.airTime = 0;
@@ -772,8 +807,9 @@ export class Kart {
       sy *= 1 - 0.65 * f;
       sx *= 1 + 0.3 * f;
     }
-    const sc = this._scale;
-    this.visual.scale.set(sc * sx, sc * sy, sc * sx);
+    // visual: escala uniforme (encolhido); o achatamento fica no grupo do modelo, a partir do chão
+    this.visual.scale.setScalar(this._scale);
+    this._pivotFix.scale.set(sx, sy, sx);
 
     // inclinação do chão (rampa ao longo da pista + inclinação lateral)
     let pitchT = 0;
@@ -823,12 +859,17 @@ export class Kart {
     let flipA = 0;
     let lift = 0;
     if (this.tumbleTime > 0) {
+      // capota no ar (termina antes de pousar) e depois fica tonto, balançando
       const el = this._tumbleTotal - this.tumbleTime;
-      const p = clamp(el / (this._tumbleTotal * 0.62), 0, 1);
+      const p = clamp(el / T.tumbleFlip, 0, 1);
       flipA = -TWO_PI * easeInOut(p);
       spinA += this._spinDir * 0.6 * Math.sin(Math.PI * p);
-      if (p >= 1) flipA += Math.sin(el * 18) * 0.08 * (this.tumbleTime / this._tumbleTotal);
-      lift = 0.25 * Math.sin(Math.PI * p);
+      lift = 0.3 * Math.sin(Math.PI * p);
+      if (p >= 1) {
+        const w = this.tumbleTime / this._tumbleTotal;
+        flipA += Math.sin(el * 16) * 0.1 * w;
+        spinA += Math.sin(el * 9) * 0.25 * w;
+      }
     }
 
     // manobra na rampa
@@ -942,6 +983,9 @@ function collideKarts(karts) {
       bvz += nz * jimp * ib;
       if (ia > 0) a._setVelXZ(avx, avz);
       if (ib > 0) b._setVelXZ(bvx, bvz);
+      const kick = clamp(-rel * 0.025, 0, 0.18);
+      a._jolt(-nx, -nz, kick * (ia / isum) * 2);
+      b._jolt(nx, nz, kick * (ib / isum) * 2);
       if (-rel > 1 && a._bumpCd <= 0 && b._bumpCd <= 0) {
         a._bumpCd = 0.3;
         b._bumpCd = 0.3;
