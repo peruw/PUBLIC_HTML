@@ -302,15 +302,19 @@ test('?c= abre a conversa: mensagens, separadores de dia, cabeçalho, denúncia 
   expect(errors, errors.join('\n')).toEqual([]);
 });
 
-test('conversa com aluno: sem link de perfil', async ({ page }) => {
+test('conversa com aluno: sem link de perfil e nome do aluno abreviado', async ({ page }) => {
   await seedSession(page);
+  // Mesmo que o banco devolva o nome completo, o professor vê "Pedro S." (cadastro e privacidade prometem isso)
   const convs = [{
-    id: CONV1, other_id: ME, other_name: 'Pedro Aluno', other_avatar: null, other_slug: null, i_am: 'tutor',
+    id: CONV1, other_id: ME, other_name: 'Pedro Aluno  Souza', other_avatar: null, other_slug: null, i_am: 'tutor',
     last_message_at: minutesAgo(3), last_body: 'Oi', unread: false,
   }];
   await mockSupabase(page, { convs, profile: { id: TUTOR_ID, full_name: 'Ana Silva', role: 'tutor', is_admin: false, avatar_path: null, banned_at: null, tutor_profiles: null } });
   await page.goto(`/professores/mensagens.html?c=${CONV1}`);
-  await expect(page.locator('#threadTitle')).toHaveText('Pedro Aluno');
+  await expect(page.locator('#threadTitle')).toHaveText('Pedro S.');
+  await expect(page.locator('#convList .pf-conv-name')).toHaveText('Pedro S.');
+  await expect(page.locator('#bubbles')).toHaveAttribute('aria-label', 'Mensagens com Pedro S.');
+  await expect(page.locator('main')).not.toContainText('Souza');
   await expect(page.locator('#threadTitle a')).toHaveCount(0);
   await expect(page.locator('.pf-thread-sub')).toHaveText('Aluno');
 });

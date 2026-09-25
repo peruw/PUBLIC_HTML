@@ -238,6 +238,77 @@ test.describe('entrar: cadastro', () => {
     expect(calls.find((c) => c.path === '/auth/v1/signup').body.data.role).toBe('student');
   });
 
+  // Funil "Enviar mensagem" sem conta: o link de confirmação (e o reenvio) voltam para o professor
+  test('cadastro vindo de "Enviar mensagem": link de confirmação leva o next do professor', async ({ page }) => {
+    const errors = trackErrors(page);
+    const calls = await mockSupabase(page, [
+      { method: 'POST', path: /^\/auth\/v1\/signup$/, reply: () => ({ body: user({ email_confirmed_at: null }) }) },
+    ]);
+    const next = '/professores/p/bruno-costa#mensagem';
+    await page.goto(`/professores/entrar.html?next=${encodeURIComponent(next)}`);
+    // "Criar conta" mantém o next
+    await page.getByRole('link', { name: 'Criar conta' }).first().click();
+    await page.waitForURL(/modo=cadastro/);
+    expect(new URL(page.url()).searchParams.get('next')).toBe(next);
+
+    await page.getByLabel('Nome completo').fill('Maria Souza');
+    await page.getByLabel('E-mail').fill('maria@exemplo.test');
+    await page.getByLabel('Senha', { exact: true }).fill('segredo123');
+    await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
+    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await expect(page.getByRole('heading', { name: 'Confirme seu e-mail' })).toBeVisible();
+
+    const redirect = new URL(calls.find((c) => c.path === '/auth/v1/signup').url.searchParams.get('redirect_to'));
+    expect(redirect.pathname).toBe('/professores/entrar.html');
+    expect(redirect.searchParams.get('confirmado')).toBe('1');
+    expect(redirect.searchParams.get('next')).toBe(next);
+    // O próprio redirect_to não tem fragmento (o # do next vai codificado)
+    expect(redirect.hash).toBe('');
+
+    await page.getByRole('button', { name: 'Reenviar e-mail' }).click();
+    await expect.poll(() => calls.filter((c) => c.path === '/auth/v1/resend').length).toBe(1);
+    const resend = calls.find((c) => c.path === '/auth/v1/resend');
+    expect(new URL(resend.url.searchParams.get('redirect_to')).searchParams.get('next')).toBe(next);
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+
+  test('cadastro com next inseguro: link de confirmação volta para o painel', async ({ page }) => {
+    const calls = await mockSupabase(page, [
+      { method: 'POST', path: /^\/auth\/v1\/signup$/, reply: () => ({ body: user({ email_confirmed_at: null }) }) },
+    ]);
+    await page.goto(`/professores/entrar.html?modo=cadastro&next=${encodeURIComponent('//evil.com/professores/')}`);
+    await page.getByLabel('Nome completo').fill('Maria Souza');
+    await page.getByLabel('E-mail').fill('maria@exemplo.test');
+    await page.getByLabel('Senha', { exact: true }).fill('segredo123');
+    await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
+    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await expect(page.getByRole('heading', { name: 'Confirme seu e-mail' })).toBeVisible();
+    const redirect = new URL(calls.find((c) => c.path === '/auth/v1/signup').url.searchParams.get('redirect_to'));
+    expect(redirect.searchParams.get('next')).toBe('/professores/painel.html?bemvindo=1');
+  });
+
+  test('confirmação desligada (signup já devolve sessão): vai direto para o next', async ({ page }) => {
+    await mockSupabase(page, [
+      {
+        method: 'POST', path: /^\/auth\/v1\/signup$/,
+        reply: () => ({
+          body: {
+            access_token: 'FAKE.JWT.TOKEN', token_type: 'bearer', expires_in: 3600, expires_at: 4102444800,
+            refresh_token: 'fakerefresh', user: user(),
+          },
+        }),
+      },
+      { method: 'GET', path: /^\/rest\/v1\/profiles$/, reply: () => ({ body: [profileRow({ role: 'student' })] }) },
+    ]);
+    await page.goto(`/professores/entrar.html?modo=cadastro&next=${encodeURIComponent('/professores/duvidas.html#perguntar')}`);
+    await page.getByLabel('Nome completo').fill('Maria Souza');
+    await page.getByLabel('E-mail').fill('maria@exemplo.test');
+    await page.getByLabel('Senha', { exact: true }).fill('segredo123');
+    await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
+    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await page.waitForURL('**/professores/duvidas.html#perguntar');
+  });
+
   test('erros do Auth aparecem em português (senha fraca, limite de envio)', async ({ page }) => {
     let n = 0;
     await mockSupabase(page, [
@@ -406,6 +477,17 @@ test.describe('painel', () => {
     await mockSupabase(page);
     await page.goto('/professores/painel.html#plano');
     await page.waitForURL(/entrar\.html\?next=%2Fprofessores%2Fpainel\.html%23plano$/);
+  });
+
+  test('sem sessão: hash com token (#access_token=...) nunca vai para o next', async ({ page }) => {
+    const reqs = [];
+    page.on('request', (r) => reqs.push(r.url()));
+    await mockSupabase(page);
+    await page.goto('/professores/painel.html#access_token=SEGREDO.JWT&refresh_token=segredorefresh&type=invite');
+    await page.waitForURL((u) => u.pathname === '/professores/entrar.html');
+    expect(new URL(page.url()).searchParams.get('next')).toBe('/professores/painel.html');
+    expect(page.url()).not.toContain('SEGREDO');
+    expect(reqs.filter((u) => u.includes('SEGREDO') || u.includes('segredorefresh'))).toEqual([]);
   });
 
   test('professor: abas, checklist e salvar anúncio só com colunas liberadas', async ({ page }) => {

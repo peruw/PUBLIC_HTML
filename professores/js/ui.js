@@ -7,6 +7,27 @@
 import { avatarPublicUrl } from './supabase.js';
 import { renderAuthSlot } from './auth.js';
 
+// ---------- Anti-clickjacking ----------
+// O .htaccess envia X-Frame-Options/CSP frame-ancestors; isto cobre servidores sem mod_headers
+// (e o preview do Vite). Dentro de um iframe de OUTRO site a página fica oculta: nenhum botão
+// (Quero dar aulas, Remover foto, Banir…) pode ser clicado por baixo de uma camada invisível.
+function framedByOtherSite() {
+  try {
+    if (window.top === window.self) return false;
+    return window.top.location.origin !== location.origin; // outro site: lança SecurityError
+  } catch {
+    return true;
+  }
+}
+if (typeof window !== 'undefined' && framedByOtherSite()) {
+  document.documentElement.style.setProperty('display', 'none', 'important');
+  try {
+    window.top.location.replace(location.href);
+  } catch {
+    /* iframe com sandbox: a página continua oculta */
+  }
+}
+
 // ---------- h(): criação segura de elementos ----------
 
 // Atributos que recebem URL: bloqueia javascript:, vbscript: e data: (exceto imagem em src)
@@ -409,8 +430,10 @@ export function errorMsg(err) {
 
 /** Aviso "Portal em configuração" (quando config.js ainda tem placeholders). */
 export function notConfiguredNotice(container) {
+  // Se o container era o que tinha o <h1> da página, o aviso passa a ser o título principal
+  const keepsH1 = [...document.querySelectorAll('h1')].some((el) => !container || !container.contains(el));
   const box = h('div', { class: 'pf-notice pf-notice--warn', role: 'status' },
-    h('h2', { class: 'pf-notice-title' }, 'Portal em configuração'),
+    h(keepsH1 ? 'h2' : 'h1', { class: 'pf-notice-title' }, 'Portal em configuração'),
     h('p', {}, 'O portal de professores está sendo configurado. Volte em breve!'),
     h('a', { class: 'btn btn-ghost btn-sm', href: '/' }, 'Ir para o Quanta Aulas'));
   if (container) container.replaceChildren(box);

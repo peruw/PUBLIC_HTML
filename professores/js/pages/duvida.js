@@ -424,7 +424,7 @@ function answerView(a, v) {
     h('div', { class: 'pf-qa-a-who' },
       h('p', { class: 'pf-qa-a-line' },
         nameEl,
-        h('span', { class: 'pf-badge pf-badge--pro' }, 'Professor(a)'),
+        t ? h('span', { class: 'pf-badge pf-badge--pro' }, 'Professor(a)') : null,
         mine ? h('span', { class: 'pf-badge pf-badge--ok' }, 'Sua resposta') : null,
         a.status !== 'published' ? h('span', { class: 'pf-badge pf-badge--warn' }, 'Oculta pela moderação') : null),
       t && t.headline ? h('p', { class: 'pf-qa-a-headline' }, t.headline) : null,
@@ -609,10 +609,12 @@ function answerFormView(v) {
       await reloadAnswers({ focusId: data && qaId(data.id) });
     } catch (err) {
       const msg = qaErrorMsg(err, 'resposta');
+      toast(msg, 'erro');
       status.textContent = '';
       status.append(h('span', { class: 'pf-error' }, msg));
       submit.disabled = false;
       submit.removeAttribute('aria-busy');
+      // Já existe resposta deste professor: recarrega para mostrá-la (o formulário vira aviso)
       if (err && String(err.code) === '23505') reloadAnswers();
     }
   });
@@ -667,7 +669,8 @@ function renderAll() {
   els.answers = h('section', { class: 'pf-qa-answers-sec', 'aria-labelledby': 'respostasTitulo' });
   els.form = h('div', { class: 'pf-qa-form-slot' });
   els.aside = h('aside', { class: 'pf-qa-aside', 'aria-label': 'Aulas e outras dúvidas' });
-  root.replaceChildren(
+  // (replaceChildren escreveria null como texto "null": filtra antes)
+  root.replaceChildren(...[
     breadcrumb(q),
     q.status !== 'open'
       ? h('div', { class: 'pf-notice pf-notice--warn pf-qa-hidden-notice', role: 'status' },
@@ -675,7 +678,8 @@ function renderAll() {
       : null,
     h('div', { class: 'pf-qa-layout pf-qa-detail' },
       h('div', { class: 'pf-qa-col' }, questionView(q, v), els.answers, els.form),
-      els.aside));
+      els.aside),
+  ].filter(Boolean));
   renderDynamic();
   updateHead();
 }

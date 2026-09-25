@@ -1210,10 +1210,12 @@ async function main() {
     return;
   }
 
-  // Sem sessão: vai para o login e volta para esta mesma aba depois
+  // Sem sessão: vai para o login e volta para esta mesma aba depois.
+  // loginUrl() sem argumento só leva âncoras simples (#plano, #avaliacoes): um hash com
+  // "=" (#access_token=..., #error_code=...) nunca vai para o ?next= (logs, histórico).
   const session = await getSession();
   if (!session) {
-    location.replace(loginUrl(location.pathname + location.search + location.hash));
+    location.replace(loginUrl());
     return;
   }
 

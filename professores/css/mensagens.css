@@ -237,6 +237,9 @@
 .pf-bubble-meta .pf-bubble-time { margin-top: 0; }
 .pf-msg-actions { margin-left: auto; opacity: 0; transition: opacity 0.15s ease; }
 .pf-msg-actions .pf-link-btn { font-size: 11px; line-height: 1.2; }
+/* Botão "Denunciar" (report.js) compacto na linha da hora */
+.pf-msg-actions .pf-report-btn { font-size: 11px; min-height: 24px; padding: 2px 6px; gap: 4px; }
+.pf-msg-actions .pf-report-icon { width: 12px; height: 12px; }
 .pf-msg:hover .pf-msg-actions,
 .pf-msg:focus-within .pf-msg-actions { opacity: 1; }
 @media (hover: none) { .pf-msg-actions { opacity: 0.85; } }

@@ -40,6 +40,14 @@ function cleanQ(v) {
   return String(v || '').replace(/\s+/g, ' ').trim().slice(0, 80);
 }
 
+/**
+ * Aula online não tem local: com modo=online, estado/cidade saem do estado da busca
+ * (a RPC ignora o local nesse modo). Assim URL, chips, título e consulta dizem a mesma coisa.
+ */
+function normalize(s) {
+  return s.modo === 'online' && (s.uf || s.cidade != null) ? { ...s, uf: '', cidade: null } : s;
+}
+
 /** Estado da busca a partir da URL atual (valores inválidos são descartados). */
 function readState() {
   const p = new URLSearchParams(location.search);
@@ -50,7 +58,7 @@ function readState() {
   let min = parseReais(p.get('min') ?? p.get('preco_min'));
   let max = parseReais(p.get('max') ?? p.get('preco_max'));
   if (min != null && max != null && min > max) [min, max] = [max, min];
-  return {
+  return normalize({
     q: cleanQ(p.get('q')),
     materia: SLUG_RE.test(materia) && materia.length <= 60 ? materia : '',
     uf: isUf(uf) ? uf : '',
@@ -60,7 +68,7 @@ function readState() {
     max,
     ordem: ORDENS.includes(p.get('ordem')) ? p.get('ordem') : 'relevancia',
     pagina: Number.isInteger(pagina) && pagina > 1 ? Math.min(pagina, 1000) : 1,
-  };
+  });
 }
 
 /** URL (pathname + query) que representa o estado; mantém parâmetros alheios (utm etc.). */
@@ -104,11 +112,12 @@ function writeUrl(s, kind) {
 }
 
 function rpcParams(s) {
+  const online = s.modo === 'online';
   return {
     q: s.q || null,
     p_materia: s.materia || null,
-    p_uf: s.uf || null,
-    p_cidade: s.cidade || null,
+    p_uf: online ? null : (s.uf || null),
+    p_cidade: online ? null : (s.cidade || null),
     p_modo: s.modo || null,
     p_preco_min: toCents(s.min),
     p_preco_max: toCents(s.max),
@@ -183,12 +192,26 @@ function stateToForm(s, { withPicker = true } = {}) {
   if (els.min) els.min.value = s.min ?? '';
   if (els.max) els.max.value = s.max ?? '';
   if (els.ordem) els.ordem.value = s.ordem;
-  if (picker && withPicker) {
-    const cur = picker.getValue();
-    if (cur.uf !== (s.uf || null) || cur.cityId !== s.cidade) {
-      picker.setValue({ uf: s.uf, cityId: s.cidade }).then(() => syncChrome(state));
-    }
+  if (withPicker) syncPicker(s);
+}
+
+/** Seletor de UF/cidade igual ao estado (ex.: "Online" limpa o local escolhido antes). */
+function syncPicker(s) {
+  if (!picker) return;
+  const cur = picker.getValue();
+  if (cur.uf !== (s.uf || null) || cur.cityId !== s.cidade) {
+    picker.setValue({ uf: s.uf, cityId: s.cidade }).then(() => syncChrome(state));
   }
+}
+
+/** Online: no lugar de Estado/Cidade, um aviso de que o local não se aplica. */
+function syncLocal(s) {
+  if (!picker || !els.localNote) return;
+  const online = s.modo === 'online';
+  picker.hidden = online;
+  els.localNote.hidden = !online;
+  if (online) els.modo?.setAttribute('aria-describedby', els.localNote.id);
+  else els.modo?.removeAttribute('aria-describedby');
 }
 
 /** Estado a partir dos campos (local vem do estado, atualizado pelo onChange do seletor de cidade). */
@@ -225,6 +248,7 @@ function syncChrome(s) {
     else a.removeAttribute('aria-current');
   });
 
+  syncLocal(s);
   renderActiveFilters(s);
 }
 
@@ -243,7 +267,7 @@ function renderActiveFilters(s) {
   if (s.q) items.push(chip(`“${s.q}”`, { q: '' }));
   if (s.materia) items.push(chip(subjectName(s.materia), { materia: '' }));
   if (s.modo) items.push(chip(s.modo === 'online' ? 'Online' : 'Presencial', { modo: '' }));
-  const place = placeText(s);
+  const place = s.modo === 'online' ? '' : placeText(s);
   if (place) items.push(chip(place, { uf: '', cidade: null }));
   const price = priceText(s);
   if (price) items.push(chip(price, { min: null, max: null }));
@@ -268,7 +292,8 @@ let lastApply = { key: '', at: 0 };
  * Aplica um novo estado: URL (push/replace), formulário, textos e busca.
  * opts.history: 'push' (padrão) | 'replace' | 'typing' | 'none'
  */
-function apply(next, { history: kind = 'push', syncForm = true, focusResults = false, scroll = false } = {}) {
+function apply(nextRaw, { history: kind = 'push', syncForm = true, focusResults = false, scroll = false } = {}) {
+  const next = normalize(nextRaw);
   // Enter num campo de preço dispara "change" e "submit" juntos: uma busca só
   const key = JSON.stringify(rpcParams(next));
   const now = Date.now();
@@ -277,6 +302,7 @@ function apply(next, { history: kind = 'push', syncForm = true, focusResults = f
   state = next;
   if (kind !== 'none') writeUrl(state, kind);
   if (syncForm) stateToForm(state);
+  else syncPicker(state); // o local pode ter sido limpo por "Online"
   syncChrome(state);
   search(state);
   if (scroll) scrollToResults();
@@ -420,7 +446,8 @@ function tutorCard(row) {
   const meta = h('div', { class: 'pf-tutor-meta' },
     count > 0
       ? starsEl(Number(row.rating_avg) || 0, { count })
-      : h('span', { class: 'pf-badge pf-badge--muted pf-new' }, 'Novo'),
+      // search_tutors não traz created_at: "Novo" contradiria anúncios antigos
+      : h('span', { class: 'pf-badge pf-badge--muted pf-new' }, 'Sem avaliações'),
     where.map((txt) => h('span', { class: 'pf-tutor-where' }, txt === 'Online' ? ICON_SCREEN() : ICON_PIN(), txt)));
 
   return h('article', { class: ['pf-tutor-card', premium ? 'is-premium' : null], dataset: { slug } },
@@ -615,7 +642,9 @@ function main() {
         apply({ ...state, uf: uf || '', cidade: cityId, pagina: 1 }, { syncForm: false });
       },
     });
-    els.local.replaceChildren(picker);
+    els.localNote = h('p', { class: 'pf-hint pf-local-note', id: 'fLocalNote', hidden: true },
+      'Aulas online: professores de todo o Brasil. Estado e cidade não se aplicam.');
+    els.local.replaceChildren(picker, els.localNote);
     picker.ready?.then(() => syncChrome(state)).catch(() => {});
   }
 

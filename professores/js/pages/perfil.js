@@ -33,6 +33,9 @@ const SELECT = [
 const $ = (id) => document.getElementById(id);
 let root = null;
 let ctaBar = null;
+let ratingBadge = null; // nota/“Novo no portal”/“Sem avaliações ainda” no cabeçalho
+let tutorSince = null; // created_at do anúncio (decide entre “Novo no portal” e “Sem avaliações ainda”)
+const NEW_DAYS = 30;
 
 // ---------- Slug ----------
 
@@ -253,6 +256,26 @@ function fact(iconName, ...children) {
   return h('li', {}, icon(ICONS[iconName]), ...children);
 }
 
+// "Novo" só nos primeiros 30 dias; depois, sem avaliações não é "novo"
+// (o cabeçalho também diz "No portal desde ...").
+function isNewListing() {
+  const t = tutorSince ? new Date(tutorSince).getTime() : NaN;
+  return Number.isFinite(t) && Date.now() - t < NEW_DAYS * 864e5;
+}
+
+function ratingEl(avg, count) {
+  if (count > 0) return h('a', { href: '#avaliacoes', class: 'pf-profile-rating' }, starsEl(avg, { count }));
+  return h('span', { class: 'pf-badge pf-badge--muted' }, isNewListing() ? 'Novo no portal' : 'Sem avaliações ainda');
+}
+
+/** Nota do cabeçalho depois que o visitante publica/edita/exclui a própria avaliação. */
+function updateRating({ avg, count } = {}) {
+  if (!ratingBadge || !ratingBadge.isConnected) return;
+  const next = ratingEl(Number(avg) || 0, Math.max(0, Number(count) || 0));
+  ratingBadge.replaceWith(next);
+  ratingBadge = next;
+}
+
 function renderHead(t) {
   const facts = [];
   if (t.presencial) facts.push(fact('pin', placeText(t) ? `Presencial em ${placeText(t)}` : 'Aulas presenciais'));
@@ -266,9 +289,9 @@ function renderHead(t) {
     if (ago) facts.push(fact('clock', `Ativo ${ago}`));
   }
 
-  const rating = t.ratingCount > 0
-    ? h('a', { href: '#avaliacoes', class: 'pf-profile-rating' }, starsEl(t.ratingAvg, { count: t.ratingCount }))
-    : h('span', { class: 'pf-badge pf-badge--muted' }, 'Novo no portal');
+  tutorSince = t.createdAt;
+  ratingBadge = ratingEl(t.ratingAvg, t.ratingCount);
+  const rating = ratingBadge;
 
   return h('header', { class: ['pf-profile-head', t.plan === 'premium' ? 'is-premium' : null] },
     h('div', { class: 'pf-profile-avatar' }, avatarEl(t.avatarPath, t.name, 128)),
@@ -443,7 +466,9 @@ function renderProfile(t, viewer) {
     subjects: t.subjects.map((s) => ({ id: s.id, name: s.name })),
   };
   safeMount($('perfilContato'), () => mountContactButton($('perfilContato'), contactOpts));
-  safeMount(reviewsBox, () => mountReviews(reviewsBox, { tutorId: t.userId, ratingAvg: t.ratingAvg, ratingCount: t.ratingCount }));
+  safeMount(reviewsBox, () => mountReviews(reviewsBox, {
+    tutorId: t.userId, ratingAvg: t.ratingAvg, ratingCount: t.ratingCount, onChange: updateRating,
+  }));
   safeMount(answersBox, () => mountTutorAnswers(answersBox, { tutorId: t.userId }));
 
   // Barra fixa de contato no celular (não para o próprio professor nem anúncio fora do ar)

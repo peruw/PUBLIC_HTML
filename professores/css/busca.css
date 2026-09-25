@@ -14,6 +14,18 @@
   margin-right: 4px;
 }
 
+/* Modalidade "Online": aviso no lugar de Estado/Cidade (mesma altura de um campo) */
+.pf-local-note {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  line-height: 1.4;
+}
+
 /* Título dos resultados recebe foco (tabindex=-1) ao trocar de página/filtro */
 .pf-results-title { overflow-wrap: anywhere; }
 .pf-results-title:focus { outline: none; }

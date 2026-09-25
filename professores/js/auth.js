@@ -83,8 +83,13 @@ export function clearProfileCache() {
   profileInflight = null;
 }
 
+// Mantém a aba/âncora (#plano, #avaliacoes) para voltar ao mesmo lugar depois do login.
+// Só âncoras simples: hash com "=" (tokens, error_code) nunca vai para o next.
+const PLAIN_HASH_RE = /^#[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+
 function currentPathForNext() {
-  return location.pathname + location.search;
+  const hash = PLAIN_HASH_RE.test(location.hash) ? location.hash : '';
+  return location.pathname + location.search + hash;
 }
 
 /** URL da página de login voltando para `next` depois. */
@@ -94,6 +99,40 @@ export function loginUrl(next = currentPathForNext()) {
 
 // Promessa que nunca resolve: a página "para" enquanto o navegador redireciona
 const halt = () => new Promise(() => {});
+
+// ---------- Página privada: saiu ou trocou de conta (nesta ou em outra aba) ----------
+
+let signingOut = false; // "Sair"/excluir conta desta aba: quem chamou já navega
+let privateWatch = false;
+
+/**
+ * Depois do requireAuth: se a sessão acabar (Sair em outra aba, refresh token revogado)
+ * vai para o login; se outra conta entrar (outra aba), recarrega. Assim os dados privados
+ * do usuário anterior (mensagens, e-mail, pagamentos) não ficam na tela.
+ * O supabase-js repassa SIGNED_IN/SIGNED_OUT entre abas por BroadcastChannel.
+ */
+function watchPrivatePage(uid) {
+  if (privateWatch || !isConfigured) return;
+  privateWatch = true;
+  sb.auth.onAuthStateChange((event, session) => {
+    if (signingOut) return;
+    const other = session?.user?.id;
+    if (event === 'SIGNED_OUT') {
+      hidePrivateContent();
+      setTimeout(() => location.replace(loginUrl()), 0);
+    } else if (other && other !== uid) {
+      hidePrivateContent();
+      setTimeout(() => location.reload(), 0);
+    }
+  });
+}
+
+// Esconde o conteúdo já na hora (o redirecionamento pode demorar num aparelho lento)
+function hidePrivateContent() {
+  const main = document.querySelector('main');
+  if (main) main.hidden = true;
+  document.querySelectorAll('dialog[open]').forEach((d) => { try { d.close(); } catch { /* ignora */ } });
+}
 
 /**
  * Exige login. Sem sessão -> entrar.html?next=<página atual>.
@@ -119,6 +158,7 @@ export async function requireAuth({ role } = {}) {
     if (location.pathname !== PAINEL) location.replace(PAINEL);
     return halt();
   }
+  watchPrivatePage(session.user?.id ?? profile.id);
   return profile;
 }
 
@@ -250,6 +290,7 @@ export async function renderAuthSlot() {
 
 /** Sai da conta (erros ignorados) e limpa caches. */
 export async function signOut() {
+  signingOut = true; // esta aba navega sozinha depois (não redirecionar para o login)
   stopUnreadPolling();
   clearProfileCache();
   try {

@@ -17,6 +17,13 @@
   </RequireAny>
 </IfModule>
 
+# Anti-clickjacking: nenhuma página do site pode ser exibida em iframe de outro domínio
+# (painel, admin e perfis logados têm ações de dois cliques: botão + confirmar)
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Content-Security-Policy "frame-ancestors 'self'"
+</IfModule>
+
 # Portal de professores: /professores/p/<slug> serve o perfil (o JS lê o slug da URL)
 <IfModule mod_rewrite.c>
   RewriteEngine On

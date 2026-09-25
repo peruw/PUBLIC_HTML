@@ -29,6 +29,11 @@
    ============================================ */
 
 /* ---------- Base ---------- */
+/* Texto secundário do portal: o #6b8076 do site fica abaixo de 4,5:1 (WCAG AA) nos cartões.
+   #879d92 dá 6,6:1 em --bg, 5,5:1 em --bg-card e 4,78:1 no item ativo #103323,
+   e continua mais escuro que --ink-dim (hierarquia mantida). Só vale nas páginas do portal. */
+:root { --ink-mute: #879d92; }
+
 .pf-main { min-height: 60vh; }
 
 :where(.pf-main, .nav, .pf-modal) :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
@@ -108,6 +113,19 @@
 
 @media (max-width: 900px) {
   .pf-auth-slot { display: none; }
+
+  /* O backdrop-filter do .nav (styles.css) faz do nav o bloco de contenção do painel "fixed":
+     o inset: 72px 0 0 0 vira 72px..73px do NAV e os links ficam soltos por cima da página.
+     Altura medida pela viewport, rolagem própria e fundo opaco (o blur do painel não funciona
+     dentro do nav já borrado). */
+  .nav .mobile-panel {
+    bottom: auto;
+    height: calc(100vh - 72px);
+    height: calc(100dvh - 72px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--bg);
+  }
 }
 
 /* Contador (mensagens não lidas) */
@@ -220,7 +238,8 @@
 .pf-input,
 .pf-select,
 .pf-textarea,
-.pf-field input:not([type=checkbox]):not([type=radio]):not([type=file]),
+/* :where() zera o peso dos :not(): senão esta regra venceria :focus e .is-invalid abaixo */
+.pf-field input:where(:not([type=checkbox]):not([type=radio]):not([type=file])),
 .pf-field select,
 .pf-field textarea {
   width: 100%;

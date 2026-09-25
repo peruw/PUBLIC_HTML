@@ -42,13 +42,15 @@ function readState() {
   };
 }
 
+const STATE_KEYS = ['q', 'materia', 'pagina'];
+
+/** URL do estado (ordem fixa q, materia, pagina; mantém parâmetros alheios, ex.: utm). */
 function stateUrl(s, hash = location.hash) {
-  const p = new URLSearchParams(location.search);
-  const set = { q: s.q || null, materia: s.materia || null, pagina: s.pagina > 1 ? s.pagina : null };
-  for (const [k, v] of Object.entries(set)) {
-    if (v == null || v === '') p.delete(k);
-    else p.set(k, String(v));
-  }
+  const p = new URLSearchParams();
+  if (s.q) p.set('q', s.q);
+  if (s.materia) p.set('materia', s.materia);
+  if (s.pagina > 1) p.set('pagina', String(s.pagina));
+  for (const [k, v] of new URLSearchParams(location.search)) if (!STATE_KEYS.includes(k)) p.append(k, v);
   const qs = p.toString();
   return location.pathname + (qs ? `?${qs}` : '') + (hash || '');
 }

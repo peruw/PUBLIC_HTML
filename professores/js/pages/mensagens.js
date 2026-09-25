@@ -92,8 +92,19 @@ function isMobile() {
 function coarsePointer() {
   return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 }
+// "Maria da Silva" -> "Maria S." (igual a public.short_name no banco; idempotente)
+function shortName(full) {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Usuário';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+}
+// Aluno aparece abreviado para o professor (como prometem o cadastro e a Política de Privacidade);
+// o professor aparece com o nome do anúncio.
 function otherName(row) {
-  return String(row?.other_name || '').trim() || 'Usuário';
+  const name = String(row?.other_name || '').trim();
+  if (!name) return 'Usuário';
+  return otherIsTutor(row) ? name : shortName(name);
 }
 function otherIsTutor(row) {
   return row?.i_am === 'student';

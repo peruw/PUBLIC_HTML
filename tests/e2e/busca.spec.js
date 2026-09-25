@@ -103,9 +103,10 @@ test('lista 3 professores; premium primeiro com selo "Destaque"', async ({ page 
   await expect(second).not.toContainText('Destaque');
   await expect(second).toContainText('Profissional');
 
-  // Sem avaliações -> "Novo"; sem preço -> "a combinar"; HTML do usuário vira texto
+  // Sem avaliações -> "Sem avaliações" (não "Novo": a busca não sabe a idade do anúncio);
+  // sem preço -> "a combinar"; HTML do usuário vira texto
   const third = cards(page).nth(2);
-  await expect(third).toContainText('Novo');
+  await expect(third.locator('.pf-new')).toHaveText('Sem avaliações');
   await expect(third).toContainText('Preço a combinar');
   await expect(third.getByRole('link')).toHaveText('Carla <b>Souza</b>');
   await expect(third).toContainText('<img src=x onerror=window.__xss=1>');
@@ -174,15 +175,15 @@ test('atalhos de matéria filtram sem recarregar a página', async ({ page }) =>
 
 test('URL preenche o formulário e vira parâmetros da RPC (preço em centavos)', async ({ page }) => {
   const calls = await mockSupabase(page);
-  await page.goto('/professores/?q=viol%C3%A3o&modo=online&min=50&max=120&ordem=preco_asc&uf=SP&cidade=3550308&pagina=1');
+  await page.goto('/professores/?q=viol%C3%A3o&modo=presencial&min=50&max=120&ordem=preco_asc&uf=SP&cidade=3550308&pagina=1');
   await expect(cards(page)).toHaveCount(3);
 
   expect(lastCall(calls)).toEqual({
-    q: 'violão', p_materia: null, p_uf: 'SP', p_cidade: 3550308, p_modo: 'online',
+    q: 'violão', p_materia: null, p_uf: 'SP', p_cidade: 3550308, p_modo: 'presencial',
     p_preco_min: 5000, p_preco_max: 12000, p_ordem: 'preco_asc', p_lim: 12, p_pagina: 0,
   });
   await expect(page.locator('#fQ')).toHaveValue('violão');
-  await expect(page.locator('#fModo')).toHaveValue('online');
+  await expect(page.locator('#fModo')).toHaveValue('presencial');
   await expect(page.locator('#fPrecoMin')).toHaveValue('50');
   await expect(page.locator('#fPrecoMax')).toHaveValue('120');
   await expect(page.locator('#fOrdem')).toHaveValue('preco_asc');
@@ -198,6 +199,55 @@ test('URL preenche o formulário e vira parâmetros da RPC (preço em centavos)'
   expect(lastCall(calls).p_cidade).toBeNull();
   await expect(page).toHaveURL(/uf=SC/);
   await expect(page).not.toHaveURL(/cidade=/);
+});
+
+// search_tutors ignora o local quando p_modo = 'online': a página não pode mostrar São Paulo como filtro ativo
+test('Online: estado e cidade não se aplicam (URL, chips, formulário e RPC concordam)', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  const calls = await mockSupabase(page);
+  await page.goto('/professores/?modo=online&uf=SP&cidade=3550308');
+  await expect(cards(page)).toHaveCount(3);
+  expect(lastCall(calls)).toMatchObject({ p_modo: 'online', p_uf: null, p_cidade: null });
+  await expect(page).not.toHaveURL(/uf=|cidade=/);
+  await expect(page).toHaveURL(/modo=online/);
+  await expect(page.locator('#resultadosTitulo')).toHaveText('Professores online');
+  const active = page.locator('#filtrosAtivos');
+  await expect(active).toContainText('Online');
+  await expect(active).not.toContainText('São Paulo');
+  await expect(page.getByLabel('Estado')).toBeHidden();
+  await expect(page.getByLabel('Cidade')).toBeHidden();
+  await expect(page.locator('#fLocalNote')).toBeVisible();
+  await expect(page.locator('#fLocalNote')).toContainText('Estado e cidade não se aplicam');
+  await expect(page.locator('#fModo')).toHaveAttribute('aria-describedby', 'fLocalNote');
+
+  // Presencial + cidade...
+  await page.locator('#fModo').selectOption('presencial');
+  await expect(page.getByLabel('Estado')).toBeVisible();
+  await expect(page.locator('#fLocalNote')).toBeHidden();
+  await expect(page.locator('#fModo')).not.toHaveAttribute('aria-describedby', /./);
+  await page.getByLabel('Estado').selectOption('SP');
+  await expect(page.getByLabel('Cidade')).toBeEnabled();
+  await page.getByLabel('Cidade').selectOption('3550308');
+  await expect.poll(() => lastCall(calls)?.p_cidade).toBe(3550308);
+  await expect(active).toContainText('São Paulo/SP');
+  // ...e depois "Online": o local sai da URL, dos chips e da RPC
+  await page.locator('#fModo').selectOption('online');
+  await expect.poll(() => lastCall(calls)?.p_modo).toBe('online');
+  expect(lastCall(calls)).toMatchObject({ p_uf: null, p_cidade: null });
+  await expect(page).not.toHaveURL(/uf=|cidade=/);
+  await expect(active).not.toContainText('São Paulo');
+  await expect(page.getByLabel('Estado')).toBeHidden();
+  // "Online ou presencial": o seletor volta, vazio
+  await page.locator('#fModo').selectOption('');
+  await expect(page.getByLabel('Estado')).toBeVisible();
+  await expect(page.getByLabel('Estado')).toHaveValue('');
+  await expect(page.getByLabel('Cidade')).toBeDisabled();
+  // Voltar do navegador restaura "Online" sem local
+  await page.goBack();
+  await expect(page.locator('#fModo')).toHaveValue('online');
+  await expect(page.getByLabel('Estado')).toBeHidden();
+  expect(errors).toEqual([]);
 });
 
 test('nomes do formulário sem JS (preco_min) viram min na URL', async ({ page }) => {

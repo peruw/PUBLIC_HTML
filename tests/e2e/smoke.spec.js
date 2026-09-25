@@ -117,23 +117,58 @@ test('municípios: JSON estático e seletor de cidade', async ({ page, request }
   await expect(page.getByLabel('Cidade')).toHaveValue('3550308');
 });
 
+// Sem rolagem horizontal. styles.css tem body { overflow-x: hidden }, que esconde o problema:
+// além do scrollWidth, confere elemento a elemento (inclui barras fixas e modais abertos).
+async function expectNoOverflow(page, label = '') {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow, label).toBeLessThanOrEqual(0);
+  const wide = await page.evaluate(() => [...document.querySelectorAll('header *, main *, footer *, body > .pf-cta-bar *, dialog[open] *')]
+    .filter((el) => {
+      if (el.closest('.pf-sr-only')) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.right > window.innerWidth + 1;
+    })
+    .map((el) => `${el.tagName.toLowerCase()}.${el.className}`));
+  expect(wide, `${label}\n${wide.join('\n')}`).toEqual([]);
+}
+
+// Painel do menu mobile aberto: começa logo abaixo do nav, vai até o fim da tela, tem fundo opaco
+// e a caixa contém todos os itens (ou rola por dentro).
+async function expectMenuCoversItems(page) {
+  const m = await page.locator('#mobileMenu').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const bg = getComputedStyle(el).backgroundColor;
+    const alpha = /rgba\([^)]*,\s*([\d.]+)\)/.exec(bg);
+    const items = [...el.querySelectorAll('a, button')].map((i) => i.getBoundingClientRect());
+    return {
+      top: r.top, bottom: r.bottom, height: r.height, client: el.clientHeight, scroll: el.scrollHeight,
+      alpha: alpha ? Number(alpha[1]) : 1,
+      firstItemTop: items.length ? items[0].top : 0,
+      overflowY: getComputedStyle(el).overflowY,
+      vh: window.innerHeight,
+    };
+  });
+  expect(m.top).toBeGreaterThanOrEqual(70);
+  expect(m.top).toBeLessThanOrEqual(74);
+  expect(Math.abs(m.bottom - m.vh)).toBeLessThanOrEqual(1);
+  expect(m.alpha).toBe(1);
+  expect(m.firstItemTop).toBeGreaterThanOrEqual(m.top);
+  // Cabe inteiro ou rola dentro do próprio painel
+  if (m.scroll > m.client + 1) expect(m.overflowY).toBe('auto');
+  else expect(m.height).toBeGreaterThanOrEqual(m.scroll);
+}
+
 test.describe('celular (360px)', () => {
   test.use({ viewport: { width: 360, height: 740 } });
 
-  for (const path of ['/professores/', '/professores/entrar.html', '/professores/p/demo']) {
+  // Todas as páginas, sem sessão (as privadas terminam no entrar.html)
+  for (const path of PAGES) {
     test(`sem rolagem horizontal: ${path}`, async ({ page }) => {
+      const errors = trackErrors(page);
       await page.goto(path);
       await page.waitForLoadState('networkidle');
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-      expect(overflow).toBeLessThanOrEqual(0);
-      // styles.css tem body { overflow-x: hidden }, que esconde o problema: confere elemento a elemento
-      const wide = await page.evaluate(() => [...document.querySelectorAll('header *, main *, footer *')]
-        .filter((el) => {
-          const r = el.getBoundingClientRect();
-          return r.width > 0 && r.height > 0 && r.right > window.innerWidth + 1;
-        })
-        .map((el) => `${el.tagName.toLowerCase()}.${el.className}`));
-      expect(wide, wide.join('\n')).toEqual([]);
+      await expectNoOverflow(page, path);
+      expect(errors, errors.join('\n')).toEqual([]);
     });
   }
 
@@ -146,8 +181,30 @@ test.describe('celular (360px)', () => {
     const panel = page.locator('#mobileMenu');
     await expect(panel.getByRole('link', { name: 'Buscar professores' })).toBeVisible();
     await expect(panel.getByRole('link', { name: 'Entrar' })).toBeVisible();
+    await expectMenuCoversItems(page);
     await page.keyboard.press('Escape');
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  // O backdrop-filter do .nav fazia do nav o bloco de contenção do painel fixo:
+  // o painel tinha ~64px de altura e os links ficavam sem fundo por cima da página.
+  test('menu mobile cobre todos os itens com fundo opaco (logado, página rolada)', async ({ page }) => {
+    await seedTutorAdmin(page);
+    await page.goto('/professores/painel.html');
+    await expect(page.locator('#authSlotMobile').getByRole('button', { name: 'Sair', includeHidden: true })).toHaveCount(1);
+    await page.evaluate(() => window.scrollTo(0, 400));
+    await page.locator('#menuToggle').click();
+    await expect(page.locator('#mobileMenu').getByRole('link', { name: 'Meu painel' })).toBeVisible();
+    await expectMenuCoversItems(page);
+    // O último item ("Voltar ao Quanta Aulas") recebe o toque (não o conteúdo da página por baixo)
+    const last = page.locator('#mobileMenu > a').last();
+    await last.scrollIntoViewIfNeeded();
+    const hit = await last.evaluate((a) => {
+      const r = a.getBoundingClientRect();
+      const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return el === a || a.contains(el);
+    });
+    expect(hit).toBe(true);
   });
 });
 
@@ -271,6 +328,180 @@ test.describe('card de professor em 360px', () => {
     expect(res.btnRight).toBeLessThanOrEqual(360);
     expect(res.scroll).toBeLessThanOrEqual(360);
   });
+});
+
+// ---------- next do login: âncora simples sim, hash com dados não ----------
+
+test('login pelo nav volta para a mesma âncora; hash com "=" nunca vai para o next', async ({ page }) => {
+  await page.goto('/professores/planos.html#faq');
+  await expect(page.locator('#authSlot').getByRole('link', { name: 'Entrar' }))
+    .toHaveAttribute('href', '/professores/entrar.html?next=%2Fprofessores%2Fplanos.html%23faq');
+  await page.goto(`/professores/termos.html${ATTACKER_HASH}`);
+  await expect(page.locator('#authSlot').getByRole('link', { name: 'Entrar' }))
+    .toHaveAttribute('href', '/professores/entrar.html?next=%2Fprofessores%2Ftermos.html');
+});
+
+// ---------- Logado (professor + admin): páginas privadas sem erro e sem rolagem em 360px ----------
+
+const ME_TUTOR = {
+  user_id: VICTIM_ID, slug: 'vitoria-teste', headline: 'Matemática para o ENEM', bio: 'Bio', hourly_rate_cents: 8000,
+  mode_online: true, mode_presencial: true, uf: 'SP', city_ibge: 3550308, city_name: 'São Paulo',
+  published: true, suspended: false, plan: 'premium', plan_expires_at: '2099-01-01T00:00:00Z', rating_avg: 0, rating_count: 0,
+  last_active_at: null, created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z',
+};
+
+async function seedTutorAdmin(page) {
+  await seedVictim(page);
+  await page.route('http://supabase.test/rest/v1/profiles*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'access-control-allow-origin': '*' },
+    body: JSON.stringify([{
+      id: VICTIM_ID, full_name: 'Vitória Teste', role: 'tutor', is_admin: true, avatar_path: null, banned_at: null,
+      created_at: '2026-09-01T00:00:00Z', tutor_profiles: ME_TUTOR,
+    }]),
+  }));
+  await page.route('http://supabase.test/auth/v1/user', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'access-control-allow-origin': '*' },
+    body: JSON.stringify({ id: VICTIM_ID, aud: 'authenticated', role: 'authenticated', email: 'vitima@exemplo.test' }),
+  }));
+}
+
+const PRIVATE_PAGES = [
+  '/professores/painel.html',
+  '/professores/mensagens.html',
+  '/professores/admin.html',
+  '/professores/pagamento.html?external_reference=b0000000-0000-4000-8000-000000000001',
+  '/professores/planos.html',
+  '/professores/duvidas.html#perguntar',
+  '/professores/p/vitoria-teste',
+];
+
+for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['360px', { width: 360, height: 740 }]]) {
+  test.describe(`logado (${label})`, () => {
+    test.use({ viewport });
+
+    for (const path of PRIVATE_PAGES) {
+      test(`sem erros: ${path}`, async ({ page }) => {
+        const errors = trackErrors(page);
+        await seedTutorAdmin(page);
+        await page.goto(path);
+        await page.waitForLoadState('networkidle');
+        // Continua na página pedida (não foi mandado para o login)
+        expect(new URL(page.url()).pathname).not.toBe('/professores/entrar.html');
+        await expect(page.locator('h1').first()).toBeVisible();
+        await expect(page.locator('#authSlot .pf-nav-user-name')).toHaveCount(1);
+        if (viewport.width === 360) await expectNoOverflow(page, path);
+        expect(errors, errors.join('\n')).toEqual([]);
+      });
+    }
+
+    test('painel: todas as abas do professor', async ({ page }) => {
+      const errors = trackErrors(page);
+      await seedTutorAdmin(page);
+      await page.goto('/professores/painel.html');
+      const tabs = page.getByRole('tab');
+      await expect(tabs).toHaveCount(7);
+      for (let i = 0; i < 7; i += 1) {
+        const tab = tabs.nth(i);
+        await tab.click();
+        const panel = page.locator(`#${await tab.getAttribute('aria-controls')}`);
+        await expect(panel).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        await expect(panel.locator('.pf-notice--erro')).toHaveCount(0);
+        if (viewport.width === 360) await expectNoOverflow(page, await tab.textContent());
+      }
+      expect(errors, errors.join('\n')).toEqual([]);
+    });
+  });
+}
+
+// ---------- Supabase fora do ar: nenhuma página quebra (sem exceção não tratada) ----------
+
+test.describe('Supabase fora do ar (500 em tudo)', () => {
+  for (const loggedIn of [false, true]) {
+    for (const path of PAGES) {
+      test(`${loggedIn ? 'logado' : 'visitante'}: ${path}`, async ({ page }) => {
+        const errors = trackErrors(page);
+        if (loggedIn) await seedVictim(page);
+        await page.route('http://supabase.test/**', (route) => {
+          if (route.request().method() === 'OPTIONS') {
+            return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+          }
+          return route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            headers: { 'access-control-allow-origin': '*' },
+            body: JSON.stringify({ message: 'boom', code: 'XX000' }),
+          });
+        });
+        await page.goto(path);
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator('h1').first()).toBeVisible();
+        // O navegador registra os 500 ("Failed to load resource"); o resto seria bug da página
+        const real = errors.filter((e) => !/Failed to load resource/.test(e));
+        expect(real, real.join('\n')).toEqual([]);
+      });
+    }
+  }
+});
+
+// ---------- Portal sem configuração (isConfigured = false): aviso em vez de quebrar ----------
+
+test.describe('portal em configuração (servidor de dev com URL placeholder)', () => {
+  test.describe.configure({ mode: 'serial', timeout: 60_000 });
+  let server;
+  let base;
+
+  test.beforeAll(async () => {
+    const saved = { url: process.env.VITE_SUPABASE_URL, key: process.env.VITE_SUPABASE_ANON_KEY };
+    process.env.VITE_SUPABASE_URL = 'https://SEU-PROJETO.supabase.co';
+    process.env.VITE_SUPABASE_ANON_KEY = 'SUA-CHAVE';
+    try {
+      const { createServer } = await import('vite');
+      server = await createServer({
+        configFile: resolve(ROOT, 'vite.config.js'),
+        root: ROOT,
+        cacheDir: resolve(ROOT, `.vite/e2e-dev-cache-nc-${process.env.E2E_PORT || 4173}`),
+        logLevel: 'error',
+        server: { port: 0, strictPort: false, hmr: false },
+      });
+      await server.listen();
+    } finally {
+      // O env só é lido na criação do servidor; restaura para os outros blocos deste worker
+      if (saved.url === undefined) delete process.env.VITE_SUPABASE_URL; else process.env.VITE_SUPABASE_URL = saved.url;
+      if (saved.key === undefined) delete process.env.VITE_SUPABASE_ANON_KEY; else process.env.VITE_SUPABASE_ANON_KEY = saved.key;
+    }
+    base = `http://localhost:${server.httpServer.address().port}`;
+  });
+
+  test.afterAll(async () => {
+    await server?.close();
+  });
+
+  const STATIC_PAGES = ['/professores/privacidade.html', '/professores/termos.html'];
+
+  for (const path of PAGES) {
+    test(`sem Supabase: ${path}`, async ({ page }) => {
+      const errors = trackErrors(page);
+      const supaReqs = [];
+      page.on('request', (req) => {
+        const host = new URL(req.url()).hostname;
+        if (host.endsWith('supabase.co') || host === 'supabase.test') supaReqs.push(req.url());
+      });
+      await page.goto(`${base}${path}`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('h1').first()).toBeVisible();
+      if (!STATIC_PAGES.includes(path)) await expect(page.getByText('Portal em configuração')).toBeVisible();
+      // Slot de login mostra os links de visitante
+      await expect(page.locator('#authSlot').getByRole('link', { name: 'Entrar' })).toBeVisible();
+      expect(supaReqs, supaReqs.join('\n')).toEqual([]);
+      const real = errors.filter((e) => !/\[vite\]/.test(e));
+      expect(real, real.join('\n')).toEqual([]);
+    });
+  }
 });
 
 // ---------- ui.js no servidor de dev (módulos importáveis direto) ----------

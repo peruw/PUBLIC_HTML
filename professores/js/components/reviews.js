@@ -445,6 +445,8 @@ export function createReviewFeed({
     summaryEl: summaryBox,
     listEl: listBox,
     reload,
+    /** Média e total conhecidos agora (depois do último reload). */
+    stats: () => ({ avg: st.avg, count: st.count }),
     setViewer(id) {
       st.viewerId = id || null;
       if (st.loaded) renderList();
@@ -461,13 +463,22 @@ export function createReviewFeed({
  * sb.rpc('can_review', { p_tutor }) = true (ou a própria avaliação para editar/excluir);
  * botão denunciar em cada avaliação de outra pessoa.
  * @param {HTMLElement} container
- * @param {{ tutorId: string, ratingAvg?: number, ratingCount?: number }} opts
+ * onChange({ avg, count }) é chamado depois que o visitante publica, edita ou exclui a própria
+ * avaliação (para a página atualizar a nota do cabeçalho); nunca na carga inicial.
+ * @param {{ tutorId: string, ratingAvg?: number, ratingCount?: number,
+ *   onChange?: (stats: { avg: number, count: number }) => void }} opts
  * @returns {void}
  */
-export function mountReviews(container, { tutorId, ratingAvg = 0, ratingCount = 0 } = {}) {
+export function mountReviews(container, { tutorId, ratingAvg = 0, ratingCount = 0, onChange = null } = {}) {
   if (!container) return;
   const titleId = nextId('pfRvTitle');
   const feed = createReviewFeed({ tutorId, ratingAvg, ratingCount });
+  // Recarrega a lista e avisa a página (nota do cabeçalho) sem deixar um erro dela quebrar a seção
+  const reloadAndNotify = () => feed.reload().then(() => {
+    if (typeof onChange === 'function') {
+      try { onChange(feed.stats()); } catch { /* opcional */ }
+    }
+  });
   const userBox = h('div', { class: 'pf-rv-user' });
   const title = h('h2', { class: 'pf-section-title pf-rv-title', id: titleId, tabindex: '-1' }, 'Avaliações');
   container.replaceChildren(h('div', { class: 'pf-rv', dataset: { tutorId: tutorId || '' } },
@@ -549,7 +560,7 @@ export function mountReviews(container, { tutorId, ratingAvg = 0, ratingCount = 
     if (viewer.own) renderOwn({ focus: true });
     else await refreshUserBox({ focus: true });
     toast('Obrigado! Sua avaliação foi publicada.', 'ok');
-    feed.reload();
+    reloadAndNotify();
   }
 
   async function saveEdit({ rating, comment }) {
@@ -565,7 +576,7 @@ export function mountReviews(container, { tutorId, ratingAvg = 0, ratingCount = 
     viewer.own = row;
     renderOwn({ focus: true });
     toast('Avaliação atualizada.', 'ok');
-    feed.reload();
+    reloadAndNotify();
   }
 
   function confirmDelete() {
@@ -595,7 +606,7 @@ export function mountReviews(container, { tutorId, ratingAvg = 0, ratingCount = 
         if (!deleted) return;
         viewer.own = null;
         toast('Avaliação excluída.', 'ok');
-        feed.reload();
+        reloadAndNotify();
         title.focus();
         refreshUserBox();
       },

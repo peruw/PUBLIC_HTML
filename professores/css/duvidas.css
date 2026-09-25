@@ -67,10 +67,11 @@
 .pf-qa-field-foot .pf-hint { flex: 1 1 auto; min-width: 0; }
 .pf-qa-field-foot .pf-counter { flex: none; white-space: nowrap; }
 .pf-counter.is-short { color: var(--warn); }
-.pf-qa-form .pf-error:empty,
-.pf-qa-err:empty { margin: 0; min-height: 0; }
-.pf-qa-status { font-size: 14px; color: var(--ink-dim); min-height: 0; }
-.pf-qa-status:empty { display: none; }
+/* Regiões aria-live vazias saem do fluxo (sem espaço do gap) mas continuam renderizadas:
+   com display:none alguns leitores de tela não anunciam o texto que entra depois */
+.pf-qa-err:empty,
+.pf-qa-status:empty { position: absolute; margin: 0; }
+.pf-qa-status { font-size: 14px; color: var(--ink-dim); }
 .pf-qa-status .pf-error { display: block; font-size: 14px; }
 .pf-qa-tip { font-size: 14px; padding: 12px 14px; }
 .pf-qa-tip a { color: var(--brand); }
@@ -166,6 +167,13 @@
 }
 .pf-qa-card-meta > span:not(.pf-chip) { overflow-wrap: anywhere; }
 .pf-qa-card-answers { font-weight: 500; }
+/* A contagem já aparece no quadro à esquerda: o texto fica só para leitores de tela */
+@media (min-width: 481px) {
+  .pf-qa-card .pf-qa-card-answers {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+}
 .pf-qa-card-answers.is-answered { color: var(--brand); }
 .pf-qa-card .pf-chip { cursor: inherit; }
 @media (max-width: 480px) {
@@ -234,7 +242,8 @@
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-.pf-qa-actions .pf-link-btn { margin-left: auto; }
+.pf-qa-actions .pf-link-btn,
+.pf-qa-actions .pf-report-btn { margin-left: auto; }
 
 .pf-qa-answers-sec { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
 .pf-qa-answers-sec .pf-section-title { margin: 0; }

@@ -52,8 +52,17 @@ function siteBase() {
   return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? location.origin : SITE_URL;
 }
 
+/**
+ * Destino depois do cadastro: o ?next= válido (ex.: /professores/p/<slug>#mensagem de quem
+ * clicou "Enviar mensagem" sem conta), senão `fallback`. Sem isso o novo aluno perde o professor.
+ */
+function signupNext(fallback) {
+  const raw = params.get('next');
+  return raw && safeNext(raw) === raw ? raw : fallback;
+}
+
 function confirmRedirect() {
-  const next = `${PAINEL}?bemvindo=1`;
+  const next = signupNext(`${PAINEL}?bemvindo=1`);
   return `${siteBase()}${ENTRAR}?modo=entrar&confirmado=1&next=${encodeURIComponent(next)}`;
 }
 
@@ -424,7 +433,7 @@ function renderSignup(card, notice) {
       if (error) throw error;
       if (data?.session) {
         // Confirmação de e-mail desligada no projeto: já entra
-        location.replace(safeNext(`${PAINEL}${role === 'tutor' ? '#anuncio' : ''}`));
+        location.replace(signupNext(`${PAINEL}${role === 'tutor' ? '#anuncio' : ''}`));
         return;
       }
       renderCheckEmail(card, em);

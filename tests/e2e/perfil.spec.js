@@ -197,6 +197,15 @@ test('erro ao carregar mostra aviso e "Tentar de novo"', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ana Silva');
 });
 
+test('"Novo no portal" só nos primeiros 30 dias do anúncio', async ({ page }) => {
+  const recent = new Date(Date.now() - 5 * 864e5).toISOString();
+  await mockSupabase(page, { tutor: makeTutor({ rating_avg: 0, rating_count: 0, created_at: recent }) });
+  await page.goto('/professores/p/ana-silva');
+  const head = page.locator('.pf-profile-head');
+  await expect(head).toContainText('Novo no portal');
+  await expect(head).not.toContainText('Sem avaliações ainda');
+});
+
 test('professor sem avaliações, sem preço e só online', async ({ page }) => {
   await mockSupabase(page, {
     tutor: makeTutor({
@@ -206,7 +215,10 @@ test('professor sem avaliações, sem preço e só online', async ({ page }) => 
   });
   await page.goto('/professores/p/ana-silva');
   const head = page.locator('.pf-profile-head');
-  await expect(head).toContainText('Novo no portal');
+  // Anúncio de jan. de 2026 sem avaliações: não é "novo" (o cabeçalho diz "No portal desde jan. de 2026")
+  await expect(head).toContainText('Sem avaliações ainda');
+  await expect(head).not.toContainText('Novo no portal');
+  await expect(head).toContainText('No portal desde');
   await expect(head).not.toContainText('Destaque'); // plano vencido = básico
   await expect(head).not.toContainText('Presencial');
   await expect(page.locator('#contato')).toContainText('Preço a combinar');

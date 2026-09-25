@@ -173,6 +173,8 @@ function answerItem(row) {
 /**
  * Últimas respostas publicadas pelo professor, com link para cada dúvida
  * (/professores/duvida.html?q=<question_id>#resposta-<id>).
+ * Carregando ou sem respostas: o container fica VAZIO (o perfil esconde a seção
+ * com .pf-profile-section:has(> .pf-mount:empty), sem "pisca-pisca").
  * Nunca rejeita: erros viram mensagem com "Tentar de novo".
  * @param {HTMLElement} container
  * @param {{ tutorId: string }} opts
@@ -180,14 +182,9 @@ function answerItem(row) {
  */
 export async function mountTutorAnswers(container, { tutorId } = {}) {
   if (!container) return;
-  const box = h('div', { class: 'pf-ta', 'aria-busy': 'true' },
-    h('p', { class: 'pf-loading', role: 'status' }, 'Carregando respostas…'));
-  container.replaceChildren(box);
-  if (!tutorId) {
-    box.replaceChildren(h('p', { class: 'pf-muted' }, 'Nenhuma resposta no tira-dúvidas ainda.'));
-    box.setAttribute('aria-busy', 'false');
-    return;
-  }
+  container.replaceChildren();
+  if (!tutorId) return;
+  container.setAttribute('aria-busy', 'true');
 
   try {
     // !inner: resposta a pergunta oculta (embed null pelo RLS) não entra na lista
@@ -200,20 +197,15 @@ export async function mountTutorAnswers(container, { tutorId } = {}) {
       .limit(SHOWN);
     if (error) throw error;
     const rows = (Array.isArray(data) ? data : []).filter((r) => r && r.questions && qaId(r.questions.id));
-    if (!rows.length) {
-      box.replaceChildren(
-        h('p', { class: 'pf-muted' }, 'Este professor ainda não respondeu perguntas no tira-dúvidas.'),
-        h('a', { class: 'pf-ta-more', href: '/professores/duvidas.html' }, 'Conhecer o tira-dúvidas'));
-      return;
-    }
-    box.replaceChildren(
+    if (!rows.length) return;
+    container.replaceChildren(h('div', { class: 'pf-ta' },
       h('ul', { class: 'pf-ta-list', 'aria-label': 'Últimas respostas' }, rows.map(answerItem)),
-      h('a', { class: 'pf-ta-more', href: '/professores/duvidas.html' }, 'Ver mais dúvidas no tira-dúvidas'));
+      h('a', { class: 'pf-ta-more', href: '/professores/duvidas.html' }, 'Ver mais dúvidas no tira-dúvidas')));
   } catch (err) {
-    box.replaceChildren(h('div', { class: 'pf-qa-inline-error', role: 'alert' },
+    container.replaceChildren(h('div', { class: 'pf-qa-inline-error', role: 'alert' },
       h('p', {}, `Não foi possível carregar as respostas. ${errorMsg(err)}`),
       h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onClick: () => mountTutorAnswers(container, { tutorId }) }, 'Tentar de novo')));
   } finally {
-    box.setAttribute('aria-busy', 'false');
+    container.setAttribute('aria-busy', 'false');
   }
 }
