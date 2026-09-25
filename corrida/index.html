@@ -101,7 +101,7 @@
   /* Pergunta */
   .question {
     position: fixed; left: 50%; z-index: 2;
-    top: calc(max(10px, env(safe-area-inset-top)) + 46px);
+    top: calc(max(10px, env(safe-area-inset-top)) + 54px);
     transform: translateX(-50%);
     pointer-events: none;
     text-align: center;
@@ -109,19 +109,25 @@
   }
   .question.show { opacity: 1; }
   .q-inner {
-    padding: 10px 18px 12px;
+    position: relative;
+    padding: 13px 16px 8px;
     background: rgba(4, 16, 11, 0.9);
     border: 3px solid var(--brand);
     box-shadow: 4px 4px 0 #000, 0 0 24px rgba(31,214,133,0.35);
   }
-  .q-level { font-family: var(--pixel-text); font-weight: 700; font-size: 13px; line-height: 1; color: var(--brand); letter-spacing: 2px; margin-bottom: 8px; }
+  .q-level {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    padding: 3px 8px 2px; white-space: nowrap;
+    font-family: var(--pixel-text); font-weight: 700; font-size: 12px; line-height: 1; letter-spacing: 1px;
+    color: #03140c; background: var(--brand); box-shadow: 2px 2px 0 #000;
+  }
   .q-text {
     font-family: var(--pixel); white-space: nowrap;
-    font-size: clamp(16px, min(4.6vw, 5.2vh), 30px);
+    font-size: clamp(14px, min(4.4vw, 4.8vh), 26px);
     text-shadow: 3px 3px 0 #000;
   }
   .q-text .qm { color: var(--gold); }
-  .q-bar { height: 6px; margin-top: 10px; background: #000; border: 1px solid var(--brand-dark); }
+  .q-bar { height: 5px; margin-top: 8px; background: #000; border: 1px solid var(--brand-dark); }
   .q-bar i { display: block; height: 100%; width: 100%; background: var(--brand); transform-origin: left; }
   .q-bar i.late { background: var(--gold); }
   .q-bar i.later { background: var(--danger); }
@@ -160,6 +166,7 @@
     text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
     animation: rise 1s steps(10) forwards;
   }
+  .pop.accent { font-family: var(--pixel-text); font-weight: 700; }
   .pop.big { font-family: var(--pixel-text); font-weight: 700; animation: zoom 1.4s steps(12) forwards; }
   @keyframes rise { 0% { opacity: 1; margin-top: 0; } 70% { opacity: 1; } 100% { opacity: 0; margin-top: -70px; } }
   @keyframes zoom {
@@ -232,6 +239,8 @@
   #loading { font-family: var(--pixel-text); font-weight: 700; font-size: 14px; color: var(--brand); }
 
   @media (max-height: 520px) {
+    .question { top: calc(max(10px, env(safe-area-inset-top)) + 48px); }
+    .q-inner { padding: 11px 12px 6px; }
     .card { padding: 16px 18px; }
     .card .logo, .keys { display: none; }
     .tag { margin: 0 0 10px; }
@@ -264,7 +273,7 @@
 <div class="question" id="question">
   <div class="q-inner">
     <div class="q-level" id="qLevel">NÍVEL 1</div>
-    <div class="q-text" id="qText"></div>
+    <div class="q-text" id="qText">0 + 0 = ?</div>
     <div class="q-bar"><i id="qBar"></i></div>
   </div>
 </div>
@@ -336,7 +345,6 @@
 
   // ================= Configuração =================
   const CFG = {
-    lanes: [-2.1, 2.1],
     spawnZ: -100,        // onde o portal nasce
     resolveZ: -0.4,      // onde o portal alcança o corredor
     startSpeed: 16,      // unidades/s -> ~6 s para responder
@@ -359,10 +367,14 @@
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
   };
+  // 2 portais nos níveis 1-2, 3 nos níveis 3-4, 4 do nível 5 em diante
+  const portalsFor = (level) => (level >= 5 ? 4 : level >= 3 ? 3 : 2);
+  const ROAD = 8.4;
+  const laneXs = (n) => Array.from({ length: n }, (_, i) => -ROAD / 2 + (ROAD / n) * (i + 0.5));
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ================= Contas =================
-  function makeQuestion(level) {
+  function makeQuestion(level, n) {
     let a, b, c, text, ans;
     const big = Math.max(0, level - 5);
     const types = ['add'];
@@ -382,14 +394,23 @@
         else { c = rand(1, a * b - 1); text = `${a} × ${b} - ${c}`; ans = a * b - c; }
         break;
     }
-    return { text, ans, wrong: makeDistractor(ans, type, a, b) };
+    return { text, ans, wrong: makeDistractors(ans, type, a, b, n - 1) };
   }
-  function makeDistractor(ans, type, a, b) {
-    const opts = [ans + 1, ans - 1, ans + 2, ans - 2, ans + 10, ans - 10];
-    if (type === 'mul') opts.push(a * (b + 1), a * (b - 1), (a + 1) * b, a + b);
-    if (type === 'div') opts.push(b);
+  // respostas erradas plausíveis: vizinhas da certa ou erros típicos de conta
+  function makeDistractors(ans, type, a, b, count) {
+    const opts = [ans + 1, ans - 1, ans + 2, ans - 2, ans + 10, ans - 10, ans + 3, ans - 3];
+    if (type === 'mul') opts.push(a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b, a + b);
+    if (type === 'div') opts.push(b, ans * 2);
     if (type === 'sub') opts.push(a + b);
-    return pick(opts.filter((v) => v !== ans && v >= 0));
+    if (type === 'add') opts.push(Math.abs(a - b));
+    const pool = shuffle([...new Set(opts)].filter((v) => v !== ans && v >= 0));
+    const out = pool.slice(0, count);
+    for (let k = 4; out.length < count; k++) if (!out.includes(ans + k)) out.push(ans + k);
+    return out;
+  }
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    return arr;
   }
 
   // ================= Texturas em pixel =================
@@ -473,18 +494,19 @@
     }, [60, 60]);
   }
 
-  function panelTex(num, state) {
+  function panelTex(num, state, pw, len) {
     const col = state === 'bad' ? '#ff4d5e' : state === 'good' ? '#7dffc0' : '#1fd685';
     const fill = state === 'bad' ? 'rgba(255,77,94,0.45)' : state === 'good' ? 'rgba(125,255,192,0.4)' : 'rgba(31,214,133,0.22)';
-    return canvasTex(96, 104, (g, w, h) => {
+    return canvasTex(Math.round(128 * pw / 3.6), 138, (g, w, h) => {
       g.fillStyle = fill; g.fillRect(4, 4, w - 8, h - 8);
       // brilho diagonal
       g.fillStyle = 'rgba(255,255,255,0.08)';
-      for (let i = 0; i < 26; i++) g.fillRect(10 + i, 8 + i * 2, 6, 2);
+      for (let i = 0; i < Math.min(34, w - 20); i++) g.fillRect(10 + i, 8 + i * 2, 6, 2);
       g.fillStyle = col;
       g.fillRect(4, 0, w - 8, 4); g.fillRect(4, h - 4, w - 8, 4); g.fillRect(0, 4, 4, h - 8); g.fillRect(w - 4, 4, 4, h - 8);
       g.fillRect(4, 4, 4, 4); g.fillRect(w - 8, 4, 4, 4); g.fillRect(4, h - 8, 4, 4); g.fillRect(w - 8, h - 8, 4, 4);
-      const s = String(num), fs = s.length <= 2 ? 32 : 24;
+      const s = String(num);
+      const fs = [40, 32, 24, 16, 8].find((f) => f * len <= w - 10); // mesmo tamanho em todos os portais
       g.font = `${fs}px 'Press Start 2P', monospace`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = '#000'; g.fillText(s, w / 2 + 3, h / 2 + 5);
@@ -528,7 +550,8 @@
   scene.add(new T.HemisphereLight(0xd8ffe9, 0x0a2a1b, 0.95));
   const sun = new T.DirectionalLight(0xffffff, 0.75); sun.position.set(-6, 12, 8); scene.add(sun);
 
-  let W = 0, H = 0, PX = 3;
+  let W = 0, H = 0, PX = 3, qBottom = 0;
+  const measureQuestion = () => { qBottom = $('question').getBoundingClientRect().bottom; };
   function resize() {
     W = window.innerWidth; H = window.innerHeight;
     PX = clamp(Math.round(Math.min(H, W * 1.2) / 250), 2, 5);
@@ -537,6 +560,7 @@
     camera.aspect = aspect;
     CAM.baseFov = aspect < 1 ? 62 + (1 - aspect) * 34 : 62;
     camera.updateProjectionMatrix();
+    measureQuestion();
   }
   window.addEventListener('resize', resize);
 
@@ -564,10 +588,11 @@
   const postMat = new T.MeshLambertMaterial({ color: 0x0b2a1c });
   const capGeo = new T.BoxGeometry(0.46, 0.16, 0.46);
   const capMat = new T.MeshBasicMaterial({ color: C.brand });
+  const rowDashes = [];
   for (let i = 0; i < CFG.rows; i++) {
     const row = new T.Group();
     const slab = new T.Mesh(rowGeo, tileMats[i % 2]); slab.position.y = -0.4; row.add(slab);
-    if (i % 2 === 0) { const d = new T.Mesh(dashGeo, dashMat); d.position.y = 0.02; row.add(d); }
+    if (i % 2 === 0) for (let k = 0; k < 3; k++) { const d = new T.Mesh(dashGeo, dashMat); d.position.y = 0.02; row.add(d); rowDashes.push(d); }
     for (const sx of [-4.4, 4.4]) {
       const p = new T.Mesh(postGeo, postMat); p.position.set(sx, 0.35, 0); row.add(p);
       const cp = new T.Mesh(capGeo, capMat); cp.position.set(sx, 0.76, 0); row.add(cp);
@@ -575,6 +600,14 @@
     row.position.z = 12 - i * CFG.rowLen;
     scene.add(row); moving.push({ obj: row, span: trackSpan, limit: 14 });
   }
+  function setTrackLanes(n) {
+    rowDashes.forEach((d, j) => {
+      const k = j % 3;
+      d.visible = k < n - 1;
+      d.position.x = -ROAD / 2 + (ROAD / n) * (k + 1);
+    });
+  }
+  setTrackLanes(2);
   const railGeo = new T.BoxGeometry(0.14, 0.12, trackSpan + 20);
   for (const sx of [-4.4, 4.4]) {
     const rail = new T.Mesh(railGeo, capMat); rail.position.set(sx, 0.76, 12 - trackSpan / 2); scene.add(rail);
@@ -673,22 +706,26 @@
   // ================= Portais =================
   const postGateGeo = new T.BoxGeometry(0.55, 5.3, 0.55);
   const postGateMat = new T.MeshLambertMaterial({ color: 0x0c2d20 });
-  const panelGeo = new T.PlaneGeometry(3.6, 3.9);
-  const padGeo = new T.BoxGeometry(3.6, 0.06, 1.2);
+  const innerPostGeo = new T.BoxGeometry(0.3, 5.3, 0.4);
   const beamGeo = new T.BoxGeometry(9.4, 1.18, 0.6);
-  function makeGate(q, answers) {
+  function makeGate(q, answers, xs) {
     const g = new T.Group();
-    for (const x of [-4.4, 0, 4.4]) {
-      const p = new T.Mesh(postGateGeo, postGateMat); p.position.set(x, 2.65, 0); g.add(p);
-      const cap = new T.Mesh(capGeo, capMat); cap.scale.set(1.3, 1, 1.3); cap.position.set(x, 5.36, 0); g.add(cap);
-    }
+    const n = xs.length, pw = ROAD / n - 0.42, len = Math.max(...answers.map((v) => String(v).length));
+    const posts = [-4.4, 4.4];
+    for (let k = 1; k < n; k++) posts.push(-ROAD / 2 + (ROAD / n) * k);
+    posts.forEach((x, k) => {
+      const p = new T.Mesh(k < 2 ? postGateGeo : innerPostGeo, postGateMat); p.position.set(x, 2.65, 0); g.add(p);
+      const cap = new T.Mesh(capGeo, capMat); cap.scale.set(k < 2 ? 1.3 : 0.8, 1, 1.3); cap.position.set(x, 5.36, 0); g.add(cap);
+    });
+    const panelGeo = new T.PlaneGeometry(pw, 3.9);
+    const padGeo = new T.BoxGeometry(pw, 0.06, 1.2);
     const btex = bannerTex(`${q.text} = ?`);
     const bfront = new T.MeshBasicMaterial({ map: btex });
     const beam = new T.Mesh(beamGeo, [postGateMat, postGateMat, postGateMat, postGateMat, bfront, postGateMat]);
     beam.position.set(0, 5.95, 0); g.add(beam);
     const pads = [];
-    const panels = CFG.lanes.map((lx, i) => {
-      const mat = new T.MeshBasicMaterial({ map: panelTex(answers[i], 'idle'), transparent: true, side: T.DoubleSide, depthWrite: false });
+    const panels = xs.map((lx, i) => {
+      const mat = new T.MeshBasicMaterial({ map: panelTex(answers[i], 'idle', pw, len), transparent: true, side: T.DoubleSide, depthWrite: false });
       const m = new T.Mesh(panelGeo, mat); m.position.set(lx, 2.3, 0); g.add(m);
       const pad = new T.Mesh(padGeo, new T.MeshBasicMaterial({ color: C.brand, transparent: true, opacity: 0.35 }));
       pad.position.set(lx, 0.04, 0.2); g.add(pad); pads.push(pad);
@@ -696,12 +733,12 @@
     });
     g.position.z = CFG.spawnZ;
     scene.add(g);
-    return { group: g, panels, pads, banner: btex, bfront };
+    return { group: g, panels, pads, banner: btex, bfront, pw, len, geos: [panelGeo, padGeo] };
   }
   function setPanel(gate, i, state) {
     const m = gate.obj.panels[i];
     m.material.map.dispose();
-    m.material.map = panelTex(gate.answers[i], state);
+    m.material.map = panelTex(gate.answers[i], state, gate.obj.pw, gate.obj.len);
     m.material.needsUpdate = true;
   }
   function removeGate(gate) {
@@ -710,6 +747,7 @@
     o.panels.forEach((m) => { m.material.map.dispose(); m.material.dispose(); });
     o.pads.forEach((m) => m.material.dispose());
     o.banner.dispose(); o.bfront.dispose();
+    o.geos.forEach((geo) => geo.dispose());
   }
 
   // ================= Som =================
@@ -770,7 +808,7 @@
   // ================= Estado =================
   const S = {
     mode: 'menu', score: 0, lives: CFG.lives, hits: 0, combo: 0, level: 1,
-    speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lane: 0, x: CFG.lanes[0],
+    speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, x: -2.1, horizon: 0,
     gate: null, gap: 0, t: 0, phase: 0, shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0,
   };
   let best = store.get('quanta-corrida-best', 0);
@@ -795,9 +833,9 @@
     cb.innerHTML = `${S.combo} SEGUIDAS<small>PONTOS x${mult}</small>`;
     cb.classList.toggle('show', S.combo >= 2);
   }
-  function popText(text, color, top, big) {
+  function popText(text, color, top, big, accent) {
     const el = document.createElement('div');
-    el.className = 'pop' + (big ? ' big' : '');
+    el.className = 'pop' + (big ? ' big' : '') + (accent ? ' accent' : '');
     el.textContent = text; el.style.color = color; el.style.top = top;
     el.style.fontSize = big ? 'clamp(30px, 8vw, 56px)' : 'clamp(14px, 3.6vw, 22px)';
     $('fx').appendChild(el);
@@ -812,7 +850,7 @@
   // ================= Controles =================
   function setLane(i) {
     if (S.mode !== 'play') return;
-    i = clamp(i, 0, CFG.lanes.length - 1);
+    i = clamp(i, 0, S.lanes.length - 1);
     if (i !== S.lane) sfx.move();
     S.lane = i;
   }
@@ -829,9 +867,9 @@
   cv.addEventListener('pointermove', (e) => {
     if (tx0 === null || swiped) return;
     const dx = e.clientX - tx0;
-    if (Math.abs(dx) > 28) { setLane(dx < 0 ? 0 : 1); swiped = true; }
+    if (Math.abs(dx) > 28) { setLane(S.lane + (dx < 0 ? -1 : 1)); swiped = true; }
   });
-  cv.addEventListener('pointerup', (e) => { if (tx0 !== null && !swiped) setLane(e.clientX < W / 2 ? 0 : 1); tx0 = null; });
+  cv.addEventListener('pointerup', (e) => { if (tx0 !== null && !swiped) setLane(S.lane + (e.clientX < W / 2 ? -1 : 1)); tx0 = null; });
 
   // ================= Fluxo =================
   function startGame() {
@@ -839,27 +877,38 @@
     if (S.gate) { removeGate(S.gate); S.gate = null; }
     Object.assign(S, {
       mode: 'play', score: 0, lives: CFG.lives, hits: 0, combo: 0, level: 1,
-      speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lane: 0, gap: 0.8,
+      speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, gap: 0.8,
       shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0,
     });
+    setTrackLanes(2);
     ['startScreen', 'overScreen', 'pauseScreen'].forEach((id) => $(id).classList.remove('show'));
     $('question').classList.remove('show');
     updateHud();
   }
 
   function spawnGate() {
-    const q = makeQuestion(S.level);
-    const correct = Math.random() < 0.5 ? 0 : 1;
-    const answers = correct === 0 ? [q.ans, q.wrong] : [q.wrong, q.ans];
-    S.gate = { q, answers, correct, state: 'coming', timer: 0, z: CFG.spawnZ, obj: makeGate(q, answers) };
+    const n = portalsFor(S.level);
+    if (n !== S.lanes.length) {
+      S.lanes = laneXs(n);
+      setTrackLanes(n);
+      let bestI = 0;
+      S.lanes.forEach((x, i) => { if (Math.abs(x - S.x) < Math.abs(S.lanes[bestI] - S.x)) bestI = i; });
+      S.lane = bestI;
+      setTimeout(() => popText(`AGORA SÃO ${n} PORTAIS!`, '#ffd23f', '56%', false, true), 500);
+    }
+    const q = makeQuestion(S.level, n);
+    const answers = shuffle([q.ans, ...q.wrong]);
+    const correct = answers.indexOf(q.ans);
+    S.gate = { q, answers, correct, state: 'coming', timer: 0, z: CFG.spawnZ, obj: makeGate(q, answers, S.lanes) };
     $('qText').innerHTML = `${q.text} = <span class="qm">?</span>`;
     $('qLevel').textContent = `NÍVEL ${S.level}`;
     const qe = $('question');
     qe.classList.remove('bounce'); void qe.offsetWidth; qe.classList.add('show', 'bounce');
+    measureQuestion();
   }
 
   function resolveGate(g) {
-    const lx = CFG.lanes[S.lane];
+    const lx = S.lanes[S.lane];
     if (S.lane === g.correct) {
       g.state = 'pass';
       g.obj.panels[S.lane].visible = false;
@@ -948,7 +997,7 @@
 
     // corredor
     if (!frozen) S.phase += dt * (4 + v * 0.42);
-    const lx = S.mode === 'menu' ? Math.sin(S.t * 0.7) * 1.2 : CFG.lanes[S.lane];
+    const lx = S.mode === 'menu' ? Math.sin(S.t * 0.7) * 1.2 : S.lanes[S.lane];
     S.x += (lx - S.x) * (1 - Math.pow(0.00002, dt));
     runner.position.x = S.x;
     const sw = Math.sin(S.phase);
@@ -978,9 +1027,13 @@
     S.fovKick *= Math.pow(0.02, dt);
     const shk = S.shake * 1.2;
     camera.position.set(CAM.x + S.x * 0.25 + rnd(-shk, shk), CAM.y + rnd(-shk, shk) * 0.6, CAM.z);
-    camera.lookAt(S.x * 0.35, CAM.lookY, CAM.lookZ);
     const fov = CAM.baseFov + sf * 10 + S.fovKick;
     if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+    // inclina a câmera para o horizonte (de onde vêm os portais) ficar abaixo da pergunta
+    const hy = clamp(Math.max(H * 0.33, qBottom + 16), 0, H * 0.46);
+    S.horizon = S.horizon ? S.horizon + (hy - S.horizon) * Math.min(1, dt * 6) : hy;
+    const tanP = (1 - 2 * S.horizon / H) * Math.tan(camera.fov * Math.PI / 360);
+    camera.lookAt(S.x * 0.35, camera.position.y - tanP * (CAM.z - CAM.lookZ), CAM.lookZ);
 
     if (!playing) return;
 
@@ -1041,6 +1094,7 @@
     ready = true;
     const b = $('btnStart'); b.disabled = false;
     b.innerHTML = '<span class="blink">► JOGAR</span>';
+    measureQuestion();
   });
 })();
 </script>
