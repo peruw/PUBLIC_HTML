@@ -1,4 +1,4 @@
-// Corrida dos Cientistas: renderer, loop principal, estados do jogo e integração dos módulos.
+// Kart Científico: renderer, loop principal, estados do jogo e integração dos módulos.
 import * as THREE from './three.js';
 import { CHARACTERS, CLASSES, QUALITY, RACE, ITEM_IDS } from './config.js';
 import { bus } from './events.js';

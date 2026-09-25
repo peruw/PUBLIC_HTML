@@ -1,7 +1,7 @@
 // Configuração compartilhada: elenco, itens, classes de motor, qualidade gráfica.
 // Os módulos só LEEM daqui. Ajustes finos de física ficam em kart.js.
 
-export const GAME_TITLE = 'Corrida dos Cientistas';
+export const GAME_TITLE = 'Kart Científico';
 
 // Atributos de 1 a 5. Peso alto empurra os outros nas batidas, mas acelera devagar.
 // `colors.kart`/`colors.kartAccent` pintam o kart; `look` orienta o modelo em models.js.

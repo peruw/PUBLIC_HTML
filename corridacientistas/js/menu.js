@@ -30,7 +30,7 @@ const STAT_LABELS = [['speed', 'Velocidade'], ['accel', 'Aceleração'], ['handl
 const store = {
   get(k, def) {
     try {
-      const v = localStorage.getItem('corrida-' + k);
+      const v = localStorage.getItem('kartcientifico-' + k);
       return v === null ? def : JSON.parse(v);
     } catch {
       return def;
@@ -38,7 +38,7 @@ const store = {
   },
   set(k, v) {
     try {
-      localStorage.setItem('corrida-' + k, JSON.stringify(v));
+      localStorage.setItem('kartcientifico-' + k, JSON.stringify(v));
     } catch {
       /* armazenamento indisponível */
     }
