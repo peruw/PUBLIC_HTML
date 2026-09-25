@@ -343,7 +343,7 @@
     scene.add(root);
 
     // ---------- câmera (lida no render; valores padrão do jogo até o 1º quadro) ----------
-    const cam = { x: 0, y: 5.2, z: 8.6, tanV: Math.tan(31 * Math.PI / 180), aspect: 1.6, tanUp: Math.tan(19.5 * Math.PI / 180) };
+    const cam = { y: 5.2, z: 8.6, tanV: Math.tan(31 * Math.PI / 180), aspect: 1.6, tanUp: Math.tan(19.5 * Math.PI / 180) };
     const halfW = (z) => Math.max(8, (cam.z - z) * cam.tanV * cam.aspect);   // meia largura visível na profundidade z
     const topY = (z) => cam.y + (cam.z - z) * cam.tanUp;                      // topo da tela na profundidade z
 
@@ -512,7 +512,7 @@
       norm.mat.uniforms.uScale.value = glow.mat.uniforms.uScale.value = v2.y / 2;
       if (!camera || !camera.isPerspectiveCamera) return;
       const e = camera.matrixWorld.elements;
-      cam.x = e[12]; cam.y = e[13]; cam.z = e[14];
+      cam.y = e[13]; cam.z = e[14];
       const half = camera.fov * Math.PI / 360;
       cam.tanV = Math.tan(half); cam.aspect = camera.aspect || 1;
       const pitch = Math.asin(clamp(-e[9], -1, 1));
@@ -615,7 +615,6 @@
     }
 
     // ---------- instâncias ----------
-    const matList = (c) => c.mats;
     function inst() {
       const g = new T.Group(); g.visible = false; root.add(g);
       return { g, mats: [], sp: null, age: 0, acc: 0 };
@@ -1132,7 +1131,7 @@
     }
     function disposeInst(c) {
       root.remove(c.g);
-      for (const m of matList(c)) m.dispose();
+      for (const m of c.mats) m.dispose();
     }
     function release(i) {
       const c = active[i];
