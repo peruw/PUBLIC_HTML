@@ -429,6 +429,37 @@ h2 {
   padding: 12px;
 }
 
+/* vitrine: kart 3D girando + retrato pequeno no canto */
+.detail-visual {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 45%, var(--c, #1fd685) 0%, rgba(0, 0, 0, 0) 70%);
+}
+
+.detail-visual canvas {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.detail-visual.has-3d canvas { display: block; }
+
+.detail-visual.has-3d #detail-portrait {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 38% !important;
+  height: 38% !important;
+  border-radius: 50%;
+  background: rgba(16, 26, 22, 0.9);
+  border: 2px solid var(--brand);
+  animation: none;
+}
+
 #detail-portrait {
   width: 150px;
   height: 150px;
@@ -1000,8 +1031,9 @@ body.touch .touch-only {
   .char-card img,
   .char-card .ph { width: auto; height: min(16vh, 64px); margin: 0 auto; }
   .char-card .ph { font-size: 22px; }
-  .char-detail { grid-template-columns: 84px 1fr; gap: 8px; padding: 8px; }
+  .char-detail { grid-template-columns: 96px 1fr; gap: 8px; padding: 8px; }
   #detail-portrait { width: 84px; height: 84px; }
+  .detail-visual { width: 96px; height: 96px; }
   .detail-text h3 { font-size: 18px; }
   .detail-meta { font-size: 12px; margin: 0 0 4px; }
   .detail-bio { font-size: 12.5px; margin-bottom: 6px; }
@@ -1159,4 +1191,23 @@ body.touch {
   .brand-chip svg { width: 24px; height: 24px; }
   .brand-chip b { font-size: 11px; }
   .brand-chip small { display: none; }
+}
+
+/* retratos balançando devagar (cada card num ritmo) */
+@keyframes sway {
+  0%, 100% { transform: rotate(-2.5deg) translateY(0); }
+  50% { transform: rotate(2.5deg) translateY(-3px); }
+}
+
+.char-card img {
+  transform-origin: 50% 85%;
+  animation: sway 3.4s ease-in-out infinite;
+}
+
+.char-card:nth-child(2n) img { animation-duration: 3.9s; animation-delay: -1.2s; }
+.char-card:nth-child(3n) img { animation-duration: 4.3s; animation-delay: -2.1s; }
+.char-card.selected img { animation-duration: 1.6s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .char-card img { animation: none; }
 }

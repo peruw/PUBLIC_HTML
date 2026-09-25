@@ -11,6 +11,7 @@ import { Input } from './input.js';
 import { ItemSystem } from './items.js';
 import { Effects } from './effects.js';
 import { createKartModel, renderPortraits } from './models.js';
+import { KartPreview } from './preview.js';
 import { CameraRig } from './camera.js';
 import { AudioSystem } from './audio.js';
 import { RaceManager } from './race.js';
@@ -40,6 +41,7 @@ const game = {
 async function init() {
   let audio = null;
   let input = null;
+  let preview = null; // kart 3D girando na escolha do cientista
   const menu = new Menu({
     sfx: (n) => audio?.sfx(n),
     onStart: (opts) => startRace(opts),
@@ -52,6 +54,8 @@ async function init() {
     onRestart: () => startRace(game.opts),
     onQuit: () => enterTitle(),
     onToggleSound: () => toggleSound(),
+    onCharacter: (id) => preview?.setCharacter(id),
+    onScreen: (name) => preview?.setActive(name === 'select'),
     onToggleQuality: () => toggleQuality(),
     onToggleAuto: () => {
       input.setAutoAccelerate(!input.autoAccelerate);
@@ -119,6 +123,8 @@ async function init() {
 
   menu.setLoading(0.85, 'Tirando as fotos oficiais…');
   await nextFrame();
+  preview = new KartPreview(document.getElementById('detail-kart'), { quality });
+  document.getElementById('detail-visual').classList.toggle('has-3d', preview.ok);
   try {
     menu.setPortraits(await Promise.resolve(renderPortraits(renderer, 256, { ss: quality.id === 'baixa' ? 1 : 2 })));
   } catch (err) {

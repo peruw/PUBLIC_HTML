@@ -126,10 +126,12 @@ export class Menu {
     this.current = name;
     for (const s of SCREENS) $('screen-' + s)?.classList.toggle('hidden', s !== name);
     if (name === 'select') this.refreshSelect();
+    this.h.onScreen?.(name);
   }
 
   hideAll() {
     this.current = null;
+    this.h.onScreen?.(null);
     // tira o foco do botão clicado (senão Enter/Espaço o aciona de novo no meio da corrida)
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     for (const s of SCREENS) $('screen-' + s)?.classList.add('hidden');
@@ -222,6 +224,7 @@ export class Menu {
     for (const b of $('opt-cc').children) b.classList.toggle('on', b.dataset.cc === this.opts.cc);
     for (const b of $('opt-laps').children) b.classList.toggle('on', Number(b.dataset.laps) === this.opts.laps);
 
+    this.h.onCharacter?.(c.id);
     const img = $('detail-portrait');
     img.style.setProperty('--c', c.colors.ui);
     if (this.portraits[c.id]) {
