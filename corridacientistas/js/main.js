@@ -4,6 +4,7 @@ import { CHARACTERS, CLASSES, QUALITY, RACE, ITEM_IDS } from './config.js';
 import { bus } from './events.js';
 import { buildTrack } from './track.js';
 import { buildEnvironment } from './environment.js';
+import { buildAds } from './ads.js';
 import { Kart, updateKarts } from './kart.js';
 import { AIDriver } from './ai.js';
 import { Input } from './input.js';
@@ -102,6 +103,8 @@ async function init() {
   menu.setLoading(0.5, 'Montando o observatório…');
   await nextFrame();
   const env = buildEnvironment(scene, track, quality, renderer);
+  // Propagandas da Quanta Aulas ao longo da pista (placas, outdoors, dirigível)
+  const ads = buildAds(scene, track, quality, env);
 
   menu.setLoading(0.7, 'Chamando os cientistas…');
   await nextFrame();
@@ -478,6 +481,7 @@ async function init() {
 
     rig.update(dt, world, { lookBack: !!(world.player && !game.autopilot && ctrl.lookBack && game.state === 'race') });
     env.update(dt, t, camera);
+    ads.update(dt, t, camera);
     track.update(dt, t);
     if (game.state === 'race') hud.update(game.paused ? 0 : dt, world, race);
     if (!game.paused) audio.update(dt, world);

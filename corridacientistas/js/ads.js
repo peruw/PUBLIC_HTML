@@ -1,6 +1,7 @@
 // Patrocínio da Quanta Aulas no Campus da Ciência, como numa pista de verdade:
-// placas de beira de pista, outdoors sobre pés, faixas no pórtico da largada, nas arquibancadas,
-// na ponte e no túnel, um dirigível circulando e o logotipo pintado no gramado.
+// placas de beira de pista, outdoors sobre pés, coroas nos pórticos da largada e da Reta de Tesla,
+// faixas nas arquibancadas, na ponte e no túnel, um dirigível circulando e a marca pintada no
+// asfalto à frente do grid, nos acostamentos e no gramado.
 // Tudo é desenhado num atlas de canvas (logotipo real + fonte da marca, com alternativas) e
 // mesclado em poucos pedaços (culling), com um único material.
 import * as THREE from './three.js';
@@ -17,7 +18,14 @@ const BRAND = {
 };
 const FONT = "'Plus Jakarta Sans', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&display=swap';
-const LOGO_URL = new URL('../assets/quanta-logo.png', import.meta.url).href;
+// Logo: ao lado dos módulos (js/../assets/quanta-logo.png) ou, no pacote do site (build-site.mjs junta
+// tudo num game.<hash>.js e não copia assets), o logo do próprio site em /assets/logo-quanta.png.
+// Se o primeiro falhar, tenta o outro.
+const LOGO_URLS = (() => {
+  const mod = new URL('../assets/quanta-logo.png', import.meta.url).href;
+  const site = new URL('/assets/logo-quanta.png', import.meta.url).href;
+  return /\/js\/ads\.js([?#]|$)/.test(import.meta.url) ? [mod, site] : [site, mod];
+})();
 const ENVELOPE = '#eef3f0'; // cor do dirigível (o painel do atlas usa a mesma, sem emenda)
 
 // ---------------------------------------------------------------------------
@@ -34,21 +42,31 @@ function loadBrandFont() {
   fontPromise = new Promise((resolve) => {
     if (typeof document === 'undefined' || !document.fonts) { resolve(false); return; }
     if (brandFontLoaded()) { resolve(true); return; }
-    const load = () => Promise.all([document.fonts.load('800 64px "Plus Jakarta Sans"'), document.fonts.load('700 64px "Plus Jakarta Sans"')])
-      .then(([a]) => resolve(a.length > 0), () => resolve(false));
+    let started = false;
+    const load = () => {
+      if (started) return;
+      started = true;
+      Promise.all([document.fonts.load('800 64px "Plus Jakarta Sans"'), document.fonts.load('700 64px "Plus Jakarta Sans"')])
+        .then(([a]) => resolve(a.length > 0), () => resolve(false));
+    };
     // a página pode já pedir a fonte no <link> do Google Fonts (baixa junto com o three.js)
-    const link = document.querySelector('link[href*="Plus+Jakarta+Sans"]');
-    if (link) {
-      if (link.sheet) load();
-      else { link.addEventListener('load', load); link.addEventListener('error', () => resolve(false)); }
-      return;
+    let link = document.querySelector('link[href*="Plus+Jakarta+Sans"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = FONT_CSS;
+      document.head.appendChild(link);
     }
-    const el = document.createElement('link');
-    el.rel = 'stylesheet';
-    el.href = FONT_CSS;
-    el.onload = load;
-    el.onerror = () => resolve(false);
-    document.head.appendChild(el);
+    if (link.sheet) { load(); return; }
+    link.addEventListener('load', load);
+    link.addEventListener('error', () => resolve(false));
+    // Enquanto o jogo monta a cena ele só cede a vez por requestAnimationFrame, e o evento "load" do
+    // <link> fica na fila até o fim; a folha já chega antes: confere a cada quadro e pede a fonte logo.
+    if (typeof requestAnimationFrame !== 'undefined') {
+      let n = 0;
+      const poll = () => { if (started) return; if (link.sheet) load(); else if (++n < 600) requestAnimationFrame(poll); };
+      requestAnimationFrame(poll);
+    }
   });
   return fontPromise;
 }
@@ -57,13 +75,17 @@ function loadLogo() {
   if (logoPromise) return logoPromise;
   logoPromise = new Promise((resolve) => {
     if (typeof Image === 'undefined') { resolve(null); return; }
-    const img = new Image();
-    img.decoding = 'async';
-    img.fetchPriority = 'high'; // <img> criada por script entraria com prioridade baixa
-    img.onload = () => { art.img = img; resolve(img); };
-    img.onerror = () => resolve(null);
-    img.src = LOGO_URL;
-    logoImg = img;
+    const tryUrl = (k) => {
+      if (k >= LOGO_URLS.length) { resolve(null); return; }
+      const img = new Image();
+      img.decoding = 'async';
+      img.fetchPriority = 'high'; // <img> criada por script entraria com prioridade baixa
+      img.onload = () => { art.img = img; resolve(img); };
+      img.onerror = () => tryUrl(k + 1);
+      img.src = LOGO_URLS[k];
+      logoImg = img;
+    };
+    tryUrl(0);
   });
   return logoPromise;
 }
@@ -1569,8 +1591,10 @@ function build(scene, track, quality, env, opts, hold) {
     redraws++;
     drawn.font = brandFontLoaded();
     drawn.logo = logoReadyNow();
-    if (force !== 'jobs' && (force === 'now' || now() - lastRun > 400)) { atlas.draw(); atlas.upload(); jobs = null; }
-    else jobs = atlas.jobs();
+    try {
+      if (force !== 'jobs' && (force === 'now' || now() - lastRun > 400)) { atlas.draw(); atlas.upload(); jobs = null; }
+      else jobs = atlas.jobs();
+    } catch (err) { jobs = null; console.warn('anúncios: redesenho falhou', err); }
   };
   const maybeRedraw = (late) => {
     if (!alive) return;
@@ -1592,9 +1616,12 @@ function build(scene, track, quality, env, opts, hold) {
   let time = 0;
   function update(dt) {
     if (jobs) {
-      const t0 = now();
-      do { jobs.shift()(); } while (jobs.length && now() - t0 < 3);
-      if (!jobs.length) { jobs = null; atlas.upload(); }
+      // um erro aqui não pode derrubar o laço do jogo: desiste do redesenho (fica a arte anterior)
+      try {
+        const t0 = now();
+        do { jobs.shift()(); } while (jobs.length && now() - t0 < 3);
+        if (!jobs.length) { jobs = null; atlas.upload(); }
+      } catch (err) { jobs = null; console.warn('anúncios: redesenho falhou', err); }
     }
     if (!dt) return;
     lastRun = now();
