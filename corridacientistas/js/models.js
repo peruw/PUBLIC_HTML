@@ -1018,10 +1018,10 @@ const KART_EXTRAS = {
       b.setBase();
       b.cyl(WOOD, [s * 0.45, 0.47, -0.16], [s * 0.52, 0.57, -0.16], 0.018, 0.018, 5);
     }
-    // mastro da hélice
-    b.cyl(WOOD, [0, 0.64, -0.8], [0, 0.86, -0.93], 0.03, 0.025);
+    // mastro da hélice, na frente do kart (hélice puxando, lida como "para a frente")
+    b.cyl(WOOD, [0, 0.5, 0.86], [0, 0.66, 1.02], 0.03, 0.025);
     emblemSides(b, C, cellUV(EMBLEM.dumont, 2));
-    ext.propeller = { pos: [0, 0.86, -0.97] };
+    ext.propeller = { pos: [0, 0.66, 1.06] };
   },
   oswaldo(b, C) {
     // microscópio preto e latão

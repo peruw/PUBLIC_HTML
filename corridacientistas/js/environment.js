@@ -864,52 +864,6 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       for (let k = -2; k <= 2; k++) reserve(mid + k * len / 5, base.z + 8, 10);
     }
   }
-  const crowdTime = { value: 0 };
-  if (crowdSpots.length) {
-    const body = keep(new THREE.BoxGeometry(0.46, 0.62, 0.3));
-    body.translate(0, 0.35, 0);
-    const head = keep(hi ? new THREE.IcosahedronGeometry(0.17, 0) : new THREE.OctahedronGeometry(0.19, 0));
-    head.translate(0, 0.86, 0);
-    // um InstancedMesh por arquibancada (culling separado)
-    const mk = (geo, colors, name) => {
-      const mat = keep(new THREE.MeshLambertMaterial({ color: 0xffffff }));
-      mat.onBeforeCompile = (sh) => {
-        sh.uniforms.uTime = crowdTime;
-        sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `
-          #include <begin_vertex>
-          #ifdef USE_INSTANCING
-            vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
-            float ph = fract(sin(dot(ip.xz, vec2(12.9898, 78.233))) * 43758.5453);
-            float hop = max(0.0, sin(uTime * (5.0 + ph * 4.0) + ph * 6.2831));
-            float wave = fract((ip.x * 0.7 - uTime * 18.0) / 160.0);
-            float ola = smoothstep(0.0, 0.025, wave) * smoothstep(0.07, 0.03, wave);
-            transformed.y += hop * hop * 0.22 * step(0.45, ph) + ola * 0.55;
-          #endif
-        `);
-      };
-      const c = new THREE.Color();
-      for (let si = 0; si < 2; si++) {
-        const spots = crowdSpots.filter((sp) => sp[4] === si);
-        if (!spots.length) continue;
-        const im = new THREE.InstancedMesh(geo, mat, spots.length);
-        spots.forEach(([x, y, z, h], i) => {
-          im.setMatrixAt(i, mat4(x, y, z, 0, h, 0, 1, 0.9 + rand() * 0.25, 1));
-          im.setColorAt(i, c.copy(colors[Math.floor(rand() * colors.length)]));
-        });
-        im.instanceMatrix.needsUpdate = true;
-        im.castShadow = false;
-        im.receiveShadow = false;
-        im.computeBoundingSphere();
-        im.name = name + '-' + si;
-        group.add(im);
-      }
-    };
-    const shirts = [0xe3262f, 0x1d7bd8, 0xffd23f, 0x2fbf71, 0x8a3cff, 0xff7b29, 0xffffff, 0x17a2b8, 0xff5fa2, 0x009c3b].map(col);
-    const skins = [0xf2c9a0, 0xe0ac7e, 0xc68642, 0x8d5524, 0xf6d7b8, 0x6b4226].map(col);
-    mk(body, shirts, 'torcida');
-    mk(head, skins, 'torcida-cabecas');
-  }
-
   // ------------------------------------------------------------ Laboratório: vidrarias gigantes, DNA, tabela periódica
   const glass = new Merge();
   const liquid = new Merge();
@@ -1466,6 +1420,134 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     b.add(G.box, mat4(0, 6.82, 1.45, 0, 0, 0, 0.4, 0.06, 0.75), col(0xfff6c8));
     const g = keep(b.build(false));
     instanced('postes', g, keep(new THREE.MeshLambertMaterial({ vertexColors: true })), lampSpots, null);
+  }
+
+  // ------------------------------------------------------------ arquibancadas móveis nas curvas e retas
+  // Torcida extra ao longo do circuito: só onde o terreno é plano e não há marcos, pista ou mata reservada.
+  let standCount = 2;
+  {
+    const rnd = mulberry(90210);
+    const want = [
+      [1560, 1], [1560, -1], [990, 1], [990, -1], [1440, 1], [1440, -1], [1360, 1], [1360, -1],
+      [210, 1], [210, -1], [760, 1], [760, -1], [1630, -1], [60, -1], [470, -1], [470, 1],
+    ];
+    const placed = [];
+    const tiers = 4;
+    const seatCols = [col(0xe3262f), col(0x1d7bd8), col(0xffd23f), col(0x2fbf71), col(0x8a3cff)];
+    for (const [s0, side, lenTry] of want.flatMap(([a, b]) => [[a, b, 30], [a, b, 18]])) {
+      if (placed.length >= (hi ? 7 : 5)) break;
+      if (placed.some((p) => p.s0 === s0 && p.side === side)) continue;
+      const sm = smp(s0);
+      const pos = sm.pos.clone(), tan = sm.tangent.clone().setY(0).normalize();
+      const right = new THREE.Vector3(-tan.z, 0, tan.x);
+      const out = right.clone().multiplyScalar(side);
+      const len = lenTry;
+      const heading = Math.atan2(tan.x, tan.z);
+      // reta o bastante: a pista não pode se afastar da linha da arquibancada
+      const a = smp(s0 - len / 2).pos, b = smp(s0 + len / 2).pos;
+      const bow = Math.abs(pos.clone().sub(a.clone().add(b).multiplyScalar(0.5)).dot(right));
+      if (bow > 1.6) continue;
+      const base = pos.clone().addScaledVector(out, sm.wallDist + 4.2);
+      const depth = 1.2 + tiers * 1.3 + 0.8;
+      let ok = true, gMin = Infinity, gMax = -Infinity;
+      for (let u = -len / 2; u <= len / 2 && ok; u += 3) {
+        for (let v = 0; v <= depth && ok; v += 1.5) {
+          const q = base.clone().addScaledVector(tan, u).addScaledVector(out, v);
+          if (clearance(q.x, q.z) < (v === 0 ? 2.6 : 2.2) || isReserved(q.x, q.z, 1) || lagoonF(q.x, q.z) > -0.2) ok = false;
+          const g = groundAt(q.x, q.z);
+          gMin = Math.min(gMin, g); gMax = Math.max(gMax, g);
+        }
+      }
+      if (!ok || gMax - gMin > 2.8) continue;
+      if (placed.some((p) => p.distanceTo(base) < 60)) continue;
+      const mark = base.clone();
+      mark.s0 = s0; mark.side = side;
+      placed.push(mark);
+      const si = standCount++;
+      const y0 = gMax;
+      // base de concreto nivelando o terreno
+      const pad = base.clone().addScaledVector(out, depth / 2);
+      addS(G.box, pad.x, (gMin + gMax) / 2 - 0.4, pad.z, len + 1, gMax - gMin + 0.8, depth + 1, col(0xa9afb3), heading + Math.PI / 2);
+      const rot = heading + Math.PI / 2;
+      for (let k = 0; k < tiers; k++) {
+        const dist = 1.2 + k * 1.3;
+        const h = 0.7 + k * 0.7;
+        const c = base.clone().addScaledVector(out, dist);
+        addS(G.box, c.x, y0 + h / 2, c.z, len, h, 1.3, k % 2 ? col(0xd9dde4) : col(0xc5cad3), rot);
+        for (let sgi = 0; sgi < 5; sgi++) {
+          const sx = -len / 2 + (sgi + 0.5) * (len / 5);
+          const sp = c.clone().addScaledVector(tan, sx).addScaledVector(out, -0.35);
+          addS(G.box, sp.x, y0 + h + 0.18, sp.z, len / 5 - 0.4, 0.36, 0.5, seatCols[(sgi + k + si) % seatCols.length], rot);
+        }
+        for (let q = 0.5; q < len - 0.4; q += hi ? 0.8 : 1.3) {
+          if (rnd() < 0.12) continue;
+          const pp = c.clone().addScaledVector(tan, -len / 2 + q + (rnd() - 0.5) * 0.15).addScaledVector(out, 0.05);
+          // torcida olha para a pista
+          crowdSpots.push([pp.x, y0 + h, pp.z, side > 0 ? rot : rot + Math.PI, si]);
+        }
+      }
+      // faixa frontal verde Quanta, parede e toldo
+      const front = base.clone().addScaledVector(out, 0.4);
+      addS(G.box, front.x, y0 + 0.55, front.z, len, 1.1, 0.3, col(0x16a86a), rot);
+      const back = base.clone().addScaledVector(out, depth - 0.4);
+      addS(G.box, back.x, y0 + 2.8, back.z, len, 5.6, 0.5, col(0x1b3a2c), rot);
+      const roof = base.clone().addScaledVector(out, depth / 2);
+      addS(G.box, roof.x, y0 + 6.8, roof.z, len + 1.5, 0.3, depth + 1.5, col(0xf4f4f4), rot);
+      for (const u of [-len / 2, 0, len / 2]) {
+        const pp = back.clone().addScaledVector(tan, u);
+        addS(G.cyl, pp.x, y0 + 3.4, pp.z, 0.25, 6.8, 0.25, col(0xbfc6cc));
+      }
+      const mid = base.clone().addScaledVector(out, depth / 2);
+      for (let k = -2; k <= 2; k++) {
+        const r = mid.clone().addScaledVector(tan, k * len / 5);
+        reserve(r.x, r.z, 7);
+      }
+    }
+  }
+  const crowdTime = { value: 0 };
+  if (crowdSpots.length) {
+    const body = keep(new THREE.BoxGeometry(0.46, 0.62, 0.3));
+    body.translate(0, 0.35, 0);
+    const head = keep(hi ? new THREE.IcosahedronGeometry(0.17, 0) : new THREE.OctahedronGeometry(0.19, 0));
+    head.translate(0, 0.86, 0);
+    // um InstancedMesh por arquibancada (culling separado)
+    const mk = (geo, colors, name) => {
+      const mat = keep(new THREE.MeshLambertMaterial({ color: 0xffffff }));
+      mat.onBeforeCompile = (sh) => {
+        sh.uniforms.uTime = crowdTime;
+        sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `
+          #include <begin_vertex>
+          #ifdef USE_INSTANCING
+            vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+            float ph = fract(sin(dot(ip.xz, vec2(12.9898, 78.233))) * 43758.5453);
+            float hop = max(0.0, sin(uTime * (5.0 + ph * 4.0) + ph * 6.2831));
+            float wave = fract((ip.x * 0.7 - uTime * 18.0) / 160.0);
+            float ola = smoothstep(0.0, 0.025, wave) * smoothstep(0.07, 0.03, wave);
+            transformed.y += hop * hop * 0.22 * step(0.45, ph) + ola * 0.55;
+          #endif
+        `);
+      };
+      const c = new THREE.Color();
+      for (let si = 0; si < standCount; si++) {
+        const spots = crowdSpots.filter((sp) => sp[4] === si);
+        if (!spots.length) continue;
+        const im = new THREE.InstancedMesh(geo, mat, spots.length);
+        spots.forEach(([x, y, z, h], i) => {
+          im.setMatrixAt(i, mat4(x, y, z, 0, h, 0, 1, 0.9 + rand() * 0.25, 1));
+          im.setColorAt(i, c.copy(colors[Math.floor(rand() * colors.length)]));
+        });
+        im.instanceMatrix.needsUpdate = true;
+        im.castShadow = false;
+        im.receiveShadow = false;
+        im.computeBoundingSphere();
+        im.name = name + '-' + si;
+        group.add(im);
+      }
+    };
+    const shirts = [0xe3262f, 0x1d7bd8, 0xffd23f, 0x2fbf71, 0x8a3cff, 0xff7b29, 0xffffff, 0x17a2b8, 0xff5fa2, 0x009c3b].map(col);
+    const skins = [0xf2c9a0, 0xe0ac7e, 0xc68642, 0x8d5524, 0xf6d7b8, 0x6b4226].map(col);
+    mk(body, shirts, 'torcida');
+    mk(head, skins, 'torcida-cabecas');
   }
 
   // ------------------------------------------------------------ vegetação espalhada
