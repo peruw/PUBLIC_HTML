@@ -74,64 +74,69 @@ const SONGS = {
       },
     ],
   },
-  // Corrida: enérgica, Lá menor com refrão em Dó maior, 150 bpm.
-  // Introdução → estrofe → pré-refrão → refrão → ponte; o laço volta para a estrofe.
-  // Na volta final: mais rápida e três semitons acima (Dó menor).
+  // Corrida: estilo "circuito de kart" — Dó maior com acordes de jazz, metais,
+  // baixo funk e a subida Láb → Sib → Dó na ponte. 158 bpm.
+  // Introdução → estrofe → ponte B → refrão → subida; o laço volta para a estrofe.
+  // Na volta final, só acelera.
   race: {
-    bpm: 150, swing: 0, loopFrom: 4,
-    vol: { lead: 0.16, counter: 0.08, arp: 0.17, pad: 0.016, bass: 0.105 },
+    bpm: 158, swing: 0, loopFrom: 4, leadInst: 'brass',
+    vol: { lead: 0.16, counter: 0.06, arp: 0.1, pad: 0.014, bass: 0.11 },
     sections: [
       {
-        drums: 'intro', bass: 'R.R.R.R.R.R.R.R.', arp: 'up16', pad: true,
+        drums: 'intro', bass: 'R..R..O.R..R.O5.', arp: 'stab',
         bars: [
-          ['Am', REST],
-          ['F', REST],
-          ['C', REST, null, 'build'],
-          ['G', '. . . . . . . . D5 - G5 - A5 - B5 -', null, 'roll'],
+          ['Cmaj7', REST],
+          ['Am7', REST],
+          ['Dm7', REST, null, 'build'],
+          ['G7', 'G5 . G5 . G5 . . . A5 - B5 - D6 - . .', null, 'roll'],
         ],
       },
       {
-        drums: 'drive', bass: 'R.OR.OR.R.OR.O5.', arp: 'up16', crash: true,
+        drums: 'funk', bass: 'R.O.RO.5R.O.RO7.', arp: 'stab', crash: true,
         bars: [
-          ['Am', 'A5 - - E5 - - A5 - C6 - - B5 - - A5 -'],
-          ['F', 'F5 - - C5 - - F5 - A5 - - G5 - - F5 -'],
-          ['C', 'E5 - - G5 - - C6 - E6 - - D6 - - C6 -'],
-          ['G', 'D6 - - B5 - - G5 - D5 - - - . . G5 A5'],
-          ['Am', 'C6 - B5 - A5 - E5 - A5 - B5 - C6 - D6 -'],
-          ['F', 'E6 - - - D6 - C6 - D6 - - - C6 - A5 -'],
-          ['G', 'B5 - - - G5 - - - D6 - - - B5 - G5 -'],
-          ['E7', 'G#5 - - - B5 - - - E6 - - - ~D6 - B5 -', null, 'driveFill'],
+          ['Cmaj7', 'E6 - - C6 - - G5 - A5 - C6 - . . D6 -'],
+          ['Am7', '- - E6 - . . C6 - - - . . A5 - C6 -'],
+          ['Dm7', 'D6 - - F6 - - E6 - D6 - C6 - A5 - C6 -'],
+          ['G7', '- - B5 - G5 - - - F5 - G5 - B5 - D6 -'],
+          ['Cmaj7', 'E6 - - C6 - - G5 - A5 - C6 - . . E6 -'],
+          ['Am7', '- - G6 - . . E6 - - - . . C6 - D6 -'],
+          ['Dm7 G7', 'F6 - - E6 - - D6 - B5 - - G5 - - A5 B5'],
+          ['C', 'C6 - - - . . . . . . . . G5 - A5 -', null, 'funkFill'],
         ],
       },
       {
-        drums: 'pre', bass: 'R.R.R.R.R.R.R.RA', arp: 'updown', pad: true,
+        drums: 'funk2', bass: 'R-.R.O.5R-.R.O5A', arp: 'up16', pad: true,
         bars: [
-          ['Dm', 'D5 - F5 - A5 - D5 - F5 - A5 - D6 - A5 -'],
-          ['Em', 'E5 - G5 - B5 - E5 - G5 - B5 - E6 - B5 -'],
-          ['F', 'F5 - A5 - C6 - F5 - A5 - C6 - F6 - C6 -'],
-          ['G', 'G5 - - - B5 - - - D6 - - - F6 - E6 D6', null, 'preRoll'],
+          ['Fmaj7', 'C6 - - A5 - - F5 - E6 - - - C6 - . .'],
+          ['Em7', 'B5 - - G5 - - E5 - D6 - - - B5 - . .'],
+          ['Dm7', 'A5 - - F5 - - D5 - C6 - - - A5 - C6 -'],
+          ['G7', 'B5 - - - D6 - - - F6 - - - ~G6 - - -'],
+          ['Fmaj7', 'A6 - - - G6 - E6 - F6 - - - E6 - C6 -'],
+          ['E7', 'D6 - - - B5 - G#5 - B5 - - - E6 - - -'],
+          ['Am7 D7', 'C6 - - A5 - - E5 - F#5 - - A5 - - C6 -'],
+          ['G7', 'B5 - - - D6 - - - G6 - - - . . . .', null, 'preRoll'],
+        ],
+      },
+      {
+        drums: 'chorus', bass: 'R.OR.OR.R.OR.O5.', arp: 'stab', pad: true, crash: true,
+        bars: [
+          ['F', 'A5 - C6 - F6 - - - E6 - - F6 - - G6 -', 'F5 - - - - - - - A5 - - - - - - -'],
+          ['G', '- - - - D6 - - - B5 - - C6 - - D6 -', 'G5 - - - - - - - B5 - - - - - - -'],
+          ['Em7', 'E6 - - - - - D6 - E6 - - G6 - - - -', 'G5 - - - - - - - B5 - - - - - - -'],
+          ['Am7', '- - - - E6 - - - C6 - - - A5 - C6 -', 'A5 - - - - - - - G5 - - - - - - -'],
+          ['Dm7', 'D6 - - - F6 - - - A6 - - - G6 - F6 -', 'F5 - - - - - - - A5 - - - - - - -'],
+          ['G7', 'E6 - - - D6 - - - B5 - - - G5 - A5 B5', 'G5 - - - - - - - F5 - - - - - - -'],
+          ['C', 'C6 - - E6 - - G6 - - - E6 - G6 - C7 -', 'E5 - - - - - - - G5 - - - - - - -'],
+          ['C', '- - - - - - - - . . . . . . . .', 'E5 - - - - - - - . . . . . . . .', 'chorusFill'],
         ],
       },
       {
         drums: 'chorus', bass: 'R.O.R.O.R.O.R.O.', arp: 'up16', pad: true, crash: true,
         bars: [
-          ['C', 'E6 - - - - - D6 - C6 - - - G5 - - -', 'C5 - - - - - - - E5 - - - - - - -'],
-          ['G', 'D6 - - - - - C6 - B5 - - - G5 - A5 B5', 'B4 - - - - - - - D5 - - - - - - -'],
-          ['Am', 'C6 - - - - - B5 - A5 - - - E6 - - -', 'C5 - - - - - - - E5 - - - - - - -'],
-          ['F', 'F6 - - - E6 - - - C6 - - - A5 - C6 -', 'A4 - - - - - - - C5 - - - - - - -'],
-          ['C', 'E6 - - - - - D6 - C6 - - - G5 - - -', 'E5 - - - - - - - G5 - - - - - - -'],
-          ['G', 'D6 - - - - - C6 - B5 - - - D6 - E6 -', 'D5 - - - - - - - B4 - - - - - - -'],
-          ['F G', 'F6 - - - E6 - D6 - E6 - - - D6 - B5 -', 'A4 - - - - - - - B4 - - - - - - -'],
-          ['C', 'C6 - - - - - - - - - - - . . . .', 'E5 - - - - - - - - - - - . . . .', 'chorusFill'],
-        ],
-      },
-      {
-        drums: 'half', bass: 'R-------5-----A-', arp: 'up16', pad: true,
-        bars: [
-          ['Am', 'A4 - - - C5 - - - E5 - - - A5 - - -'],
-          ['F', 'A5 - - - G5 - - - F5 - - - C5 - - -'],
-          ['Dm', 'D5 - - - F5 - - - A5 - - - D6 - - -'],
-          ['E7', 'E6 - - - D6 - - - B5 - - - G#5 - - -', null, 'roll'],
+          ['Abmaj7', 'C6 - - Eb6 - - G6 - - - Eb6 - C6 - - -'],
+          ['Bb7', 'D6 - - F6 - - Ab6 - - - F6 - D6 - - -'],
+          ['Cmaj7', 'E6 - - G6 - - B6 - - - G6 - E6 - - -'],
+          ['G7', 'D6 - - - F6 - - - G6 - - - B6 - - -', null, 'roll'],
         ],
       },
     ],
@@ -166,7 +171,7 @@ const SONGS = {
   },
 };
 
-// Padrões de bateria (16 passos): k = bumbo, s = caixa, h = chimbal (x fechado, o aberto), t = tom
+// Padrões de bateria (16 passos): k = bumbo, s = caixa (g = nota fantasma), h = chimbal (x fechado, o aberto), t = tom
 const DRUMS = {
   pop: { k: 'x.......x.......', s: '....x.......x...', h: '..x...x...x...x.' },
   pop2: { k: 'x.......x.x.....', s: '....x.......x...', h: 'x.x.x.x.x.x.x.o.' },
@@ -176,6 +181,9 @@ const DRUMS = {
   roll: { k: 'x...x...x...x...', s: 'x.x.x.x.xxxxxxxx' },
   drive: { k: 'x.....x.x.......', s: '....x.......x...', h: 'x.x.x.x.x.x.x.o.' },
   driveFill: { k: 'x.....x.x.......', s: '....x.......x.xx', h: 'x.x.x.x.x.x.....', t: '..........x.x...' },
+  funk: { k: 'x..x......x..x..', s: '....x..g....x..g', h: 'xxxxxxxxxxxxxxox' },
+  funk2: { k: 'x.....x...x.....', s: '....x.g.....x.g.', h: 'x.x.x.x.x.x.x.o.' },
+  funkFill: { k: 'x..x......x.....', s: '....x.......xxxx', h: 'xxxxxxxxxxxx....' },
   pre: { k: 'x...x...x...x...', s: '....x.......x...', h: 'xxxxxxxxxxxxxxxx' },
   preRoll: { k: 'x...x...x...x...', s: 'x.x.x.x.x.x.xxxx' },
   chorus: { k: 'x...x...x...x...', s: '....x.......x...', h: '..o...o...o...o.' },
@@ -185,6 +193,8 @@ const DRUMS = {
   crash: { k: 'x...............' },
   soft: { k: 'x.......x.......', h: '....x.......x...' },
 };
+
+const STAB = '..x..x....x..x..';
 
 function parseLine(toks, steps, where) {
   const out = new Array(steps).fill(null);
@@ -256,7 +266,7 @@ function compile(song) {
     i = j;
   }
   return {
-    bpm: song.bpm, swing: song.swing, loopFrom: song.loopFrom, vol: song.vol, steps,
+    bpm: song.bpm, swing: song.swing, loopFrom: song.loopFrom, vol: song.vol, steps, leadInst: song.leadInst,
     lead: parseLine(leadT, steps, 'melodia'), counter: parseLine(ctrT, steps, 'contracanto'),
     chords, arp, bass, pad, crash, drums,
   };
@@ -375,10 +385,10 @@ export class AudioSystem {
     b = !!b;
     if (b === this.finalLap) return;
     this.finalLap = b;
-    this.tempoMul = b ? 1.12 : 1;
+    this.tempoMul = b ? 1.15 : 1;
     if (b && this.ctx) {
       this.sfx('finalLap');
-      // a música para durante a vinheta e volta do começo, mais rápida e em Dó menor
+      // a música para durante a vinheta e volta do começo, mais rápida
       if (this._seq && this._seq.name === 'race') {
         this._applyFinal(this._seq);
         this._seq.hold = this.ctx.currentTime + 1.7;
@@ -637,7 +647,7 @@ export class AudioSystem {
   }
 
   _applyFinal(s) {
-    s.tr = 3;
+    s.tr = 0;
     this._setDelay(s, this.tempoMul);
   }
 
@@ -679,7 +689,8 @@ export class AudioSystem {
     // melodia
     const n = song.lead[i];
     if (n) {
-      this._lead(fx.lead, n.m + tr, t, n.len * sd * 0.92, v.lead, n.glide && s.last ? s.last + tr : 0);
+      const play = song.leadInst === 'brass' ? this._brass : this._lead;
+      play.call(this, fx.lead, n.m + tr, t, n.len * sd * 0.92, v.lead, n.glide && s.last ? s.last + tr : 0);
       s.last = n.m;
     }
     // contracanto
@@ -698,6 +709,9 @@ export class AudioSystem {
         const tones = [ch.root, ch.fifth, ch.third + 12, ch.fifth];
         this._pluck(fx.arp, tones[(inBar / 2) % 4] + tr, t, sd * 3, v.arp);
       }
+    } else if (mode === 'stab') {
+      // metais no contratempo
+      if (STAB[inBar] === 'x') for (const m of [ch.third, ch.fifth, ch.seventh]) this._brass(fx.arp, m + tr, t, sd * 1.4, v.arp * 0.9, 0, true);
     } else if (mode === 'off' && inBar % 4 === 2) {
       for (const m of [ch.third, ch.fifth, ch.root + 12]) this._pluck(fx.arp, m + tr, t, sd * 1.6, v.arp * 0.55);
     }
@@ -719,6 +733,7 @@ export class AudioSystem {
       d.setValueAtTime(0.45, t);
       d.setTargetAtTime(1, t + 0.02, 0.08);
     }
+    if (dr.s && dr.s[inBar] === 'g') this._snare(t, fx.drums, 0.08);
     if (dr.s && dr.s[inBar] === 'x') this._snare(t, fx.drums, 0.3 * (dr.s === DRUMS.roll.s || dr.s === DRUMS.preRoll.s ? 0.55 + 0.45 * (inBar / 15) : 1));
     if (dr.h) {
       const hv = inBar % 4 === 0 ? 0.075 : inBar % 2 === 0 ? 0.06 : 0.04;
@@ -773,6 +788,51 @@ export class AudioSystem {
     }
     o1.start(t); o2.start(t);
     o1.stop(end); o2.stop(end);
+  }
+
+  // Metais: duas serras com filtro que "sopra" (abre e assenta) e subida de afinação nas notas longas
+  _brass(out, m, t, dur, vol, from = 0, stab = false) {
+    const ctx = this.ctx, f = mtof(m);
+    const oscs = [-7, 7].map((dt) => {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.detune.value = dt;
+      if (from) {
+        o.frequency.setValueAtTime(mtof(from), t);
+        o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+      } else if (!stab && dur > 0.25) {
+        o.frequency.setValueAtTime(f * 0.95, t);
+        o.frequency.exponentialRampToValueAtTime(f, t + 0.06);
+      } else o.frequency.setValueAtTime(f, t);
+      return o;
+    });
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 2;
+    lp.frequency.setValueAtTime(700, t);
+    lp.frequency.linearRampToValueAtTime(stab ? 3200 : 4200, t + 0.03);
+    lp.frequency.setTargetAtTime(stab ? 1200 : 2000, t + 0.04, 0.12);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.015);
+    g.gain.setTargetAtTime(vol * 0.8, t + 0.04, 0.12);
+    g.gain.setTargetAtTime(0.0001, t + dur, stab ? 0.02 : 0.04);
+    for (const o of oscs) o.connect(lp);
+    lp.connect(g).connect(out);
+    const end = t + dur + 0.25;
+    if (!stab && dur > 0.3) {
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 5.5;
+      const lg = ctx.createGain();
+      lg.gain.setValueAtTime(0, t);
+      lg.gain.setValueAtTime(0, t + 0.15);
+      lg.gain.linearRampToValueAtTime(15, t + Math.min(0.5, dur));
+      lfo.connect(lg);
+      for (const o of oscs) lg.connect(o.detune);
+      lfo.start(t);
+      lfo.stop(end);
+    }
+    for (const o of oscs) { o.start(t); o.stop(end); }
   }
 
   // Contracanto: triângulo + pulso fino, ataque suave
