@@ -8,7 +8,7 @@
   const LEGACY_BEST = 'quanta-corrida-best';
 
   function blank() {
-    return { v: 1, xp: 0, bestScore: 0, maxLevel: 1, maxCombo: 0, maxSpeed: 1, totalHits: 0, runs: 0, skins: ['quanta'], skin: 'quanta', updatedAt: 0 };
+    return { v: 1, xp: 0, bestScore: 0, maxLevel: 1, maxCombo: 0, maxSpeed: 1, totalHits: 0, runs: 0, skins: ['quanta'], skin: 'quanta', bests: { mat: 0, quim: 0, fis: 0 }, updatedAt: 0 };
   }
 
   function sanitize(p) {
@@ -26,6 +26,12 @@
       runs: Math.floor(num(p.runs, 0)),
       skins: Array.isArray(p.skins) ? [...new Set(['quanta', ...p.skins.filter((s) => typeof s === 'string' && s.length < 25)])] : b.skins,
       skin: typeof p.skin === 'string' ? p.skin : 'quanta',
+      // recorde por modo (mat, quim, fis); antes dos modos todo recorde era de Matemática
+      bests: ['mat', 'quim', 'fis'].reduce((o, m) => {
+        const v = p.bests && typeof p.bests === 'object' ? num(p.bests[m], 0) : 0;
+        o[m] = Math.floor(m === 'mat' && !(p.bests && typeof p.bests === 'object') ? num(p.bestScore, 0) : v);
+        return o;
+      }, {}),
       updatedAt: num(p.updatedAt, 0),
     };
   }
@@ -37,6 +43,7 @@
     try { // recorde da versão anterior do jogo
       const old = JSON.parse(localStorage.getItem(LEGACY_BEST) || '0');
       if (typeof old === 'number' && old > p.bestScore) p.bestScore = old;
+      if (typeof old === 'number' && old > p.bests.mat) p.bests.mat = old;
     } catch (e) {}
     return p;
   }
@@ -62,6 +69,8 @@
         default: return Infinity;
       }
     },
+
+    bestOf(mode) { return this.data.bests[mode] || 0; },
 
     isUnlocked(id) { return this.data.skins.includes(id); },
 
@@ -91,7 +100,9 @@
     // aplica uma corrida terminada
     applyRun(run) {
       const d = this.data;
-      const prevBest = d.bestScore;
+      const mode = run.mode || 'mat';
+      const prevBest = d.bests[mode] || 0;
+      d.bests[mode] = Math.max(prevBest, run.score);
       d.xp += run.score;
       d.bestScore = Math.max(d.bestScore, run.score);
       d.maxLevel = Math.max(d.maxLevel, run.maxLevel);

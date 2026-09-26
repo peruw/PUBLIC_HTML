@@ -144,16 +144,30 @@
     text-shadow: 3px 3px 0 #000;
   }
   .q-text .qm { color: var(--gold); }
+  .gr { font-family: system-ui, 'Segoe UI', Roboto, Arial, sans-serif; font-weight: 800; }
+  .q-text sub, .q-text sup, .q-opts sub, .q-opts sup, .pop sub, .pop sup { font-size: 0.66em; line-height: 0; }
+  /* modos de ciência: nome da lei/elemento em cima, grandeza pedida embaixo; opções em fonte mais estreita */
+  .q-title { display: block; margin-bottom: 6px; font-family: var(--pixel-text); font-weight: 700; white-space: normal;
+    font-size: clamp(15px, min(4.6vw, 4.6vh), 24px); color: var(--brand-hi); max-width: 88vw; }
+  body.rich .q-text { font-family: var(--pixel-text); font-weight: 700; }
+  body.rich .q-opts { max-width: 94vw; }
+  body.rich .q-opts > span { flex: 1 1 0; min-width: 0; font-family: var(--pixel-text); font-weight: 700;
+    font-size: clamp(12px, min(3.4vw, 3.6vh), 18px); white-space: normal; line-height: 1.25; }
+  .modes { display: flex; gap: 6px; justify-content: center; margin: 14px 0 4px; flex-wrap: wrap; }
+  .mode { font-family: var(--pixel-text); font-weight: 700; font-size: 14px; letter-spacing: 1px; padding: 9px 12px 8px;
+    color: var(--ink-dim); background: var(--panel-2); border: 2px solid var(--brand-dark); box-shadow: 0 3px 0 #000; cursor: pointer; }
+  .mode.on { color: #03140c; background: var(--brand); border-color: var(--brand-hi); }
+  .mode:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
   .q-opts { display: flex; gap: 6px; justify-content: center; }
-  .q-opts span {
+  .q-opts > span {
     min-width: 2.9em; padding: 6px 6px 5px;
     font-family: var(--pixel); font-size: clamp(11px, min(3.2vw, 3.6vh), 17px); line-height: 1;
     background: #000; color: var(--ink);
     border: 2px solid var(--brand-dark);
   }
-  .q-opts span.here { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 12px rgba(255,210,63,0.45); }
-  .q-opts span.ok { background: var(--brand); border-color: var(--brand-hi); color: #03140c; }
-  .q-opts span.bad { background: var(--danger); border-color: #ffc2c8; color: #fff; }
+  .q-opts > span.here { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 12px rgba(255,210,63,0.45); }
+  .q-opts > span.ok { background: var(--brand); border-color: var(--brand-hi); color: #03140c; }
+  .q-opts > span.bad { background: var(--danger); border-color: #ffc2c8; color: #fff; }
   .q-bar { height: 5px; margin-top: 8px; background: #000; border: 1px solid var(--brand-dark); }
   .q-bar i { display: block; height: 100%; width: 100%; background: var(--brand); transform-origin: left; }
   .q-bar i.late { background: var(--gold); }
@@ -547,9 +561,10 @@
 <div class="overlay show" id="startScreen">
   <div class="card">
     <img class="logo" src="/assets/logo-quanta.png" alt="Quanta Aulas">
-    <div class="tag">QUANTA AULAS · CÁLCULO MENTAL</div>
+    <div class="tag" id="modeTag">QUANTA AULAS · CÁLCULO MENTAL</div>
     <h1 class="title">CORRIDA<br><span>QUANTA</span></h1>
-    <p>Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
+    <div class="modes" role="group" aria-label="Modo de jogo"></div>
+    <p id="modeIntro">Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
     <div class="keys">
       <div><span class="kc">◄ ►</span> Setas ou A/D. No celular, toque no lado ou deslize.</div>
       <div><span class="kc">▲</span> Já sabe? Seta pra cima ou W dá dash e acelera. No celular, deslize pra cima ou segure ▲.</div>
@@ -564,7 +579,7 @@
     </div>
     <div class="rec">RECORDE <b id="bestStart">0</b> · XP <b id="xpStart">0</b> · SKINS <b id="skinCount">1/10</b></div>
     <!-- Versão do jogo: troque a cada publicação (o mesmo número vai no ?v= dos scripts abaixo) -->
-    <div class="ver">VERSÃO <span id="gameVersion">2026.09.25-6</span></div>
+    <div class="ver">VERSÃO <span id="gameVersion">2026.09.26-1</span></div>
   </div>
 </div>
 
@@ -598,6 +613,7 @@
     </div>
     <div class="online-line" id="onlineLine"></div>
     <button class="btn" id="btnRetry" type="button">► JOGAR DE NOVO</button>
+    <div class="modes" role="group" aria-label="Modo de jogo"></div>
     <div class="row2">
       <button class="btn alt" type="button" data-open="locker">SKINS</button>
       <button class="btn alt" type="button" data-open="rank">RANKING</button>
@@ -652,19 +668,20 @@
 
 <noscript><p style="position:fixed;inset:auto 16px 16px;z-index:9">Ative o JavaScript para jogar.</p></noscript>
 
-<script src="js/themes.js?v=2026.09.25-6"></script>
-<script src="js/skins.js?v=2026.09.25-6"></script>
-<script src="js/creatures.js?v=2026.09.25-6"></script>
-<script src="js/music.js?v=2026.09.25-6"></script>
-<script src="js/fx2d.js?v=2026.09.25-6"></script>
-<script src="js/progress.js?v=2026.09.25-6"></script>
-<script src="js/online.js?v=2026.09.25-6"></script>
+<script src="js/themes.js?v=2026.09.26-1"></script>
+<script src="js/skins.js?v=2026.09.26-1"></script>
+<script src="js/creatures.js?v=2026.09.26-1"></script>
+<script src="js/music.js?v=2026.09.26-1"></script>
+<script src="js/fx2d.js?v=2026.09.26-1"></script>
+<script src="js/progress.js?v=2026.09.26-1"></script>
+<script src="js/online.js?v=2026.09.26-1"></script>
+<script src="js/modes.js?v=2026.09.26-1"></script>
 <script>
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
   const $$ = (sel) => [...document.querySelectorAll(sel)];
-  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES) {
+  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES || !QC.Modes) {
     $('loading').textContent = 'ERRO AO CARREGAR. RECARREGUE A PÁGINA.';
     return;
   }
@@ -696,6 +713,12 @@
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
   };
+  // modo de jogo (Matemática, Química, Física): perguntas, velocidade e dicas vêm de js/modes.js
+  let GM = QC.Modes.get(store.get('quanta-corrida-mode', 'mat'));
+  const applyModeSpeed = () => { CFG.startSpeed = GM.speed.start; CFG.speedStep = GM.speed.step; CFG.maxSpeed = GM.speed.max; };
+  applyModeSpeed();
+  document.body.classList.toggle('rich', !!GM.rich);
+
   // 2 portais nos níveis 1-2, 3 nos níveis 3-4, 4 do nível 5 em diante
   const portalsFor = (level) => (level >= 5 ? 4 : level >= 3 ? 3 : 2);
   const ROAD = 8.4;
@@ -705,6 +728,7 @@
 
   // ================= Contas =================
   function makeQuestion(level, n) {
+    if (GM.make) return GM.make(level, n);
     let a, b, c, text, ans;
     const big = Math.max(0, level - 5);
     const types = ['add'];
@@ -831,6 +855,131 @@
       g.fillStyle = '#000';
       for (const [ox, oy] of [[-3, 0], [3, 0], [0, -3], [0, 5], [3, 5]]) g.fillText(s, w / 2 + ox, h / 2 + 2 + oy);
       g.fillStyle = '#ffffff'; g.fillText(s, w / 2, h / 2 + 2);
+    });
+  }
+
+  // ---- texto "rico" dos modos de ciência: _x = índice, ^x = expoente (ver js/modes.js) ----
+  function parseRich(str) {
+    const s = String(str), out = [];
+    let i = 0, buf = '';
+    const push = (t, k) => { if (t) out.push({ t, k }); };
+    while (i < s.length) {
+      const c = s[i];
+      if ((c === '_' || c === '^') && i + 1 < s.length) {
+        push(buf, 0); buf = '';
+        const k = c === '_' ? 1 : 2;
+        if (s[i + 1] === '{') { const j = s.indexOf('}', i + 2), end = j < 0 ? s.length : j; push(s.slice(i + 2, end), k); i = end + 1; }
+        else { push(s[i + 1], k); i += 2; }
+        continue;
+      }
+      buf += c; i++;
+    }
+    push(buf, 0);
+    // letras gregas e √ não existem nas fontes pixeladas: vão em fonte do sistema (gr)
+    return out.flatMap((p) => p.t.split(GREEK_SPLIT).filter(Boolean).map((t) => ({ t, k: p.k, gr: GREEK_ONE.test(t) })));
+  }
+  const GREEK_SPLIT = /([\u0370-\u03ff√]+)/, GREEK_ONE = /^[\u0370-\u03ff√]+$/;
+  const richHtml = (str) => parseRich(str).map((p) => {
+    const t = p.gr ? `<span class="gr">${esc(p.t)}</span>` : esc(p.t);
+    return p.k === 1 ? `<sub>${t}</sub>` : p.k === 2 ? `<sup>${t}</sup>` : t;
+  }).join('');
+  const RICH_FONT = "'Pixelify Sans', 'Press Start 2P', sans-serif", GREEK_FONT = "system-ui, 'Segoe UI', Roboto, Arial, sans-serif";
+  const richFont = (fs, k, gr) => `${gr ? 800 : 700} ${Math.round((k ? fs * 0.66 : fs) * (gr ? 0.92 : 1))}px ${gr ? GREEK_FONT : RICH_FONT}`;
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  // palavras para quebra de linha; também pode quebrar depois de · e / (sem espaço: glue)
+  function richWords(str) {
+    const words = [[]];
+    for (const p of parseRich(str)) {
+      if (p.k) { words[words.length - 1].push(p); continue; }
+      p.t.split(' ').forEach((part, idx) => {
+        if (idx > 0) words.push([]);
+        part.split(/(?<=[·\/])/).forEach((piece, j) => {
+          if (j > 0) { words.push([]); words[words.length - 1].glue = true; }
+          if (piece) words[words.length - 1].push({ t: piece, k: 0, gr: p.gr });
+        });
+      });
+    }
+    return words.filter((w) => w.length);
+  }
+  // quebra em linhas que caibam em maxW; null se uma palavra sozinha não couber (a menos que force)
+  function layoutRich(g, str, fs, maxW, force) {
+    g.font = richFont(fs, 0);
+    const sp = g.measureText(' ').width, lines = [];
+    let cur = null;
+    for (const w of richWords(str)) {
+      let ww = 0;
+      for (const p of w) { g.font = richFont(fs, p.k, p.gr); ww += g.measureText(p.t).width; }
+      if (ww > maxW && !force) return null;
+      const gap = w.glue ? 0 : sp;
+      if (cur && cur.w + gap + ww <= maxW) { cur.words.push(w); cur.w += gap + ww; }
+      else { cur = { words: [w], w: ww }; lines.push(cur); }
+    }
+    return { lines, sp, fs };
+  }
+  // maior fonte da lista em que TODOS os textos cabem (mesmo tamanho em todos os portais)
+  function fitRich(texts, sizes, maxW, maxH, maxLines) {
+    for (const fs of sizes) {
+      const ok = texts.every((t) => { const l = layoutRich(measureCtx, t, fs, maxW); return l && l.lines.length <= maxLines && l.lines.length * fs * 1.15 <= maxH; });
+      if (ok) return fs;
+    }
+    return sizes[sizes.length - 1];
+  }
+  function drawRich(g, lay, cx, cy, colorOf, dx, dy) {
+    const lh = lay.fs * 1.15, top = cy - (lay.lines.length - 1) * lh / 2;
+    g.textAlign = 'left'; g.textBaseline = 'middle';
+    lay.lines.forEach((ln, li) => {
+      let x = cx - ln.w / 2 + dx;
+      const y = top + li * lh + dy;
+      ln.words.forEach((w, wi) => {
+        if (wi && !w.glue) x += lay.sp;
+        for (const p of w) {
+          g.font = richFont(lay.fs, p.k, p.gr); g.fillStyle = colorOf(p);
+          g.fillText(p.t, x, y + (p.k === 1 ? lay.fs * 0.3 : p.k === 2 ? -lay.fs * 0.36 : 0));
+          x += g.measureText(p.t).width;
+        }
+      });
+    });
+  }
+  function drawRichShadowed(g, lay, cx, cy, colorOf, o) {
+    for (const [ox, oy] of [[-o, 0], [o, 0], [0, -o], [0, o * 1.6], [o, o * 1.6]]) drawRich(g, lay, cx, cy, () => '#000', ox, oy);
+    drawRich(g, lay, cx, cy, colorOf, 0, 0);
+  }
+  // portal dos modos de ciência: resolução dobrada para fórmulas com índice e expoente
+  function panelTexRich(label, state, pw, fs) {
+    const col = state === 'bad' ? '#ff4d5e' : state === 'good' ? '#7dffc0' : '#1fd685';
+    const fill = state === 'bad' ? 'rgba(255,77,94,0.5)' : state === 'good' ? 'rgba(125,255,192,0.45)' : 'rgba(4,16,11,0.55)';
+    const S = 2;
+    return canvasTex(Math.round(128 * pw / 3.6) * S, 138 * S, (g, W2, H2) => {
+      const w = W2 / S, h = H2 / S;
+      g.save(); g.scale(S, S);
+      g.fillStyle = fill; g.fillRect(4, 4, w - 8, h - 8);
+      g.fillStyle = 'rgba(31,214,133,0.18)';
+      for (let i = 0; i < Math.min(34, w - 20); i++) g.fillRect(10 + i, 8 + i * 2, 6, 2);
+      g.fillStyle = col;
+      g.fillRect(4, 0, w - 8, 4); g.fillRect(4, h - 4, w - 8, 4); g.fillRect(0, 4, 4, h - 8); g.fillRect(w - 4, 4, 4, h - 8);
+      g.restore();
+      const lay = layoutRich(g, label, fs, W2 - 28, true);
+      drawRichShadowed(g, lay, W2 / 2, H2 / 2 + 2, () => '#ffffff', 3);
+    });
+  }
+  // fórmula numa linha só enquanto a letra fica grande; só quebra (nos espaços, · ou /) quando não cabe
+  function panelFitRich(answers, pw) {
+    const maxW = Math.round(128 * pw / 3.6) * 2 - 28, maxH = 138 * 2 - 36;
+    const one = fitRich(answers, [60, 52, 44, 38, 32, 28, 25, 22], maxW, maxH, 1);
+    if (answers.every((t) => { const l = layoutRich(measureCtx, t, one, maxW); return l && l.lines.length === 1; })) return one;
+    return fitRich(answers, [44, 38, 32, 28, 24, 20, 17, 14], maxW, maxH, 3);
+  }
+  // placa dos modos de ciência: nome em cima, grandeza pedida embaixo (só o miolo aparece no celular)
+  function bannerTexRich(title, text) {
+    const q = `${text} = ?`, W = 300;
+    const one = (t, fs) => { const l = layoutRich(measureCtx, t, fs, W); return l && l.lines.length === 1; };
+    const fs = [26, 23, 20, 18, 16, 14, 12].find((f) => one(title, f) && one(q, f)) || 12;
+    return canvasTex(512, 64, (g, w, h) => {
+      g.fillStyle = '#04100b'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#1fd685'; g.fillRect(0, 0, w, 4); g.fillRect(0, h - 4, w, 4);
+      const l1 = layoutRich(g, title, fs, 9999, true), l2 = layoutRich(g, q, fs, 9999, true);
+      const lay = { lines: [l1.lines[0], l2.lines[0]], sp: l1.sp, fs };
+      drawRichShadowed(g, lay, w / 2, h / 2 + 1, (p) => (p.t === '?' ? '#ffd23f' : '#ffffff'), 2);
     });
   }
 
@@ -1061,7 +1210,9 @@
   }
   function makeGate(q, answers, xs) {
     const g = new T.Group();
-    const n = xs.length, pw = ROAD / n - 0.42, len = Math.max(...answers.map((v) => String(v).length));
+    const n = xs.length, pw = ROAD / n - 0.42;
+    // tamanho da fonte comum a todos os portais: pelo nº de caracteres (contas) ou medido (ciências)
+    const len = GM.rich ? panelFitRich(answers, pw) : Math.max(...answers.map((v) => String(v).length));
     const posts = [-4.4, 4.4];
     for (let k = 1; k < n; k++) posts.push(-ROAD / 2 + (ROAD / n) * k);
     posts.forEach((x, k) => {
@@ -1069,7 +1220,7 @@
       const cap = new T.Mesh(capGeo, capMat); cap.scale.set(k < 2 ? 1.3 : 0.8, 1, 1.3); cap.position.set(x, 5.36, 0); g.add(cap);
     });
     const geos = gateGeos(n);
-    const btex = bannerTex(`${q.text} = ?`);
+    const btex = GM.rich ? bannerTexRich(q.title, q.text) : bannerTex(`${q.text} = ?`);
     // portais e placa ignoram a neblina: continuam nítidos mesmo longe
     const bfront = bannerPool.pop() || new T.MeshBasicMaterial({ fog: false });
     bfront.map = btex; bfront.needsUpdate = true;
@@ -1078,7 +1229,7 @@
     const pads = [];
     const panels = xs.map((lx, i) => {
       const mat = panelPool.pop() || new T.MeshBasicMaterial({ transparent: true, side: T.DoubleSide, depthWrite: false, fog: false });
-      mat.map = panelTex(answers[i], 'idle', pw, len); mat.needsUpdate = true;
+      mat.map = (GM.rich ? panelTexRich : panelTex)(answers[i], 'idle', pw, len); mat.needsUpdate = true;
       const m = new T.Mesh(geos.panel, mat); m.position.set(lx, 2.3, 0); g.add(m);
       const pad = new T.Mesh(geos.pad, padMat);
       pad.position.set(lx, 0.04, 0.2); g.add(pad); pads.push(pad);
@@ -1091,7 +1242,7 @@
   function setPanel(gate, i, state) {
     const m = gate.obj.panels[i];
     m.material.map.dispose();
-    m.material.map = panelTex(gate.answers[i], state, gate.obj.pw, gate.obj.len);
+    m.material.map = (GM.rich ? panelTexRich : panelTex)(gate.answers[i], state, gate.obj.pw, gate.obj.len);
     m.material.needsUpdate = true;
   }
   function removeGate(gate) {
@@ -1367,7 +1518,9 @@
     useSkin(P.data.skin);
     setTrackLanes(2);
     // bilhete do ranking: pedido só depois de a corrida anterior terminar de ser enviada
-    runTicket = onlineReady && !embedded && QC.Online.user ? submitting.then(() => QC.Online.startRun()) : null;
+    applyModeSpeed();
+    S.speed = S.maxSpeedSeen = CFG.startSpeed;
+    runTicket = GM.ranked && onlineReady && !embedded && QC.Online.user ? submitting.then(() => QC.Online.startRun()) : null;
     applyTheme(1, themeIdx === 0);
     if (creatures) creatures.clear();
     if (music) { try { music.resume(); music.play(0); } catch (e) {} }
@@ -1396,8 +1549,8 @@
     const answers = shuffle([q.ans, ...q.wrong]);
     const correct = answers.indexOf(q.ans);
     S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: 1, obj: makeGate(q, answers, S.lanes) };
-    $('qText').innerHTML = `${esc(q.text)} = <span class="qm">?</span>`;
-    $('qOpts').innerHTML = answers.map((a) => `<span>${a}</span>`).join('');
+    $('qText').innerHTML = (q.title ? `<small class="q-title">${richHtml(q.title)}</small>` : '') + `${richHtml(q.text)} = <span class="qm">?</span>`;
+    $('qOpts').innerHTML = answers.map((a) => `<span>${richHtml(a)}</span>`).join('');
     $('qLevel').textContent = `NÍVEL ${S.level}`;
     paintOptions();
     const qe = $('question');
@@ -1500,7 +1653,7 @@
       }
       paintCombo(false);
       flash('rgba(255,77,94,0.9)', 0.35);
-      popText(`ERA ${g.q.ans}`, '#ff4d5e', '52%');
+      popText(`ERA ${richHtml(g.q.ans)}`, '#ff4d5e', '52%');
       sfx.bad();
       if (navigator.vibrate) { try { navigator.vibrate(140); } catch (e) {} }
     }
@@ -1526,6 +1679,7 @@
     const run = {
       score: S.score, hits: S.hits, maxLevel: S.level, maxCombo: S.maxCombo,
       maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, ticket: runTicket,
+      mode: GM.id, ranked: !!GM.ranked,
     };
     runTicket = null;
     const res = P.applyRun(run);
@@ -1533,11 +1687,12 @@
 
     countUp($('rScore'), S.score, 900); countUp($('rHits'), S.hits, 700); countUp($('rCombo'), S.maxCombo, 700);
     $('rLevel').textContent = S.level;
+    $('overTag').textContent = `FIM DE CORRIDA · ${GM.name.toUpperCase()}`;
     S.fever = false; paintCombo(false);
     if (res.record) recordTimer = setTimeout(() => { if (S.mode === 'over') { fxCall('fireworks', 8); fxCall('confetti', 90); } }, 400);
     $('newRecord').classList.toggle('show', res.record);
     $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
-    $('overTip').textContent = pick(TIPS);
+    $('overTip').textContent = pick(GM.tips || TIPS);
     countUp($('xpGain'), res.xpGained, 900);
     countUp($('xpTotal'), P.data.xp, 1100, P.data.xp - res.xpGained);
     const un = $('unlocked');
@@ -1784,12 +1939,33 @@
   }
   function refreshMenus() {
     $$('.account-slot').forEach((el) => { el.innerHTML = accountHtml(); });
-    $('bestStart').textContent = fmt(P.data.bestScore);
+    $('bestStart').textContent = fmt(P.bestOf(GM.id));
+    paintModes();
     $('xpStart').textContent = fmt(P.data.xp);
     const total = QC.Skins.list.length;
     $('skinCount').textContent = `${P.data.skins.filter((id) => QC.Skins.list.some((s) => s.id === id)).length}/${total}`;
   }
+  // seletor de modo (no início e no fim de corrida)
+  function paintModes() {
+    $$('.modes').forEach((box) => {
+      box.innerHTML = QC.Modes.list.map((id) => {
+        const m = QC.Modes.get(id), on = id === GM.id;
+        return `<button class="mode${on ? ' on' : ''}" type="button" data-mode="${id}" aria-pressed="${on}">${esc(m.name.toUpperCase())}</button>`;
+      }).join('');
+    });
+    $('modeTag').textContent = `QUANTA AULAS · ${GM.tag}`;
+    $('modeIntro').textContent = GM.intro;
+  }
   document.addEventListener('click', (e) => {
+    const m = e.target.closest('[data-mode]');
+    if (m && (S.mode === 'menu' || S.mode === 'over') && m.dataset.mode !== GM.id) {
+      GM = QC.Modes.get(m.dataset.mode);
+      document.body.classList.toggle('rich', !!GM.rich);
+      store.set('quanta-corrida-mode', GM.id);
+      applyModeSpeed();
+      refreshMenus();
+      return;
+    }
     const b = e.target.closest('[data-act]');
     if (b && b.dataset.act === 'nick') openScreen('nickScreen');
   });
@@ -1850,6 +2026,7 @@
     const line = $('onlineLine');
     delete line.dataset.needsNick;
     if (embedded) { line.textContent = ''; return; }
+    if (!run.ranked) { line.textContent = run.score > 0 ? 'Por enquanto o ranking online é só do modo Matemática. Seu recorde deste modo fica salvo.' : ''; return; }
     if (!onlineReady || !QC.Online.user) {
       if (!run.ticket) line.innerHTML = `<a class="link" href="${accountUrl}">Entre com sua conta Quanta</a> para aparecer no ranking.`;
       return;
