@@ -797,6 +797,30 @@ kbd {
   border: 2px solid #fff;
 }
 
+.hud-item-key {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(8, 20, 15, 0.7);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hud-item-key kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font: 700 12px var(--display);
+  text-align: center;
+}
+
+body.touch .hud-item-key {
+  display: none;
+}
+
 .hud-item-name {
   font-size: 14px;
   max-width: 130px;
