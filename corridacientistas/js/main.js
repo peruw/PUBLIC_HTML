@@ -17,6 +17,7 @@ import { AudioSystem } from './audio.js';
 import { RaceManager } from './race.js';
 import { Hud } from './hud.js';
 import { Menu, store, is150Unlocked } from './menu.js';
+import { Online, boardOf } from './online.js';
 
 const STEP = 1 / 60; // passo fixo da simulação
 const PLAYER_SLOT = 5; // o jogador larga em 6º
@@ -196,6 +197,9 @@ async function init() {
   input.setAutoAccelerate(store.get('auto', input.touchEnabled));
   menu.setAutoLabel(input.autoAccelerate);
   const race = new RaceManager({ bus });
+  // ranking online (conta do site): carrega em segundo plano; sem ela o jogo segue normal
+  Online.init();
+  let runTicket = null; // promessa do bilhete da corrida atual (kart_start_run)
   const hud = new Hud({ bus });
 
   audio.setMuted(store.get('muted', false));
@@ -237,24 +241,25 @@ async function init() {
     introTimer = 0;
     pendingUse = false;
     bus.emit('race:reset');
-    world.karts = karts;
+    // demo do título: 8 cientistas sorteados entre todos (a pista tem 8 posições de largada)
+    const order = shuffle(karts.slice()).slice(0, RACE.kartCount);
+    world.karts = order;
     world.phase = 'title';
     world.cc = CLASSES['100cc'];
     for (const k of karts) {
       k.isPlayer = false;
       k.frozen = false;
-      k.object3d.visible = true;
+      k.object3d.visible = order.includes(k);
       k.model?.setHero?.(false);
     }
     setGhost(null);
     env.setMood?.(0);
     items.setMode?.('race');
     world.rival = null;
-    const order = shuffle(karts.slice());
     setupGrid(order);
-    items.reset(karts);
+    items.reset(order);
     effects.reset();
-    drivers = new Map(karts.map((k) => [k, new AIDriver(k, track, { skill: 0.55 + Math.random() * 0.4 })]));
+    drivers = new Map(order.map((k) => [k, new AIDriver(k, track, { skill: 0.55 + Math.random() * 0.4 })]));
     race.phase = 'idle';
     rig.setMode('flyover');
     rig.snap();
@@ -280,9 +285,10 @@ async function init() {
     world.mode = opts.mode;
     const player = karts.find((k) => k.character.id === opts.character) || karts[0];
     // contrarrelógio: sozinho na pista (os outros karts somem)
-    const others = tt ? [] : shuffle(karts.filter((k) => k !== player));
+    // 7 adversários sorteados entre os demais cientistas; quem não corre fica fora de cena
+    const others = tt ? [] : shuffle(karts.filter((k) => k !== player)).slice(0, RACE.kartCount - 1);
     for (const k of karts) {
-      k.object3d.visible = !tt || k === player;
+      k.object3d.visible = k === player || others.includes(k);
       k.frozen = false;
     }
     // karts[0] é o jogador; o grid tem o jogador em PLAYER_SLOT
@@ -297,7 +303,7 @@ async function init() {
     }
     world.player = player;
     items.setMode?.(tt ? 'timetrial' : 'race');
-    items.reset(karts);
+    items.reset(world.karts);
     effects.reset();
     env.setMood?.(0);
     moodT = -1;
@@ -317,6 +323,8 @@ async function init() {
     store.set('played', played + 1);
     hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tutorial: played < 2, touch: input.touchEnabled });
     // fantasma do recorde (contrarrelógio)
+    // bilhete do ranking online: o servidor marca a hora da largada
+    runTicket = Online.user ? Online.startRun(boardOf(opts)) : null;
     ghostRec = tt ? [] : null;
     ghostSampleT = 0;
     setGhost(tt ? store.get(ghostKey(opts), null) : null);
@@ -396,6 +404,8 @@ async function init() {
     // ranking deste aparelho
     if (valid) Object.assign(info, addRanking(recordKey(opts), me.time, p.character.id));
     menu.showResults(results, p, info);
+    menu.renderOnlineResult(null);
+    if (valid) sendOnline(opts, me, p);
     audio.playMusic('results');
     if (tt) rig.setMode('orbit', { target: p, radius: 7, height: 2.6, speed: 0.35 });
     else podium(results);
@@ -430,6 +440,41 @@ async function init() {
     rig.setMode('podium', { position, lookAt });
     if (effects.podiumConfetti) effects.podiumConfetti(base.pos, { duration: 6 });
     else effects.confetti?.(top[0]);
+  }
+
+  // Envia o tempo ao ranking online e à sala da turma (se houver) e mostra a colocação.
+  async function sendOnline(opts, me, p) {
+    const board = boardOf(opts);
+    const room = opts.room && opts.room.board === board ? opts.room : null;
+    const ticket = runTicket;
+    runTicket = null;
+    if (!ticket && !room) {
+      if (Online.available) menu.renderOnlineResult({ loginHint: true });
+      return;
+    }
+    const run = {
+      board,
+      timeMs: me.time * 1000,
+      bestLapMs: (p.lapTimes && p.lapTimes.length ? Math.min(...p.lapTimes) : me.time / opts.laps) * 1000,
+      character: p.character.id,
+      place: me.place,
+    };
+    menu.renderOnlineResult({ pending: true });
+    const res = { roomCode: room?.code, loginHint: !Online.user };
+    try {
+      if (ticket) {
+        const runId = await ticket;
+        res.global = runId ? await Online.submitRun({ runId, ...run }) : { ok: false, error: 'offline' };
+        if (res.global?.ok && !res.global.rank_all) menu.me = await Online.getMe();
+      }
+      if (room) {
+        res.room = await Online.roomSubmit(room.code, run, room.guestName);
+        if (res.room?.ok) res.roomBoard = await Online.roomBoard(room.code, 8);
+      }
+    } catch {
+      /* sem conexão: o resultado local já foi salvo */
+    }
+    if (game.state === 'results') menu.renderOnlineResult(res);
   }
 
   // ---------- recordes, medalhas, ranking e desafio ----------

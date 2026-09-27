@@ -89,6 +89,10 @@
       <div class="menu-buttons">
         <button class="btn btn-primary btn-big" data-action="play">▶ JOGAR</button>
         <button class="btn btn-daily" data-action="daily" id="btn-daily">⭐ Desafio do dia</button>
+        <div class="row">
+          <button class="btn" data-action="online">🌐 Ranking online</button>
+          <button class="btn" data-action="turma">🏫 Turma</button>
+        </div>
         <button class="btn" data-action="howto">📖 Como jogar</button>
         <div class="row">
           <button class="btn btn-small" data-action="toggle-sound" id="btn-sound">🔊 Som: ligado</button>
@@ -145,7 +149,57 @@
         </div>
         <button class="btn btn-primary btn-go" data-action="start">CORRER! 🏁</button>
         <p class="select-note" id="select-note" aria-live="polite"></p>
+        <div class="room-banner hidden" id="room-banner"></div>
       </footer>
+    </div>
+  </section>
+
+  <!-- Ranking online -->
+  <section class="screen hidden" id="screen-online" role="dialog" aria-labelledby="online-title">
+    <div class="panel online-wrap">
+      <header class="select-head">
+        <button class="btn btn-small" data-action="back">← Voltar</button>
+        <h2 id="online-title">Ranking online</h2>
+        <span></span>
+      </header>
+      <div class="online-body">
+        <div class="online-account" id="online-account"></div>
+        <div class="online-filters">
+          <div class="seg" id="on-mode"><button data-v="race">Corrida</button><button data-v="timetrial">Contra o relógio</button></div>
+          <div class="seg" id="on-cc"><button data-v="50cc">50cc</button><button data-v="100cc">100cc</button><button data-v="150cc">150cc</button></div>
+          <div class="seg" id="on-laps"><button data-v="1">1 volta</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button></div>
+          <div class="seg" id="on-period"><button data-v="week">Semana</button><button data-v="all">Geral</button></div>
+        </div>
+        <ol class="online-list" id="online-list" aria-live="polite"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- Salas de turma -->
+  <section class="screen hidden" id="screen-turma" role="dialog" aria-labelledby="turma-title">
+    <div class="panel online-wrap">
+      <header class="select-head">
+        <button class="btn btn-small" data-action="back">← Voltar</button>
+        <h2 id="turma-title">Turma</h2>
+        <span></span>
+      </header>
+      <div class="online-body turma-body">
+        <div class="turma-box">
+          <h3>Entrar numa sala</h3>
+          <p>Digite o código que o professor passou.</p>
+          <div class="turma-row">
+            <input id="room-code" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off" aria-label="Código da sala" />
+            <input id="room-name" maxlength="20" placeholder="Seu nome" aria-label="Seu nome na sala" />
+            <button class="btn btn-primary btn-small" data-action="room-join">Entrar</button>
+          </div>
+          <p class="turma-msg" id="room-msg" aria-live="polite"></p>
+        </div>
+        <div class="turma-box" id="turma-teacher">
+          <h3>Sou professor(a): criar sala</h3>
+          <div id="turma-create"></div>
+          <div id="turma-list"></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -227,6 +281,7 @@
       <div class="results-side">
         <div class="fact-card" id="results-fact"></div>
         <div class="results-quiz" id="results-quiz"></div>
+        <div class="results-online" id="results-online" aria-live="polite"></div>
         <div class="results-rank" id="results-rank"></div>
       </div>
       <div class="row">

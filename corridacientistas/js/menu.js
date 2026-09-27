@@ -3,9 +3,10 @@ import { CHARACTERS, CLASSES, ITEMS, RACE } from './config.js';
 import { itemIconHTML } from './hud.js';
 import { formatTime } from './race.js';
 import { SCIENTIST_FACTS, pickFact, shuffledQuiz } from './facts.js';
+import { Online, ERR_TEXT, boardOf, parseBoard } from './online.js';
 
 const $ = (id) => document.getElementById(id);
-const SCREENS = ['loading', 'title', 'select', 'howto', 'pause', 'results', 'error'];
+const SCREENS = ['loading', 'title', 'select', 'howto', 'online', 'turma', 'pause', 'results', 'error'];
 // Bandeiras em SVG (emoji de bandeira vira letras no Windows).
 const svgFlag = (body, vb = '0 0 30 20') => `<svg viewBox="${vb}" preserveAspectRatio="none" aria-hidden="true">${body}</svg>`;
 const hStripes = (...cs) => cs.map((c, i) => `<rect y="${(i * 20) / cs.length}" width="30" height="${20 / cs.length}" fill="${c}"/>`).join('');
@@ -26,6 +27,9 @@ const FLAGS = {
   Rússia: svgFlag(hStripes('#fff', '#0039a6', '#d52b1e')),
   Alemanha: svgFlag(hStripes('#000', '#dd0000', '#ffce00')),
   Itália: svgFlag(vStripes('#009246', '#fff', '#ce2b37')),
+  EUA: svgFlag(
+    hStripes('#b22234', '#fff', '#b22234', '#fff', '#b22234', '#fff', '#b22234') + '<rect width="13" height="11" fill="#3c3b6e"/>',
+  ),
   Brasil: svgFlag(
     '<rect width="30" height="20" fill="#009c3b"/><path d="M15 2L27.5 10L15 18L2.5 10Z" fill="#ffdf00"/>' +
       '<circle cx="15" cy="10" r="4.6" fill="#002776"/><path d="M10.6 9.2Q15 7.6 19.5 10.8" stroke="#fff" stroke-width="1" fill="none"/>',
@@ -80,6 +84,7 @@ export class Menu {
     if (!CLASSES[this.opts.cc] || (this.opts.cc === '150cc' && !is150Unlocked())) this.opts.cc = CLASSES[this.opts.cc] ? '100cc' : '50cc';
     if (!RACE.lapOptions.includes(this.opts.laps)) this.opts.laps = RACE.defaultLaps;
 
+    this.room = store.get('room', null); // sala de turma em que o aluno entrou
     this.tabNav = false; // foco veio do Tab (não do mouse/toque)
     this.buildSelect();
     this.buildHowto();
@@ -153,11 +158,38 @@ export class Menu {
         store.set('cc', this.opts.cc);
         store.set('laps', this.opts.laps);
         store.set('mode', this.opts.mode);
-        h.onStart({ ...this.opts });
+        h.onStart({ ...this.opts, room: this.room || null });
         break;
       case 'daily':
         h.sfx('menuSelect');
         h.onDaily?.();
+        break;
+      case 'online':
+        h.sfx('menuSelect');
+        this.show('online');
+        break;
+      case 'turma':
+        h.sfx('menuSelect');
+        this.show('turma');
+        break;
+      case 'room-join':
+        this.joinRoom();
+        break;
+      case 'room-leave':
+        h.sfx('menuMove');
+        this.setRoom(null);
+        break;
+      case 'room-create':
+        this.createRoom();
+        break;
+      case 'room-report':
+        this.showReport(btn?.dataset.code);
+        break;
+      case 'room-toggle':
+        this.toggleRoom(btn?.dataset.code, btn?.dataset.open === '1');
+        break;
+      case 'nick-save':
+        this.saveNick();
         break;
       case 'share':
         this.share(btn);
@@ -210,6 +242,8 @@ export class Menu {
     for (const s of SCREENS) $('screen-' + s)?.classList.toggle('hidden', s !== name);
     if (name === 'select') this.refreshSelect();
     if (name === 'title') this.refreshTitle();
+    if (name === 'online') this.refreshOnline();
+    if (name === 'turma') this.refreshTurma();
     this.h.onScreen?.(name);
     // teclado: foco no botão principal da tela (pausa e resultado)
     if (name === 'results') requestAnimationFrame(() => $('screen-results')?.querySelector('.btn-primary')?.focus({ preventScroll: true }));
@@ -304,7 +338,7 @@ export class Menu {
       .join('');
     cc.addEventListener('click', (e) => {
       const b = e.target.closest('button');
-      if (!b) return;
+      if (!b || this.room) return;
       if (b.dataset.cc === '150cc' && !is150Unlocked()) {
         this.h.sfx('menuMove');
         this.flashHint('Vença uma corrida no 100cc para liberar o 150cc.');
@@ -319,7 +353,7 @@ export class Menu {
     laps.innerHTML = RACE.lapOptions.map((n) => `<button data-laps="${n}">${n}<small></small></button>`).join('');
     laps.addEventListener('click', (e) => {
       const b = e.target.closest('button');
-      if (!b) return;
+      if (!b || this.room) return;
       this.opts.laps = Number(b.dataset.laps);
       this.h.sfx('menuMove');
       this.refreshSelect();
@@ -330,7 +364,7 @@ export class Menu {
       mode.innerHTML = '<button data-mode="race">Corrida<small>8 karts</small></button><button data-mode="timetrial">Contra o relógio<small>com fantasma</small></button>';
       mode.addEventListener('click', (e) => {
         const b = e.target.closest('button');
-        if (!b) return;
+        if (!b || this.room) return;
         this.opts.mode = b.dataset.mode;
         this.h.sfx('menuMove');
         this.refreshSelect();
@@ -351,6 +385,7 @@ export class Menu {
   }
 
   cycleOpt(kind, dir = 1) {
+    if (this.room) return; // numa sala de turma, motor e voltas são os da sala
     if (kind === 'cc') {
       const ids = Object.keys(CLASSES).filter((id) => id !== '150cc' || is150Unlocked());
       this.opts.cc = ids[(ids.indexOf(this.opts.cc) + dir + ids.length) % ids.length];
@@ -368,6 +403,17 @@ export class Menu {
     for (const b of $('opt-cc').children) b.classList.toggle('on', b.dataset.cc === this.opts.cc);
     for (const b of $('opt-laps').children) b.classList.toggle('on', Number(b.dataset.laps) === this.opts.laps);
     for (const b of $('opt-mode')?.children || []) b.classList.toggle('on', b.dataset.mode === this.opts.mode);
+    // sala de turma: mostra o aviso e trava motor/voltas/modo nos da sala
+    const rb = $('room-banner');
+    if (rb) {
+      rb.classList.toggle('hidden', !this.room);
+      if (this.room) {
+        const b = parseBoard(this.room.board);
+        Object.assign(this.opts, b);
+        rb.innerHTML = `🏫 Sala <b>${esc(this.room.code)}</b> · ${esc(this.room.name)} · ${b.cc}, ${b.laps === 1 ? '1 volta' : b.laps + ' voltas'}${b.mode === 'timetrial' ? ', contra o relógio' : ''} <button class="btn btn-small" data-action="room-leave">Sair da sala</button>`;
+      }
+    }
+    for (const g of ['opt-cc', 'opt-laps', 'opt-mode']) $(g)?.classList.toggle('room-locked', !!this.room);
     const unlocked = is150Unlocked();
     for (const b of $('opt-cc').children) {
       const locked = b.dataset.cc === '150cc' && !unlocked;
@@ -429,7 +475,8 @@ export class Menu {
 
   moveSelection(dx, dy) {
     const i = CHARACTERS.findIndex((x) => x.id === this.opts.character);
-    const cols = 4;
+    // colunas reais da grade (4 ou 5 conforme a tela)
+    const cols = getComputedStyle(this.grid).gridTemplateColumns.split(' ').length || 4;
     let n = i + dx + dy * cols;
     n = (n + CHARACTERS.length) % CHARACTERS.length;
     this.opts.character = CHARACTERS[n].id;
@@ -606,6 +653,218 @@ export class Menu {
         if (e.key === 'Enter') commit();
       });
     }
+  }
+
+  // ---------- ranking online ----------
+  accountHTML(me) {
+    const u = Online.user;
+    if (!Online.available) return '<p class="muted">O ranking online funciona no site quantaaulas.com. Aqui vale o ranking deste aparelho.</p>';
+    if (!u) return `<p>Entre com sua conta Google para aparecer no ranking.</p><a class="btn btn-primary btn-small" href="${Online.loginUrl}">Entrar com Google</a>`;
+    if (me && me.nickname) return `<p>Você aparece como <b>${esc(me.nickname)}</b>.</p>` + this.nickForm(me.nickname, 'Trocar apelido');
+    return '<p>Escolha um apelido para aparecer no ranking (os colegas veem esse nome, não o seu e-mail).</p>' + this.nickForm(me?.suggest || u.firstName || '', 'Salvar apelido');
+  }
+
+  nickForm(value, label) {
+    return `<div class="turma-row"><input id="nick-input" maxlength="16" value="${esc(value)}" aria-label="Apelido" /><button class="btn btn-small" data-action="nick-save">${label}</button></div><p class="turma-msg" id="nick-msg"></p>`;
+  }
+
+  async saveNick() {
+    const v = ($('nick-input')?.value || '').trim();
+    const r = await Online.setNickname(v);
+    const msg = $('nick-msg');
+    if (r?.ok) {
+      this.me = { nickname: r.nickname };
+      this.h.sfx('menuSelect');
+      if (this.current === 'online') this.refreshOnline();
+      else if (this.current === 'results') this.renderOnlineResult(this._onlineRes);
+    } else if (msg) msg.textContent = ERR_TEXT[r?.error] || ERR_TEXT.offline;
+  }
+
+  async refreshOnline() {
+    if (!this.onFilter) this.onFilter = { mode: this.opts.mode, cc: this.opts.cc, laps: this.opts.laps, period: 'week' };
+    const f = this.onFilter;
+    // seletores (liga os cliques só uma vez)
+    const segs = { 'on-mode': 'mode', 'on-cc': 'cc', 'on-laps': 'laps', 'on-period': 'period' };
+    for (const [id, key] of Object.entries(segs)) {
+      const el = $(id);
+      if (!el) continue;
+      if (!el._wired) {
+        el._wired = true;
+        el.addEventListener('click', (e) => {
+          const b = e.target.closest('button');
+          if (!b) return;
+          f[key] = key === 'laps' ? Number(b.dataset.v) : b.dataset.v;
+          this.h.sfx('menuMove');
+          this.refreshOnline();
+        });
+      }
+      for (const b of el.children) b.classList.toggle('on', String(f[key]) === b.dataset.v);
+    }
+    const list = $('online-list');
+    list.innerHTML = '<li class="muted">Carregando…</li>';
+    await Online.init();
+    this.me = Online.user ? await Online.getMe() : null;
+    $('online-account').innerHTML = this.accountHTML(this.me);
+    if (!Online.available) {
+      list.innerHTML = '';
+      return;
+    }
+    const rows = await Online.leaderboard(boardOf(f), f.period, 20);
+    if (this.current !== 'online') return;
+    list.innerHTML = this.boardRows(rows, 'Ninguém correu nesta combinação ainda. Seja o primeiro!');
+  }
+
+  boardRows(rows, empty) {
+    if (rows === null || rows === undefined) return `<li class="muted">${ERR_TEXT.offline}</li>`;
+    if (!rows.length) return `<li class="muted">${empty}</li>`;
+    return rows
+      .map((r) => {
+        const c = CHARACTERS.find((x) => x.id === (r.character || r.char_id));
+        const face = c && this.portraits[c.id] ? `<img class="face" src="${this.portraits[c.id]}" alt="" style="--c:${c.colors.ui}">` : '<span class="face"></span>';
+        return `<li class="${r.is_me ? 'me' : ''}"><span class="p">${r.rank}º</span>${face}<span class="n">${esc(r.nickname || r.name || '')}</span><span class="t">${formatTime((r.time_ms || 0) / 1000)}</span></li>`;
+      })
+      .join('');
+  }
+
+  // Resultado: envio já feito pelo main.js; aqui só mostra a colocação e o placar.
+  renderOnlineResult(res) {
+    this._onlineRes = res;
+    const box = $('results-online');
+    if (!box) return;
+    if (!res) {
+      box.innerHTML = '';
+      return;
+    }
+    const parts = [];
+    if (res.pending) parts.push('<p class="muted">🌐 Enviando para o ranking online…</p>');
+    if (res.global) {
+      const g = res.global;
+      if (g.ok) {
+        const rk = [];
+        if (g.rank_week) rk.push(`${g.rank_week}º da semana`);
+        if (g.rank_all) rk.push(`${g.rank_all}º no geral`);
+        parts.push(`<p>🌐 Ranking online: ${rk.length ? '<b>' + rk.join(' · ') + '</b>' : 'tempo salvo'}</p>`);
+        if (!g.rank_all && !g.rank_week) parts.push(this.nickForm(this.me?.suggest || Online.user?.firstName || '', 'Salvar apelido'));
+      } else parts.push(`<p class="muted">🌐 ${ERR_TEXT[g.error] || ERR_TEXT.offline}</p>`);
+    } else if (res.loginHint && Online.available) {
+      parts.push(`<p class="muted">🌐 Entre com sua conta para este tempo valer no ranking online. <a href="${Online.loginUrl}">Entrar com Google</a></p>`);
+    }
+    if (res.room) {
+      const r = res.room;
+      if (r.ok) parts.push(`<p>🏫 Sala ${esc(res.roomCode)}: <b>${r.rank}º de ${r.participants}</b> (seu melhor: ${formatTime(r.best / 1000)})</p>`);
+      else parts.push(`<p class="muted">🏫 ${ERR_TEXT[r.error] || ERR_TEXT.offline}</p>`);
+      if (res.roomBoard?.players) parts.push(`<ol class="online-list compact">${this.boardRows(res.roomBoard.players.slice(0, 8), '')}</ol>`);
+    }
+    box.innerHTML = parts.join('');
+  }
+
+  // ---------- turma ----------
+  setRoom(room) {
+    this.room = room;
+    if (room) store.set('room', room);
+    else store.set('room', null);
+    if (this.current === 'select') this.refreshSelect();
+  }
+
+  async joinRoom() {
+    const code = ($('room-code').value || '').trim().toUpperCase();
+    const name = ($('room-name').value || '').trim();
+    const msg = $('room-msg');
+    if (!/^[A-Z0-9]{5}$/.test(code)) {
+      msg.textContent = 'O código tem 5 letras ou números.';
+      return;
+    }
+    await Online.init();
+    if (!Online.available) {
+      msg.textContent = 'As salas funcionam no site quantaaulas.com, com internet.';
+      return;
+    }
+    if (!Online.user && name.length < 2) {
+      msg.textContent = 'Escreva seu nome para a turma ver no placar.';
+      return;
+    }
+    msg.textContent = 'Procurando a sala…';
+    const r = await Online.roomGet(code);
+    if (r === undefined) msg.textContent = ERR_TEXT.offline;
+    else if (!r) msg.textContent = ERR_TEXT.not_found;
+    else if (!r.open) msg.textContent = ERR_TEXT.closed;
+    else {
+      store.set('room-name', name);
+      this.setRoom({ code: r.code, name: r.name, board: r.board, guestName: name });
+      this.h.sfx('menuSelect');
+      this.show('select');
+    }
+  }
+
+  async refreshTurma() {
+    const saved = store.get('room', null);
+    if (saved && !this.room) this.room = saved;
+    $('room-name').value = store.get('room-name', store.get('nick', ''));
+    if (this.room) $('room-code').value = this.room.code;
+    $('room-msg').textContent = this.room ? `Você está na sala ${this.room.code} (${this.room.name}).` : '';
+    const create = $('turma-create');
+    const list = $('turma-list');
+    create.innerHTML = '<p class="muted">Carregando…</p>';
+    list.innerHTML = '';
+    await Online.init();
+    if (!Online.available) {
+      create.innerHTML = '<p class="muted">As salas funcionam no site quantaaulas.com, com internet.</p>';
+      return;
+    }
+    if (!Online.user) {
+      create.innerHTML = `<p>Para criar uma sala, entre com a sua conta.</p><a class="btn btn-small" href="${Online.loginUrl}">Entrar com Google</a>`;
+      return;
+    }
+    const o = this.opts;
+    create.innerHTML = `<p>A sala usa o motor, as voltas e o modo escolhidos agora: <b>${o.cc}, ${o.laps === 1 ? '1 volta' : o.laps + ' voltas'}${o.mode === 'timetrial' ? ', contra o relógio' : ''}</b> (troque na tela de escolha antes de criar).</p>
+      <div class="turma-row"><input id="room-new-name" maxlength="40" placeholder="Nome da turma (ex.: 1º ano B)" aria-label="Nome da turma" /><button class="btn btn-primary btn-small" data-action="room-create">Criar sala</button></div><p class="turma-msg" id="room-new-msg"></p>`;
+    const rooms = await Online.roomList();
+    if (!rooms || !rooms.length) return;
+    list.innerHTML = '<h3>Minhas salas</h3><ul class="room-list">' + rooms
+      .map((r) => {
+        const b = parseBoard(r.board) || {};
+        return `<li><b class="code">${esc(r.code)}</b> ${esc(r.name)} <small>${b.cc || ''}, ${b.laps || '?'} v${b.mode === 'timetrial' ? ', relógio' : ''} · ${r.participants} aluno(s) · ${r.open ? 'aberta' : 'fechada'}</small>
+          <button class="btn btn-small" data-action="room-report" data-code="${esc(r.code)}">Resultados</button>
+          <button class="btn btn-small" data-action="room-toggle" data-code="${esc(r.code)}" data-open="${r.open ? '0' : '1'}">${r.open ? 'Fechar' : 'Reabrir'}</button></li>`;
+      })
+      .join('') + '</ul><div id="room-report"></div>';
+  }
+
+  async createRoom() {
+    const name = ($('room-new-name').value || '').trim();
+    const msg = $('room-new-msg');
+    const r = await Online.roomCreate(name, boardOf(this.opts));
+    if (r?.ok) {
+      this.h.sfx('menuSelect');
+      await this.refreshTurma();
+      const m = $('room-new-msg');
+      if (m) m.innerHTML = `Sala criada! Passe o código <b class="code">${esc(r.code)}</b> para a turma.`;
+    } else if (msg) msg.textContent = r?.error === 'invalid' ? 'Dê um nome de 2 a 40 letras para a turma.' : ERR_TEXT[r?.error] || ERR_TEXT.offline;
+  }
+
+  async toggleRoom(code, open) {
+    await Online.roomOpen(code, open);
+    this.refreshTurma();
+  }
+
+  async showReport(code) {
+    const box = $('room-report');
+    if (!box || !code) return;
+    box.innerHTML = '<p class="muted">Carregando…</p>';
+    const r = await Online.roomReport(code);
+    if (!r?.ok) {
+      box.innerHTML = `<p class="muted">${ERR_TEXT[r?.error] || ERR_TEXT.offline}</p>`;
+      return;
+    }
+    const rows = (r.players || [])
+      .map((p, i) => {
+        const c = CHARACTERS.find((x) => x.id === p.character);
+        return `<tr><td>${i + 1}º</td><td>${esc(p.name)}${p.guest ? ' <small>(sem conta)</small>' : ''}</td><td>${formatTime(p.time_ms / 1000)}</td><td>${formatTime(p.best_lap_ms / 1000)}</td><td>${c ? esc(c.name) : ''}</td><td>${p.runs}</td></tr>`;
+      })
+      .join('');
+    box.innerHTML = `<h3>Sala ${esc(code)} · ${esc(r.room.name)}</h3>` + (rows
+      ? `<table class="report"><thead><tr><th></th><th>Aluno</th><th>Melhor tempo</th><th>Melhor volta</th><th>Cientista</th><th>Corridas</th></tr></thead><tbody>${rows}</tbody></table>`
+      : '<p class="muted">Ninguém correu ainda.</p>');
   }
 
   // ---------- teclado nos menus ----------

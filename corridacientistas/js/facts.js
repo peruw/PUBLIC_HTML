@@ -191,6 +191,36 @@ export const SCIENTIST_FACTS = {
     { text: 'A Fiocruz nasceu em 1900 como Instituto Soroterápico Federal e hoje leva o nome de Oswaldo Cruz.' },
     { text: 'Uma vacina ensina o sistema imunológico a reconhecer o invasor antes que ele cause a doença.', quiz: { q: 'Como uma vacina protege o corpo?', options: ['Ensina o sistema imunológico a reconhecer o invasor', 'Mata todas as bactérias do corpo', 'Substitui o sangue', 'Funciona como um antibiótico'], answer: 0 } },
   ],
+  samuel: [
+    { text: 'Nas fotos do site, o Professor Samuel aparece com um cubo mágico: o quebra-cabeça tem mais de 43 quintilhões de combinações.', quiz: { q: 'Quantas combinações, aproximadamente, tem um cubo mágico 3×3?', options: ['Mais de 43 quintilhões', 'Cerca de 1 milhão', 'Exatamente 54', 'Cerca de 10 mil'], answer: 0 } },
+    { text: 'O Professor Samuel fez o doutorado em Ciências (Física) no ITA, o Instituto Tecnológico de Aeronáutica, em São José dos Campos.', quiz: { q: 'Em que instituição o Professor Samuel fez o doutorado?', options: ['ITA', 'NASA', 'Fiocruz', 'CBPF'], answer: 0 } },
+    { text: 'Além de dar aulas, o Professor Samuel pesquisa Astrofísica: fez pós-doutorado na Universidade do Minho, em Portugal, e na UDESC.' },
+    { text: 'Astrofísica é a parte da Física que estuda estrelas, galáxias, buracos negros e o universo inteiro usando as mesmas leis da física da Terra.', quiz: { q: 'O que a Astrofísica estuda?', options: ['Estrelas, galáxias e o universo com as leis da física', 'Só os planetas do Sistema Solar', 'Apenas a previsão do tempo', 'Horóscopo'], answer: 0 } },
+  ],
+  lattes: [
+    { text: 'A Plataforma Lattes, onde ficam os currículos dos pesquisadores brasileiros, tem esse nome em homenagem a César Lattes.', quiz: { q: 'A Plataforma Lattes, dos currículos de pesquisadores, homenageia:', options: ['César Lattes', 'Carlos Chagas', 'Santos Dumont', 'Oswaldo Cruz'], answer: 0 } },
+    { text: 'Em 1947, Lattes ajudou a descobrir o méson pi (píon), uma partícula que ajuda a manter o núcleo do átomo unido.', quiz: { q: 'Que partícula César Lattes ajudou a descobrir em 1947?', options: ['O méson pi (píon)', 'O elétron', 'O fóton', 'O neutrino'], answer: 0 } },
+    { text: 'Para registrar raios cósmicos, Lattes levou chapas fotográficas especiais ao monte Chacaltaya, na Bolívia, a mais de 5 mil metros de altitude.' },
+    { text: 'César Lattes nasceu em Curitiba e foi um dos fundadores do Centro Brasileiro de Pesquisas Físicas (CBPF), no Rio de Janeiro, em 1949.' },
+  ],
+  franklin: [
+    { text: 'A "Foto 51", feita pela equipe de Rosalind Franklin em 1952 com raios X, mostrou o padrão em forma de X que revelou a dupla hélice do DNA.', quiz: { q: 'Que técnica Rosalind Franklin usou para fotografar o DNA?', options: ['Difração de raios X', 'Microscópio comum', 'Ultrassom', 'Telescópio'], answer: 0 } },
+    { text: 'Rosalind Franklin morreu em 1958, aos 37 anos. O Nobel de 1962 pela estrutura do DNA foi para Watson, Crick e Wilkins: o prêmio não é dado a quem já morreu.' },
+    { text: 'Além do DNA, Rosalind Franklin estudou a estrutura de vírus, como o do mosaico do tabaco, e a do carvão.' },
+    { text: 'O DNA guarda as instruções genéticas dos seres vivos em uma sequência de quatro bases: A, T, C e G.', quiz: { q: 'Quantos tipos de base formam o "alfabeto" do DNA?', options: ['Quatro (A, T, C e G)', 'Duas', 'Vinte e seis', 'Cem'], answer: 0 } },
+  ],
+  johnson: [
+    { text: 'Antes do voo de John Glenn, em 1962, o astronauta pediu que Katherine Johnson conferisse à mão os números calculados pelo computador.', quiz: { q: 'O que o astronauta John Glenn pediu a Katherine Johnson antes do voo de 1962?', options: ['Que conferisse os cálculos do computador', 'Que pilotasse a nave', 'Que desenhasse o foguete', 'Que fosse junto no voo'], answer: 0 } },
+    { text: 'Katherine Johnson ajudou a calcular trajetórias da missão Apollo 11, que levou pessoas à Lua em 1969.', quiz: { q: 'Em que ano a Apollo 11 levou pessoas à Lua?', options: ['1969', '1906', '1945', '2001'], answer: 0 } },
+    { text: 'A história de Katherine Johnson e de outras matemáticas negras da NASA é contada no filme "Estrelas Além do Tempo" (2016).' },
+    { text: 'Em 2015, Katherine Johnson recebeu a Medalha Presidencial da Liberdade, a maior honra civil dos Estados Unidos.' },
+  ],
+  enedina: [
+    { text: 'Enedina Alves Marques se formou em Engenharia Civil em 1945, no Paraná: foi a primeira mulher negra engenheira do Brasil.', quiz: { q: 'Quem foi a primeira mulher negra engenheira do Brasil?', options: ['Enedina Alves Marques', 'Marie Curie', 'Katherine Johnson', 'Rosalind Franklin'], answer: 0 } },
+    { text: 'Enedina trabalhou no projeto da Usina Hidrelétrica Capivari-Cachoeira, no Paraná, que transforma a energia da água em energia elétrica.', quiz: { q: 'Uma usina hidrelétrica transforma a energia de quê em energia elétrica?', options: ['Da água em movimento', 'Do vento', 'Do Sol', 'Do carvão'], answer: 0 } },
+    { text: 'Para pagar os estudos, Enedina trabalhou como professora e como empregada doméstica enquanto cursava engenharia.' },
+    { text: 'Enedina também foi a primeira mulher a se formar em engenharia no estado do Paraná.' },
+  ],
 };
 
 // Setores da pista (nomes iguais aos de track.meta.zones).

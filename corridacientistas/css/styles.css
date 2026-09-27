@@ -382,7 +382,7 @@ a.btn {
 
 .char-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 10px;
   align-content: start;
 }
@@ -1322,7 +1322,7 @@ body.touch .touch-only {
 
   .select-head { padding: 8px 12px 4px; }
   .select-body { grid-template-columns: 1fr 1fr; gap: 10px; padding: 4px 12px; }
-  .char-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .char-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
   .char-card { padding: 3px 0 4px; }
   .char-card span { font-size: clamp(10px, 1.5vw, 12px); letter-spacing: -0.2px; line-height: 1.05; }
   .char-card .flag { top: 3px; right: 4px; }
@@ -1725,3 +1725,107 @@ body.touch {
   font-size: 18px;
 }
 .hud-item-slot.back::after { content: '▼'; color: #ffd23f; }
+
+/* ---------- Ranking online e salas de turma ---------- */
+.online-wrap {
+  width: min(760px, 100%);
+  max-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.online-body {
+  overflow: auto;
+  padding: 4px 18px 18px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.online-account p { margin: 0 0 6px; }
+.online-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.muted { color: var(--ink-dim); }
+
+.online-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.online-list li {
+  display: grid;
+  grid-template-columns: 40px 30px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.online-list li.muted { display: block; background: none; }
+.online-list li.me { outline: 2px solid var(--brand); background: rgba(31, 214, 133, 0.18); }
+.online-list .p { font-weight: 700; }
+.online-list .t { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.online-list .face {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--c, rgba(255, 255, 255, 0.4));
+}
+.online-list.compact li { padding: 2px 8px; font-size: 13px; }
+
+.turma-body { grid-template-columns: 1fr 1fr; }
+.turma-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(181, 205, 189, 0.2);
+  border-radius: 14px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.turma-box h3 { margin: 0 0 6px; font-size: 17px; }
+.turma-box p { margin: 0 0 8px; font-size: 14px; }
+.turma-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.turma-row input {
+  flex: 1 1 110px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  color: inherit;
+  font: inherit;
+}
+#room-code { flex: 0 1 110px; text-transform: uppercase; letter-spacing: 3px; font-weight: 700; }
+.turma-msg { min-height: 1.2em; color: var(--yellow); }
+.code { font-family: var(--display); letter-spacing: 2px; color: var(--yellow); }
+.room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.room-list li { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.room-list small { color: var(--ink-dim); }
+table.report { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+table.report th, table.report td { text-align: left; padding: 3px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+
+.room-banner {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(31, 214, 133, 0.14);
+  border: 1px solid var(--brand);
+  font-size: 14px;
+}
+.seg.room-locked button:not(.on) { opacity: 0.35; pointer-events: none; }
+.results-online p { margin: 4px 0; font-size: 14px; }
+
+@media (max-width: 760px), (max-height: 520px) {
+  .turma-body { grid-template-columns: 1fr; }
+  .online-body { padding: 4px 12px 12px; gap: 8px; }
+  .online-list li { font-size: 13px; padding: 2px 8px; }
+}
