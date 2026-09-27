@@ -50,11 +50,19 @@ export class AIDriver {
     // recuperação
     this._stuckT = 0;
     this._reverseT = 0;
+    // erros visíveis (sorteados uma vez por curva; menos habilidade = mais erros)
+    this._inCurve = false;
+    this._errWideT = 0; // s restantes do "entrou rápido demais e saiu largo"
+    this._errWideDir = 0;
+    this._errWideAmt = 0;
+    this._errHold = 0; // s a mais segurando o drift nesta curva
+    this._errHoldArmed = false;
     // itens
     this._itemId = null;
     this._itemCnt = 0;
     this._itemT = 0;
     this._itemDelay = 0;
+    this._itemHold = false; // segura Buraco Negro/Tesla para um momento melhor
     this._pulse = false;
   }
 
@@ -126,6 +134,25 @@ export class AIDriver {
       return;
     }
 
+    // ---------- curvatura à frente (para frear e sortear erros) ----------
+    let maxK = 0;
+    let kSign = 0;
+    const scale = 0.6 + v / 40;
+    for (let i = 0; i < SCAN.length; i++) {
+      const cv = track.curvature(k.s + SCAN[i] * scale);
+      if (Math.abs(cv) > maxK) {
+        maxK = Math.abs(cv);
+        kSign = cv > 0 ? 1 : -1;
+      }
+    }
+    // entrou numa curva nova (raio < 50 m; histerese até a reta): sorteia um erro visível
+    if (!this._inCurve && maxK > 1 / 50) {
+      this._inCurve = true;
+      this._rollMistakes(world, kSign);
+    } else if (this._inCurve && maxK < 1 / 100) this._inCurve = false;
+    this._errWideT = Math.max(0, this._errWideT - dt);
+    const wide = this._errWideT > 0;
+
     // ---------- alvo lateral ----------
     const ahead = clamp(7 + v * 0.55, 7, 26);
     const ts = k.s + ahead;
@@ -137,6 +164,8 @@ export class AIDriver {
     lat = this._avoidHazards(lat, k, track, world, L, ahead);
     const lim = Math.max(1, hw - 1.3);
     lat = clamp(lat, -lim, lim);
+    // erro "entrou rápido demais": abre para o lado de fora da curva, às vezes além da borda
+    if (wide) lat = -this._errWideDir * (hw + this._errWideAmt);
     this._lat = damp(this._lat, lat, this._avoidT > 0 ? 14 : 4, dt);
 
     // ---------- perseguição pura ----------
@@ -164,24 +193,21 @@ export class AIDriver {
     steer += this._noise;
 
     // ---------- acelerador / freio pela curvatura à frente ----------
-    let maxK = 0;
-    const scale = 0.6 + v / 40;
-    for (let i = 0; i < SCAN.length; i++) {
-      const cv = Math.abs(track.curvature(k.s + SCAN[i] * scale));
-      if (cv > maxK) maxK = cv;
-    }
-    const allowed = (k.turnRate(v) * (k.drifting ? 1.15 : 0.95)) / Math.max(maxK, 1e-4);
+    // driftando o kart gira mais (driftYawBase + driftYawMod × esterço para dentro)
+    const T = TUNING;
+    const yawCap = k.drifting ? k.driftYawFactor * (T.driftYawBase + 0.8 * T.driftYawMod) : 0.95;
+    const allowed = (k.turnRate(v) * yawCap) / Math.max(maxK, 1e-4);
     let thr = 1;
     let brk = 0;
-    if (v > allowed + 1.5) thr = 0;
-    if (v > allowed + 5) brk = 1;
+    // no erro "saiu largo" a freada atrasa: entra no talo
+    if (v > allowed + 1.5 && !wide) thr = 0;
+    if (v > allowed + 5 && !wide) brk = 1;
     if (Math.abs(alpha) > 1.2 && v > 12) {
       thr = 0; // alvo muito de lado: alivia
       if (Math.abs(alpha) > 1.6) brk = 1;
     }
 
     // ---------- drift ----------
-    const T = TUNING;
     let drift = false;
     this._driftCd -= dt;
     if (k.onGround) this._trickDone = false;
@@ -198,7 +224,7 @@ export class AIDriver {
       else this._wideT = Math.max(0, this._wideT - dt * 0.5);
       const outside = k.lateral * dir < -(hw - 1.1);
       const inside = k.lateral * dir > hw - 0.8;
-      const release =
+      let release =
         k.driftLevel >= this._driftTarget ||
         this._wideT > 0.3 ||
         need < -0.2 ||
@@ -206,6 +232,15 @@ export class AIDriver {
         outside ||
         inside ||
         this._driftT > 5;
+      // erro: segura o drift um pouco demais e escorrega para fora da linha
+      if (release && this._errHoldArmed) {
+        this._errHoldArmed = false;
+        this._errHold = 0.4;
+      }
+      if (this._errHold > 0) {
+        this._errHold -= dt;
+        if (Math.abs(k.lateral) < hw + 2 && this._driftT < 6) release = false;
+      }
       drift = !release;
       if (release) this._endDriftPlan();
     } else if (this._driftDir !== 0) {
@@ -219,7 +254,7 @@ export class AIDriver {
         drift = false;
         this._endDriftPlan();
       }
-    } else if (this._driftCd <= 0 && k.onGround && v > 14 && !k.offroad && !avoiding && !this._rampAhead) {
+    } else if (this._driftCd <= 0 && k.onGround && v > 14 && !k.offroad && !avoiding && !this._rampAhead && !wide) {
       const dir = this._curveAhead(k, track);
       if (dir !== 0) {
         if (Math.random() < 0.35 + 0.65 * sk) {
@@ -251,7 +286,25 @@ export class AIDriver {
     this._useItems(dt, k, world, L);
   }
 
+  // Sorteia os erros desta curva. CLASSES[cc].aiMistakes escala (0 no 150cc: IA limpa).
+  // O kart do jogador (piloto automático) não erra de propósito.
+  _rollMistakes(world, dir) {
+    this._errHoldArmed = false;
+    const m = this.kart.isPlayer ? 0 : (world.cc?.aiMistakes ?? 0) * (1 - this.skill);
+    if (m <= 0 || dir === 0) return;
+    if (Math.random() < 0.35 * m) {
+      // freada atrasada: entra rápido, não drifta e sai largo (às vezes pisa na zebra/grama)
+      this._errWideT = rand(0.8, 1.2);
+      this._errWideDir = dir;
+      // m além da borda do asfalto: às vezes só chega perto, às vezes pisa na zebra/grama
+      this._errWideAmt = rand(-1.5, 2.5);
+      this._driftCd = Math.max(this._driftCd, this._errWideT);
+    }
+    this._errHoldArmed = Math.random() < 0.3 * m;
+  }
+
   _endDriftPlan() {
+    this._errHold = 0;
     this._driftDir = 0;
     this._driftT = 0;
     this._wideT = 0;
@@ -393,11 +446,14 @@ export class AIDriver {
       this._itemCnt = k.itemCount;
       this._itemT = 0;
       this._itemDelay =
-        k.item === 'maca' ? rand(4, 10)
+        k.item === 'maca' ? rand(18, 26) // sem ninguém alinhado atrás, só solta bem depois
           : k.item === 'tesla' ? rand(1, 4)
             : k.item === 'faraday' || k.item === 'buraco' ? rand(1, 3)
               : k.item === 'pilha3' ? rand(0.8, 1.2)
                 : 0;
+      // agressividade da classe: às vezes guarda o Buraco Negro/Tesla para a hora certa
+      const agg = world.cc?.aiAggression ?? 1;
+      this._itemHold = !k.isPlayer && (k.item === 'buraco' || k.item === 'tesla') && Math.random() > agg;
     }
     this._itemT += dt;
     const t = this._itemT;
@@ -410,7 +466,9 @@ export class AIDriver {
         use = t > this._itemDelay;
         break;
       case 'maca':
-        use = (t > 0.5 && this._kartNear(k, world, L, -25, -1.5, false)) || t > this._itemDelay;
+        // só vale a pena se quem vem atrás estiver na mesma linha (vai passar por cima)
+        use = (t > 0.5 && this._kartNear(k, world, L, -25, -1.5, 'behind')) ||
+          (t > this._itemDelay && this._kartNear(k, world, L, -60, -1.5, false));
         break;
       case 'alfa':
         use = (t > 0.4 && this._kartNear(k, world, L, 2, 40, true)) || t > 8;
@@ -418,9 +476,11 @@ export class AIDriver {
       case 'eletron':
         use = (t > 0.5 && this._kartNear(k, world, L, 2, 120, false)) || t > 15;
         break;
-      case 'faraday':
       case 'tesla':
       case 'buraco':
+        use = t > this._itemDelay && (!this._itemHold || this._holdOver(k, world));
+        break;
+      case 'faraday':
         use = t > this._itemDelay;
         break;
       default:
@@ -439,7 +499,19 @@ export class AIDriver {
     return true;
   }
 
-  // Há kart entre `from` e `to` metros (negativo = atrás)? `aligned` exige mira reta.
+  // Item guardado (IA pouco agressiva): libera quando o jogador abriu mais de 60 m
+  // ou quando a penúltima volta acabou.
+  _holdOver(k, world) {
+    const p = world.player;
+    if (!p || p === k) return true;
+    if (k.lap >= (world.totalLaps || 1)) return true;
+    const pd = typeof p.progress === 'number' ? p.progress : p.distance;
+    const kd = typeof k.progress === 'number' ? k.progress : k.distance;
+    return pd - kd > 60;
+  }
+
+  // Há kart entre `from` e `to` metros (negativo = atrás)? `aligned` exige mira reta;
+  // 'behind' exige que o de trás esteja na mesma linha (para a maçã).
   _kartNear(k, world, L, from, to, aligned) {
     const ks = world.karts;
     if (!ks) return false;
@@ -448,7 +520,9 @@ export class AIDriver {
       if (o === k || o.finished) continue;
       const ds = wrapSigned(o.s - k.s, L);
       if (ds < from || ds > to) continue;
-      if (aligned) {
+      if (aligned === 'behind') {
+        if (Math.abs(o.lateral - k.lateral) > 1.6 - ds * 0.02) continue;
+      } else if (aligned) {
         if (Math.abs(o.lateral - k.lateral) > 2.5 + ds * 0.04) continue;
         const dx = o.position.x - k.position.x;
         const dz = o.position.z - k.position.z;
@@ -473,8 +547,17 @@ export class AIDriver {
       // ritmo base da classe (aiSpeed) × variação por habilidade
       target = (cc.aiSpeed ?? 1) * (0.93 + 0.07 * sk);
       if (!p.finished) {
-        if (gap > 0) target *= 1 + (cc.aiCatchUp ?? 0.1) * clamp((gap - 15) / 120, 0, 1) * (0.5 + 0.5 * sk);
-        else target *= 1 - 0.07 * clamp((-gap - 25) / 150, 0, 1) * (1.25 - 0.5 * sk);
+        if (gap > 0) {
+          // últimos ~300 m do jogador: sem elástico (ultrapassagem no fim só por item ou erro)
+          const L = world.track?.length || this.track.length;
+          const laps = world.totalLaps || 1;
+          const left = laps * L - (typeof p.progress === 'number' ? p.progress : pd);
+          const fade = p.lap >= laps ? clamp((left - 250) / 100, 0, 1) : 1;
+          target *= 1 + (cc.aiCatchUp ?? 0.1) * clamp((gap - 15) / 120, 0, 1) * (0.5 + 0.5 * sk) * fade;
+        } else {
+          // à frente do jogador: tira o pé (satura em ~80 m), para quem rodou rever o pelotão logo
+          target *= 1 - (cc.aiLeadBrake ?? 0.07) * clamp((-gap - 10) / 70, 0, 1) * (1.25 - 0.5 * sk);
+        }
       }
       // teto por classe: a IA pode colar no jogador, mas não ultrapassa só no ritmo do motor
       if (typeof cc.aiMax === 'number') target = Math.min(target, cc.aiMax);
