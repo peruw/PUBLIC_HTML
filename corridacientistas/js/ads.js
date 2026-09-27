@@ -4,7 +4,11 @@
 // asfalto à frente do grid, nos acostamentos e no gramado.
 // Tudo é desenhado num atlas de canvas (logotipo real + fonte da marca, com alternativas) e
 // mesclado em poucos pedaços (culling), com um único material.
+// "Respiro": nas zonas temáticas, a cada 2 ou 3 placas da marca entra uma placa do próprio campus
+// (tabela periódica, céu do observatório, tentilhões da lagoa, raios de Tesla), no mesmo atlas.
 import * as THREE from './three.js';
+import { ELEMENT_TILES, paintElementTile } from './environment.js';
+import { drawStars } from './track.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -544,8 +548,211 @@ const PAINT = {
   },
 };
 
-// Atlas: regiões em px na resolução de referência 4096 × 2048 (alta); 'baixa' usa metade.
+// ---------------------------------------------------------------------------
+// Placas temáticas do campus (≈ 5,9 × 1,1 m, como as da marca): estilo das faixas de setor de
+// track.js (fundo da cor da zona, moldura branca, letra com contorno), para se diferenciarem da marca.
+const THEME_FONT = '"Trebuchet MS", "Segoe UI", "DejaVu Sans", Arial, sans-serif';
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function themeBg(g, w, h, top, bottom) {
+  const gr = g.createLinearGradient(0, 0, 0, h);
+  gr.addColorStop(0, top); gr.addColorStop(1, bottom);
+  g.fillStyle = gr;
+  g.fillRect(0, 0, w, h);
+}
+function themeFrame(g, w, h) {
+  g.strokeStyle = 'rgba(255,255,255,0.85)';
+  g.lineWidth = 7;
+  g.strokeRect(9, 9, w - 18, h - 18);
+}
+function themeText(g, str, x, yc, { size, color = '#ffffff', stroke = null, align = 'center', maxW = 1e9 }) {
+  let s = size;
+  g.font = `900 ${s}px ${THEME_FONT}`;
+  const tw = g.measureText(str).width;
+  if (tw > maxW) { s = Math.floor(s * maxW / tw); g.font = `900 ${s}px ${THEME_FONT}`; }
+  g.textAlign = align;
+  g.textBaseline = 'middle';
+  if (stroke) { g.lineJoin = 'round'; g.lineWidth = s * 0.16; g.strokeStyle = stroke; g.strokeText(str, x, yc); }
+  g.fillStyle = color;
+  g.fillText(str, x, yc);
+}
+// fileira de azulejos da tabela periódica (desenho de environment.js)
+function tiles(g, list, x0, y0, size, gap) {
+  list.forEach((i, k) => {
+    g.save();
+    g.translate(x0 + k * (size + gap), y0);
+    paintElementTile(g, size, size, ELEMENT_TILES[i % ELEMENT_TILES.length]);
+    g.restore();
+  });
+}
+// estrela de 4 pontas com brilho (céu do observatório)
+function sparkle(g, x, y, r, color) {
+  const gr = g.createRadialGradient(x, y, 0, x, y, r * 2.2);
+  gr.addColorStop(0, 'rgba(255,240,180,0.55)'); gr.addColorStop(1, 'rgba(255,240,180,0)');
+  g.fillStyle = gr;
+  g.fillRect(x - r * 2.2, y - r * 2.2, r * 4.4, r * 4.4);
+  g.fillStyle = color;
+  g.beginPath();
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4, rr = k % 2 ? r * 0.28 : r;
+    g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  g.closePath();
+  g.fill();
+}
+// raio em zigue-zague (deslocamento do ponto médio) com brilho roxo
+function bolt(g, x0, y0, x1, y1, rnd, width) {
+  let pts = [[x0, y0], [x1, y1]];
+  let disp = Math.hypot(x1 - x0, y1 - y0) * 0.22;
+  for (let l = 0; l < 5; l++) {
+    const out = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+      const len = Math.hypot(bx - ax, by - ay) || 1;
+      const d = (rnd() - 0.5) * disp;
+      out.push([(ax + bx) / 2 - ((by - ay) / len) * d, (ay + by) / 2 + ((bx - ax) / len) * d], pts[i + 1]);
+    }
+    pts = out;
+    disp *= 0.55;
+  }
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  for (const [lw, c] of [[width * 4.5, 'rgba(138,60,255,0.35)'], [width * 2.2, 'rgba(179,136,255,0.85)'], [width, '#f4eeff']]) {
+    g.lineWidth = lw; g.strokeStyle = c;
+    g.beginPath();
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.stroke();
+  }
+  g.lineCap = 'butt';
+}
+// tentilhão pousado (silhueta); beak: [comprimento, altura] do bico
+function finch(g, x, y, s, [bl, bh], color) {
+  g.fillStyle = color;
+  g.beginPath(); g.ellipse(x, y, 34 * s, 22 * s, -0.25, 0, TAU); g.fill(); // corpo
+  g.beginPath(); g.arc(x + 26 * s, y - 20 * s, 15 * s, 0, TAU); g.fill(); // cabeça
+  g.beginPath(); g.moveTo(x - 26 * s, y + 4 * s); g.lineTo(x - 62 * s, y + 22 * s); g.lineTo(x - 56 * s, y + 6 * s); g.closePath(); g.fill(); // cauda
+  g.fillStyle = '#e8b04a'; // bico
+  g.beginPath(); g.moveTo(x + 37 * s, y - 20 * s - bh * s / 2); g.lineTo(x + 37 * s + bl * s, y - 18 * s); g.lineTo(x + 37 * s, y - 20 * s + bh * s / 2); g.closePath(); g.fill();
+  g.fillStyle = '#ffffff';
+  g.beginPath(); g.arc(x + 30 * s, y - 24 * s, 3.5 * s, 0, TAU); g.fill();
+  g.strokeStyle = '#3a2a1a'; g.lineWidth = 3 * s; // patas
+  g.beginPath(); g.moveTo(x + 4 * s, y + 18 * s); g.lineTo(x + 2 * s, y + 32 * s); g.moveTo(x + 14 * s, y + 16 * s); g.lineTo(x + 14 * s, y + 32 * s); g.stroke();
+}
+function leaf(g, x, y, len, ang, color) {
+  g.save();
+  g.translate(x, y); g.rotate(ang);
+  g.fillStyle = color;
+  g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * 0.5, -len * 0.3, len, 0); g.quadraticCurveTo(len * 0.5, len * 0.3, 0, 0); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(len * 0.05, 0); g.lineTo(len * 0.9, 0); g.stroke();
+  g.restore();
+}
+const THEME_PAINT = {
+  // Laboratório: fileira de elementos
+  tLab0(g, w, h) {
+    themeBg(g, w, h, '#8a3cff', '#5518b8');
+    tiles(g, [0, 1, 2, 3, 4, 5], 27, 21, 150, 14);
+  },
+  tLab1(g, w, h) {
+    themeBg(g, w, h, '#8a3cff', '#5518b8');
+    tiles(g, [6, 7, 8, 9], 24, 21, 150, 14);
+    themeText(g, 'TABELA', 845, 66, { size: 66, stroke: '#2a0a60', maxW: 330 });
+    themeText(g, 'PERIÓDICA', 845, 130, { size: 66, stroke: '#2a0a60', maxW: 330 });
+    themeFrame(g, w, h);
+  },
+  // Observatório: Cruzeiro do Sul e Sistema Solar
+  tObs0(g, w, h) {
+    themeBg(g, w, h, '#1b2f6b', '#0b1433');
+    drawStars(g, w, h, 90, 3);
+    const S = [[175, 32, 16], [190, 162, 19], [112, 88, 16], [262, 98, 13], [224, 128, 8]]; // Gacrux, Acrux, Mimosa, Pálida, Intrometida
+    g.strokeStyle = 'rgba(255,227,110,0.45)'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(S[0][0], S[0][1]); g.lineTo(S[1][0], S[1][1]); g.moveTo(S[2][0], S[2][1]); g.lineTo(S[3][0], S[3][1]); g.stroke();
+    for (const [x, y, r] of S) sparkle(g, x, y, r, '#fff6cf');
+    themeText(g, 'CRUZEIRO DO SUL', 650, h / 2 + 2, { size: 76, color: '#ffe36e', stroke: '#050a1e', maxW: 640 });
+    themeFrame(g, w, h);
+  },
+  tObs1(g, w, h) {
+    themeBg(g, w, h, '#1b2f6b', '#0b1433');
+    drawStars(g, w, h, 70, 5);
+    const sun = g.createRadialGradient(-30, h / 2, 20, -30, h / 2, 150);
+    sun.addColorStop(0, '#fff6c0'); sun.addColorStop(0.6, '#ffc93a'); sun.addColorStop(1, 'rgba(255,140,30,0)');
+    g.fillStyle = sun; g.fillRect(0, 0, 150, h);
+    const y = h / 2;
+    const ball = (x, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); };
+    ball(150, 8, '#b9b0a8'); ball(196, 14, '#e8c27a');
+    ball(252, 15, '#1f6fd1'); g.fillStyle = '#3faa4a'; g.beginPath(); g.arc(247, y - 3, 7, 0, TAU); g.fill();
+    ball(304, 11, '#c1502e');
+    // Júpiter com faixas
+    g.save(); g.beginPath(); g.arc(392, y, 42, 0, TAU); g.clip();
+    ['#e9d8b8', '#c98e5a', '#f1e3c8', '#b5703f', '#efe0c0', '#a8653a', '#e8d6b0'].forEach((c, k) => { g.fillStyle = c; g.fillRect(350, y - 42 + k * 12, 84, 13); });
+    g.fillStyle = '#b8452a'; g.beginPath(); g.ellipse(404, y + 12, 9, 5, 0, 0, TAU); g.fill();
+    g.restore();
+    // Saturno com anel
+    g.strokeStyle = '#d9c28a'; g.lineWidth = 7;
+    g.beginPath(); g.ellipse(522, y, 62, 16, -0.25, Math.PI, TAU); g.stroke();
+    ball(522, 30, '#f0dca8');
+    g.beginPath(); g.ellipse(522, y, 62, 16, -0.25, 0, Math.PI); g.stroke();
+    ball(636, 22, '#9be7ff'); ball(712, 21, '#3a5fd8');
+    themeText(g, 'SISTEMA', 880, 70, { size: 58, color: '#ffe36e', stroke: '#050a1e', maxW: 250 });
+    themeText(g, 'SOLAR', 880, 128, { size: 58, color: '#ffe36e', stroke: '#050a1e', maxW: 250 });
+    themeFrame(g, w, h);
+  },
+  // Lagoa: tentilhões de Darwin (bicos diferentes) e folhas
+  tLag0(g, w, h) {
+    themeBg(g, w, h, '#19b5c9', '#0b7d98');
+    g.strokeStyle = '#6b4423'; g.lineWidth = 9; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(24, 150); g.quadraticCurveTo(300, 132, 590, 154); g.stroke();
+    g.lineCap = 'butt';
+    for (let k = 0; k < 6; k++) leaf(g, 60 + k * 100, 150, 46, -0.5 - (k % 2) * 1.9, k % 2 ? '#3fa34d' : '#4cb85a');
+    const beaks = [[30, 26], [24, 14], [38, 7], [16, 10]];
+    beaks.forEach((b, k) => finch(g, 88 + k * 138, 106 - (k % 2) * 4, 1.1, b, k % 2 ? '#3a3440' : '#2a2f36'));
+    themeText(g, 'TENTILHÕES', 810, 70, { size: 62, stroke: '#07435a', maxW: 380 });
+    themeText(g, 'DE DARWIN', 810, 132, { size: 62, stroke: '#07435a', maxW: 380 });
+    themeFrame(g, w, h);
+  },
+  tLag1(g, w, h) {
+    themeBg(g, w, h, '#0f8f86', '#0a5a52');
+    const r = rng(17);
+    const greens = ['#3fa34d', '#4cb85a', '#2f8a3c', '#7ccf5a', '#58b848'];
+    for (let k = 0; k < 34; k++) leaf(g, r() * w, r() * h, 60 + r() * 70, r() * TAU, greens[k % greens.length]);
+    themeText(g, 'GALÁPAGOS', w / 2, h / 2 + 4, { size: 104, stroke: '#07435a', maxW: w - 120 });
+    themeFrame(g, w, h);
+  },
+  // Reta de Tesla: raios roxos
+  tTes0(g, w, h) {
+    themeBg(g, w, h, '#241050', '#0a0520');
+    const r = rng(29);
+    bolt(g, 10, 40, 1014, 150, r, 4);
+    bolt(g, 10, 160, 1014, 30, r, 3);
+    themeText(g, 'BOBINA DE TESLA', w / 2, h / 2 + 2, { size: 84, color: '#ffcf1a', stroke: '#1b1b1b', maxW: w - 110 });
+    themeFrame(g, w, h);
+  },
+  tTes1(g, w, h) {
+    themeBg(g, w, h, '#2b1470', '#0b0626');
+    const r = rng(41);
+    for (let k = 0; k < 5; k++) bolt(g, 120, h / 2, 330 + k * 150 + r() * 60, 18 + r() * (h - 36), r, 3);
+    const s = g.createRadialGradient(118, h / 2, 6, 118, h / 2, 64);
+    s.addColorStop(0, '#ffffff'); s.addColorStop(0.5, '#dfe6ee'); s.addColorStop(1, 'rgba(179,136,255,0)');
+    g.fillStyle = s; g.fillRect(40, 0, 160, h);
+    themeText(g, 'CORRENTE ALTERNADA', 610, h / 2 + 2, { size: 64, stroke: '#2a0a60', maxW: 720 });
+    themeFrame(g, w, h);
+  },
+};
+Object.assign(PAINT, THEME_PAINT);
+// placas temáticas por zona de track.meta.zones (largada e curva final ficam só com a marca)
+const THEMES = { lab: ['tLab0', 'tLab1'], observatorio: ['tObs0', 'tObs1'], lagoa: ['tLag0', 'tLag1'], tesla: ['tTes0', 'tTes1'] };
+
+// Atlas: regiões em px na resolução de referência 4096 × 2432 (alta); 'baixa' usa metade.
+const ATLAS_W = 4096, ATLAS_H = 2432;
 const HOARD_IDS = ['h0', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9'];
+const THEME_IDS = Object.keys(THEME_PAINT);
 function atlasLayout() {
   const R = {};
   HOARD_IDS.forEach((id, k) => { R[id] = [0, k * 192, 1024, 192, 'hoard']; });
@@ -559,13 +766,15 @@ function atlasLayout() {
   R.f0 = [2560, 1440, 1536, 192, 'wide'];
   R.f1 = [2560, 1632, 1536, 192, 'wide'];
   R.f2 = [2560, 1824, 1536, 192, 'wide'];
+  // placas temáticas: duas fileiras de quatro embaixo
+  THEME_IDS.forEach((id, k) => { R[id] = [(k % 4) * 1024, 2048 + Math.floor(k / 4) * 192, 1024, 192, 'hoard']; });
   return R;
 }
 function buildAtlas(hi) {
-  // 2048 × 1024 nas duas qualidades: na tela fica igual ao de 4096 (placas a > 5 m, filtro anisotrópico)
+  // 2048 × 1216 nas duas qualidades: na tela fica igual ao de 4096 (placas a > 5 m, filtro anisotrópico)
   // e custa 1/4 da memória e do envio. A tinta do chão (vista de perto no acostamento) fica maior na alta.
   const S = 0.5, SG = hi ? 1 : 0.5;
-  const W = 4096 * S, H = 2048 * S;
+  const W = ATLAS_W * S, H = ATLAS_H * S;
   const canvas = makeCanvas(W, H);
   const g = canvas.getContext('2d');
   const L = atlasLayout();
@@ -600,10 +809,10 @@ function buildAtlas(hi) {
   const uv = (id) => {
     const [x, y, w, h] = L[id];
     const e = 1.5 / S;
-    return [(x + e) / 4096, 1 - (y + h - e) / 2048, (x + w - e) / 4096, 1 - (y + e) / 2048];
+    return [(x + e) / ATLAS_W, 1 - (y + h - e) / ATLAS_H, (x + w - e) / ATLAS_W, 1 - (y + e) / ATLAS_H];
   };
   const wr = L.white;
-  const white = [(wr[0] + wr[2] / 2) / 4096, 1 - (wr[1] + wr[3] / 2) / 2048];
+  const white = [(wr[0] + wr[2] / 2) / ATLAS_W, 1 - (wr[1] + wr[3] / 2) / ATLAS_H];
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = hi ? 8 : 4;
@@ -842,9 +1051,24 @@ function build(scene, track, quality, env, opts, hold) {
     const r = track.sample(s);
     return out.copy(r.pos).addScaledVector(r.right, side * (r.wallDist + off));
   };
+  let themeCount = 0;
   function hoardingRun(s0, s1, side, seqName, seqOffset = 0) {
     if (s1 < s0) s1 += LEN;
     const seq = SEQ[seqName];
+    // respiro: nas sequências 'mix', depois de 2 ou 3 placas da marca vem uma do campus (tema da zona);
+    // cada trecho começa com a marca
+    let k = seqOffset, brandLeft = 2, gap = 2, themeK = seqOffset;
+    const pick = (sMid) => {
+      const th = seqName === 'mix' && meta.zoneOf ? THEMES[meta.zoneOf(wrapS(sMid))] : null;
+      if (th && brandLeft <= 0) {
+        gap = gap === 2 ? 3 : 2;
+        brandLeft = gap;
+        themeCount++;
+        return th[themeK++ % th.length];
+      }
+      brandLeft--;
+      return seq[k++ % seq.length];
+    };
     // trechos contínuos livres (sem setas/pórticos)
     const spans = [];
     let cur = null;
@@ -855,7 +1079,6 @@ function build(scene, track, quality, env, opts, hold) {
       if (!ok && cur) { spans.push(cur); cur = null; }
     }
     if (cur) spans.push(cur);
-    let k = seqOffset;
     for (const [a, b] of spans) {
       let tire = false;
       for (let s = a; s <= b; s += 1) if (tireAt(s, side)) { tire = true; break; }
@@ -881,8 +1104,7 @@ function build(scene, track, quality, env, opts, hold) {
       const bounds = [];
       for (let j = 0; j <= n; j++) bounds.push(sAt(j * len + (total - n * len) / 2));
       for (let j = 0; j < n; j++) {
-        board(bounds[j], bounds[j + 1], side, off, seq[k % seq.length], j === 0, j === n - 1);
-        k++;
+        board(bounds[j], bounds[j + 1], side, off, pick((bounds[j] + bounds[j + 1]) / 2), j === 0, j === n - 1);
       }
     }
     return k;
@@ -1650,7 +1872,7 @@ function build(scene, track, quality, env, opts, hold) {
   if (DEBUG) {
     handle.atlas = atlas.tex; // extras só para a página de teste
     handle.debug = {
-      solids, feet, boards: () => boardCount, billboards: bb, billMoves, billSight, skipped, times,
+      solids, feet, boards: () => boardCount, themeBoards: () => themeCount, billboards: bb, billMoves, billSight, skipped, times,
       canvases: { atlas: atlas.canvas, grass: atlas.grass },
       get redraws() { return redraws; }, get pending() { return jobs ? jobs.length : 0; },
       drawnWithLogo: logoWasReady, drawnWithFont: fontWasReady, orbit,

@@ -435,6 +435,15 @@ function glowTexture() {
   return canvasTex(c);
 }
 
+// Estrelas (pontos brancos) numa área w × h; também usado nas placas temáticas de ads.js
+export function drawStars(gg, w, h, n, seed, scale = 1) {
+  const r = mulberry(seed);
+  for (let i = 0; i < n; i++) {
+    gg.fillStyle = `rgba(255,255,255,${0.4 + r() * 0.6})`;
+    gg.beginPath(); gg.arc(r() * w, r() * h, (1 + r() * 2.5) * scale, 0, TAU); gg.fill();
+  }
+}
+
 // Atlas com placas, tabuleiro, setas e padrões. Região 'white' serve para geometria lisa.
 function buildAtlas(hi, aniso) {
   const W = hi ? 2048 : 1024, H = hi ? 1024 : 512;
@@ -469,13 +478,7 @@ function buildAtlas(hi, aniso) {
     gg.fillStyle = fg;
     gg.fillText(text, w / 2, h * 0.54);
   };
-  const stars = (n, seed) => (gg, w, h) => {
-    const r = mulberry(seed);
-    for (let i = 0; i < n; i++) {
-      gg.fillStyle = `rgba(255,255,255,${0.4 + r() * 0.6})`;
-      gg.beginPath(); gg.arc(r() * w, r() * h, 1 + r() * 2.5, 0, TAU); gg.fill();
-    }
-  };
+  const stars = (n, seed) => (gg, w, h) => drawStars(gg, w, h, n, seed);
   // branco
   put('white', 0, 0, 48, 48, (gg, w, h) => { gg.fillStyle = '#fff'; gg.fillRect(0, 0, w, h); });
   // tabuleiro de chegada 16x2

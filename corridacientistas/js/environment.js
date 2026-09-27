@@ -104,6 +104,23 @@ const ELEMENTS = [
   ['Ag', 47, 'Prata', '#6fb7ff'], ['Au', 79, 'Ouro', '#ffd23f'], ['Ra', 88, 'Rádio', '#ff8fd0'], ['Po', 84, 'Polônio', '#9be7ff'],
   ['Md', 101, 'Mendelévio', '#ff8fd0'], ['Ne', 10, 'Neônio', '#b388ff'], ['Si', 14, 'Silício', '#9be7ff'], ['U', 92, 'Urânio', '#ff8fd0'],
 ];
+export const ELEMENT_TILES = ELEMENTS;
+const ENV_FONT = '"Trebuchet MS", "Segoe UI", "DejaVu Sans", Arial, sans-serif';
+// Azulejo de um elemento (w × h a partir da origem atual); também usado nas placas temáticas de ads.js
+export function paintElementTile(gg, w, h, [sym, num, name, color]) {
+  const k = Math.min(w, h) / 128; // desenho de referência: 128 px
+  gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, w, h);
+  gg.fillStyle = color; gg.fillRect(6 * k, 6 * k, w - 12 * k, h - 12 * k);
+  gg.fillStyle = 'rgba(255,255,255,0.35)'; gg.fillRect(6 * k, 6 * k, w - 12 * k, 18 * k);
+  gg.fillStyle = '#1b1b2a';
+  gg.textAlign = 'left'; gg.textBaseline = 'top';
+  gg.font = `bold ${20 * k}px ${ENV_FONT}`; gg.fillText(String(num), 14 * k, 12 * k);
+  gg.textAlign = 'center'; gg.textBaseline = 'middle';
+  gg.font = `900 ${(sym.length > 1 ? 56 : 64) * k}px ${ENV_FONT}`; gg.fillText(sym, w / 2, h * 0.52);
+  let fs = 16 * k; gg.font = `bold ${fs}px ${ENV_FONT}`;
+  while (gg.measureText(name).width > w - 16 * k && fs > 8 * k) { fs -= k; gg.font = `bold ${fs}px ${ENV_FONT}`; }
+  gg.fillText(name, w / 2, h - 18 * k);
+}
 function envAtlas(hi) {
   const S = hi ? 1024 : 512;
   const c = makeCanvas(S, S);
@@ -114,22 +131,10 @@ function envAtlas(hi) {
     g.save(); g.translate(x, y); g.beginPath(); g.rect(0, 0, w, h); g.clip(); fn(g, w, h); g.restore();
     R[name] = [(x + 2) / 1024, 1 - (y + h - 2) / 1024, (x + w - 2) / 1024, 1 - (y + 2) / 1024];
   };
-  const FONT = '"Trebuchet MS", "Segoe UI", "DejaVu Sans", Arial, sans-serif';
+  const FONT = ENV_FONT;
   put('white', 0, 0, 32, 32, (gg, w, h) => { gg.fillStyle = '#fff'; gg.fillRect(0, 0, w, h); });
-  ELEMENTS.forEach(([sym, num, name, color], i) => {
-    put('el' + i, (i % 8) * 128, 40 + Math.floor(i / 8) * 128, 128, 128, (gg, w, h) => {
-      gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, w, h);
-      gg.fillStyle = color; gg.fillRect(6, 6, w - 12, h - 12);
-      gg.fillStyle = 'rgba(255,255,255,0.35)'; gg.fillRect(6, 6, w - 12, 18);
-      gg.fillStyle = '#1b1b2a';
-      gg.textAlign = 'left'; gg.textBaseline = 'top';
-      gg.font = `bold 20px ${FONT}`; gg.fillText(String(num), 14, 12);
-      gg.textAlign = 'center'; gg.textBaseline = 'middle';
-      gg.font = `900 ${sym.length > 1 ? 56 : 64}px ${FONT}`; gg.fillText(sym, w / 2, h * 0.52);
-      let fs = 16; gg.font = `bold ${fs}px ${FONT}`;
-      while (gg.measureText(name).width > w - 16 && fs > 8) { fs--; gg.font = `bold ${fs}px ${FONT}`; }
-      gg.fillText(name, w / 2, h - 18);
-    });
+  ELEMENTS.forEach((el, i) => {
+    put('el' + i, (i % 8) * 128, 40 + Math.floor(i / 8) * 128, 128, 128, (gg, w, h) => paintElementTile(gg, w, h, el));
   });
   // bandeira do Brasil
   put('flagBR', 0, 300, 220, 150, (gg, w, h) => {
