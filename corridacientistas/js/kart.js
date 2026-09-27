@@ -8,54 +8,70 @@ import { statFactor } from './config.js';
 export const TUNING = {
   // velocidade (m/s) em 100cc com atributo 3; ±por ponto de atributo
   topSpeed: 24,
-  topSpeedPerStat: 0.3, // 0,5 deixava o atributo velocidade decidir a corrida
+  topSpeedPerStat: 0.08, // velocidade 5 × 1 = só 1,3%: o atributo não decide a corrida sozinho
   // aceleração: a = accel0 * (1 - (v/vmax)²) + accelFloor → ~3 s até a máxima (atributo 3)
   accel0: 16.5,
   accelPerFactor: 0.45, // ±45% com atributo 5/1
-  weightAccelPenalty: 0.07, // peso alto acelera um pouco mais devagar
+  weightAccelPenalty: 0.04, // peso alto acelera um pouco mais devagar (0,07 tornava o peso só desvantagem)
   accelFloor: 0.7,
+  accelFloorPerFactor: 0.95, // perto da máxima, aceleração 5 recupera o embalo bem mais rápido (0,04–1,37 m/s²)
+  recoverPerFactor: 0.15, // aceleração 5/1: rodada e capotagem ~15% mais curtas/longas
   brakeDecel: 34,
   coastDecel: 4.5,
   reverseAccel: 11,
   reverseMax: 6,
   reverseDelay: 0.12, // s parado segurando freio antes de dar ré
   // curvas
-  maxYaw: 1.8, // rad/s com esterço total (handling 3)
+  // 1,35 rad/s: as curvas fechadas (raio ~21 m) pedem drift, linha ou tirar o pé no 150cc
+  maxYaw: 1.35, // rad/s com esterço total (handling 3)
   maxYawPerFactor: 0.2,
   turnFullSpeed: 5.5, // abaixo disso a curva é proporcional à velocidade
   pivotSpeed: 3.5, // giro mínimo (como se andasse a 3,5 m/s) ao acelerar parado
-  turnHighSpeedLoss: 0.15, // perda de giro em velocidade muito alta
+  // perda de giro em alta: 0 até 20 m/s, 20% a 32 m/s (no 150cc o grampo pede drift, linha ou tirar o pé)
+  turnHighSpeedLoss: 0.2,
+  turnLossFrom: 20,
+  turnLossRange: 12,
   yawResponse: 15, // 1/s: rapidez com que a guinada alcança o alvo
   steerRate: 8, // 1/s: suavização do esterço digital
   airSteer: 0.45,
+  hopSteer: 0.8, // no pulo do drift (botão segurado) dá para apontar a curva no ar
   grip: 9, // 1/s: amortecimento do deslize lateral
   driftGrip: 4,
   driftSlip: 1.6, // m/s de deslize para fora durante o drift
   gravity: 28,
   crestGap: 0.04, // m que o chão precisa cair num passo para o kart decolar
-  hopVy: 4.5,
+  hopVy: 3.2, // ~0,23 s no ar: o drift entra rápido
   // drift
   driftMinSpeed: 9,
   driftSteerMin: 0.3,
   driftArmTime: 0.22, // tolerância para escolher a direção logo após pousar
-  driftYawBase: 0.6, // giro no drift = base + mod * (esterço para dentro)
-  driftYawMod: 0.5,
+  // giro no drift = base + mod * (esterço para dentro); para dentro chega a 1,4× o giro normal,
+  // então driftar é o jeito mais fechado de fazer curva
+  driftYawBase: 0.8,
+  driftYawMod: 0.6,
   driftYawPerHandling: 0.12,
   driftSpeedMult: 0.985,
+  driftSpeedPerHandling: 0.005, // controle 5 perde só 1% no drift; controle 1, 2%
   driftVisualYaw: 0.47, // ~27° de guinada visual para dentro da curva
   driftCharge: [0.8, 1.7, 2.7], // carga para azul, laranja, roxo
   driftChargeIn: 1.3,
   driftChargeNeutral: 1.0,
   driftChargeOut: 0.6,
   driftBoost: [0, 0.7, 1.2, 1.8],
-  driftOffroadCancel: 0.45,
+  boostPerHandling: 0.08, // controle: +8% de turbo do drift e da manobra por ponto acima de 3
   // turbo
   boostMult: 0.35,
   boostAccel: 40,
   boostKick: 3,
   overspeedDecel: 9,
-  offroadMult: 0.55,
+  // fora do asfalto, em duas faixas: a zebra (edgeBand m além da meia-largura) só freia um pouco;
+  // o resto do acostamento (grama/areia) freia de verdade
+  edgeBand: 1.5,
+  edgeMult: 0.85,
+  edgeDecel: 12,
+  offroadMult: 0.6,
   offroadDecel: 30,
+  offroadWeight: 0.06, // peso 5/1: perde 6% a mais/menos na grama (e metade disso na zebra)
   starMult: 1.15,
   shrinkMult: 0.75,
   shrinkScale: 0.55,
@@ -66,6 +82,8 @@ export const TUNING = {
   trickWindow: 0.6,
   trickBuffer: 0.15, // apertar drift um pouco antes da rampa também vale
   trickAnim: 0.5,
+  trickMinAir: 0.3, // manobra só dá turbo se o kart ficou pelo menos isso no ar
+  crestTrickVy: 3, // crista/lombada: decolando com vy acima disso também vale manobra
   // batidas
   spinTime: 1.0,
   shockTime: 0.8,
@@ -75,9 +93,13 @@ export const TUNING = {
   hitGrace: 1.0, // s de proteção depois que o kart se recupera de uma batida
   // colisões
   kartRadius: 1.1, // raio do círculo kart×kart (×escala)
+  massPerFactor: 0.35, // peso 5 empurra 35% mais que o 3
   wallRadius: 0.85,
   wallBounce: 0.3,
-  wallScrub: 0.9, // perda de velocidade × seno do ângulo de impacto
+  wallScrub: 0.5, // perda de velocidade × seno do ângulo de impacto
+  wallWeight: 0.25, // peso 5/1: raspa 25% menos/mais no muro
+  wallGrazeSin: 0.35, // raspão (ângulo baixo, ~20°) ...
+  wallGrazeKeep: 0.65, // ... nunca tira mais que 35% da velocidade
   wallDeflect: 0.55, // quanto o rumo se alinha ao muro num raspão
   bumpRestitution: 0.5,
   bumpMinSep: 2.6, // m/s mínimos de separação numa batida
@@ -141,6 +163,7 @@ export class Kart {
     this.distance = 0; // avanço contínuo em s desde a linha (negativo no grid)
     this.onGround = true;
     this.offroad = false;
+    this.offroadLevel = 0; // 0 = asfalto, 1 = zebra (borda), 2 = acostamento (grama/areia)
     this.airTime = 0;
     this.groundY = 0;
     this.normal = new THREE.Vector3(0, 1, 0);
@@ -152,6 +175,7 @@ export class Kart {
     this.driftDir = 0;
     this.driftLevel = 0;
     this.driftCharge = 0;
+    this.driftFrozen = false; // drift na grama: a carga do mini-turbo fica parada
     this.boostTime = 0;
     this.boostSource = null;
     this.starTime = 0;
@@ -177,11 +201,21 @@ export class Kart {
     const st = character?.stats || { speed: 3, accel: 3, handling: 3, weight: 3 };
     const T = TUNING;
     this._topBase = T.topSpeed + T.topSpeedPerStat * (st.speed - 3);
+    this._accelFloor = T.accelFloor * (1 + T.accelFloorPerFactor * statFactor(st.accel));
     this._accel = T.accel0 * (1 + T.accelPerFactor * statFactor(st.accel)) * (1 - T.weightAccelPenalty * statFactor(st.weight));
     this._maxYaw = T.maxYaw * (1 + T.maxYawPerFactor * statFactor(st.handling));
     this.driftYawFactor = 1 + T.driftYawPerHandling * statFactor(st.handling);
-    this.mass = 1 + 0.3 * statFactor(st.weight);
     this._handF = statFactor(st.handling); // controle: menos perda no acostamento e drift carrega mais rápido
+    const wF = statFactor(st.weight);
+    this.mass = 1 + T.massPerFactor * wF;
+    // aceleração: se recupera mais rápido de rodadas e capotagens
+    this._recover = 1 - T.recoverPerFactor * statFactor(st.accel);
+    // controle: turbo do drift e da manobra mais longo (+8% por ponto)
+    this._boostMul = 1 + T.boostPerHandling * (st.handling - 3);
+    // peso: perde menos no muro, mas afunda mais na grama/areia
+    this._wallScrub = T.wallScrub * (1 - T.wallWeight * wF);
+    this._offMult = T.offroadMult + 0.1 * this._handF - T.offroadWeight * wF;
+    this._edgeMult = T.edgeMult + 0.04 * this._handF - 0.5 * T.offroadWeight * wF;
 
     this._ccMult = 1;
     this._boostStrength = 1;
@@ -204,7 +238,6 @@ export class Kart {
     this._trickType = 0;
     this._trickDir = 1;
     this._revT = 0;
-    this._offT = 0;
     this._hitCd = 0;
     this._wallCd = 0;
     this._bumpCd = 0;
@@ -241,8 +274,8 @@ export class Kart {
     if (this.starTime > 0) v *= T.starMult;
     if (this.shrinkTime > 0) v *= T.shrinkMult;
     if (this.boostTime > 0) v *= 1 + T.boostMult * this._boostStrength;
-    else if (this.offroad && this.starTime <= 0) v *= T.offroadMult + 0.1 * this._handF;
-    if (this.drifting) v *= T.driftSpeedMult;
+    else if (this.offroad && this.starTime <= 0) v *= this.offroadLevel >= 2 ? this._offMult : this._edgeMult;
+    if (this.drifting) v *= T.driftSpeedMult + T.driftSpeedPerHandling * this._handF;
     return v;
   }
 
@@ -269,7 +302,7 @@ export class Kart {
     const T = TUNING;
     const a = Math.abs(v);
     const low = Math.min(1, a / T.turnFullSpeed);
-    const high = 1 - T.turnHighSpeedLoss * clamp((a - 22) / 12, 0, 1);
+    const high = 1 - T.turnHighSpeedLoss * clamp((a - T.turnLossFrom) / T.turnLossRange, 0, 1);
     return this._maxYaw * low * high;
   }
 
@@ -289,12 +322,14 @@ export class Kart {
     this.velocity.set(0, 0, 0);
     this.onGround = true;
     this.offroad = false;
+    this.offroadLevel = 0;
     this.airTime = 0;
     this.groundY = slot.pos.y;
     this.drifting = false;
     this.driftDir = 0;
     this.driftLevel = 0;
     this.driftCharge = 0;
+    this.driftFrozen = false;
     this.boostTime = 0;
     this.boostSource = null;
     this.starTime = 0;
@@ -348,7 +383,9 @@ export class Kart {
     return true;
   }
 
-  hit(type = 'spin', by = null) {
+  // item: id do item que causou a batida ('maca', 'alfa', 'eletron', 'buraco', 'tesla', 'faraday')
+  // ou null (o HUD usa para mostrar quem acertou quem).
+  hit(type = 'spin', by = null, item = null) {
     if (this.invincible || this._hitCd > 0 || this.frozen) return false;
     const T = TUNING;
     if (this.drifting) this._endDrift(false);
@@ -358,13 +395,15 @@ export class Kart {
     this.trickWindow = 0;
     this.boostTime = 0;
     this.hitType = type;
+    // atributo aceleração encurta (ou alonga) o tempo atordoado
+    const stun = (type === 'tumble' ? T.tumbleTime : type === 'shock' ? T.shockTime : T.spinTime) * this._recover;
     // só pode apanhar de novo depois de se recuperar + um tempinho de proteção
-    this._hitCd = (type === 'tumble' ? T.tumbleTime : type === 'shock' ? T.shockTime : T.spinTime) + T.hitGrace;
+    this._hitCd = stun + T.hitGrace;
     const sp = Math.max(0, this.speed);
     this._spinDir = Math.random() < 0.5 ? -1 : 1;
     if (type === 'tumble') {
       this.spinTime = 0;
-      this.tumbleTime = this._tumbleTotal = T.tumbleTime;
+      this.tumbleTime = this._tumbleTotal = stun;
       this.vy = Math.max(this.vy, T.tumbleVy);
       if (this.onGround) this.airTime = 0;
       this.onGround = false;
@@ -372,17 +411,17 @@ export class Kart {
       this._stunSpeed = sp * 0.2;
     } else if (type === 'shock') {
       this.tumbleTime = 0;
-      this.spinTime = this._spinTotal = T.shockTime;
+      this.spinTime = this._spinTotal = stun;
       this._spinTurns = 1;
       this._stunSpeed = sp * 0.4;
     } else {
       this.tumbleTime = 0;
-      this.spinTime = this._spinTotal = T.spinTime;
+      this.spinTime = this._spinTotal = stun;
       this._spinTurns = 2;
       this._stunSpeed = sp * 0.25;
     }
     this._suspVel -= 0.8;
-    this.bus?.emit('kart:hit', { kart: this, type, by });
+    this.bus?.emit('kart:hit', { kart: this, type, by, item: item ?? null });
     return true;
   }
 
@@ -479,7 +518,7 @@ export class Kart {
         if (v < 0) v = Math.min(0.5, v + T.brakeDecel * thr * dt);
         else if (v < max) {
           const r = v / max;
-          let a = this._accel * (1 - r * r) + T.accelFloor;
+          let a = this._accel * (1 - r * r) + this._accelFloor;
           if (this.boostTime > 0) a = Math.max(a, T.boostAccel);
           v = Math.min(max, v + a * thr * dt);
         }
@@ -490,7 +529,10 @@ export class Kart {
         // turbo empurra mesmo sem acelerar
         if (this.boostTime > 0 && v >= 0 && v < max) v = Math.min(max, v + T.boostAccel * 0.6 * dt);
       }
-      if (v > max) v = Math.max(max, v - (this.offroad ? T.offroadDecel : T.overspeedDecel) * dt);
+      if (v > max) {
+        const dec = !this.offroad ? T.overspeedDecel : this.offroadLevel >= 2 ? T.offroadDecel : T.edgeDecel;
+        v = Math.max(max, v - dec * dt);
+      }
     } else if (this.boostTime > 0 && v >= 0 && v < max) {
       v = Math.min(max, v + T.boostAccel * dt);
     }
@@ -516,7 +558,8 @@ export class Kart {
         }
         yawT = this.steer * this.turnRate(vt) * sign;
       }
-      if (!this.onGround) yawT *= this.drifting ? 0.85 : T.airSteer;
+      // no pulo do drift (botão segurado) o kart já aponta para a curva antes de pousar
+      if (!this.onGround) yawT *= this.drifting ? 0.85 : this._hopping && driftBtn ? T.hopSteer : T.airSteer;
     }
     this.yawVel = damp(this.yawVel, yawT, T.yawResponse, dt);
     this.heading = wrapAngle(this.heading - this.yawVel * dt);
@@ -572,6 +615,9 @@ export class Kart {
         this.position.y = ballistic;
         this.airTime = 0;
         this._airKind = 'crest';
+        this._hopping = false;
+        // lombada forte (decolando para cima) também vale manobra, como na rampa
+        if (this.vy > T.crestTrickVy && !stunned) this.trickWindow = T.trickWindow;
       } else {
         this.vy = gvy;
         this.position.y = gy;
@@ -586,7 +632,8 @@ export class Kart {
       }
     }
     this.offroad = !!p.offroad && this.onGround;
-    this._offT = this.offroad ? this._offT + dt : 0;
+    // faixa da zebra (edgeBand m além do asfalto) freia pouco; além dela, grama/areia
+    this.offroadLevel = !this.offroad ? 0 : Math.abs(this.lateral) - this.halfWidth <= T.edgeBand ? 1 : 2;
 
     // ---------- aceleradores e rampas ----------
     const nearGround = this.onGround || this.position.y - gy < 0.8;
@@ -626,26 +673,32 @@ export class Kart {
     }
 
     // ---------- drift ----------
+    this.driftFrozen = false;
     if (this.drifting) {
       if (!driftBtn) this._endDrift(true);
       else if (stunned || this.speed < T.driftMinSpeed * 0.7) this._endDrift(false);
-      else if (this._offT > T.driftOffroadCancel && this.boostTime <= 0 && this.starTime <= 0) this._endDrift(false);
       else if (this.onGround) {
-        const into = clamp(this.steer * this.driftDir, -1, 1);
-        const rate = into >= 0
-          ? T.driftChargeNeutral + (T.driftChargeIn - T.driftChargeNeutral) * into
-          : T.driftChargeNeutral + (T.driftChargeOut - T.driftChargeNeutral) * -into;
-        this.driftCharge += rate * dt * (1 + 0.15 * this._handF);
-        const th = T.driftCharge;
-        const lvl = this.driftCharge >= th[2] ? 3 : this.driftCharge >= th[1] ? 2 : this.driftCharge >= th[0] ? 1 : 0;
-        if (lvl > this.driftLevel) {
-          this.driftLevel = lvl;
-          this.bus?.emit('kart:driftLevel', { kart: this, level: lvl });
+        // na grama/areia o drift continua, mas a carga do mini-turbo fica parada (a zebra não atrapalha)
+        this.driftFrozen = this.offroadLevel >= 2 && this.boostTime <= 0 && this.starTime <= 0;
+        if (!this.driftFrozen) {
+          const into = clamp(this.steer * this.driftDir, -1, 1);
+          const rate = into >= 0
+            ? T.driftChargeNeutral + (T.driftChargeIn - T.driftChargeNeutral) * into
+            : T.driftChargeNeutral + (T.driftChargeOut - T.driftChargeNeutral) * -into;
+          this.driftCharge += rate * dt * (1 + 0.15 * this._handF);
+          const th = T.driftCharge;
+          const lvl = this.driftCharge >= th[2] ? 3 : this.driftCharge >= th[1] ? 2 : this.driftCharge >= th[0] ? 1 : 0;
+          if (lvl > this.driftLevel) {
+            this.driftLevel = lvl;
+            this.bus?.emit('kart:driftLevel', { kart: this, level: lvl });
+          }
         }
       }
-    } else if (this._driftArm > 0 && driftBtn && this.onGround && !stunned) {
-      const st = +c.steer || 0;
-      if (Math.abs(st) > T.driftSteerMin && this.speed > T.driftMinSpeed) this._startDrift(st > 0 ? 1 : -1);
+    } else if (driftBtn && !stunned && this.speed > T.driftMinSpeed && Math.abs(+c.steer || 0) > T.driftSteerMin) {
+      const dir = c.steer > 0 ? 1 : -1;
+      if (this._driftArm > 0 && this.onGround) this._startDrift(dir);
+      // ápice do pulo com esterço: o drift já começa no ar (entrada mais direta)
+      else if (this._hopping && !this.onGround && this.vy <= 0) this._startDrift(dir);
     }
 
     // vetor velocidade no mundo
@@ -671,7 +724,9 @@ export class Kart {
     if (vn <= 0) return;
     const vmag = Math.hypot(vx, vz);
     const sinA = clamp(vn / Math.max(vmag, 0.01), 0, 1);
-    const keep = clamp(1 - T.wallScrub * sinA, 0.05, 1) * 0.997;
+    const speed0 = this.speed;
+    // o kart já perdeu velocidade no acostamento: o muro raspa menos (e o peso ajuda)
+    const keep = clamp(1 - this._wallScrub * sinA, 0.05, 1) * 0.997;
     const tx = (vx - nx * vn) * keep;
     const tz = (vz - nz * vn) * keep;
     vx = tx - nx * vn * T.wallBounce;
@@ -683,6 +738,14 @@ export class Kart {
     }
     this.yawVel *= 0.5;
     this._setVelXZ(vx, vz);
+    // raspão de ângulo baixo nunca tira mais que 35% (batida de frente continua forte)
+    if (sinA < T.wallGrazeSin && speed0 > 0 && this.speed < speed0 * T.wallGrazeKeep) {
+      this.speed = speed0 * T.wallGrazeKeep;
+      const sh2 = Math.sin(this.heading);
+      const ch2 = Math.cos(this.heading);
+      this.velocity.x = sh2 * this.speed - ch2 * this.slip;
+      this.velocity.z = ch2 * this.speed + sh2 * this.slip;
+    }
     if (vn > 1.5 && this._wallCd <= 0) {
       this._wallCd = 0.35;
       this._jolt(-nx, -nz, Math.min(0.2, vn * 0.015));
@@ -756,7 +819,8 @@ export class Kart {
     if (air > 0.12 || (kind && kind !== 'crest')) this.bus?.emit('kart:land', { kart: this, airTime: air });
     if (this._trickPending) {
       this._trickPending = false;
-      if (!this.stunned) this.applyBoost(TUNING.trickBoost, 1, 'trick');
+      // pulinho curto não vale turbo (evita manobra "de graça" em qualquer lombadinha)
+      if (!this.stunned && air > TUNING.trickMinAir) this.applyBoost(TUNING.trickBoost * this._boostMul, 1, 'trick');
     }
     this._hopping = false;
     // segurando drift ao pousar numa curva: começa o drift
@@ -782,8 +846,9 @@ export class Kart {
     this.driftDir = 0;
     this.driftLevel = 0;
     this.driftCharge = 0;
+    this.driftFrozen = false;
     this.bus?.emit('kart:driftEnd', { kart: this, level: release ? lvl : 0, cancelled: !release });
-    if (release && lvl > 0) this.applyBoost(TUNING.driftBoost[lvl], 1, 'drift');
+    if (release && lvl > 0) this.applyBoost(TUNING.driftBoost[lvl] * this._boostMul, 1, 'drift');
   }
 
   // ---------- Visual (uma vez por quadro) ----------
@@ -951,8 +1016,8 @@ function collideKarts(karts) {
       // estrela capota; kart normal amassa o encolhido
       const aStar = a.starTime > 0;
       const bStar = b.starTime > 0;
-      if (aStar && !bStar) b.hit('tumble', a);
-      else if (bStar && !aStar) a.hit('tumble', b);
+      if (aStar && !bStar) b.hit('tumble', a, 'faraday');
+      else if (bStar && !aStar) a.hit('tumble', b, 'faraday');
       else if (!aStar && !bStar) {
         const aSmall = a.shrinkTime > 0;
         const bSmall = b.shrinkTime > 0;

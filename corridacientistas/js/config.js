@@ -206,13 +206,17 @@ export const ITEM_IDS = Object.keys(ITEMS);
 
 // Classes de motor. speedMult multiplica a velocidade máxima; aiSkill vai de 0 a 1.
 // aiSpeed multiplica o ritmo da IA; aiCatchUp = quanto a IA de trás acelera para alcançar o jogador;
-// aiMax = teto do ritmo da IA em relação ao jogador (1.0 = nunca ultrapassa só na velocidade).
+// aiLeadBrake = quanto a IA à frente do jogador tira o pé (satura a ~80 m); os dois somem nos últimos
+// ~300 m do jogador; aiMax = teto do ritmo da IA em relação ao jogador (1.0 = nunca ultrapassa só na velocidade).
+// aiMistakes escala os erros visíveis da IA por curva (sair largo, segurar o drift demais; 0 = limpa);
+// aiAggression = chance de a IA usar Buraco Negro/Tesla logo (senão guarda até o jogador abrir 60 m
+// ou até a última volta).
 // Calibrado com o harness de corridas simuladas (scratchpad/tools/test-difficulty.js):
 // 50cc: iniciante vence, mas com o 2º colado; 100cc: piloto mediano briga pelo pódio; 150cc: só quem drifta bem vence.
 export const CLASSES = {
-  '50cc': { id: '50cc', label: '50cc', hint: 'Tranquilo', speedMult: 0.8, aiSkill: 0.35, aiSpeed: 0.97, aiCatchUp: 0.08, aiMax: 0.995 },
-  '100cc': { id: '100cc', label: '100cc', hint: 'Normal', speedMult: 1.0, aiSkill: 0.72, aiSpeed: 1.0, aiCatchUp: 0.08, aiMax: 1.03 },
-  '150cc': { id: '150cc', label: '150cc', hint: 'Rápido', speedMult: 1.15, aiSkill: 0.84, aiSpeed: 0.985, aiCatchUp: 0.07, aiMax: 1.03 },
+  '50cc': { id: '50cc', label: '50cc', hint: 'Tranquilo', speedMult: 0.8, aiSkill: 0.35, aiSpeed: 0.985, aiCatchUp: 0.08, aiLeadBrake: 0.12, aiMax: 1.0, aiMistakes: 1.2, aiAggression: 0.5 },
+  '100cc': { id: '100cc', label: '100cc', hint: 'Normal', speedMult: 1.0, aiSkill: 0.72, aiSpeed: 0.9975, aiCatchUp: 0.1, aiLeadBrake: 0.12, aiMax: 1.03, aiMistakes: 0.7, aiAggression: 0.8 },
+  '150cc': { id: '150cc', label: '150cc', hint: 'Rápido', speedMult: 1.15, aiSkill: 0.84, aiSpeed: 0.989, aiCatchUp: 0.07, aiLeadBrake: 0.04, aiMax: 1.03, aiMistakes: 0, aiAggression: 1 },
 };
 
 export const RACE = {
