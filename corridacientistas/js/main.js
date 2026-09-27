@@ -250,13 +250,36 @@ async function init() {
   }
   let introTimer = 0;
 
+  // Recordes por classe (tempo total por número de voltas e melhor volta), no localStorage.
+  function saveRecords(results) {
+    const p = world.player;
+    const me = results.find((r) => r.kart === p);
+    if (!me || !p.finished || me.estimated || !game.opts) return null;
+    const { cc, laps } = game.opts;
+    const rec = store.get('records', {});
+    const keyT = `${cc}-${laps}`;
+    const keyL = `lap-${cc}`;
+    const bestLap = p.lapTimes && p.lapTimes.length ? Math.min(...p.lapTimes) : 0;
+    const info = { cc, laps, time: me.time, bestLap, newTotal: false, newLap: false, prevTotal: rec[keyT] || null, prevLap: rec[keyL] || null };
+    if (!rec[keyT] || me.time < rec[keyT].time) {
+      info.newTotal = true;
+      rec[keyT] = { time: me.time, character: p.character.id };
+    }
+    if (bestLap > 0 && (!rec[keyL] || bestLap < rec[keyL].time)) {
+      info.newLap = true;
+      rec[keyL] = { time: bestLap, character: p.character.id };
+    }
+    store.set('records', rec);
+    return info;
+  }
+
   function showResults() {
     game.state = 'results';
     const results = race.buildResults();
     hud.show(false);
     input.showTouch(false);
     rig.setMode('orbit', { target: world.player, radius: 7, height: 2.6, speed: 0.35 });
-    menu.showResults(results, world.player);
+    menu.showResults(results, world.player, saveRecords(results));
     audio.playMusic('results');
   }
 
@@ -295,6 +318,12 @@ async function init() {
   const unlock = () => {
     audio.unlock();
     if (game.state === 'title') audio.playMusic('menu');
+    if (audio.ctx && !audio.ctx._hooked) {
+      audio.ctx._hooked = true;
+      // iOS deixa o contexto 'interrupted' (ligação, Siri, alarme) com a página visível:
+      // volta a escutar o próximo gesto para retomar o som.
+      audio.ctx.onstatechange = () => { if (audio.ctx.state !== 'running') armUnlock(); };
+    }
     if (audio.ctx?.state === 'running') for (const ev of unlockEvents) removeEventListener(ev, unlock, true);
   };
   const armUnlock = () => {
@@ -302,11 +331,14 @@ async function init() {
   };
   armUnlock();
 
-  // Pausa automática ao trocar de aba.
+  // Pausa automática ao trocar de aba ou quando a janela perde o foco (outro app/janela por cima).
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && game.state === 'race' && !game.paused) setPaused(true);
     // iOS pode deixar o áudio 'interrupted': volta a tentar no próximo gesto
     if (!document.hidden && audio.ctx) setTimeout(() => { if (audio.ctx.state !== 'running') armUnlock(); }, 300);
+  });
+  addEventListener('blur', () => {
+    if (game.state === 'race' && !game.paused && race.phase === 'racing') setPaused(true);
   });
 
   // Saiu da tela cheia no celular (gesto de voltar): pausa.
@@ -316,17 +348,38 @@ async function init() {
 
   // ---------- redimensionamento e orientação ----------
   const rotateHint = document.getElementById('rotate-hint');
+  let portraitNow = false;
+  let rotateDismissed = false; // "Jogar assim mesmo" (iPhone com bloqueio de rotação)
+  // O aviso de girar o celular só aparece durante a corrida: os menus funcionam em pé.
+  function updateRotateHint() {
+    const show = portraitNow && game.state === 'race' && !rotateDismissed;
+    rotateHint.classList.toggle('hidden', !show);
+    // corrida começou com o celular em pé: não deixa a contagem correr por trás do aviso
+    // (no próximo tique: menu.hideAll ainda vai esconder as telas depois deste callback)
+    if (show && !game.paused) setTimeout(() => { if (portraitNow && !rotateDismissed && !game.paused) setPaused(true); }, 0);
+  }
+  rotateHint.querySelector('[data-action="rotate-dismiss"]')?.addEventListener('click', () => {
+    rotateDismissed = true;
+    updateRotateHint();
+  });
   function onResize() {
     renderer.setSize(innerWidth, innerHeight);
     needsRender = true; // setSize limpa o canvas
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
-    const portrait = isTouch && innerHeight > innerWidth && Math.min(screen.width, screen.height) < 600;
-    rotateHint.classList.toggle('hidden', !portrait);
-    if (portrait && game.state === 'race' && !game.paused) setPaused(true);
+    portraitNow = isTouch && innerHeight > innerWidth && Math.min(screen.width, screen.height) < 600;
+    updateRotateHint();
+    if (portraitNow && !rotateDismissed && game.state === 'race' && !game.paused) setPaused(true);
   }
   addEventListener('resize', onResize);
   onResize();
+  const prevOnScreen = menu.h.onScreen;
+  menu.h.onScreen = (name) => {
+    prevOnScreen?.(name);
+    updateRotateHint();
+    // pausa: foco em "Continuar", para Enter/A não cair em "Sair"
+    if (name === 'pause') document.querySelector('#screen-pause [data-action="resume"]')?.focus();
+  };
 
   // ---------- gamepad nos menus ----------
   // Lido em TODO quadro, para um A segurado (acelerar) não virar um novo "confirmar".
@@ -439,6 +492,35 @@ async function init() {
     if (kart === world.player) resultsTimer = RESULTS_DELAY;
   });
 
+  // ---------- tremor de câmera e vibração nos impactos do jogador ----------
+  const isP = (k) => k && k === world.player && game.state === 'race';
+  const buzz = (ms) => { if (isTouch) navigator.vibrate?.(ms); };
+  bus.on('kart:wall', ({ kart, strength }) => {
+    if (!isP(kart)) return;
+    rig.shake(0.06 + 0.16 * strength, 0.25);
+    if (strength > 0.4) buzz(25);
+  });
+  bus.on('kart:bump', ({ a, b, strength }) => {
+    if (!isP(a) && !isP(b)) return;
+    rig.shake(0.05 + 0.1 * strength, 0.2);
+  });
+  bus.on('kart:hit', ({ kart, type }) => {
+    if (!isP(kart)) return;
+    const big = type === 'tumble' || type === 'shock';
+    rig.shake(big ? 0.4 : 0.25, big ? 0.6 : 0.4);
+    buzz(big ? [70, 40, 70] : 60);
+  });
+  bus.on('kart:land', ({ kart, airTime }) => {
+    if (!isP(kart) || !(airTime > 0.3)) return;
+    rig.shake(0.1, 0.2);
+  });
+  bus.on('item:explode', ({ pos }) => {
+    const p = world.player;
+    if (!p || game.state !== 'race' || !pos) return;
+    const d = Math.hypot(pos.x - p.position.x, pos.z - p.position.z);
+    if (d < 14) rig.shake(0.2 * (1 - d / 14) + 0.05, 0.3);
+  });
+
   // ---------- loop ----------
   const clock = new THREE.Clock();
   let acc = 0;
@@ -536,7 +618,7 @@ async function init() {
           // Ainda lento em 'alta' (reduzir não resolve mais): a próxima visita já começa em 'baixa'.
           slowWarned = true;
           store.set('quality', 'baixa');
-          hud.toast?.('Jogo lento? Da próxima vez o jogo abre em <b>Qualidade: baixa</b> (dá para trocar no menu inicial).', 6000);
+          hud.toast?.('<div class="item-ico">🐢</div><div><b>Jogo lento?</b><p>Da próxima vez o jogo abre em qualidade baixa (dá para trocar no menu inicial).</p></div>', 6000);
         }
       }
     } else if (dtAvg < 1 / 50 && pixelRatio < maxPR) {

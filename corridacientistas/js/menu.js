@@ -70,12 +70,37 @@ export class Menu {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
-      this.action(btn.dataset.action);
+      if (btn.tagName === 'A') e.preventDefault(); // links com confirmação (voltar à página inicial)
+      this.action(btn.dataset.action, btn);
     });
     document.addEventListener('keydown', (e) => this.onKey(e));
   }
 
-  action(a) {
+  // Botão de duas etapas: o 1º toque troca o rótulo por 'label' e só o 2º (em 3 s) confirma.
+  _confirm(btn, label) {
+    if (!btn) return true;
+    if (btn.dataset.armed === '1') {
+      this._disarm(btn);
+      return true;
+    }
+    btn.dataset.armed = '1';
+    btn.dataset.label = btn.innerHTML;
+    btn.innerHTML = label;
+    btn.classList.add('armed');
+    clearTimeout(btn._armT);
+    btn._armT = setTimeout(() => this._disarm(btn), 3000);
+    return false;
+  }
+
+  _disarm(btn) {
+    if (btn.dataset.armed !== '1') return;
+    clearTimeout(btn._armT);
+    btn.dataset.armed = '';
+    btn.innerHTML = btn.dataset.label;
+    btn.classList.remove('armed');
+  }
+
+  action(a, btn = null) {
     const h = this.h;
     switch (a) {
       case 'play':
@@ -107,7 +132,13 @@ export class Menu {
         break;
       case 'quit':
         h.sfx('menuMove');
+        // na pausa, sair joga a corrida fora: pede um segundo toque
+        if (this.current === 'pause' && !this._confirm(btn, 'Sair mesmo?')) break;
         h.onQuit();
+        break;
+      case 'home':
+        h.sfx('menuMove');
+        if (this._confirm(btn, 'Sair do jogo?')) location.href = btn.getAttribute('href') || '/';
         break;
       case 'toggle-sound':
         h.onToggleSound();
@@ -269,10 +300,24 @@ export class Menu {
   }
 
   // ---------- resultado ----------
-  showResults(results, player) {
+  showResults(results, player, rec = null) {
     const me = results.find((r) => r.kart === player);
     const place = me ? me.place : 0;
     $('results-title').textContent = place === 1 ? 'Você venceu! 🏆' : `Você chegou em ${place}º lugar`;
+    const recEl = $('results-record');
+    recEl.classList.toggle('hidden', !rec);
+    if (rec) {
+      const v = rec.laps === 1 ? '1 volta' : `${rec.laps} voltas`;
+      const parts = [];
+      if (rec.newTotal) parts.push(`🏁 Novo recorde no ${rec.cc} (${v}): <b>${formatTime(rec.time)}</b>`);
+      else if (rec.prevTotal) parts.push(`Seu recorde no ${rec.cc} (${v}): ${formatTime(rec.prevTotal.time)}`);
+      if (rec.bestLap > 0) {
+        if (rec.newLap) parts.push(`⚡ Melhor volta nova: <b>${formatTime(rec.bestLap)}</b>`);
+        else parts.push(`melhor volta ${formatTime(rec.bestLap)} (recorde ${formatTime(rec.prevLap.time)})`);
+      }
+      recEl.innerHTML = parts.join(' · ');
+      recEl.classList.toggle('new', rec.newTotal || rec.newLap);
+    }
     $('results-list').innerHTML = results
       .map(
         (r) => `<li class="${r.kart === player ? 'me' : ''}">

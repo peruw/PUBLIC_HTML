@@ -33,6 +33,7 @@ export class RaceManager {
     this._lastCount = 0;
     this._throttleStart = -1;
     this._finalLapShown = false;
+    for (const k of karts) { k.lapTimes = []; k._lapStart = 0; }
     const L = track.length;
     for (const k of karts) {
       k.frozen = true;
@@ -80,8 +81,10 @@ export class RaceManager {
       this.time = 0;
       for (const k of this.karts) k.frozen = false;
       this.bus.emit('race:go', {});
-      if (this.player && this._throttleStart >= step * 1.0 && this._throttleStart <= step * 2.6) {
-        this.player.applyBoost(1.1, 1, 'rocket');
+      if (this.player) {
+        const ts = this._throttleStart;
+        if (ts >= step * 0.9 && ts <= step * 2.85) this.player.applyBoost(1.1, 1, 'rocket');
+        else if (ts >= 0 && ts < step * 0.9) this.bus.emit('race:rocketEarly', { kart: this.player });
       }
       for (const k of this.karts) if (k._aiRocket) k.applyBoost(0.8 + Math.random() * 0.3, 1, 'rocket');
     }
@@ -108,12 +111,18 @@ export class RaceManager {
       const lapNow = Math.floor(k.progress / L) + 1; // 0 no grid, 1 na primeira volta
       if (lapNow > k.maxLap) {
         k.maxLap = lapNow;
+        let lapTime = 0;
+        if (lapNow >= 2) {
+          lapTime = this.time - (k._lapStart || 0);
+          k._lapStart = this.time;
+          (k.lapTimes || (k.lapTimes = [])).push(lapTime);
+        }
         if (lapNow > this.totalLaps) {
           this.finishKart(k);
           continue;
         }
         if (lapNow >= 2) {
-          this.bus.emit('race:lap', { kart: k, lap: lapNow });
+          this.bus.emit('race:lap', { kart: k, lap: lapNow, lapTime });
           if (k === this.player && lapNow === this.totalLaps && this.totalLaps > 1) {
             this.bus.emit('race:finalLap', { kart: k });
           }

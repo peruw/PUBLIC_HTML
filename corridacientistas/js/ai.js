@@ -476,6 +476,8 @@ export class AIDriver {
         if (gap > 0) target *= 1 + (cc.aiCatchUp ?? 0.1) * clamp((gap - 15) / 120, 0, 1) * (0.5 + 0.5 * sk);
         else target *= 1 - 0.07 * clamp((-gap - 25) / 150, 0, 1) * (1.25 - 0.5 * sk);
       }
+      // teto por classe: a IA pode colar no jogador, mas não ultrapassa só no ritmo do motor
+      if (typeof cc.aiMax === 'number') target = Math.min(target, cc.aiMax);
     }
     k.speedFactor = damp(k.speedFactor, target, 0.6, dt);
   }

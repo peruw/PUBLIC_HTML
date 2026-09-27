@@ -205,11 +205,14 @@ export const ITEMS = {
 export const ITEM_IDS = Object.keys(ITEMS);
 
 // Classes de motor. speedMult multiplica a velocidade máxima; aiSkill vai de 0 a 1.
-// aiSpeed multiplica o ritmo da IA; aiCatchUp = quanto a IA de trás acelera para alcançar o jogador.
+// aiSpeed multiplica o ritmo da IA; aiCatchUp = quanto a IA de trás acelera para alcançar o jogador;
+// aiMax = teto do ritmo da IA em relação ao jogador (1.0 = nunca ultrapassa só na velocidade).
+// Calibrado com o harness de corridas simuladas (scratchpad/tools/test-difficulty.js):
+// 50cc: iniciante vence, mas com o 2º colado; 100cc: piloto mediano briga pelo pódio; 150cc: só quem drifta bem vence.
 export const CLASSES = {
-  '50cc': { id: '50cc', label: '50cc', hint: 'Tranquilo', speedMult: 0.8, aiSkill: 0.35, aiSpeed: 0.95, aiCatchUp: 0.05 },
-  '100cc': { id: '100cc', label: '100cc', hint: 'Normal', speedMult: 1.0, aiSkill: 0.65, aiSpeed: 0.98, aiCatchUp: 0.08 },
-  '150cc': { id: '150cc', label: '150cc', hint: 'Rápido', speedMult: 1.18, aiSkill: 0.92, aiSpeed: 0.99, aiCatchUp: 0.10 },
+  '50cc': { id: '50cc', label: '50cc', hint: 'Tranquilo', speedMult: 0.8, aiSkill: 0.35, aiSpeed: 0.97, aiCatchUp: 0.08, aiMax: 0.995 },
+  '100cc': { id: '100cc', label: '100cc', hint: 'Normal', speedMult: 1.0, aiSkill: 0.72, aiSpeed: 1.0, aiCatchUp: 0.08, aiMax: 1.03 },
+  '150cc': { id: '150cc', label: '150cc', hint: 'Rápido', speedMult: 1.15, aiSkill: 0.84, aiSpeed: 0.985, aiCatchUp: 0.07, aiMax: 1.03 },
 };
 
 export const RACE = {

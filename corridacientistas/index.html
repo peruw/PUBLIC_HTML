@@ -47,6 +47,7 @@
     <button class="hud-pause" id="hud-pause" aria-label="Pausar">❚❚</button>
     <div id="hud-toasts"></div>
     <div id="hud-center"></div>
+    <div id="hud-warn" class="hidden"></div>
     <div id="hud-drift" class="hidden"></div>
   </div>
 
@@ -185,8 +186,10 @@
       <button class="btn" data-action="restart">↻ Reiniciar corrida</button>
       <button class="btn btn-small" data-action="toggle-sound" id="btn-sound-2">🔊 Som: ligado</button>
       <button class="btn btn-small touch-only" data-action="toggle-auto" id="btn-auto">Aceleração automática: ligada</button>
-      <button class="btn" data-action="quit">✕ Sair para o menu</button>
-      <a class="btn btn-home" href="/">⌂ Voltar à página inicial</a>
+      <div class="pause-exit">
+        <button class="btn btn-quiet" data-action="quit">✕ Sair para o menu</button>
+        <a class="btn btn-quiet btn-home" href="/" data-action="home">⌂ Voltar à página inicial</a>
+      </div>
     </div>
   </section>
 
@@ -194,6 +197,7 @@
   <section class="screen hidden dim-light" id="screen-results">
     <div class="panel results-wrap">
       <h2 id="results-title">Resultado</h2>
+      <p class="results-record hidden" id="results-record"></p>
       <ol class="results-list" id="results-list"></ol>
       <div class="fact-card" id="results-fact"></div>
       <div class="row">
@@ -208,6 +212,8 @@
   <div id="rotate-hint" class="hidden">
     <div class="rotate-phone">📱</div>
     <p>Gire o celular para jogar na horizontal</p>
+    <small>Se a tela não girar, desligue o bloqueio de rotação do celular.</small>
+    <button class="btn btn-small" data-action="rotate-dismiss">Jogar assim mesmo</button>
   </div>
 
   <!-- Erro de carregamento -->

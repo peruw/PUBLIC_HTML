@@ -1095,6 +1095,7 @@ export class AudioSystem {
       this._at(name, null, d.kart, name === 'blackhole' ? 1 : 0.9);
     });
     bus.on('item:explode', (d) => this._at('explosion', d && d.pos, null, 1));
+    bus.on('item:incoming', (d) => { if (isP(d && d.kart)) this.sfx('warn', { vol: d.dist < 30 ? 1 : 0.7 }); });
     bus.on('item:lightning', () => { if (this._world?.phase !== 'title') this.sfx('lightning'); });
     bus.on('item:blackhole', (d) => this._at('blackhole', d && d.pos, d && d.target, 1.2));
     bus.on('kart:hit', (d) => this._at('hit', null, d && d.kart, 1));
@@ -1115,11 +1116,17 @@ export class AudioSystem {
 }
 
 // Intervalo mínimo entre repetições do mesmo efeito (s)
-const GAPS = { boost: 0.15, lightning: 0.4, finish: 1, finalLap: 1, go: 0.5, countdown: 0.3, roulette: 0.045, blackhole: 0.3, lap: 0.5 };
+const GAPS = { warn: 0.4, boost: 0.15, lightning: 0.4, finish: 1, finalLap: 1, go: 0.5, countdown: 0.3, roulette: 0.045, blackhole: 0.3, lap: 0.5 };
 const PRIORITY = { go: 1, countdown: 1, finish: 1, finalLap: 1, lap: 1, lightning: 1, itemGet: 1 };
 
 // Geradores de efeitos: this = AudioSystem; recebem (saída, instante) e devolvem a duração
 const SFX = {
+  // aviso de item vindo (elétron / buraco negro): dois bipes curtos descendo
+  warn(o, t) {
+    this._tone(o, 'square', 1567.98, 1567.98, t, 0.07, 0.11);
+    this._tone(o, 'square', 1174.66, 1174.66, t + 0.09, 0.09, 0.11);
+    return 0.2;
+  },
   countdown(o, t) {
     this._tone(o, 'square', 523.25, 523.25, t, 0.25, 0.34);
     this._tone(o, 'triangle', 261.6, 261.6, t, 0.25, 0.4);

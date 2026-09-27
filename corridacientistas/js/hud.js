@@ -32,7 +32,10 @@ export class Hud {
       center: $('hud-center'),
       toasts: $('hud-toasts'),
       map: $('hud-minimap'),
+      warn: $('hud-warn'),
     };
+    this.warnItem = null; // item que está vindo na direção do jogador
+    this.warnBeep = 0;
     this.ctx = this.el.map.getContext('2d');
     this.seenFacts = new Set();
     this.centerTimer = 0;
@@ -42,11 +45,17 @@ export class Hud {
     this.player = null;
     this.toastList = []; // toasts ativos com tempo de vida (em ms de jogo)
 
-    bus.on('race:countdown', ({ n }) => this.center(String(n), 'pop', RACE_COUNT_MS));
+    // No "2" acende o sinal da largada-foguete: é a hora de acelerar.
+    bus.on('race:countdown', ({ n }) => this.center(n === 2 ? '2<small>acelere agora!</small>' : String(n), n === 2 ? 'pop go' : 'pop', RACE_COUNT_MS));
     bus.on('race:go', () => this.center('VAI!', 'pop', 900));
+    bus.on('race:rocketEarly', ({ kart }) => {
+      if (kart === this.player) setTimeout(() => this.center('Cedo demais! Acelere no 2', 'msg pop', 1500), 950);
+    });
     bus.on('race:finalLap', () => this.center('ÚLTIMA VOLTA!', 'msg pop', 1800));
-    bus.on('race:lap', ({ kart, lap }) => {
-      if (kart === this.player && lap < this.totalLaps) this.center(`Volta ${lap}`, 'msg pop', 1300);
+    bus.on('race:lap', ({ kart, lap, lapTime }) => {
+      if (kart !== this.player || lap >= this.totalLaps) return;
+      const t = lapTime > 0 ? `<small>${formatTime(lapTime)}</small>` : '';
+      this.center(`Volta ${lap}${t}`, 'msg pop', 1500);
     });
     bus.on('race:finish', ({ kart, place }) => {
       if (kart === this.player) this.center(place === 1 ? 'VITÓRIA! 🏆' : 'CHEGADA!', 'msg pop', 3500);
@@ -158,6 +167,8 @@ export class Hud {
     if (!this.active || !this.player) return;
     const p = this.player;
 
+    this.updateWarn(dt, world);
+
     // item / roleta
     const showing = p.roulette ? p.roulette.showing : p.item;
     const key = `${showing}|${p.itemCount}|${!!p.roulette}`;
@@ -214,6 +225,44 @@ export class Hud {
     }
 
     this.drawMinimap();
+  }
+
+  // Aviso de elétron teleguiado ou buraco negro vindo na direção do jogador.
+  updateWarn(dt, world) {
+    const p = this.player;
+    const items = world.items;
+    let item = null;
+    let dist = Infinity;
+    if (items && !p.finished) {
+      for (const pr of items.projs || []) {
+        if (!pr.active || pr.type !== 'eletron' || pr.target !== p) continue;
+        const d = pr.pos.distanceTo(p.position);
+        if (d < dist) { dist = d; item = 'eletron'; }
+      }
+      for (const h of items.holes || []) {
+        if (!h.active || h.target !== p || h.phase === 'boom') continue;
+        const d = h.pos.distanceTo(p.position);
+        if (d < dist) { dist = d; item = 'buraco'; }
+      }
+    }
+    const el = this.el.warn;
+    if (!el) return;
+    if (item !== this.warnItem) {
+      this.warnItem = item;
+      el.classList.toggle('hidden', !item);
+      if (item) {
+        el.innerHTML = `<span class="ico">${itemIconHTML(item)}</span><span class="txt">${item === 'buraco' ? 'Buraco negro vindo!' : 'Elétron vindo!'}</span>`;
+        this.warnBeep = 0;
+      }
+    }
+    if (!item) return;
+    const near = dist < 30;
+    el.classList.toggle('near', near);
+    this.warnBeep -= dt;
+    if (this.warnBeep <= 0) {
+      this.warnBeep = near ? 0.5 : 1.1;
+      this.bus.emit('item:incoming', { kart: p, item, dist });
+    }
   }
 
   center(text, cls = 'pop', ms = 1000, sticky = false) {
