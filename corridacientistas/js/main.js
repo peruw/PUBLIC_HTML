@@ -53,6 +53,14 @@ addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch') document.body.classList.add('touch');
 }, true);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+// Embaralhamento justo (Fisher–Yates): sort(() => random - 0.5) é enviesado no V8.
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 const game = {
   state: 'loading', // 'loading' | 'title' | 'select' | 'race' | 'results'
@@ -236,12 +244,13 @@ async function init() {
       k.isPlayer = false;
       k.frozen = false;
       k.object3d.visible = true;
+      k.model?.setHero?.(false);
     }
     setGhost(null);
     env.setMood?.(0);
     items.setMode?.('race');
     world.rival = null;
-    const order = karts.slice().sort(() => Math.random() - 0.5);
+    const order = shuffle(karts.slice());
     setupGrid(order);
     items.reset(karts);
     effects.reset();
@@ -271,7 +280,7 @@ async function init() {
     world.mode = opts.mode;
     const player = karts.find((k) => k.character.id === opts.character) || karts[0];
     // contrarrelógio: sozinho na pista (os outros karts somem)
-    const others = tt ? [] : karts.filter((k) => k !== player).sort(() => Math.random() - 0.5);
+    const others = tt ? [] : shuffle(karts.filter((k) => k !== player));
     for (const k of karts) {
       k.object3d.visible = !tt || k === player;
       k.frozen = false;
@@ -281,7 +290,11 @@ async function init() {
     const grid = others.slice();
     grid.splice(tt ? 0 : PLAYER_SLOT, 0, player);
     setupGrid(grid);
-    for (const k of karts) k.isPlayer = k === player;
+    for (const k of karts) {
+      k.isPlayer = k === player;
+      // o kart do jogador fica no nível de detalhe cheio mesmo na câmera da largada
+      k.model?.setHero?.(k.isPlayer);
+    }
     world.player = player;
     items.setMode?.(tt ? 'timetrial' : 'race');
     items.reset(karts);
@@ -400,6 +413,7 @@ async function init() {
       const pos = base.pos.clone().addScaledVector(base.right, lat).addScaledVector(base.tangent, back);
       k.placeAt({ pos, heading, s: 22 + back });
       k.object3d.visible = true;
+      k.model?.setHero?.(true); // câmera a ~12 m: sem trocar para o modelo simplificado
     });
     // os demais saem de cena para não atravessarem o pódio
     for (const k of world.karts) if (!top.includes(k)) k.object3d.visible = false;
@@ -730,6 +744,7 @@ async function init() {
     world.time = race.time;
     if (player) {
       if (game.autopilot || player.finished) {
+        player.controls.holdItem = player.controls.itemBack = false;
         playerAI.update(h, world);
         pendingUse = false;
       } else if (ctrl) {
@@ -739,6 +754,9 @@ async function init() {
         c.steer = ctrl.steer;
         c.drift = ctrl.drift;
         c.lookBack = ctrl.lookBack;
+        // segurar o item atrás (escudo) e o gesto de tiro para trás no toque
+        c.holdItem = !!ctrl.holdItem;
+        c.itemBack = !!ctrl.itemBack;
         if (pendingUse) {
           c.useItem = true;
           pendingUse = false;
@@ -782,6 +800,9 @@ async function init() {
     rig.shake(big ? 0.4 : 0.25, big ? 0.6 : 0.4);
     buzz(big ? [70, 40, 70] : 60);
     input.rumble?.(big ? 300 : 180, big ? 0.9 : 0.6);
+  });
+  bus.on('kart:boost', ({ kart }) => {
+    if (isP(kart)) input.rumble?.(120, 0.35);
   });
   bus.on('kart:land', ({ kart, airTime }) => {
     if (!isP(kart) || !(airTime > 0.3)) return;

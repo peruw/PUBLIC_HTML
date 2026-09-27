@@ -211,6 +211,15 @@ export class AudioSystem {
 - Tudo é sintetizado com WebAudio. As músicas são chiptune **originais**.
 - O módulo escuta os eventos do bus e toca os sons sozinho.
 
+## Novidades de setembro/2026 (resumo das APIs)
+- Pista: `track.overpass` (trechos de cima/baixo do viaduto do 8), `track.minimapPoints[i].{s, over, under}`, `track.itemBoxRows` (fileiras de caixas), `track.setViewHint(...)` (chamado pelo ambiente).
+- Ambiente: `buildEnvironment(...)` devolve também `setMood(t)` (0 = meio-dia, 1 = hora dourada), `mood`, `hemi`, `groundAt(x, z)`.
+- Kart: `hit(type, by, item)`; `offroadLevel` (0 asfalto, 1 zebra, 2 grama); `driftFrozen`; `itemHeld` (item seguro atrás como escudo). Acostamento em duas faixas; drift que começa no ápice do pulo; manobra também em cristas (turbo só com mais de 0,3 s no ar).
+- IA: `CLASSES[cc].aiLeadBrake`, `aiMistakes` (erros visíveis; 0 no 150cc), `aiAggression` (uso de Buraco/Tesla); o elástico some nos últimos ~300 m.
+- Itens: `items.setMode('race'|'timetrial')`; caixa não é consumida por quem já tem item; Buraco Negro troca de alvo se o 1º chegar e não fere o dono; item sem alvo não é gasto; `ITEMS[id].hold` e `weights50cc`.
+- Entrada: `input.poll()` devolve também `holdItem` e `itemBack`; `input.rumble(ms, força)`; direção analógica no toque.
+- Modelos: proporções do kart pelos atributos; LOD barato (baixa: 8/14 m); `model.setHero(on)`.
+
 ## Jogo e interface (integração)
 `main.js` (loop, estados, renderer), `race.js` (contagem, voltas, posições, chegada, largada-foguete), `hud.js`, `menu.js`, `facts.js`, `index.html`, `css/styles.css`.
 - `facts.js`: curiosidades de itens (`ITEM_FACTS`), cientistas (`SCIENTIST_FACTS`) e setores da pista (`ZONE_FACTS`), cada uma com `short` (corrida), `text` (resultado) e `quiz` opcional.

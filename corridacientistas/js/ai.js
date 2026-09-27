@@ -474,7 +474,8 @@ export class AIDriver {
         use = (t > 0.4 && this._kartNear(k, world, L, 2, 40, true)) || t > 8;
         break;
       case 'eletron':
-        use = (t > 0.5 && this._kartNear(k, world, L, 2, 120, false)) || t > 15;
+        // o 1º colocado não tem alvo à frente: o elétron vai em quem vem logo atrás
+        use = (t > 0.5 && (k.place === 1 ? this._kartNear(k, world, L, -60, -2, false) : this._kartNear(k, world, L, 2, 120, false))) || t > 15;
         break;
       case 'tesla':
       case 'buraco':

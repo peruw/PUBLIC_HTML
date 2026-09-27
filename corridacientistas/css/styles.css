@@ -1714,3 +1714,14 @@ body.touch {
 /* diferença para o fantasma do contrarrelógio */
 #hud-center small.ahead { color: #7dffb5; }
 #hud-center small.behind { color: #ffb4b4; }
+
+/* item seguro atrás do kart (escudo) */
+.hud-item-slot.held { border-color: #7dffb5; box-shadow: 0 0 0 3px rgba(125, 255, 181, 0.35); }
+.hud-item-slot.held::after {
+  content: '🛡';
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  font-size: 18px;
+}
+.hud-item-slot.back::after { content: '▼'; color: #ffd23f; }

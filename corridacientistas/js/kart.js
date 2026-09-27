@@ -1022,9 +1022,9 @@ function collideKarts(karts) {
         const aSmall = a.shrinkTime > 0;
         const bSmall = b.shrinkTime > 0;
         if (!aSmall && bSmall && !a.stunned) {
-          if (b.hit('spin', a)) b._flat = 0.8;
+          if (b.hit('spin', a, 'tesla')) b._flat = 0.8; // encolhido pela Bobina de Tesla
         } else if (aSmall && !bSmall && !b.stunned) {
-          if (a.hit('spin', b)) a._flat = 0.8;
+          if (a.hit('spin', b, 'tesla')) a._flat = 0.8;
         }
       }
 

@@ -226,25 +226,27 @@ export class Hud {
     c.strokeStyle = '#5b6b8c';
     c.lineWidth = 5;
     c.stroke();
-    // trecho da ponte do "8" por cima, mais claro, para ler o cruzamento
-    const meta = track.meta || {};
-    if (meta.bridgeS && track.sample) {
-      const [a, b] = meta.bridgeS;
+    // viaduto do "8": o trecho de cima é redesenhado por último, com contorno, para ler como ponte
+    if (pts.some((p) => p.over)) {
       const seg = (w, col) => {
         c.beginPath();
-        for (let s = a, i = 0; s <= b; s += 3, i++) {
-          const q = track.sample(s).pos;
-          const [x, y] = this.mapXY(q.x, q.z);
-          if (i === 0) c.moveTo(x, y);
+        let open = false;
+        for (const p of pts) {
+          if (!p.over) { open = false; continue; }
+          const [x, y] = this.mapXY(p.x, p.z);
+          if (!open) c.moveTo(x, y);
           else c.lineTo(x, y);
+          open = true;
         }
         c.strokeStyle = col;
         c.lineWidth = w;
         c.stroke();
       };
-      seg(13, 'rgba(0,0,0,0.55)');
+      c.lineCap = 'butt';
+      seg(15, 'rgba(0,0,0,0.6)');
       seg(9, '#ffffff');
       seg(5, '#8fa3cc');
+      c.lineCap = 'round';
     }
     // setinhas do sentido da corrida
     if (track.sample && track.length) {
@@ -267,12 +269,13 @@ export class Hud {
       }
     }
     // fileiras de caixas de item
-    if (track.itemBoxSlots) {
-      c.fillStyle = 'rgba(255,210,63,0.9)';
-      for (const b of track.itemBoxSlots) {
-        const [x, y] = this.mapXY(b.pos.x, b.pos.z);
-        c.fillRect(x - 1.5, y - 1.5, 3, 3);
-      }
+    const rows = track.itemBoxRows || (track.itemBoxSlots || []).map((b) => ({ x: b.pos.x, z: b.pos.z }));
+    for (const b of rows) {
+      const [x, y] = this.mapXY(b.x, b.z);
+      c.fillStyle = '#1a2233';
+      c.fillRect(x - 3, y - 3, 6, 6);
+      c.fillStyle = '#ffd23f';
+      c.fillRect(x - 2, y - 2, 4, 4);
     }
     // linha de chegada
     const [sx, sy] = this.mapXY(pts[0].x, pts[0].z);
@@ -326,10 +329,14 @@ export class Hud {
     this.updateWarn(dt, world);
 
     // item / roleta
-    const showing = p.roulette ? p.roulette.showing : p.item;
-    const key = `${showing}|${p.itemCount}|${!!p.roulette}`;
+    const showing = p.roulette ? p.roulette.showing : p.item || p.itemHeld?.item;
+    const held = p.itemHeld ? (p.itemHeld.back ? 'back' : 'held') : '';
+    const key = `${showing}|${p.itemCount}|${!!p.roulette}|${held}`;
     if (key !== this.last.item) {
       this.last.item = key;
+      // item seguro atrás do kart (escudo); ▼ = vai ser atirado para trás
+      this.el.slot.classList.toggle('held', !!held);
+      this.el.slot.classList.toggle('back', held === 'back');
       this.el.icon.innerHTML = showing ? itemIconHTML(showing) : '';
       this.el.slot.classList.toggle('rolling', !!p.roulette);
       // itens de vários usos (Pilha ×3): contador 3/2/1 e nome sem o "×3"
