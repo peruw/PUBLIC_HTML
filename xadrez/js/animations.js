@@ -212,6 +212,7 @@ export class Animator {
     this.queue = [];
     this.current = null;
     this.busy = false;
+    this.active = new Set();   // personagens sendo animados (o idle não mexe neles)
   }
 
   _run(seqList) {
@@ -246,6 +247,8 @@ export class Animator {
     const dest = squareToWorld(move.to, new THREE.Vector3());
     const hop = mover.mounted ? 0.9 : 0;
     const s = [];
+    const active = [mover];
+    if (victim) active.push(victim);
 
     if (firstPerson) s.push(call(() => rig.followChar(mover)));
 
@@ -259,7 +262,7 @@ export class Animator {
       const yawToVictim = Math.atan2(vpos.x - stop.x, vpos.z - stop.z);
       const yawToAttacker = yawToVictim + Math.PI;
       // câmera cinematográfica na vista de cima
-      if (!firstPerson) s.push(waitFor(() => rig.cinematic(stop, vpos)));
+      if (!firstPerson && rig.mode !== 'overhead') s.push(waitFor(() => rig.cinematic(stop, vpos)));
       s.push(parallel(
         walkTo(mover, stop, { hop }),
         seq(delay(0.15), turnTo(victimGroup, yawToAttacker, 0.35)),
@@ -274,6 +277,8 @@ export class Animator {
       // segue até a casa final (curto) e volta a olhar o inimigo
       s.push(walkTo(mover, dest, { hop: 0 }));
     } else {
+      // sem captura: na vista cinematográfica a câmera fica ao lado do trajeto
+      if (!firstPerson && rig.mode !== 'overhead') s.push(waitFor(() => rig.cinematic(moverGroup.position, dest)));
       s.push(walkTo(mover, dest, { hop }));
     }
     s.push(turnTo(moverGroup, faceYaw(mover.color), 0.3));
@@ -283,6 +288,7 @@ export class Animator {
       const rookTo = move.flags === 'k' ? move.to - 1 : move.to + 1;
       const rookGroup = board.pieceAt(rookFrom);
       if (rookGroup && rookGroup.userData.char) {
+        active.push(rookGroup.userData.char);
         const rdest = squareToWorld(rookTo, new THREE.Vector3());
         // a torre anda junto com o rei: substitui o último passo por um paralelo
         const kingWalk = s.pop(); // turnTo do rei
@@ -293,6 +299,7 @@ export class Animator {
 
     s.push(call(() => {
       board.applyMoveInstant(move);
+      for (const c of active) this.active.delete(c);
     }));
     if (move.promotion) {
       s.push(call(() => {
@@ -301,6 +308,7 @@ export class Animator {
         this.dust.burst(g ? g.position : squareToWorld(move.to, _a), 30, 0.8);
       }));
     }
+    for (const c of active) this.active.add(c);
     return this._run(s);
   }
 
@@ -308,6 +316,7 @@ export class Animator {
   kingFall(kingGroup) {
     if (!kingGroup || !kingGroup.userData.char) return Promise.resolve();
     const char = kingGroup.userData.char;
+    this.active.add(char);
     const dir = new THREE.Vector3(0, 0, char.color === 'w' ? 1 : -1);
     return this._run([
       delay(0.3),
@@ -319,6 +328,7 @@ export class Animator {
     this.queue.length = 0;
     this.current = null;
     this.busy = false;
+    this.active.clear();
   }
 }
 

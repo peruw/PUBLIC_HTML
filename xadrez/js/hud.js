@@ -1,11 +1,12 @@
 // HUD: turno, avaliação, gráfico de vantagem, melhores lances, histórico, dicas e botões.
 import { MATE_CP } from './engine.js';
+import { MiniBoard } from './miniboard.js';
 
 const $ = (id) => document.getElementById(id);
 const CLAMP = 10; // peões
 
 export class Hud {
-  constructor({ onUndo, onRestart, onToggleView, onMenu, onFlip }) {
+  constructor({ onUndo, onRestart, onToggleView, onMenu, onFlip, onMiniTap }) {
     this.root = $('hud');
     this.turn = $('hud-turn');
     this.evalNum = $('hud-eval-num');
@@ -17,6 +18,7 @@ export class Hud {
     this.hint = $('hud-hint');
     this.status = $('hud-engine');
     this.viewBtn = $('btn-view');
+    this.mini = new MiniBoard($('hud-mini'), onMiniTap);
     this.evals = []; // por ply (0 = posição inicial)
     this.evals[0] = 0;
     $('btn-undo').addEventListener('click', onUndo);
@@ -31,7 +33,7 @@ export class Hud {
     this.setEval({ cp: 0, mateIn: null });
   }
 
-  show(v) { this.root.classList.toggle('hidden', !v); this.root.setAttribute('aria-hidden', v ? 'false' : 'true'); if (v) this.drawGraph(); }
+  show(v) { this.root.classList.toggle('hidden', !v); this.root.setAttribute('aria-hidden', v ? 'false' : 'true'); if (v) { this.drawGraph(); this.mini.draw(); } }
 
   setTurn(color, check, mode) {
     const who = color === 'w' ? 'Brancas' : 'Pretas';
@@ -147,8 +149,9 @@ export class Hud {
 
   showHint(text) { this.hint.textContent = text || ''; }
 
+  // mode: 'roam' | 'firstperson' | 'overhead'. O botão mostra a vista alternativa.
   setView(mode) {
-    this.viewBtn.textContent = mode === 'firstperson' ? '⤴ Vista de cima' : '👁 1ª pessoa';
+    this.viewBtn.textContent = mode === 'overhead' ? '🏇 Campo de batalha' : '⤴ Vista de cima';
     this.root.dataset.view = mode;
   }
 

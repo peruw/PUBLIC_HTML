@@ -226,7 +226,7 @@ export function snapshotRest(char) {
 export function resetPose(char) {
   if (!char.rest) return;
   for (const r of char.rest) { r.o.rotation.copy(r.rot); r.o.position.copy(r.pos); }
-  char.setHeadVisible(true);
+  // (a visibilidade da cabeça é controlada pela câmera em 1ª pessoa, não pela pose)
 }
 
 // ---------- Cavalo (montaria do cavaleiro) ----------

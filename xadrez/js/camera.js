@@ -24,7 +24,8 @@ const wob = (t, a, b, c) => Math.sin(t * a) * 0.5 + Math.sin(t * b + 1.3) * 0.3 
 export class CameraRig {
   constructor(camera) {
     this.camera = camera;
-    this.mode = 'overhead';   // 'overhead' | 'firstperson' | 'cinematic'
+    this.mode = 'overhead';   // 'overhead' | 'firstperson' | 'cinematic' | 'roam'
+    this.roamT = 0;
     this.transition = null;   // { f0, f1, t, dur, resolve, next }
     this.side = 'w';
     this.follow = null;       // Character seguido em 1ª pessoa
@@ -82,6 +83,23 @@ export class CameraRig {
     return this._startTween(_p, _tmp.quaternion, CAMERA.overheadFov, CAMERA.flyDur, 'overhead');
   }
 
+  // Passeio do "general": atrás da 1ª fileira do lado `side`, à altura dos olhos, olhando para o inimigo,
+  // deslocando-se devagar de um lado para o outro. Modo contínuo (renderiza sempre).
+  roam(side = this.side) {
+    this.side = side;
+    this.roamT = 0;
+    this.dyaw = 0; this.dpitch = 0;
+    this._roamPose(side, 0, _p, _tmp.quaternion);
+    return this._startTween(_p, _tmp.quaternion, 62, CAMERA.flyDur, 'roam');
+  }
+  _roamPose(side, t, outPos, outQuat) {
+    const s = side === 'w' ? 1 : -1;
+    const x = Math.sin(t * 0.11) * 4.5;
+    outPos.set(x, 2.6 + Math.sin(t * 0.6) * 0.02, s * 12.0);
+    _e.set(-0.17 + this.dpitch, (s === 1 ? 0 : Math.PI) + this.dyaw + Math.sin(t * 0.07) * 0.12, 0, 'YXZ');
+    outQuat.setFromEuler(_e);
+  }
+
   // Pose de 1ª pessoa do personagem: olhos + olhar para a frente dele
   _fpPose(char, outPos, outQuat) {
     char.group.updateMatrixWorld(true);
@@ -114,15 +132,15 @@ export class CameraRig {
     _side.crossVectors(UP, _d).normalize();
     // fica do lado mais próximo da câmera atual
     if (_side.dot(this.basePos) < 0) _side.negate();
-    _look.copy(a).lerp(b, 0.5); _look.y += 1.1;
-    _p.copy(_look).addScaledVector(_side, 3.2 + len * 0.9).addScaledVector(_d, -0.6);
-    _p.y = 2.2;
+    _look.copy(a).lerp(b, 0.5); _look.y += 1.0;
+    _p.copy(_look).addScaledVector(_side, 3.4 + len * 0.9).addScaledVector(_d, -0.6);
+    _p.y = 3.4; // acima das cabeças, para outros personagens não taparem a cena
     lookQuat(_p, _look, _tmp.quaternion);
     return this._startTween(_p, _tmp.quaternion, 50, dur, 'cinematic');
   }
 
   look(dyaw, dpitch) {
-    if (this.mode !== 'firstperson') return;
+    if (this.mode !== 'firstperson' && this.mode !== 'roam') return;
     this.dyaw = THREE.MathUtils.clamp(this.dyaw + dyaw, -CAMERA.yawLimit, CAMERA.yawLimit);
     this.dpitch = THREE.MathUtils.clamp(this.dpitch + dpitch, CAMERA.pitchMin, CAMERA.pitchMax);
   }
@@ -159,6 +177,10 @@ export class CameraRig {
       }
     } else if (this.mode === 'firstperson' && this.follow) {
       this._fpPose(this.follow, this.basePos, this.baseQuat);
+      changed = true;
+    } else if (this.mode === 'roam') {
+      this.roamT += dt;
+      this._roamPose(this.side, this.roamT, this.basePos, this.baseQuat);
       changed = true;
     }
     this.camera.position.copy(this.basePos);

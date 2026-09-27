@@ -56,8 +56,13 @@ button { font: inherit; cursor: pointer; }
 }
 .hud-hint:empty { display: none; }
 
-.hud-panel {
+.hud-mini-wrap {
   position: absolute; right: 12px; top: calc(max(10px, env(safe-area-inset-top)) + 66px); width: 290px;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 8px; backdrop-filter: blur(8px);
+}
+.hud-mini { display: block; width: 100%; aspect-ratio: 1; border-radius: 8px; touch-action: none; cursor: pointer; }
+.hud-panel {
+  position: absolute; right: 12px; top: calc(max(10px, env(safe-area-inset-top)) + 66px + 300px); width: 290px;
   bottom: calc(max(12px, env(safe-area-inset-bottom)) + 70px);
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 12px 14px;
   display: flex; flex-direction: column; gap: 6px; backdrop-filter: blur(8px); overflow: hidden;
@@ -131,6 +136,10 @@ button { font: inherit; cursor: pointer; }
   #hud.panel-open .hud-panel {
     display: flex; left: 12px; right: 12px; width: auto; top: auto; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px);
     max-height: 46vh;
+  }
+  .hud-mini-wrap {
+    top: auto; right: auto; left: 50%; transform: translateX(-50%); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px);
+    width: min(62vw, 300px); padding: 6px;
   }
   .only-mobile { display: inline-block; }
   .hud-bottom { right: 12px; justify-content: space-between; }

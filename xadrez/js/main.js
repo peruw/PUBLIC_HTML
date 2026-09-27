@@ -12,6 +12,7 @@ import { Input } from './input.js';
 import { Animator } from './animations.js';
 import { Hud } from './hud.js';
 import { Menu } from './menu.js';
+import { createIdle } from './battle.js';
 
 const isCoarse = matchMedia('(pointer: coarse)').matches;
 const quality = isCoarse || Math.min(innerWidth, innerHeight) < 700 ? QUALITY.baixa : QUALITY.alta;
@@ -45,7 +46,8 @@ const G = {
   opts: null,
   game: null,
   humanColor: 'w',
-  view: 'overhead',
+  view: 'overhead',    // 'roam' (campo de batalha) | 'firstperson' | 'overhead'
+  viewPref: 'roam',    // vista de repouso preferida: 'roam' | 'overhead'
   selected: -1,
   legal: [],
   sans: [],
@@ -62,7 +64,8 @@ const hud = new Hud({
   onRestart: () => restart(),
   onToggleView: () => toggleView(),
   onMenu: () => { if (G.status === 'playing' || G.status === 'thinking') { menu.show('pause'); } },
-  onFlip: () => { if (G.view === 'overhead' && !rig.busy) { rig.side = rig.side === 'w' ? 'b' : 'w'; flyOverhead(rig.side); } },
+  onFlip: () => { if (G.view !== 'firstperson' && !rig.busy) { rig.side = rig.side === 'w' ? 'b' : 'w'; if (G.view === 'overhead') flyOverhead(rig.side); else rig.roam(rig.side); } },
+  onMiniTap: (sq) => onTap({ sq, piece: board.pieceAt(sq) }),
 });
 
 const menu = new Menu({
@@ -94,6 +97,14 @@ function playerSide() {
   return G.humanColor;
 }
 
+// Vista de repouso (sem peça escolhida): passeio no campo ou vista de cima, conforme a preferência.
+function idleView(side = playerSide()) {
+  G.view = G.viewPref;
+  hud.setView(G.view);
+  board.setLabelSide(side);
+  return G.viewPref === 'overhead' ? flyOverhead(side) : rig.roam(side);
+}
+
 async function startGame(opts) {
   G.opts = opts;
   G.humanColor = opts.color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : (opts.color || 'w');
@@ -111,10 +122,8 @@ async function startGame(opts) {
   hud.setEval({ cp: 0, mateIn: null });
   hud.show(true);
   engine.setLevel(opts.level);
-  G.view = 'overhead';
-  hud.setView('overhead');
   G.status = 'animating';
-  await flyOverhead(playerSide());
+  await idleView();
   G.status = 'playing';
   G.dirty = true;
   updateTurnUi();
@@ -144,8 +153,8 @@ function updateTurnUi() {
   hud.setUndoEnabled(G.game.history.length > 0);
   if (G.status === 'playing') {
     if (!isHumanTurn()) hud.showHint('Computador pensando…');
-    else if (G.view === 'firstperson') hud.showHint('Toque numa casa azul para mover · Esc volta à vista de cima');
-    else hud.showHint('Toque numa peça para ver pelos olhos dela');
+    else if (G.view === 'firstperson') hud.showHint('Toque numa casa azul para mover · Esc cancela');
+    else hud.showHint('Toque numa peça sua no tabuleiro pequeno');
   }
 }
 
@@ -157,6 +166,11 @@ function refreshHighlights() {
     captures: G.legal.filter((m) => m.captured).map((m) => m.to),
     lastMove: G.lastMove,
     check,
+  });
+  hud.mini.set({
+    board: G.game.board,
+    hl: { selected: G.selected, targets: G.legal.filter((m) => !m.captured).map((m) => m.to), captures: G.legal.filter((m) => m.captured).map((m) => m.to), lastMove: G.lastMove, check },
+    side: playerSide(),
   });
   G.dirty = true;
 }
@@ -205,21 +219,19 @@ async function selectPiece(sq, piece) {
 
 async function leaveFirstPerson() {
   if (rig.busy) return;
-  G.view = 'overhead';
-  hud.setView('overhead');
+  G.selected = -1; G.legal = [];
+  refreshHighlights();
   G.status = 'animating';
-  await flyOverhead(playerSide());
+  await idleView();
   if (G.status === 'animating') G.status = 'playing';
   updateTurnUi();
 }
 
+// Alterna a vista de repouso entre campo de batalha e vista de cima
 function toggleView() {
   if (G.status !== 'playing' || rig.busy) return;
-  if (G.view === 'firstperson') { leaveFirstPerson(); return; }
-  // Sem peça selecionada: voa para o rei de quem joga
-  const ks = kingSquare(G.game.board, G.game.turn);
-  const g = board.pieceAt(ks);
-  if (g && isHumanTurn()) selectPiece(ks, g);
+  G.viewPref = G.viewPref === 'overhead' ? 'roam' : 'overhead';
+  leaveFirstPerson();
 }
 
 async function humanMove(move) {
@@ -234,13 +246,7 @@ async function humanMove(move) {
   if (wasCpuMode && !gameStatus(G.game).over) G.pendingCpu = engine.bestMove(toFEN(G.game));
   await animator.playMove(move, { firstPerson });
   refreshHighlights();
-  if (firstPerson) {
-    G.view = 'overhead';
-    hud.setView('overhead');
-    await flyOverhead(playerSide());
-  } else if (G.opts.mode === '2p' && G.opts.rotate) {
-    await flyOverhead(playerSide());
-  }
+  await idleView();
   G.status = 'playing';
   if (await checkGameOver()) return;
   updateTurnUi();
@@ -281,6 +287,7 @@ async function computerTurn() {
   G.status = 'animating';
   await animator.playMove(move, { firstPerson: false });
   refreshHighlights();
+  await idleView();
   G.status = 'playing';
   if (await checkGameOver()) return;
   updateTurnUi();
@@ -353,9 +360,7 @@ async function undo() {
   hud.setLines([]);
   refreshHighlights();
   G.status = 'animating';
-  G.view = 'overhead';
-  hud.setView('overhead');
-  await flyOverhead(playerSide());
+  await idleView();
   G.status = 'playing';
   updateTurnUi();
   if (!isHumanTurn()) computerTurn(); else startAnalysis();
@@ -367,6 +372,16 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, clock.getDelta());
   let changed = animator.update(dt);
+  // Personagens "vivos" (respiração, olhar) quando a câmera está no campo
+  if (G.status !== 'menu' && G.status !== 'loading' && rig.mode !== 'overhead') {
+    for (const g of board.pieces.values()) {
+      const ch = g.userData.char;
+      if (!ch || animator.active.has(ch)) continue;
+      if (!ch.idle) ch.idle = createIdle(ch);
+      ch.idle.update(dt);
+    }
+    changed = true;
+  }
   if (rig.update(dt)) changed = true;
   board.update(dt);
   if (changed || G.dirty) {
@@ -380,6 +395,7 @@ function onResize() {
   rig.onResize(innerWidth, innerHeight);
   G.dirty = true;
   hud.drawGraph();
+  hud.mini.draw();
 }
 addEventListener('resize', onResize);
 
@@ -400,7 +416,7 @@ async function boot() {
 boot();
 
 window.__xadrez = {
-  get state() { return G; }, engine, board, rig, animator, input,
+  get state() { return G; }, engine, board, rig, animator, input, get mini() { return hud.mini; },
   fen: () => toFEN(G.game),
   play: (uci) => { const m = uciToMove(G.game, uci); if (m && isHumanTurn()) humanMove(m); return !!m; },
 };

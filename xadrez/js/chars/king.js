@@ -22,7 +22,6 @@ const LEG = 0.47 * H;                 // 0.879  altura dos quadris
 const TORSO_H = 0.30 * H;             // 0.561
 const R = 0.085 * H;                  // 0.159  raio da cabeça (headR)
 const NECK_H = 0.035 * H;             // 0.065
-const LIMB_R = 0.05 * H;              // 0.0935 (build 'heavy')
 const TORSO_R = 0.13 * H;             // 0.243  (build 'heavy'); a cápsula do tronco leva sx 1.15, sz 0.85
 const LOWER = 0.15 * H;               // 0.2805 antebraço
 const FLOOR_T = -(LEG + 0.03 * H);    // y do chão no espaço do joint `torso` (-0.935)
@@ -104,8 +103,9 @@ const HAIR = merged([
 // Perfil externo da barra (3 cm acima do chão) até a gola, depois o interno de volta (normais corretas dos
 // dois lados). Em Lathe, phi = 0 fica em +Z; a capa é centrada em phi = π (costas). O eixo fica em z = -0.03.
 const CAPE_T = 0.025;
-const CAPE_OUT = [v2(0.55, FLOOR_T + 0.03), v2(0.50, -0.70), v2(0.42, -0.45), v2(0.34, -0.20), v2(0.285, 0.05), v2(0.25, 0.30), v2(0.228, 0.48), v2(0.22, 0.575)];
-const CAPE_HALF = (70 / 180) * Math.PI;
+// A barra abre bastante (raio 0.66) para o calcanhar da perna que vai para trás ao andar não furar a capa.
+const CAPE_OUT = [v2(0.66, FLOOR_T + 0.03), v2(0.585, -0.70), v2(0.46, -0.45), v2(0.36, -0.20), v2(0.29, 0.05), v2(0.25, 0.30), v2(0.228, 0.48), v2(0.22, 0.575)];
+const CAPE_HALF = (66 / 180) * Math.PI;
 const CAPE = new THREE.LatheGeometry([...CAPE_OUT, ...CAPE_OUT.slice().reverse().map((p) => v2(p.x - CAPE_T, p.y)), CAPE_OUT[0]], 10, Math.PI - CAPE_HALF, CAPE_HALF * 2);
 
 // ---------- Tabardo (espaço do torso): painel frontal ±0.85 rad que abraça o peito; raios em unidades do
@@ -201,7 +201,7 @@ export function buildKing(color) {
   attachWeapon(char, sword, 'sword', SWORD_LEN);
 
   // ---------- Pose de repouso (sentinela): espadão em pé diante do ombro direito; esquerdo relaxado ----------
-  J.shoulderR.rotation.set(-0.42, 0, 0.06);
+  J.shoulderR.rotation.set(-0.42, 0, 0.12); // um pouco para fora: a lâmina fica ao lado da cabeça, não à frente
   J.elbowR.rotation.x = -0.98;
   J.shoulderL.rotation.set(-0.1, 0, -0.22);
   J.elbowL.rotation.x = -0.35;

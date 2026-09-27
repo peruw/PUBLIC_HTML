@@ -41,6 +41,10 @@
 
     <div id="hud-hint" class="hud-hint"></div>
 
+    <div id="hud-mini-wrap" class="hud-mini-wrap">
+      <canvas id="hud-mini" class="hud-mini" aria-label="Tabuleiro"></canvas>
+    </div>
+
     <aside class="hud-panel">
       <h3>Vantagem</h3>
       <canvas id="hud-graph" class="hud-graph"></canvas>
@@ -52,7 +56,7 @@
     </aside>
 
     <div class="hud-bottom">
-      <button id="btn-view" class="hud-btn wide">👁 1ª pessoa</button>
+      <button id="btn-view" class="hud-btn wide">⤴ Vista de cima</button>
       <button id="btn-flip" class="hud-btn" aria-label="Girar tabuleiro">⟲</button>
       <button id="btn-undo" class="hud-btn" aria-label="Desfazer">↶</button>
       <button id="btn-restart" class="hud-btn" aria-label="Reiniciar">↻</button>
@@ -124,9 +128,10 @@
       <div class="card">
         <h2>Como jogar</h2>
         <ul class="howto">
-          <li><b>Toque numa peça sua.</b> A câmera desce até os olhos dela e as casas possíveis aparecem em azul (vermelho = captura).</li>
-          <li><b>Toque na casa de destino</b> para mover. Nas capturas você assiste ao duelo em primeira pessoa.</li>
-          <li><b>Arraste</b> para olhar em volta. <b>Esc</b> ou o botão “Vista de cima” volta ao alto.</li>
+          <li><b>Toque numa peça sua no tabuleiro pequeno</b> (ou na cena). A câmera vai para os olhos do personagem e as casas possíveis aparecem em azul (vermelho = captura).</li>
+          <li><b>Toque na casa de destino</b> para mover. O personagem anda até lá; nas capturas você assiste à luta pelos olhos dele.</li>
+          <li>Sem peça escolhida, a câmera passeia atrás da sua linha de frente. <b>Arraste</b> para olhar em volta. <b>Esc</b> cancela a escolha.</li>
+          <li>O botão “Vista de cima” alterna entre o campo de batalha e a vista aérea 3D.</li>
           <li>O painel mostra a <b>vantagem</b> ao longo da partida, os <b>melhores lances</b> e o <b>histórico</b>.</li>
           <li>Roque: mova o rei duas casas. Promoção: escolha a peça no painel.</li>
         </ul>
