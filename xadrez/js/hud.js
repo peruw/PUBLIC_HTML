@@ -6,7 +6,7 @@ const $ = (id) => document.getElementById(id);
 const CLAMP = 10; // peões
 
 export class Hud {
-  constructor({ onUndo, onRestart, onToggleView, onMenu, onFlip, onMiniTap }) {
+  constructor({ onUndo, onRestart, onToggleView, onMenu, onFlip, onMiniTap, onTogglePerson }) {
     this.root = $('hud');
     this.turn = $('hud-turn');
     this.evalNum = $('hud-eval-num');
@@ -26,6 +26,8 @@ export class Hud {
     $('btn-view').addEventListener('click', onToggleView);
     $('btn-menu').addEventListener('click', onMenu);
     $('btn-flip').addEventListener('click', onFlip);
+    this.personBtn = $('btn-person');
+    this.personBtn.addEventListener('click', onTogglePerson);
     $('btn-panel').addEventListener('click', () => {
       this.root.classList.toggle('panel-open');
       this.drawGraph();
@@ -151,8 +153,16 @@ export class Hud {
 
   // mode: 'roam' | 'firstperson' | 'overhead'. O botão mostra a vista alternativa.
   setView(mode) {
-    this.viewBtn.textContent = mode === 'overhead' ? '🏇 Campo de batalha' : '⤴ Vista de cima';
+    this.viewBtn.innerHTML = mode === 'overhead'
+      ? '🏇 <span class="lbl-long">Campo de batalha</span><span class="lbl-short">Campo</span>'
+      : '⤴ <span class="lbl-long">Vista de cima</span><span class="lbl-short">Cima</span>';
     this.root.dataset.view = mode;
+  }
+
+  // Mostra a opção alternativa: em 1ª pessoa o botão oferece a 3ª, e vice-versa.
+  setPerson(person) {
+    const n = person === 'third' ? '1ª' : '3ª';
+    this.personBtn.innerHTML = `👁 ${n}<span class="lbl-long"> pessoa</span>`;
   }
 
   setUndoEnabled(v) { $('btn-undo').disabled = !v; }

@@ -88,6 +88,7 @@ button { font: inherit; cursor: pointer; }
   position: absolute; left: 12px; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 8px; align-items: center;
 }
 .only-mobile { display: none; }
+.lbl-short { display: none; }
 
 /* ---------- Promoção ---------- */
 #promo { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.45); z-index: 20; }
@@ -142,8 +143,11 @@ button { font: inherit; cursor: pointer; }
     width: min(62vw, 300px); padding: 6px;
   }
   .only-mobile { display: inline-block; }
+  .lbl-long { display: none; }
+  .lbl-short { display: inline; }
   .hud-bottom { right: 12px; justify-content: space-between; }
-  .hud-btn.wide { flex: 1; }
+  .hud-btn.wide { flex: 1; font-size: 13px; padding: 12px 8px; white-space: nowrap; }
+  .hud-bottom { gap: 6px; }
   .hud-turn { font-size: 17px; }
   .hud-turn-wrap { min-width: 0; }
   .hud-eval-num { font-size: 16px; min-width: 44px; }

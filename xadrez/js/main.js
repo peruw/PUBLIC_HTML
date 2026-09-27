@@ -63,6 +63,7 @@ const hud = new Hud({
   onUndo: () => undo(),
   onRestart: () => restart(),
   onToggleView: () => toggleView(),
+  onTogglePerson: () => togglePerson(),
   onMenu: () => { if (G.status === 'playing' || G.status === 'thinking') { menu.show('pause'); } },
   onFlip: () => { if (G.view !== 'firstperson' && !rig.busy) { rig.side = rig.side === 'w' ? 'b' : 'w'; if (G.view === 'overhead') flyOverhead(rig.side); else rig.roam(rig.side); } },
   onMiniTap: (sq) => onTap({ sq, piece: board.pieceAt(sq) }),
@@ -228,6 +229,21 @@ async function leaveFirstPerson() {
 }
 
 // Alterna a vista de repouso entre campo de batalha e vista de cima
+// 1ª ou 3ª pessoa ao seguir o personagem escolhido; a preferência fica salva neste aparelho.
+const PERSON_KEY = 'xadrez_person';
+function loadPerson() { try { return localStorage.getItem(PERSON_KEY) === 'third' ? 'third' : 'first'; } catch { return 'first'; } }
+function togglePerson() {
+  const p = rig.person === 'third' ? 'first' : 'third';
+  rig.setPerson(p);
+  hud.setPerson(p);
+  try { localStorage.setItem(PERSON_KEY, p); } catch { /* sem armazenamento: vale só nesta sessão */ }
+}
+rig.setPerson(loadPerson());
+hud.setPerson(rig.person);
+window.addEventListener('keydown', (e) => {
+  if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, textarea')) togglePerson();
+});
+
 function toggleView() {
   if (G.status !== 'playing' || rig.busy) return;
   G.viewPref = G.viewPref === 'overhead' ? 'roam' : 'overhead';
@@ -366,6 +382,35 @@ async function undo() {
   if (!isHumanTurn()) computerTurn(); else startAnalysis();
 }
 
+// Em 3ª pessoa, esconde as peças entre a câmera e o personagem seguido (ou coladas na câmera),
+// como nos jogos de ação, para ele nunca ficar tapado.
+const hiddenByCam = new Set();
+function blocksView(g) {
+  const f = rig.follow.group.position, cx = camera.position.x, cz = camera.position.z;
+  const dx = f.x - cx, dz = f.z - cz, len2 = dx * dx + dz * dz;
+  const px = g.position.x - cx, pz = g.position.z - cz;
+  if (px * px + pz * pz < 1.7 * 1.7) return true;
+  const t = (px * dx + pz * dz) / Math.max(1e-6, len2);
+  if (t <= 0 || t >= 0.92) return false;
+  const ex = px - t * dx, ez = pz - t * dz;
+  return ex * ex + ez * ez < 1.0 * 1.0;
+}
+function updateOccluders() {
+  const on = rig.person === 'third' && rig.mode === 'firstperson' && !!rig.follow;
+  let changed = false;
+  for (const g of hiddenByCam) {
+    if (!(on && g !== rig.follow.group && board.pieces.has(g.userData.sq) && blocksView(g))) {
+      g.visible = true; hiddenByCam.delete(g); changed = true;
+    }
+  }
+  if (!on) return changed;
+  for (const g of board.pieces.values()) {
+    if (g === rig.follow.group || hiddenByCam.has(g) || !g.visible) continue;
+    if (blocksView(g)) { g.visible = false; hiddenByCam.add(g); changed = true; }
+  }
+  return changed;
+}
+
 // ---------- Loop ----------
 const clock = new THREE.Clock();
 function frame() {
@@ -383,6 +428,7 @@ function frame() {
     changed = true;
   }
   if (rig.update(dt)) changed = true;
+  if (updateOccluders()) changed = true;
   board.update(dt);
   if (changed || G.dirty) {
     renderer.render(scene, camera);

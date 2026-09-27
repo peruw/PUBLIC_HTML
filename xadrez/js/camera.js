@@ -12,6 +12,10 @@ const _d = new THREE.Vector3();
 const _side = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 const FP_PITCH = -0.24; // olhar um pouco para baixo em 1ª pessoa (casas vizinhas visíveis)
+// 3ª pessoa (estilo Fortnite): câmera atrás e acima do ombro, olhando por cima do personagem
+const TP = { pitch: -0.3, dist: 4.4, shoulder: 0.85, lookH: 0.8, minY: 1.2, fov: 60, smooth: 9 };
+const _tp = new THREE.Vector3();
+const _tq = new THREE.Quaternion();
 
 // Orientação de câmera (olha por -Z) de `eye` para `target`
 function lookQuat(eye, target, out) {
@@ -36,6 +40,7 @@ export class CameraRig {
     this._p0 = new THREE.Vector3(); this._p1 = new THREE.Vector3();
     this._q0 = new THREE.Quaternion(); this._q1 = new THREE.Quaternion();
     this._pendingFollow = null;
+    this.person = 'first';    // 'first' | 'third': como seguir o personagem escolhido
     this.setOverheadInstant('w');
   }
 
@@ -100,8 +105,39 @@ export class CameraRig {
     outQuat.setFromEuler(_e);
   }
 
+  _personFov() { return this.person === 'third' ? TP.fov : CAMERA.firstPersonFov; }
+
+  // Troca entre 1ª e 3ª pessoa; vale na hora se já estiver seguindo alguém
+  setPerson(person) {
+    this.person = person === 'third' ? 'third' : 'first';
+    const ch = this.follow || this._pendingFollow;
+    if (this.follow) this.follow.setHeadVisible(this.person === 'third');
+    if (ch && (this.mode === 'firstperson' || this.transition)) {
+      this.camera.fov = this._personFov();
+      this.camera.updateProjectionMatrix();
+      if (this.transition) this.transition.f1 = this._personFov();
+    }
+  }
+
+  // Pose de 3ª pessoa: atrás e acima do ombro; o arrasto orbita em volta do personagem
+  _tpPose(char, outPos, outQuat) {
+    char.group.updateMatrixWorld(true);
+    char.group.getWorldPosition(_look);
+    _look.y += (char.height || 1.8) * TP.lookH;
+    const yaw = char.group.rotation.y + Math.PI + this.dyaw;
+    const pitch = THREE.MathUtils.clamp(TP.pitch + this.dpitch, -1.1, 0.15);
+    const cp = Math.cos(pitch);
+    _d.set(-Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp); // direção do olhar
+    _side.set(Math.cos(yaw), 0, -Math.sin(yaw));                       // direita da tela
+    outPos.copy(_look).addScaledVector(_d, -TP.dist).addScaledVector(_side, TP.shoulder);
+    if (outPos.y < TP.minY) outPos.y = TP.minY;
+    _e.set(pitch, yaw, 0, 'YXZ');
+    outQuat.setFromEuler(_e);
+  }
+
   // Pose de 1ª pessoa do personagem: olhos + olhar para a frente dele
   _fpPose(char, outPos, outQuat) {
+    if (this.person === 'third') return this._tpPose(char, outPos, outQuat);
     char.group.updateMatrixWorld(true);
     char.getEye(outPos);
     _e.set(FP_PITCH + this.dpitch, char.group.rotation.y + Math.PI + this.dyaw, 0, 'YXZ');
@@ -112,7 +148,7 @@ export class CameraRig {
   flyToPiece(char) {
     this.dyaw = 0; this.dpitch = 0;
     this._fpPose(char, _p, _tmp.quaternion);
-    const pr = this._startTween(_p, _tmp.quaternion, CAMERA.firstPersonFov, CAMERA.flyDur, 'firstperson');
+    const pr = this._startTween(_p, _tmp.quaternion, this._personFov(), CAMERA.flyDur, 'firstperson');
     this._pendingFollow = char;
     return pr;
   }
@@ -121,7 +157,7 @@ export class CameraRig {
   followChar(char) {
     if (this.follow && this.follow !== char) this.follow.setHeadVisible(true);
     this.follow = char;
-    char.setHeadVisible(false);
+    char.setHeadVisible(this.person === 'third');
   }
 
   // Plano cinematográfico da batalha: lateral aos dois combatentes (a: atacante, b: vítima; Vector3 mundo)
@@ -176,7 +212,15 @@ export class CameraRig {
         tr.resolve();
       }
     } else if (this.mode === 'firstperson' && this.follow) {
-      this._fpPose(this.follow, this.basePos, this.baseQuat);
+      if (this.person === 'third') {
+        // suaviza o balanço da caminhada e os golpes
+        this._tpPose(this.follow, _tp, _tq);
+        const k = 1 - Math.exp(-TP.smooth * dt);
+        this.basePos.lerp(_tp, k);
+        this.baseQuat.slerp(_tq, k);
+      } else {
+        this._fpPose(this.follow, this.basePos, this.baseQuat);
+      }
       changed = true;
     } else if (this.mode === 'roam') {
       this.roamT += dt;
