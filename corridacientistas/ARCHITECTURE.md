@@ -201,15 +201,22 @@ export class AudioSystem {
   muted; setMuted(bool)
   playMusic(name)         // 'menu' | 'race' | 'results' | null
   setFinalLap(bool)       // música acelera
-  update(dt, world)       // motor do world.player (tom pela velocidade), chiado do drift
-  sfx(name)
+  update(dt, world)       // motor do world.player (timbre por cientista e classe), drift, torcida, rival próximo
+  sfx(name)               // inclui 'warn', 'placeUp', 'placeDown', 'wrongWay', 'cheer', 'whoosh'
+  setVolume(kind, v)      // kind 'music' | 'sfx', v de 0 a 1 (rampa suave)
+  getVolume(kind)
+  duck(depth, hold)       // abaixa a música por um instante
 }
 ```
 - Tudo é sintetizado com WebAudio. As músicas são chiptune **originais**.
 - O módulo escuta os eventos do bus e toca os sons sozinho.
 
 ## Jogo e interface (integração)
-`main.js` (loop, estados, renderer), `race.js` (contagem, voltas, posições, chegada, largada-foguete), `hud.js`, `menu.js`, `index.html`, `css/styles.css`.
+`main.js` (loop, estados, renderer), `race.js` (contagem, voltas, posições, chegada, largada-foguete), `hud.js`, `menu.js`, `facts.js`, `index.html`, `css/styles.css`.
+- `facts.js`: curiosidades de itens (`ITEM_FACTS`), cientistas (`SCIENTIST_FACTS`) e setores da pista (`ZONE_FACTS`), cada uma com `short` (corrida), `text` (resultado) e `quiz` opcional.
+- Modos (`game.opts.mode`): `'race'` e `'timetrial'` (sozinho, só foguetes, fantasma do recorde salvo em `localStorage`).
+- `localStorage` (prefixo `kartcientifico-`): `records`, `ranking`, `medals`, `unlock150`, `quiz`, `daily`, `dailyStreak`, `played`, `nick`, `vol-music`, `vol-sfx`, `ghost-<cc>-<voltas>`, `slowHint`, além das preferências antigas.
+- Parâmetros de URL para o professor: `?cientista=curie&motor=50cc&voltas=1&modo=contrarrelogio` abre direto a escolha.
 
 ## Eventos do bus
 | Evento | Dados |
@@ -217,7 +224,9 @@ export class AudioSystem {
 | `race:countdown` | `{ n }` (3, 2, 1) |
 | `race:go` | `{}` |
 | `race:reset` | `{}` (volta ao menu ou nova corrida: apaga as luzes de largada) |
-| `race:lap` | `{ kart, lap }` |
+| `race:lap` | `{ kart, lap, lapTime }` |
+| `race:place` | `{ kart, from, to }` (só o jogador, durante a corrida) |
+| `race:rocketEarly` | `{ kart }` (acelerou cedo demais na contagem) |
 | `race:finalLap` | `{ kart }` (só o jogador) |
 | `race:finish` | `{ kart, place, time }` |
 | `race:end` | `{ results }` |
@@ -228,7 +237,7 @@ export class AudioSystem {
 | `kart:driftEnd` | `{ kart, level }` |
 | `kart:boost` | `{ kart, source, duration }`; source: `'drift'` `'pad'` `'item'` `'rocket'` `'trick'` |
 | `kart:trick` | `{ kart }` |
-| `kart:hit` | `{ kart, type, by }` |
+| `kart:hit` | `{ kart, type, by, item }` (item: id do item que acertou) |
 | `kart:bump` | `{ a, b, strength }` |
 | `kart:wall` | `{ kart, strength }` |
 | `item:pickup` | `{ kart, pos }` (caixa quebrada) |
@@ -237,6 +246,7 @@ export class AudioSystem {
 | `item:explode` | `{ pos, item }` |
 | `item:lightning` | `{ by }` |
 | `item:blackhole` | `{ target, pos }` |
+| `item:incoming` | `{ kart, item, dist }` (elétron/buraco negro indo na direção do jogador) |
 
 ## Depuração
 Em `main.js`, `window.__game` expõe:
@@ -245,4 +255,5 @@ Em `main.js`, `window.__game` expõe:
 - `giveItem(id)`
 - `skipToLastLap()`
 - `finishRace()`
-- `setQuality(q)`
+- `fastForward(segundos)` (simula sem renderizar)
+- `hud`, `env`, `effects`, `items`, `race`, `audio`
