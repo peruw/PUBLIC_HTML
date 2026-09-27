@@ -1199,7 +1199,9 @@ function build(scene, track, quality, env, opts, hold) {
   // Usados no build pelos outdoors, que ficam longe do muro, onde a vegetação (sorteada por qualidade)
   // pode estar: para não atravessar nada e para não ficarem escondidos. Malhas de chão ficam de fora
   // (desempenho); o relevo entra na visada pelo env.groundAt.
-  const GROUNDISH = /^(terreno|asfalto|acostamento|decalques|aceleradores|lagoa|ceu|montanhas|nuvens|horizonte|tunel-ceu|luzes-tunel|flores)/;
+  // (bolhas, elétrons, pássaros e arcos se movem: a posição do momento da montagem não vale; o semáforo
+  // ficava de fora antes de ter culling e continua de fora, para os outdoors não mudarem de lugar)
+  const GROUNDISH = /^(terreno|asfalto|acostamento|decalques|aceleradores|lagoa|ceu|montanhas|nuvens|horizonte|tunel-ceu|luzes-tunel|flores|bolhas|eletrons|passaros|arcos-tesla|semaforo)/;
   let blockers = null;
   const getBlockers = () => {
     if (blockers) return blockers;
@@ -1663,7 +1665,7 @@ function build(scene, track, quality, env, opts, hold) {
   // a menor célula junta-se à vizinha mais próxima até sobrarem poucos pedaços (menos draw calls;
   // na baixa quase não há triângulos, então o culling vale menos que as chamadas)
   {
-    const target = hi ? 3 : 2;
+    const target = hi ? 3 : 1;
     const center = (k) => k.split(',').map(Number);
     const tris = (k) => cells.get(k).idx.length / 3;
     while (cells.size > target) {

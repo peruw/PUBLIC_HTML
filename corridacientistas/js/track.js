@@ -1041,10 +1041,11 @@ export function buildTrack(scene, quality = {}) {
   const disposables = [asphalt, grass, atlas.tex, matRoad, matGround, matAtlas, matDecal, matGlow];
 
   // split: tamanho da célula (m) para dividir a malha em pedaços que o culling descarta;
-  // células pequenas (< SPLIT_MIN triângulos) ficam juntas num pedaço só
+  // células pequenas (< SPLIT_MIN triângulos) ficam juntas num pedaço só.
+  // Na baixa as malhas são leves e o que pesa são as chamadas de desenho: pedaços maiores (ou um só).
   const SPLIT = 140, SPLIT_MIN = hi ? 1500 : 800;
-  const mkMesh = (geo, mat, { cast = false, receive = true, name = '', split = 0 } = {}) => {
-    const geos = split ? splitGeometry(geo, split, SPLIT_MIN) : [geo];
+  const mkMesh = (geo, mat, { cast = false, receive = true, name = '', split = 0, splitMin = SPLIT_MIN } = {}) => {
+    const geos = split ? splitGeometry(geo, split, splitMin) : [geo];
     if (geos[0] !== geo) geo.dispose();
     let first = null;
     geos.forEach((g, k) => {
@@ -1235,7 +1236,8 @@ export function buildTrack(scene, quality = {}) {
       }
     }
   }
-  mkMesh(gb.build(), matGround, { name: 'acostamento', split: SPLIT });
+  // (na baixa o ambiente junta esta malha à do terreno: mesma textura de grama e mesmo uv no mundo)
+  const groundMesh = mkMesh(gb.build(), matGround, { name: 'acostamento', split: hi ? SPLIT : 0 });
 
   // ------------------------------------------------------------ decalques: zebras, chegada, grid
   {
@@ -1567,7 +1569,7 @@ export function buildTrack(scene, quality = {}) {
       lamps.setColorAt(k, col(0x3a1010));
     }
     lamps.instanceMatrix.needsUpdate = true;
-    lamps.frustumCulled = false;
+    lamps.name = 'semaforo';
     group.add(lamps);
     startLights.mesh = lamps;
   }
@@ -1751,7 +1753,9 @@ export function buildTrack(scene, quality = {}) {
   }
 
   // ------------------------------------------------------------ malha das estruturas
-  mkMesh(sb.build(), matAtlas, { cast: true, receive: true, name: 'estruturas', split: SPLIT });
+  // (na baixa ela é montada depois, com os pneus e as rampas juntos: mesmo material, sem sombras)
+  const buildStructures = () => mkMesh(sb.build(), matAtlas, { cast: true, receive: true, name: 'estruturas', split: hi ? SPLIT : 0 });
+  if (hi) buildStructures();
 
   // ------------------------------------------------------------ pilhas de pneus (mescladas por célula)
   {
@@ -1788,10 +1792,15 @@ export function buildTrack(scene, quality = {}) {
       p.y -= 0.02;
       return { geo, m: new THREE.Matrix4().makeTranslation(p.x, p.y, p.z), c: palette[k % palette.length] };
     });
-    for (const g of bakeInstances(list, SPLIT, SPLIT_MIN)) mkMesh(g, mat, { cast: false, receive: true, name: 'pneus' });
+    // baixa: entram na malha das estruturas (texel branco do atlas = mesma cor)
+    if (hi) for (const g of bakeInstances(list, SPLIT, SPLIT_MIN)) mkMesh(g, mat, { cast: false, receive: true, name: 'pneus' });
+    else for (const it of list) sb.geo(it.geo, it.m, it.c, null, WHITE);
   }
 
   // ------------------------------------------------------------ interior do túnel (céu estrelado)
+  // Na baixa o interior (céu, luzes, estrelas, planetas) só é desenhado com a câmera dentro do túnel ou
+  // perto das bocas (setViewHint, chamado pelo ambiente): de fora ele fica todo coberto pelo morro.
+  const tunnelInside = [];
   const starTex = starTexture(hi);
   disposables.push(starTex);
   {
@@ -1832,7 +1841,7 @@ export function buildTrack(scene, quality = {}) {
     }
     const mat = new THREE.MeshBasicMaterial({ map: starTex, vertexColors: true, side: THREE.DoubleSide, fog: false });
     disposables.push(mat);
-    mkMesh(b.build(), mat, { receive: false, name: 'tunel-ceu' });
+    tunnelInside.push(mkMesh(b.build(), mat, { receive: false, name: 'tunel-ceu' }));
   }
 
   // Faixas de luz e anéis dentro do túnel + contornos das rampas e aceleradores (brilho)
@@ -1910,7 +1919,7 @@ export function buildTrack(scene, quality = {}) {
       }
     }
   }
-  mkMesh(glowB.build(), matGlow, { receive: false, name: 'luzes-tunel' });
+  tunnelInside.push(mkMesh(glowB.build(), matGlow, { receive: false, name: 'luzes-tunel' }));
 
   // Estrelas soltas no túnel (pontos aditivos)
   const glowTex = glowTexture();
@@ -1939,36 +1948,61 @@ export function buildTrack(scene, quality = {}) {
     const mat = new THREE.PointsMaterial({
       size: 0.9, map: glowTex, vertexColors: true, transparent: true, depthWrite: false,
       blending: THREE.AdditiveBlending, sizeAttenuation: true, fog: false,
+      toneMapped: hi, // baixa: mesmo programa do brilho das bobinas de Tesla
     });
     disposables.push(g, mat);
     const pts = new THREE.Points(g, mat);
     pts.name = 'estrelas-tunel';
     group.add(pts);
+    tunnelInside.push(pts);
   }
 
   // Planetas nas baías do túnel
   const planets = [];
+  let planetMesh = null;
+  // baixa: escreve os vértices de cada planeta (com a sua transformação) na malha única
+  function writePlanets() {
+    const attr = planetMesh.geometry.attributes.position, pa = attr.array;
+    for (const p of planets) {
+      p.updateMatrix();
+      const e = p.matrix.elements, R = p.userData.rest;
+      let o = p.userData.start * 3;
+      for (let k = 0; k < R.length; k += 3) {
+        const x = R[k], y = R[k + 1], z = R[k + 2];
+        pa[o++] = e[0] * x + e[4] * y + e[8] * z + e[12];
+        pa[o++] = e[1] * x + e[5] * y + e[9] * z + e[13];
+        pa[o++] = e[2] * x + e[6] * y + e[10] * z + e[14];
+      }
+    }
+    attr.needsUpdate = true;
+  }
   {
     const pt = planetTextures(hi);
     disposables.push(pt.tex, pt.ringTex);
-    const pmat = new THREE.MeshLambertMaterial({ map: pt.tex, emissive: 0xffffff, emissiveMap: pt.tex, emissiveIntensity: 0.55 });
+    // baixa: planetas sem luz (já brilham quase por inteiro), no mesmo programa do céu do túnel
+    const pmat = hi ? new THREE.MeshLambertMaterial({ map: pt.tex, emissive: 0xffffff, emissiveMap: pt.tex, emissiveIntensity: 0.55 })
+      : new THREE.MeshBasicMaterial({ map: pt.tex, vertexColors: true, side: THREE.DoubleSide, fog: false });
     disposables.push(pmat);
     const sphereGeo = (rect) => {
       const g = new THREE.SphereGeometry(1, hi ? 40 : 22, hi ? 24 : 14);
       const uv = g.attributes.uv;
       for (let k = 0; k < uv.count; k++) uv.setXY(k, lerp(rect[0], rect[2], uv.getX(k)), lerp(rect[1], rect[3], uv.getY(k)));
+      if (!hi) g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(uv.count * 3).fill(1), 3));
       disposables.push(g);
       return g;
     };
     const addPlanet = (rect, s, side, radius, h, tilt, spin) => {
       const i = Math.round(s / ds);
       const l = side * (WD[i] + 4.6);
-      const m = new THREE.Mesh(sphereGeo(rect), pmat);
+      // baixa: o Object3D só guarda a transformação; os cinco viram uma malha só (logo abaixo)
+      const m = hi ? new THREE.Mesh(sphereGeo(rect), pmat) : new THREE.Object3D();
+      if (!hi) m.userData.geo = sphereGeo(rect);
       m.position.set(X[i] + RX[i] * l, Y[i] + h, Z[i] + RZ[i] * l);
       m.scale.setScalar(radius);
       m.rotation.z = tilt;
       m.userData.spin = spin;
-      group.add(m);
+      m.name = 'planeta';
+      if (hi) { group.add(m); tunnelInside.push(m); }
       planets.push(m);
       return m;
     };
@@ -1979,6 +2013,35 @@ export function buildTrack(scene, quality = {}) {
     addPlanet(pt.rect.mars, sB + 8, -1, 1.5, 3.4, 0.2, 0.35);
     const moon = addPlanet(pt.rect.moon, sB - 4, 1, 0.7, 4.3, 0, 0.1);
     moon.userData.orbit = { center: earth.position.clone(), r: 4.0, speed: 0.5, s: sB - 4 };
+    if (!hi) {
+      // baixa: uma chamada de desenho para os cinco planetas; os vértices giram na CPU (≈ 1700),
+      // só enquanto o interior do túnel está à vista
+      let nv = 0, ni = 0;
+      for (const p of planets) { nv += p.userData.geo.attributes.position.count; ni += p.userData.geo.index.count; }
+      const pos = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = new Uint16Array(ni);
+      let ov = 0, oi = 0;
+      for (const p of planets) {
+        const g = p.userData.geo, P = g.attributes.position, U = g.attributes.uv, I = g.index;
+        p.userData.rest = P.array;
+        p.userData.start = ov;
+        uv.set(U.array, ov * 2);
+        for (let k = 0; k < I.count; k++) idx[oi++] = ov + I.getX(k);
+        ov += P.count;
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nv * 3).fill(1), 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      disposables.push(g);
+      planetMesh = new THREE.Mesh(g, pmat);
+      planetMesh.name = 'planetas';
+      writePlanets();
+      g.computeBoundingSphere();
+      g.boundingSphere.radius += 6; // a Lua orbita a Terra
+      group.add(planetMesh);
+      tunnelInside.push(planetMesh);
+    }
     // anel de Saturno
     const ringGeo = new THREE.RingGeometry(1.35, 2.1, hi ? 64 : 32, 1);
     const rp = ringGeo.attributes.position, ruv = ringGeo.attributes.uv;
@@ -1986,12 +2049,24 @@ export function buildTrack(scene, quality = {}) {
       const r = Math.hypot(rp.getX(k), rp.getY(k));
       ruv.setXY(k, (r - 1.35) / 0.75, 0.5);
     }
-    const ringMat = new THREE.MeshLambertMaterial({
+    // baixa: sem luz e com as duas faces na geometria (uma passada), no mesmo programa dos aceleradores
+    if (!hi) {
+      const I = ringGeo.index.array, n = I.length;
+      const idx2 = new Array(n * 2);
+      for (let k = 0; k < n; k += 3) {
+        idx2[k] = I[k]; idx2[k + 1] = I[k + 1]; idx2[k + 2] = I[k + 2];
+        idx2[n + k] = I[k]; idx2[n + k + 1] = I[k + 2]; idx2[n + k + 2] = I[k + 1];
+      }
+      ringGeo.setIndex(idx2);
+    }
+    const ringMat = hi ? new THREE.MeshLambertMaterial({
       map: pt.ringTex, emissive: 0xffffff, emissiveMap: pt.ringTex, emissiveIntensity: 0.5,
       transparent: true, side: THREE.DoubleSide, depthWrite: false,
-    });
+    }) : new THREE.MeshBasicMaterial({ map: pt.ringTex, transparent: true, depthWrite: false, toneMapped: false });
     disposables.push(ringGeo, ringMat);
     const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.name = 'anel-saturno';
+    tunnelInside.push(ring);
     ring.rotation.x = -Math.PI / 2;
     const ringHolder = new THREE.Group();
     ringHolder.position.copy(saturn.position);
@@ -2037,7 +2112,7 @@ export function buildTrack(scene, quality = {}) {
 
   // ------------------------------------------------------------ rampas (cunhas)
   {
-    const b = new Builder();
+    const b = hi ? new Builder() : sb; // baixa: na malha das estruturas (mesmo material)
     const w = new THREE.Color(1, 1, 1);
     const side = col(0xffd000);
     for (const rp of ramps) {
@@ -2083,7 +2158,8 @@ export function buildTrack(scene, quality = {}) {
       }
       b.idx.push(v2, v2 + 2, v2 + 1, v2, v2 + 3, v2 + 2);
     }
-    mkMesh(b.build(), matAtlas, { cast: true, receive: true, name: 'rampas' });
+    if (hi) mkMesh(b.build(), matAtlas, { cast: true, receive: true, name: 'rampas' });
+    else buildStructures();
     // faixa luminosa na borda de saída das rampas
     const gl = new Builder();
     const cyan = col(0x7ef9ff);
@@ -2124,21 +2200,29 @@ export function buildTrack(scene, quality = {}) {
         for (let q2 = 0; q2 < 2; q2++) {
           const v = base + q2 * 4;
           index.push(v, v + 1, v + 2, v, v + 2, v + 3);
+          if (!hi) index.push(v, v + 2, v + 1, v, v + 3, v + 2); // baixa: verso na geometria (sem DoubleSide)
         }
       }
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+    if (!hi) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(pos.length / 3 * 2).map((_, k) => WHITE[k % 2]), 2));
     g.setIndex(index);
-    g.boundingSphere = new THREE.Sphere(teslaTops[0].clone().lerp(teslaTops[teslaTops.length - 1], 0.5), 200);
-    const mat = new THREE.MeshBasicMaterial({
+    // esfera fixa em volta de todos os arcos (pontas + arqueamento e tremido de até ~6 m)
+    const arcBox = new THREE.Box3();
+    for (const a of arcs) arcBox.expandByPoint(a.a).expandByPoint(a.b);
+    g.boundingSphere = arcBox.expandByScalar(8).getBoundingSphere(new THREE.Sphere());
+    // baixa: mapa no texel branco, uma face só e com neblina: mesmo programa dos aceleradores
+    const mat = new THREE.MeshBasicMaterial(hi ? {
       color: 0xd9c8ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending,
       depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false,
       forceSinglePass: true, // aditivo: uma passada só já fica igual
+    } : {
+      map: atlas.tex, color: 0xd9c8ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending,
+      depthWrite: false, toneMapped: false,
     });
     disposables.push(g, mat);
     arcMesh = new THREE.Mesh(g, mat);
-    arcMesh.frustumCulled = false;
     arcMesh.name = 'arcos-tesla';
     group.add(arcMesh);
     // brilho nas esferas
@@ -2146,8 +2230,10 @@ export function buildTrack(scene, quality = {}) {
     teslaTops.forEach((t, k) => { gp[k * 3] = t.x; gp[k * 3 + 1] = t.y; gp[k * 3 + 2] = t.z; });
     const gg = new THREE.BufferGeometry();
     gg.setAttribute('position', new THREE.BufferAttribute(gp, 3));
+    // baixa: cor por vértice (branca) para usar o mesmo programa das estrelas do túnel
+    if (!hi) gg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(gp.length).fill(1), 3));
     const gm = new THREE.PointsMaterial({
-      size: 9, map: glowTex, color: 0xb388ff, transparent: true, depthWrite: false,
+      size: 9, map: glowTex, color: 0xb388ff, vertexColors: !hi, transparent: true, depthWrite: false,
       blending: THREE.AdditiveBlending, sizeAttenuation: true, toneMapped: false, fog: false,
     });
     disposables.push(gg, gm);
@@ -2259,6 +2345,17 @@ export function buildTrack(scene, quality = {}) {
   }
   updatePlane(0);
 
+  // Dica de onde está a câmera (s, lateral e altura sobre a pista), vinda do ambiente a cada quadro.
+  // Baixa: esconde o interior do túnel quando a câmera está longe das bocas (economiza ~6–9 chamadas).
+  let insideShown = true;
+  function setViewHint(s, lateral, height) {
+    if (hi || !tunnelInside.length) return;
+    const show = s > tunnelS[0] - 160 && s < tunnelS[1] + 70 && Math.abs(lateral) < 45 && height < 30;
+    if (show === insideShown) return;
+    insideShown = show;
+    for (const o of tunnelInside) if (o) o.visible = show;
+  }
+
   // ------------------------------------------------------------ atualização por quadro
   let arcTimer = 0;
   function update(dt, t) {
@@ -2283,6 +2380,7 @@ export function buildTrack(scene, quality = {}) {
         p.position.z -= RZ[i] * Math.sin(a) * 1.2;
       }
     }
+    if (planetMesh && planetMesh.visible) writePlanets();
     if (startLights.timer > 0) {
       startLights.timer -= dt;
       if (startLights.timer <= 0) setLights(-1);
@@ -2302,6 +2400,7 @@ export function buildTrack(scene, quality = {}) {
     ramps,
     minimapPoints,
     update,
+    setViewHint,
     group,
     // Extras (fora do contrato) usados por environment.js e testes
     meta: {
@@ -2310,6 +2409,7 @@ export function buildTrack(scene, quality = {}) {
       grassTexture: grass, headingAt, tunnelProfile,
       moundTop: group.userData.moundTop,
       moundPad: group.userData.moundPad,
+      groundMesh: hi ? null : groundMesh, // acostamento (baixa, um pedaço só): o ambiente pode juntá-lo ao terreno
     },
     dispose() {
       offs.forEach((off) => off());

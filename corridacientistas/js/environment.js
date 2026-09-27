@@ -40,17 +40,19 @@ const _m3 = new THREE.Matrix3();
 class Merge {
   constructor() { this.p = []; this.n = []; this.c = []; this.uv = []; this.idx = []; }
   get count() { return this.p.length / 3; }
+  // cor = cor dada × cor do vértice da geometria (se houver), como no InstancedMesh
   add(geo, matrix, color, uvRect, uvFixed) {
     const base = this.count;
-    const g = geo.index ? geo : geo;
-    const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv;
+    const g = geo;
+    const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, C = g.attributes.color;
     _m3.getNormalMatrix(matrix);
     for (let i = 0; i < P.count; i++) {
       _v.fromBufferAttribute(P, i).applyMatrix4(matrix);
       _n.fromBufferAttribute(N, i).applyMatrix3(_m3).normalize();
       this.p.push(_v.x, _v.y, _v.z);
       this.n.push(_n.x, _n.y, _n.z);
-      this.c.push(color.r, color.g, color.b);
+      if (C) this.c.push(C.getX(i) * color.r, C.getY(i) * color.g, C.getZ(i) * color.b);
+      else this.c.push(color.r, color.g, color.b);
       if (uvFixed) this.uv.push(uvFixed[0], uvFixed[1]);
       else if (uvRect && U) this.uv.push(lerp(uvRect[0], uvRect[2], U.getX(i)), lerp(uvRect[1], uvRect[3], U.getY(i)));
       else if (U) this.uv.push(U.getX(i), U.getY(i));
@@ -538,9 +540,29 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     g.setIndex(nx * nz > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
     g.computeVertexNormals();
-    // em ladrilhos (normais já calculadas na malha inteira): o culling descarta o que está fora de vista
+    // em ladrilhos (normais já calculadas na malha inteira): o culling descarta o que está fora de vista.
+    // Na baixa a malha é leve (grade de 7 m): um pedaço só custa menos que várias chamadas de desenho,
+    // e o acostamento da pista (mesma textura de grama, uv no mundo) entra junto.
     const tMat = keep(new THREE.MeshLambertMaterial({ map: grassTex, vertexColors: true }));
-    splitGeometry(g, 300, hi ? 3000 : 1500).forEach((tg, k) => {
+    const gm = !hi && meta.groundMesh;
+    if (gm && gm.parent && gm.geometry.index) {
+      const B = gm.geometry, na = g.attributes.position.count, nb = B.attributes.position.count;
+      const cat = (name, size) => {
+        const out = new Float32Array((na + nb) * size);
+        out.set(g.attributes[name].array);
+        out.set(B.attributes[name].array, na * size);
+        return new THREE.BufferAttribute(out, size);
+      };
+      const ia = g.index.array, ib = B.index.array;
+      const idx = new (na + nb > 65535 ? Uint32Array : Uint16Array)(ia.length + ib.length);
+      idx.set(ia);
+      for (let k = 0; k < ib.length; k++) idx[ia.length + k] = ib[k] + na;
+      for (const [name, size] of [['position', 3], ['normal', 3], ['color', 3], ['uv', 2]]) g.setAttribute(name, cat(name, size));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      g.computeBoundingSphere();
+      gm.parent.remove(gm);
+    }
+    (hi ? splitGeometry(g, 300, 3000) : [g]).forEach((tg, k) => {
       const m = new THREE.Mesh(keep(tg), tMat);
       m.receiveShadow = true;
       m.name = 'terreno-' + k;
@@ -634,9 +656,14 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const farGroup = new THREE.Group();
   farGroup.name = 'horizonte';
   group.add(farGroup);
-  // montanhas e nuvens numa malha só (mesmo material): uma chamada de desenho a menos
+  // atlas do ambiente (placas, bandeiras, letreiros; o texel branco serve a geometria lisa)
+  const atlas = envAtlas(hi);
+  keep(atlas.tex);
+  const AR = atlas.R, AW = atlas.white;
+  // montanhas e nuvens numa malha só (mesmo material): uma chamada de desenho a menos. O mapa no texel
+  // branco não muda a cor e deixa o material no mesmo programa do céu do túnel e dos planetas.
   const farB = new Merge();
-  const farMat = keep(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }));
+  const farMat = keep(new THREE.MeshBasicMaterial({ map: atlas.tex, vertexColors: true, fog: false, side: THREE.DoubleSide }));
   {
     const b = farB;
     const haze = skyHorizon.clone();
@@ -663,12 +690,12 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
         cTop.copy(L.colA).multiplyScalar(lit).lerp(haze, 0.25);
         cBase.copy(haze);
         const snow = (h) => (h > 160 ? 1 : 0);
-        const v0 = b.vert(x0, -30, z0, 0, 1, 0, cBase);
-        const v1 = b.vert(x1, -30, z1, 0, 1, 0, cBase);
+        const v0 = b.vert(x0, -30, z0, 0, 1, 0, cBase, AW[0], AW[1]);
+        const v1 = b.vert(x1, -30, z1, 0, 1, 0, cBase, AW[0], AW[1]);
         const c0 = cTop.clone().lerp(col(0xffffff), snow(h0) * 0.7);
         const c1 = cTop.clone().lerp(col(0xffffff), snow(h1) * 0.7);
-        const v2 = b.vert(x1, h1, z1, 0, 1, 0, c1);
-        const v3 = b.vert(x0, h0, z0, 0, 1, 0, c0);
+        const v2 = b.vert(x1, h1, z1, 0, 1, 0, c1, AW[0], AW[1]);
+        const v3 = b.vert(x0, h0, z0, 0, 1, 0, c0, AW[0], AW[1]);
         b.idx.push(v0, v2, v1, v0, v3, v2);
       }
     }
@@ -690,7 +717,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
         const oy = (rand() - 0.2) * size * 0.35;
         const oz = (rand() - 0.5) * size * 0.8;
         const s = size * (0.55 + rand() * 0.5);
-        b.add(ico, mat4(cx + ox * Math.cos(a) - oz * Math.sin(a), cy + oy, cz + ox * Math.sin(a) + oz * Math.cos(a), 0, rand() * 3, 0, s, s * 0.62, s), p % 2 ? white : under);
+        b.add(ico, mat4(cx + ox * Math.cos(a) - oz * Math.sin(a), cy + oy, cz + ox * Math.sin(a) + oz * Math.cos(a), 0, rand() * 3, 0, s, s * 0.62, s), p % 2 ? white : under, null, AW);
       }
     }
     // clareia a parte de cima das nuvens pela normal
@@ -699,18 +726,27 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       const k = 0.86 + 0.14 * up;
       b.c[i * 3] *= k; b.c[i * 3 + 1] *= k; b.c[i * 3 + 2] = Math.min(1, b.c[i * 3 + 2] * (k + 0.03));
     }
-    const m = new THREE.Mesh(keep(b.build(false)), farMat);
+    const m = new THREE.Mesh(keep(b.build(true)), farMat);
     m.frustumCulled = false;
     m.renderOrder = -5;
     m.name = 'montanhas';
     farGroup.add(m);
   }
 
-  // ------------------------------------------------------------ atlas e malha estática dos marcos
-  const atlas = envAtlas(hi);
-  keep(atlas.tex);
-  const AR = atlas.R, AW = atlas.white;
+  // ------------------------------------------------------------ malha estática dos marcos
+  // Na baixa o material do atlas (e o seu programa, o mesmo do terreno e da pista) serve a quase todo o
+  // cenário: marcos, vegetação (facetada na própria geometria), postes, DNA, observatório, átomo,
+  // pêndulo e rotores, com uv no texel branco do atlas.
   const matAtlas = keep(new THREE.MeshLambertMaterial({ map: atlas.tex, vertexColors: true }));
+  const lowMat = (o = {}) => (hi ? null : keep(new THREE.MeshLambertMaterial({ map: atlas.tex, vertexColors: true, ...o })));
+  // baixa: uv no texel branco para a geometria usar o material do atlas (na alta não há uv)
+  const whiteUV = (g) => {
+    if (hi) return g;
+    const n = g.attributes.position.count, a = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) { a[i * 2] = AW[0]; a[i * 2 + 1] = AW[1]; }
+    g.setAttribute('uv', new THREE.BufferAttribute(a, 2));
+    return g;
+  };
   const st = new Merge(); // estruturas estáticas (castShadow)
   const G = {
     box: keep(new THREE.BoxGeometry(1, 1, 1)),
@@ -926,18 +962,21 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     if (clearance(p.x, p.z) < R + 1.5) { lat += side * (R + 1.5 - clearance(p.x, p.z) + 1); p.copy(sm.pos).addScaledVector(sm.right, lat); }
     addFlask(p.x, p.z, R, Hh, k, kind);
   });
-  // tripé com bico de Bunsen perto de um frasco grande
+  // Na baixa: vidro só com a face de fora (uma passada) e líquido sem shader próprio (brilho uniforme);
+  // os dois usam então o mesmo programa.
   const glassMesh = glass.count ? new THREE.Mesh(keep(glass.build(false)), keep(new THREE.MeshLambertMaterial({
-    vertexColors: true, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide, emissive: 0x6688aa, emissiveIntensity: 0.35,
+    vertexColors: true, transparent: true, opacity: 0.4, depthWrite: false, side: hi ? THREE.DoubleSide : THREE.FrontSide, emissive: 0x6688aa, emissiveIntensity: 0.35,
   }))) : null;
   const liquidMesh = liquid.count ? new THREE.Mesh(keep(liquid.build(false)), keep(new THREE.MeshLambertMaterial({
-    vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.0, transparent: true, opacity: 0.88,
+    vertexColors: true, emissive: hi ? 0xffffff : 0x3a3a3a, emissiveIntensity: hi ? 0.0 : 1, transparent: true, opacity: 0.88,
   }))) : null;
   if (liquidMesh) {
     // líquidos levemente luminosos: emissivo pela própria cor do vértice
-    liquidMesh.material.onBeforeCompile = (sh) => {
-      sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vColor * 0.45;');
-    };
+    if (hi) {
+      liquidMesh.material.onBeforeCompile = (sh) => {
+        sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vColor * 0.45;');
+      };
+    }
     liquidMesh.name = 'liquidos';
     liquidMesh.renderOrder = 2;
     group.add(liquidMesh);
@@ -953,11 +992,16 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     }
     if (bubbleData.length) {
       const g = keep(new THREE.IcosahedronGeometry(1, hi ? 1 : 0));
-      const m = keep(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }));
+      // baixa: opacas e sem tom (mesmo programa das luzes da largada, dos pássaros e dos elétrons)
+      const m = keep(hi ? new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false })
+        : new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }));
       bubbles = new THREE.InstancedMesh(g, m, bubbleData.length);
       const c = new THREE.Color();
-      bubbleData.forEach((b, i) => bubbles.setColorAt(i, c.copy(liquidColors[b.ci % liquidColors.length]).lerp(col(0xffffff), 0.6)));
-      bubbles.frustumCulled = false;
+      bubbleData.forEach((b, i) => bubbles.setColorAt(i, c.copy(liquidColors[b.ci % liquidColors.length]).lerp(col(0xffffff), hi ? 0.6 : 0.7)));
+      // esfera que cobre todas as bolhas (sobem dentro dos frascos): o culling funciona mesmo animando
+      const box = new THREE.Box3();
+      for (const [x, y0, y1, z, r] of bubbleSrc) box.expandByPoint(_v.set(x - r - 1, y0 - 1, z - r - 1)).expandByPoint(_v.set(x + r + 1, y1 + 1, z + r + 1));
+      bubbles.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
       bubbles.name = 'bolhas';
       bubbles.renderOrder = 4;
       group.add(bubbles);
@@ -1004,7 +1048,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       const a = -t * turns * TAU; // sinal negativo: hélice destra, como o DNA-B real
       const yy = 2.5 + t * Hh;
       for (const [off, cc] of [[0, cA], [Math.PI, cB]]) {
-        b.add(sph, mat4(Math.cos(a + off) * R, yy, Math.sin(a + off) * R, 0, 0, 0, 0.62), cc);
+        b.add(sph, mat4(Math.cos(a + off) * R, yy, Math.sin(a + off) * R, 0, 0, 0, 0.62), cc, null, AW);
       }
       if (k % 4 === 0 && k > 0 && k < n) {
         const pr = pairs[(k / 4) % 2];
@@ -1017,12 +1061,12 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
           P3.set(mx, yy, mz);
           S3.set(0.28, R, 0.28);
           M4.compose(P3, Q, S3);
-          b.add(cylG, M4, cc);
+          b.add(cylG, M4, cc, null, AW);
         }
       }
     }
-    const g = keep(b.build(false));
-    const mat = keep(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x221133 }));
+    const g = keep(b.build(!hi));
+    const mat = lowMat({ emissive: 0x221133 }) || keep(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x221133 }));
     dna = new THREE.Mesh(g, mat);
     dna.position.set(p.x, y, p.z);
     dna.castShadow = true;
@@ -1099,8 +1143,8 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     b.add(keep(new THREE.CylinderGeometry(1.35, 1.35, 1.2, hi ? 18 : 10, 1)), mat4(0, 6.5 + Math.cos(0.75) * 7.6, 5.2 + Math.sin(0.75) * 7.6, Math.PI / 2 - 0.75, 0, 0), col(0x2b3a6b));
     b.add(keep(new THREE.CircleGeometry(1.1, 16)), mat4(0, 6.5 + Math.cos(0.75) * 8.25, 5.2 + Math.sin(0.75) * 8.25, -0.75 - Math.PI, 0, 0), col(0x0a0f22));
     b.add(G.box, mat4(0, 3, 0, 0, 0, 0, 1.4, 6, 1.4), col(0x6a7384));
-    const g = keep(b.build(false));
-    const dome = new THREE.Mesh(g, keep(new THREE.MeshLambertMaterial({ vertexColors: true })));
+    const g = keep(whiteUV(b.build(false)));
+    const dome = new THREE.Mesh(g, lowMat() || keep(new THREE.MeshLambertMaterial({ vertexColors: true })));
     dome.castShadow = true;
     domeGroup = new THREE.Group();
     domeGroup.position.set(p.x, y + 6.9, p.z);
@@ -1206,16 +1250,19 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       const nuc = keep(new THREE.IcosahedronGeometry(1, 1));
       const nucl = [[0, 0, 0], [0.9, 0.3, 0], [-0.6, 0.7, 0.4], [0.2, -0.8, 0.6], [-0.4, -0.3, -0.9], [0.5, 0.6, -0.7], [-0.9, -0.2, 0.3]];
       nucl.forEach(([x, yy, z], k) => b.add(nuc, mat4(x * 1.1, yy * 1.1, z * 1.1, 0, 0, 0, 1.0), k % 2 ? col(0xff4a4a) : col(0x4a7bff)));
-      const g = keep(b.build(false));
-      const atom = new THREE.Mesh(g, keep(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x112244 })));
+      const g = keep(whiteUV(b.build(false)));
+      const atom = new THREE.Mesh(g, lowMat({ emissive: 0x112244 }) || keep(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x112244 })));
       atom.position.set(ax, y + 11, az);
       atom.castShadow = true;
       atom.name = 'atomo';
       group.add(atom);
       const eg = keep(new THREE.IcosahedronGeometry(0.75, 1));
-      const electrons = new THREE.InstancedMesh(eg, keep(new THREE.MeshBasicMaterial({ color: 0xfff27a })), 3);
+      // baixa: cor por instância e sem tom (mesmo programa das luzes da largada)
+      const electrons = new THREE.InstancedMesh(eg, keep(new THREE.MeshBasicMaterial(hi ? { color: 0xfff27a } : { color: 0xffffff, toneMapped: false })), 3);
+      if (!hi) for (let k = 0; k < 3; k++) electrons.setColorAt(k, col(0xfff27a));
       electrons.position.copy(atom.position);
-      electrons.frustumCulled = false;
+      electrons.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 8.5); // órbitas de raio 7
+      electrons.name = 'eletrons';
       group.add(electrons);
       const em = new THREE.Matrix4(), ep = new THREE.Vector3(), eq = new THREE.Quaternion(), es = new THREE.Vector3(1, 1, 1);
       const eu = new THREE.Euler();
@@ -1308,24 +1355,26 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
           st.add(G.cyl6, mat4(mx, (ballY + y + H) / 2, mz, sz * Math.atan2(Dp / 2, H - 2.2), ry, 0, 0.03, len, 0.03), col(0x888888), null, AW);
         }
       }
-      // esferas das pontas: pivô no topo, balançam alternadamente
+      // esferas das pontas: pivô no topo, balançam alternadamente. Esfera e fio numa malha só
+      // (cor por vértice): uma chamada de desenho por pêndulo.
       const ends = [];
       const ballGeo = keep(new THREE.SphereGeometry(R, hi ? 18 : 10, hi ? 12 : 7));
       const wireGeo = keep(new THREE.CylinderGeometry(0.03, 0.03, H - 2.2, 5, 1));
       wireGeo.translate(0, -(H - 2.2) / 2, 0);
-      const ballMat = keep(new THREE.MeshLambertMaterial({ color: 0xdfe6ee, emissive: 0x222222 }));
-      const wireMat = keep(new THREE.MeshLambertMaterial({ color: 0x888888 }));
+      const endGeo = keep(whiteUV(new Merge().add(ballGeo, mat4(0, -(H - 2.2), 0), col(0xdfe6ee)).add(wireGeo, mat4(0, 0, 0), col(0x888888)).build(false)));
+      const endMat = lowMat({ emissive: 0x222222 }) || keep(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x222222 }));
       for (const sgn of [-1, 1]) {
         const pivot = new THREE.Group();
+        pivot.name = 'pendulo';
         const q = p.clone().addScaledVector(ax, sgn * R * 4);
         pivot.position.set(q.x, y + H, q.z);
         pivot.rotation.y = ry;
         const inner = new THREE.Group();
         pivot.add(inner);
-        const ball = new THREE.Mesh(ballGeo, ballMat);
-        ball.position.y = -(H - 2.2);
-        ball.castShadow = true;
-        inner.add(ball, new THREE.Mesh(wireGeo, wireMat));
+        const end = new THREE.Mesh(endGeo, endMat);
+        end.castShadow = true;
+        end.name = 'pendulo';
+        inner.add(end);
         group.add(pivot);
         ends.push({ inner, sgn });
       }
@@ -1363,21 +1412,53 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     }
     b.add(G.sph, mat4(0, 0, 0, 0, 0, 0, 1.2), col(0xe3262f));
     const g = keep(b.build(false));
-    rotors = new THREE.InstancedMesh(g, keep(new THREE.MeshLambertMaterial({ vertexColors: true })), turbines.length);
+    const rm = new THREE.Matrix4(), rq = new THREE.Quaternion(), rp = new THREE.Vector3(), re = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
+    const rotorMatrix = (k, t) => {
+      re.set(0, 0.5, t * 1.2 + k);
+      rq.setFromEuler(re);
+      rp.copy(turbines[k]).addScaledVector(_v.set(Math.sin(0.5), 0, Math.cos(0.5)), 1.8);
+      return rm.compose(rp, rq, one);
+    };
+    if (hi) {
+      rotors = new THREE.InstancedMesh(g, keep(new THREE.MeshLambertMaterial({ vertexColors: true })), turbines.length);
+      animated.push((dt, t) => {
+        for (let k = 0; k < turbines.length; k++) rotors.setMatrixAt(k, rotorMatrix(k, t));
+        rotors.instanceMatrix.needsUpdate = true;
+      });
+    } else {
+      // baixa: os 5 rotores numa malha comum (≈ 800 vértices girados na CPU), no material do atlas:
+      // evita o programa de instâncias só para eles
+      const R0 = g.attributes.position.array, N0 = g.attributes.normal.array;
+      const nv = R0.length / 3, nT = turbines.length;
+      const all = new Merge();
+      for (let k = 0; k < nT; k++) all.add(g, mat4(0, 0, 0), col(0xffffff), null, AW);
+      const rg = keep(all.build(true));
+      const pos = rg.attributes.position, nor = rg.attributes.normal;
+      pos.setUsage(THREE.DynamicDrawUsage);
+      nor.setUsage(THREE.DynamicDrawUsage);
+      rotors = new THREE.Mesh(rg, lowMat());
+      animated.push((dt, t) => {
+        const pa = pos.array, na = nor.array;
+        for (let k = 0; k < nT; k++) {
+          const e = rotorMatrix(k, t).elements; // rotação pura (escala 1): serve também para as normais
+          for (let v = 0; v < nv; v++) {
+            const x = R0[v * 3], y = R0[v * 3 + 1], z = R0[v * 3 + 2], o = (k * nv + v) * 3;
+            pa[o] = e[0] * x + e[4] * y + e[8] * z + e[12];
+            pa[o + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
+            pa[o + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+            const a = N0[v * 3], b2 = N0[v * 3 + 1], c = N0[v * 3 + 2];
+            na[o] = e[0] * a + e[4] * b2 + e[8] * c;
+            na[o + 1] = e[1] * a + e[5] * b2 + e[9] * c;
+            na[o + 2] = e[2] * a + e[6] * b2 + e[10] * c;
+          }
+        }
+        pos.needsUpdate = true;
+        nor.needsUpdate = true;
+      });
+    }
     rotors.frustumCulled = false;
     rotors.name = 'rotores';
     group.add(rotors);
-    const rm = new THREE.Matrix4(), rq = new THREE.Quaternion(), rp = new THREE.Vector3(), re = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
-    animated.push((dt, t) => {
-      for (let k = 0; k < turbines.length; k++) {
-        re.set(0, 0.5, t * 1.2 + k);
-        rq.setFromEuler(re);
-        rp.copy(turbines[k]).addScaledVector(_v.set(Math.sin(0.5), 0, Math.cos(0.5)), 1.8);
-        rm.compose(rp, rq, one);
-        rotors.setMatrixAt(k, rm);
-      }
-      rotors.instanceMatrix.needsUpdate = true;
-    });
   }
 
   // Postes de luz ao longo da pista (fora do corredor)
@@ -1398,8 +1479,19 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   // Objetos repetidos (postes, vegetação): juntados por material e mesclados em pedaços por
   // célula no fim (flushInstanced), para o culling funcionar; cor da instância vai para o vértice.
   const bakeBuckets = new Map();
+  const WHITE_C = col(0xffffff);
   const instanced = (name, geo, material, spots, colorFn, { cast = true, receive = false } = {}) => {
     if (!spots.length) return;
+    if (!hi) {
+      // baixa (sem sombras): tudo vai para a malha estática dos marcos, no material do atlas
+      // (uv no texel branco): vegetação, postes e marcos dividem os mesmos pedaços grandes
+      const c = new THREE.Color();
+      spots.forEach((sp, i) => {
+        const [x, y, z, ry = 0, s = 1, sy = s] = sp;
+        st.add(geo, mat4(x, y, z, 0, ry, 0, s, sy, s), colorFn ? colorFn(c, i) : WHITE_C, null, AW);
+      });
+      return;
+    }
     const castS = cast && !!quality.shadows;
     const key = `${material.uuid}|${castS}|${receive}`;
     let bk = bakeBuckets.get(key);
@@ -1522,12 +1614,31 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     body.translate(0, 0.35, 0);
     const head = keep(hi ? new THREE.IcosahedronGeometry(0.17, 0) : new THREE.OctahedronGeometry(0.19, 0));
     head.translate(0, 0.86, 0);
-    // um InstancedMesh por arquibancada (culling separado)
-    const mk = (geo, colors, name) => {
-      const mat = keep(new THREE.MeshLambertMaterial({ color: 0xffffff }));
-      mat.onBeforeCompile = (sh) => {
-        sh.uniforms.uTime = crowdTime;
-        sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `
+    // Corpo e cabeça numa geometria só (aHead = 1 na cabeça): uma chamada de desenho por grupo.
+    // A camisa é a cor da instância; a pele vem de um atributo por instância (aSkin).
+    const pm = new Merge().add(body, mat4(0, 0, 0), col(0x000000)).add(head, mat4(0, 0, 0), col(0xffffff));
+    const person = { index: null, attrs: {} };
+    {
+      const g = pm.build(false);
+      person.index = g.index;
+      person.attrs.position = g.attributes.position;
+      person.attrs.normal = g.attributes.normal;
+      const cc = g.attributes.color;
+      const flag = new Float32Array(cc.count);
+      for (let i = 0; i < cc.count; i++) flag[i] = cc.getX(i);
+      person.attrs.aHead = new THREE.BufferAttribute(flag, 1);
+    }
+    const mat = keep(new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = crowdTime;
+      sh.vertexShader = 'uniform float uTime;\nattribute float aHead;\nattribute vec3 aSkin;\n' + sh.vertexShader
+        .replace('#include <color_vertex>', `
+          #include <color_vertex>
+          #ifdef USE_INSTANCING_COLOR
+            vColor = mix(vColor, aSkin, aHead);
+          #endif
+        `)
+        .replace('#include <begin_vertex>', `
           #include <begin_vertex>
           #ifdef USE_INSTANCING
             vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
@@ -1538,33 +1649,49 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
             transformed.y += hop * hop * 0.22 * step(0.45, ph) + ola * 0.55;
           #endif
         `);
-      };
-      const c = new THREE.Color();
-      for (let si = 0; si < standCount; si++) {
-        const spots = crowdSpots.filter((sp) => sp[4] === si);
-        if (!spots.length) continue;
-        const im = new THREE.InstancedMesh(geo, mat, spots.length);
-        spots.forEach(([x, y, z, h], i) => {
-          im.setMatrixAt(i, mat4(x, y, z, 0, h, 0, 1, 0.9 + rand() * 0.25, 1));
-          im.setColorAt(i, c.copy(colors[Math.floor(rand() * colors.length)]));
-        });
-        im.instanceMatrix.needsUpdate = true;
-        im.castShadow = false;
-        im.receiveShadow = false;
-        im.computeBoundingSphere();
-        im.name = name + '-' + si;
-        group.add(im);
-      }
     };
     const shirts = [0xe3262f, 0x1d7bd8, 0xffd23f, 0x2fbf71, 0x8a3cff, 0xff7b29, 0xffffff, 0x17a2b8, 0xff5fa2, 0x009c3b].map(col);
     const skins = [0xf2c9a0, 0xe0ac7e, 0xc68642, 0x8d5524, 0xf6d7b8, 0x6b4226].map(col);
-    mk(body, shirts, 'torcida');
-    mk(head, skins, 'torcida-cabecas');
+    // sorteios na mesma ordem de antes (corpos de todas as arquibancadas, depois as cabeças):
+    // a sequência do gerador segue igual para a vegetação sorteada depois
+    const byStand = [];
+    for (let si = 0; si < standCount; si++) byStand.push(crowdSpots.filter((sp) => sp[4] === si).map((sp) => ({ sp })));
+    for (const L of byStand) for (const p of L) { p.sy = 0.9 + rand() * 0.25; p.shirt = shirts[Math.floor(rand() * shirts.length)]; }
+    for (const L of byStand) for (const p of L) { rand(); p.skin = skins[Math.floor(rand() * skins.length)]; }
+    // alta: um InstancedMesh por arquibancada (culling separado); baixa: todas juntas numa chamada
+    const groupsOf = hi ? byStand : [byStand.flat()];
+    groupsOf.forEach((L, gi) => {
+      if (!L.length) return;
+      const g = keep(new THREE.BufferGeometry());
+      g.setIndex(person.index);
+      for (const [k, a] of Object.entries(person.attrs)) g.setAttribute(k, a);
+      const skinArr = new Float32Array(L.length * 3);
+      const im = new THREE.InstancedMesh(g, mat, L.length);
+      L.forEach(({ sp: [x, y, z, h], sy, shirt, skin }, i) => {
+        im.setMatrixAt(i, mat4(x, y, z, 0, h, 0, 1, sy, 1));
+        im.setColorAt(i, shirt);
+        skinArr[i * 3] = skin.r; skinArr[i * 3 + 1] = skin.g; skinArr[i * 3 + 2] = skin.b;
+      });
+      g.setAttribute('aSkin', new THREE.InstancedBufferAttribute(skinArr, 3));
+      im.instanceMatrix.needsUpdate = true;
+      im.castShadow = false;
+      im.receiveShadow = false;
+      im.computeBoundingSphere();
+      im.name = 'torcida-' + gi;
+      group.add(im);
+    });
   }
 
   // ------------------------------------------------------------ vegetação espalhada
   const vegMat = keep(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
-  const vegMatDS = keep(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+  // baixa: a vegetação vai para o material do atlas (sem flatShading); as faces ficam facetadas pela
+  // própria geometria (vértices separados, normal da face), com a mesma aparência da alta
+  const facet = (g) => {
+    if (hi) return g;
+    const f = g.toNonIndexed();
+    f.computeVertexNormals();
+    return keep(f);
+  };
   const geoTree = (() => {
     const b = new Merge();
     b.add(G.cyl6, mat4(0, 1.8, 0, 0, 0, 0, 0.32, 3.6, 0.32), col(0x7a5230));
@@ -1572,7 +1699,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     b.add(ico, mat4(0, 5.2, 0, 0, 0, 0, 2.9, 2.5, 2.9), col(0x5fb43b));
     b.add(G.ico, mat4(1.4, 4.4, 0.6, 0, 1, 0, 1.9, 1.7, 1.9), col(0x6cc443));
     b.add(G.ico, mat4(-1.2, 4.6, -0.7, 0, 2, 0, 2.0, 1.8, 2.0), col(0x57a836));
-    return keep(b.build(false));
+    return facet(keep(b.build(false)));
   })();
   const geoIpe = (() => {
     const b = new Merge();
@@ -1581,7 +1708,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const ico = keep(new THREE.IcosahedronGeometry(1, hi ? 1 : 0));
     b.add(ico, mat4(0, 5.8, 0, 0, 0, 0, 3.2, 2.2, 3.2), col(0xffffff));
     b.add(G.ico, mat4(1.6, 5.2, 0.4, 0, 1, 0, 1.9, 1.4, 1.9), col(0xf4f4f4));
-    return keep(b.build(false));
+    return facet(keep(b.build(false)));
   })();
   const geoPine = (() => {
     const b = new Merge();
@@ -1590,7 +1717,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     b.add(cone, mat4(0, 3.6, 0, 0, 0, 0, 2.6, 3.4, 2.6), col(0x2f7d3a));
     b.add(cone, mat4(0, 5.6, 0, 0, 0.4, 0, 2.0, 3.0, 2.0), col(0x358a41));
     b.add(cone, mat4(0, 7.4, 0, 0, 0.8, 0, 1.3, 2.6, 1.3), col(0x3c9848));
-    return keep(b.build(false));
+    return facet(keep(b.build(false)));
   })();
   const geoPalm = (() => {
     const b = new Merge();
@@ -1609,19 +1736,28 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       lp.setXYZ(k, lp.getX(k) * (1 - t * 0.7), lp.getY(k) + 2.1, -t * t * 1.8);
     }
     leaf.computeVertexNormals();
+    // verso da folha (triângulos invertidos, normal oposta): dispensa o material de dois lados e
+    // deixa as palmeiras no mesmo material (e nos mesmos pedaços) das outras árvores
+    const back = keep(leaf.clone());
+    const bi = back.index.array;
+    for (let k = 0; k < bi.length; k += 3) { const tmp = bi[k]; bi[k] = bi[k + 1]; bi[k + 1] = tmp; }
+    const bn = back.attributes.normal;
+    for (let k = 0; k < bn.count; k++) bn.setXYZ(k, -bn.getX(k), -bn.getY(k), -bn.getZ(k));
     for (let k = 0; k < 7; k++) {
       const a = (k / 7) * TAU;
-      b.add(leaf, mat4(x, y, 0, -1.2, a, 0, 1, 1, 1), k % 2 ? col(0x3fa34d) : col(0x4cb85a));
+      const c = k % 2 ? col(0x3fa34d) : col(0x4cb85a);
+      b.add(leaf, mat4(x, y, 0, -1.2, a, 0, 1, 1, 1), c);
+      b.add(back, mat4(x, y, 0, -1.2, a, 0, 1, 1, 1), c);
     }
     if (hi) for (let k = 0; k < 3; k++) b.add(G.ico, mat4(x + Math.cos(k * 2.1) * 0.35, y - 0.35, Math.sin(k * 2.1) * 0.35, 0, 0, 0, 0.25), col(0x6b4a2e));
-    return keep(b.build(false));
+    return facet(keep(b.build(false)));
   })();
   const geoBush = (() => {
     const b = new Merge();
     b.add(G.ico, mat4(0, 0.7, 0, 0, 0, 0, 1.3, 1.0, 1.3), col(0x4f9e35));
     b.add(G.ico, mat4(0.9, 0.55, 0.3, 0, 1, 0, 0.9, 0.8, 0.9), col(0x5bb040));
     b.add(G.ico, mat4(-0.7, 0.5, -0.4, 0, 2, 0, 0.8, 0.7, 0.8), col(0x468f2f));
-    return keep(b.build(false));
+    return facet(keep(b.build(false)));
   })();
   const geoRock = (() => {
     const g = keep(new THREE.DodecahedronGeometry(1, 0));
@@ -1629,7 +1765,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const r = mulberry(3);
     for (let k = 0; k < p.count; k++) p.setXYZ(k, p.getX(k) * (0.8 + r() * 0.4), p.getY(k) * (0.6 + r() * 0.3), p.getZ(k) * (0.8 + r() * 0.4));
     g.computeVertexNormals();
-    return keep(new Merge().add(g, mat4(0, 0.35, 0), col(0x9a9a9a)).build(false));
+    return facet(keep(new Merge().add(g, mat4(0, 0.35, 0), col(0x9a9a9a)).build(false)));
   })();
   const geoFlower = (() => {
     const b = new Merge();
@@ -1640,7 +1776,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       const a = (k / nf) * TAU + r(), d = 0.3 + r() * 0.5;
       b.add(t, mat4(Math.cos(a) * d, 0.28 + r() * 0.15, Math.sin(a) * d, 0, r() * 3, 0, 1.2, 0.7, 1.2), col(0xffffff));
     }
-    return keep(b.build(false));
+    return facet(keep(b.build(false)));
   })();
 
   const lists = { tree: [], ipe: [], pine: [], palm: [], bush: [], rock: [], flower: [] };
@@ -1746,7 +1882,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   instanced('arvores', geoTree, vegMat, lists.tree, greens);
   instanced('ipes', geoIpe, vegMat, lists.ipe, (c) => c.set(rand() < 0.5 ? 0xff7eb6 : 0xffd23f));
   instanced('pinheiros', geoPine, vegMat, lists.pine, greens);
-  instanced('palmeiras', geoPalm, vegMatDS, lists.palm, greens);
+  instanced('palmeiras', geoPalm, vegMat, lists.palm, greens);
   instanced('arbustos', geoBush, vegMat, lists.bush, greens);
   instanced('pedras', geoRock, vegMat, lists.rock, (c) => c.setHSL(0.08, 0.1, 0.55 + rand() * 0.3), { cast: false });
   const flowerCols = [0xff4a6e, 0xffd23f, 0xffffff, 0xb388ff, 0xff8a3d, 0xff7eb6].map(col);
@@ -1755,8 +1891,9 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
 
   // ------------------------------------------------------------ malha estática dos marcos
   {
-    // em pedaços por célula para o culling (câmera e sombra)
-    splitGeometry(st.build(true), 150, hi ? 2000 : 1000).forEach((g, k) => {
+    // em pedaços por célula para o culling (câmera e sombra). Na baixa (com a vegetação junto) um
+    // pedaço só: a câmera via 4 de 5 pedaços na maior parte do tempo, então dividir só somava chamadas.
+    (hi ? splitGeometry(st.build(true), 150, 2000) : [st.build(true)]).forEach((g, k) => {
       const m = new THREE.Mesh(keep(g), matAtlas);
       m.castShadow = true;
       m.receiveShadow = true;
@@ -1772,13 +1909,20 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   {
     const n = hi ? 14 : 8;
     const g = keep(new THREE.BufferGeometry());
-    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0.3, -0.9, 0, -0.1, 0, 0, -0.3, 0, 0, 0.3, 0, 0, -0.3, 0.9, 0, -0.1], 3));
+    // asas com as duas faces na geometria (sem material de dois lados; sem luz, a aparência é a mesma)
+    const wing = [0, 0, 0.3, -0.9, 0, -0.1, 0, 0, -0.3, 0, 0, 0.3, 0, 0, -0.3, 0.9, 0, -0.1];
+    const both = wing.slice();
+    for (let t = 0; t < wing.length; t += 9) both.push(...wing.slice(t, t + 3), ...wing.slice(t + 6, t + 9), ...wing.slice(t + 3, t + 6));
+    g.setAttribute('position', new THREE.Float32BufferAttribute(both, 3));
     g.computeVertexNormals();
-    birds = new THREE.InstancedMesh(g, keep(new THREE.MeshBasicMaterial({ color: 0x3b3b46, side: THREE.DoubleSide })), n);
-    birds.frustumCulled = false;
+    // baixa: cor por instância e sem tom (mesmo programa das luzes da largada)
+    birds = new THREE.InstancedMesh(g, keep(new THREE.MeshBasicMaterial(hi ? { color: 0x3b3b46 } : { color: 0xffffff, toneMapped: false })), n);
+    if (!hi) for (let k = 0; k < n; k++) birds.setColorAt(k, col(0x3b3b46));
     birds.name = 'passaros';
     group.add(birds);
     for (let k = 0; k < n; k++) birdData.push({ ph: rand() * TAU, r: 25 + rand() * 30, h: 10 + rand() * 12, sp: 0.25 + rand() * 0.15, cx: 130 + (rand() - 0.5) * 40, cz: 500 + (rand() - 0.5) * 40 });
+    // voam em círculos (raio ≤ 55 m) em volta de (130, 500): esfera fixa para o culling
+    birds.boundingSphere = new THREE.Sphere(new THREE.Vector3(130, 16, 500), 90);
   }
   const birdM = new THREE.Matrix4(), birdP = new THREE.Vector3(), birdQ = new THREE.Quaternion(), birdS = new THREE.Vector3(), birdE = new THREE.Euler();
   animated.push((dt, t) => {
@@ -1796,6 +1940,25 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     birds.instanceMatrix.needsUpdate = true;
   });
 
+  // Baixa: adereços além do fim da neblina (drawDist) já saem da cor da neblina; escondê-los poupa
+  // chamadas de desenho nas vistas longas (do grampo a câmera enxerga o campus inteiro).
+  const farCull = [];
+  if (!hi) {
+    group.updateMatrixWorld(true);
+    const names = new Set(['lagoa', 'liquidos', 'vidros', 'bolhas', 'dna', 'observatorio', 'atomo', 'eletrons', 'pendulo', 'passaros']);
+    const box = new THREE.Box3();
+    for (const o of group.children) {
+      if (!names.has(o.name)) continue;
+      let sp;
+      if (o.boundingSphere) sp = o.boundingSphere.clone().applyMatrix4(o.matrixWorld);
+      else if (o.isMesh) {
+        if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+        sp = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld);
+      } else sp = box.setFromObject(o).getBoundingSphere(new THREE.Sphere());
+      farCull.push({ o, c: sp.center, r: sp.radius + 2 });
+    }
+  }
+
   // ------------------------------------------------------------ atualização por quadro
   const camFwd = new THREE.Vector3();
   const target = new THREE.Vector3();
@@ -1808,6 +1971,10 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     crowdTime.value = t;
     for (let k = 0; k < animated.length; k++) animated[k](dt, t);
     if (!camera) return;
+    for (let k = 0; k < farCull.length; k++) {
+      const f = farCull[k];
+      f.o.visible = camera.position.distanceTo(f.c) - f.r < drawDist;
+    }
     // céu, nuvens e montanhas acompanham a câmera
     sky.position.copy(camera.position);
     const far = Math.min(camera.far || 2000, 4000);
@@ -1833,6 +2000,8 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const inT = r.s > tunnelS[0] + 3 && r.s < tunnelS[1] - 3 && camera.position.y < r.groundY + 11 && Math.abs(r.lateral) < 20;
     dim += ((inT ? 1 : 0) - dim) * Math.min(1, dt * 4);
     applyLight();
+    // interior do túnel (céu estrelado, luzes, planetas) só perto das bocas ou dentro (a pista decide)
+    if (track.setViewHint) track.setViewHint(r.s, r.lateral, camera.position.y - r.groundY);
   }
   function applyLight() {
     sun.intensity = baseSun * (1 - 0.72 * dim);
