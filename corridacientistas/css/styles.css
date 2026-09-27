@@ -1266,7 +1266,12 @@ body.touch .hud-item-key {
   font: 700 18px var(--display);
   color: #fff;
   white-space: nowrap;
-  animation: toastIn 0.25s ease;
+  animation: tipIn 0.25s ease;
+}
+
+@keyframes tipIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+  to { transform: translateX(-50%); }
 }
 
 /* ---------- Aviso de orientação ---------- */
@@ -1725,3 +1730,28 @@ body.touch {
   font-size: 18px;
 }
 .hud-item-slot.back::after { content: '▼'; color: #ffd23f; }
+
+/* resultado no celular em pé (tela estreita e alta): uma coluna e botões em grade */
+@media (max-width: 760px) and (min-height: 521px) {
+  .results-wrap { grid-template-columns: 1fr; padding: 12px; }
+  .results-wrap > .row { flex-wrap: wrap; margin: 0 -12px -12px; padding: 8px 12px 12px; bottom: -12px; }
+  .results-wrap > .row .btn { flex: 1 1 40%; padding: 9px 10px; }
+}
+
+/* celular: avisos no alto, ao centro (os cantos de baixo são dos botões de toque, e sem
+   tela cheia a coluna da direita encostava no ITEM) */
+body.touch #hud-toasts {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(max(10px, env(safe-area-inset-top)) + 48px);
+  width: min(340px, 48vw);
+  justify-items: center;
+}
+body.touch .toast { padding: 5px 10px; }
+body.touch .toast p { font-size: 12px; }
+
+/* telas baixas: aviso de item vindo acima da dica do tutorial */
+@media (max-height: 520px) {
+  #hud-warn { bottom: calc(18% + 50px); }
+}

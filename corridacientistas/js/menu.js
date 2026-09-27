@@ -80,6 +80,8 @@ export class Menu {
     if (!CLASSES[this.opts.cc] || (this.opts.cc === '150cc' && !is150Unlocked())) this.opts.cc = CLASSES[this.opts.cc] ? '100cc' : '50cc';
     if (!RACE.lapOptions.includes(this.opts.laps)) this.opts.laps = RACE.defaultLaps;
 
+    // quem já jogava em 150cc (antes do cadeado) fica com ele liberado de vez
+    if (store.get('cc', '') === '150cc') store.set('unlock150', true);
     this.tabNav = false; // foco veio do Tab (não do mouse/toque)
     this.buildSelect();
     this.buildHowto();
