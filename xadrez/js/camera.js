@@ -1,40 +1,40 @@
-// Câmera: vista de cima (overhead) e primeira pessoa (olhos da peça), com tweens suaves,
-// olhar por arrasto em 1ª pessoa, seguir a peça durante o lance e tremor.
+// Câmera: vista de cima (overhead), primeira pessoa (olhos do personagem) e plano cinematográfico
+// da batalha, com tweens suaves, olhar por arrasto em 1ª pessoa, seguir o personagem e tremor.
 import * as THREE from './three.js';
 import { CAMERA } from './config.js';
 
 const _p = new THREE.Vector3();
 const _look = new THREE.Vector3();
-const _fwd = new THREE.Vector3();
 const _tmp = new THREE.Object3D();
 const _m = new THREE.Matrix4();
+const _e = new THREE.Euler(0, 0, 0, 'YXZ');
+const _d = new THREE.Vector3();
+const _side = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+const FP_PITCH = -0.24; // olhar um pouco para baixo em 1ª pessoa (casas vizinhas visíveis)
+
 // Orientação de câmera (olha por -Z) de `eye` para `target`
 function lookQuat(eye, target, out) {
   _m.lookAt(eye, target, UP);
   return out.setFromRotationMatrix(_m);
 }
-const _e = new THREE.Euler(0, 0, 0, 'YXZ');
-const UP = new THREE.Vector3(0, 1, 0);
-
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const wob = (t, a, b, c) => Math.sin(t * a) * 0.5 + Math.sin(t * b + 1.3) * 0.3 + Math.sin(t * c + 2.1) * 0.2;
 
 export class CameraRig {
   constructor(camera) {
     this.camera = camera;
-    this.mode = 'overhead';   // 'overhead' | 'firstperson'
-    this.transition = null;   // { p0, p1, q0, q1, f0, f1, t, dur, resolve, next }
+    this.mode = 'overhead';   // 'overhead' | 'firstperson' | 'cinematic'
+    this.transition = null;   // { f0, f1, t, dur, resolve, next }
     this.side = 'w';
-    this.follow = null;       // Group seguido em 1ª pessoa
-    this.followEye = 0;
-    this.yaw = 0; this.pitch = 0;      // olhar base em 1ª pessoa
-    this.dyaw = 0; this.dpitch = 0;    // deslocamento por arrasto
+    this.follow = null;       // Character seguido em 1ª pessoa
+    this.dyaw = 0; this.dpitch = 0;    // deslocamento do olhar por arrasto
     this.shakeT = 0; this.shakeDur = 0; this.shakeAmp = 0; this.shakeTime = 0;
-    this.fadeAlpha = 0;
     this.basePos = new THREE.Vector3();
     this.baseQuat = new THREE.Quaternion();
     this._p0 = new THREE.Vector3(); this._p1 = new THREE.Vector3();
     this._q0 = new THREE.Quaternion(); this._q1 = new THREE.Quaternion();
+    this._pendingFollow = null;
     this.setOverheadInstant('w');
   }
 
@@ -49,12 +49,18 @@ export class CameraRig {
   setOverheadInstant(side) {
     this.side = side;
     this.mode = 'overhead';
-    this.follow = null;
+    this._stopFollow();
     this.overheadPose(side, this.basePos, this.baseQuat);
     this.camera.position.copy(this.basePos);
     this.camera.quaternion.copy(this.baseQuat);
     this.camera.fov = CAMERA.overheadFov;
     this.camera.updateProjectionMatrix();
+  }
+
+  _stopFollow() {
+    if (this.follow) this.follow.setHeadVisible(true);
+    this.follow = null;
+    this._pendingFollow = null;
   }
 
   _startTween(p1, q1, f1, dur, next) {
@@ -65,7 +71,7 @@ export class CameraRig {
       this._p1.copy(p1);
       this._q1.copy(q1);
       this.transition = { f0: this.camera.fov, f1, t: 0, dur, resolve, next };
-      this.follow = null;
+      this._stopFollow();
       this.dyaw = 0; this.dpitch = 0;
     });
   }
@@ -76,22 +82,43 @@ export class CameraRig {
     return this._startTween(_p, _tmp.quaternion, CAMERA.overheadFov, CAMERA.flyDur, 'overhead');
   }
 
-  // Voa para os olhos da peça. eye: altura dos olhos. A peça olha para o lado inimigo.
-  flyToPiece(group, eye) {
-    const s = group.userData.color === 'w' ? -1 : 1; // frente: -Z para brancas
-    _p.copy(group.position); _p.y += eye;
-    _look.set(group.position.x * 0.6, 0.9, group.position.z + s * 9);
-    lookQuat(_p, _look, _tmp.quaternion);
+  // Pose de 1ª pessoa do personagem: olhos + olhar para a frente dele
+  _fpPose(char, outPos, outQuat) {
+    char.group.updateMatrixWorld(true);
+    char.getEye(outPos);
+    _e.set(FP_PITCH + this.dpitch, char.group.rotation.y + Math.PI + this.dyaw, 0, 'YXZ');
+    outQuat.setFromEuler(_e);
+  }
+
+  // Voa para os olhos do personagem (Character do contrato de rig.js) e passa a segui-lo.
+  flyToPiece(char) {
+    this.dyaw = 0; this.dpitch = 0;
+    this._fpPose(char, _p, _tmp.quaternion);
     const pr = this._startTween(_p, _tmp.quaternion, CAMERA.firstPersonFov, CAMERA.flyDur, 'firstperson');
-    this.followEye = eye;
-    this._pendingFollow = group;
+    this._pendingFollow = char;
     return pr;
   }
 
-  // Em 1ª pessoa: a câmera acompanha a peça (usado nas animações)
-  followPiece(group, eye) {
-    this.follow = group;
-    this.followEye = eye;
+  // Em 1ª pessoa: a câmera acompanha os olhos do personagem (andar, golpe, viradas)
+  followChar(char) {
+    if (this.follow && this.follow !== char) this.follow.setHeadVisible(true);
+    this.follow = char;
+    char.setHeadVisible(false);
+  }
+
+  // Plano cinematográfico da batalha: lateral aos dois combatentes (a: atacante, b: vítima; Vector3 mundo)
+  cinematic(a, b, dur = 0.7) {
+    _d.subVectors(b, a);
+    const len = Math.max(0.5, _d.length());
+    _d.normalize();
+    _side.crossVectors(UP, _d).normalize();
+    // fica do lado mais próximo da câmera atual
+    if (_side.dot(this.basePos) < 0) _side.negate();
+    _look.copy(a).lerp(b, 0.5); _look.y += 1.1;
+    _p.copy(_look).addScaledVector(_side, 3.2 + len * 0.9).addScaledVector(_d, -0.6);
+    _p.y = 2.2;
+    lookQuat(_p, _look, _tmp.quaternion);
+    return this._startTween(_p, _tmp.quaternion, 50, dur, 'cinematic');
   }
 
   look(dyaw, dpitch) {
@@ -114,6 +141,8 @@ export class CameraRig {
       const tr = this.transition;
       tr.t = Math.min(tr.dur, tr.t + dt);
       const k = ease(tr.t / tr.dur);
+      // Voando para um personagem: o alvo acompanha os olhos dele (ele pode estar se mexendo)
+      if (tr.next === 'firstperson' && this._pendingFollow) this._fpPose(this._pendingFollow, this._p1, this._q1);
       this.basePos.lerpVectors(this._p0, this._p1, k);
       this.baseQuat.slerpQuaternions(this._q0, this._q1, k);
       this.camera.fov = tr.f0 + (tr.f1 - tr.f0) * k;
@@ -122,21 +151,15 @@ export class CameraRig {
       if (tr.t >= tr.dur) {
         this.transition = null;
         this.mode = tr.next;
-        if (tr.next === 'firstperson') {
-          _e.setFromQuaternion(this.baseQuat, 'YXZ');
-          this.yaw = _e.y; this.pitch = _e.x;
-          if (this._pendingFollow) { this.follow = this._pendingFollow; this._pendingFollow = null; }
+        if (tr.next === 'firstperson' && this._pendingFollow) {
+          this.followChar(this._pendingFollow);
+          this._pendingFollow = null;
         }
         tr.resolve();
       }
-    } else if (this.mode === 'firstperson') {
-      if (this.follow) {
-        this.basePos.copy(this.follow.position);
-        this.basePos.y += this.followEye;
-        changed = true;
-      }
-      _e.set(this.pitch + this.dpitch, this.yaw + this.dyaw, 0, 'YXZ');
-      this.baseQuat.setFromEuler(_e);
+    } else if (this.mode === 'firstperson' && this.follow) {
+      this._fpPose(this.follow, this.basePos, this.baseQuat);
+      changed = true;
     }
     this.camera.position.copy(this.basePos);
     this.camera.quaternion.copy(this.baseQuat);

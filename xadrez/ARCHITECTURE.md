@@ -1,8 +1,11 @@
 # Xadrez em Primeira Pessoa: arquitetura
 
 Xadrez 3D em Three.js r170, sem etapa de build obrigatória: `index.html` carrega `js/main.js` como módulo ES.
-Todo o visual é procedural (sem imagens, modelos ou sons). O tabuleiro é uma praça de mármore ao ar livre;
-visto de cima parece um tabuleiro comum, e em primeira pessoa as peças são estátuas de ~2 m (casa = 2 m).
+Todo o visual é procedural (sem imagens, modelos ou sons). O tabuleiro é uma praça de mármore ao ar livre
+(casa = 2 m) e as peças são PERSONAGENS de batalha articulados (soldado, guardião, cavaleiro montado, clérigo,
+rainha e rei). Um lance é o personagem andando até a casa; uma captura é uma luta: o atacante se aproxima,
+golpeia e a vítima cai. Em primeira pessoa a câmera fica nos olhos do personagem; na vista de cima a captura
+ganha um plano cinematográfico lateral.
 
 ## Regras gerais
 - Todo módulo importa o Three.js de `./three.js` (`import * as THREE from './three.js'`), nunca de outra URL.
@@ -14,14 +17,17 @@ visto de cima parece um tabuleiro comum, e em primeira pessoa as peças são est
 - Todo texto visível ao jogador é em português do Brasil.
 
 ## Módulos
-- `config.js`: cores, perfis de torno das peças, alturas, tempos de câmera/animação, níveis (`DIFFICULTY`), candidatos de Stockfish.
+- `config.js`: cores, tempos de câmera/animação, níveis (`DIFFICULTY`), candidatos de Stockfish.
 - `rules.js`: `createGame`, `generateLegalMoves`, `makeMove`/`undoMove`, `inCheck`, `gameStatus`, `toFEN`/`fromFEN`, `toSAN` (chamar antes de `makeMove`), `moveToUCI`/`uciToMove`, `perft`.
 - `ai.js`: `bestMove(state, { depth, randomness })` (alfa-beta + tabelas de posição) e `evaluate(state)`; `ai-worker.js` a roda num Worker.
 - `engine.js`: classe `Engine`. Tenta os builds de Stockfish de `STOCKFISH_CANDIDATES` (Worker Blob que faz `importScripts` do CDN; o caminho do `.wasm` vai no hash da URL do worker) e cai na IA interna se nenhum responder `uciok`. Scores sempre na perspectiva das brancas. `bestMove(fen)` joga no nível escolhido; `analyze(fen, onUpdate)` usa força máxima e MultiPV 3.
-- `board3d.js`: `buildBoard(scene, quality)` cria praça, casas (`InstancedMesh`), realces, moldura com coordenadas, cenário e peças (`Group` por peça, `userData = { isPiece, sq, type, color, height }`). `setPosition(state)`, `applyMoveInstant(move)`, `highlight({...})`, `pieceAt(sq)`, `eyeHeight(group)`, `pickables()`.
-- `camera.js`: `CameraRig`: `flyToOverhead(side)`, `flyToPiece(group, eye)`, `followPiece`, `look(dyaw, dpitch)`, `shake`, `update(dt)`; tweens com easing cúbico e slerp.
-- `input.js`: `pointerdown/up` com raycast (peça ou casa via `instanceId`), arrasto para olhar, Esc.
-- `animations.js`: `Animator.playMove(move, { firstPerson })` (deslizar, salto do cavalo, roque, en passant, promoção, duelo de captura) e `kingFall`. Poeira em `Points`.
+- `rig.js`: contrato dos personagens. `humanoid()` (esqueleto com joints nomeados: hips, torso, neck, head, hat, shoulder/elbow/hand L/R, hip/knee L/R, weapon, shield), `horse()` (montaria com mountBody/mountNeck/mountHead/mountLegs/mountTail), `materials(color)` (paleta ARMY.w/ARMY.b), primitivas `G.*` com cache, `mesh()`, `joint()`, `attachWeapon()`, `attachShield()`, `snapshotRest()`/`resetPose()`. Personagens são construídos olhando +Z com os pés na origem; membros pendem em -Y; arma ao longo de +Y no joint `weapon`. `char.getEye(out)` dá a posição dos olhos; `char.setHeadVisible(false)` esconde a cabeça em 1ª pessoa.
+- `chars/*.js`: um construtor por peça (`buildPawn`, `buildRook`, `buildKnight`, `buildBishop`, `buildQueen`, `buildKing`); `chars/index.js` expõe `buildCharacter(letter, color)`. Geometrias e materiais extras são criados uma vez por módulo e compartilhados pelas duas cores.
+- `battle.js`: animações sobre os joints: `createWalk` (andar/galope), `createIdle`, `createAttack(attacker, victim, { onHit })` por `weaponKind` (spear, sword, hammer, staff, lance), `createHit`, `createDeath`, `createVictory`. Cada Anim tem `update(dt) -> done`.
+- `board3d.js`: `buildBoard(scene, quality)` cria praça, casas (`InstancedMesh`), realces, moldura com coordenadas, cenário e peças (`char.group` por peça, `userData = { isPiece, sq, type, color, height, char }`; brancas com `rotation.y = π`). `setPosition(state)`, `applyMoveInstant(move)`, `highlight({...})`, `pieceAt(sq)`, `pickables()`, `setLabelSide(side)`.
+- `camera.js`: `CameraRig`: `flyToOverhead(side)`, `flyToPiece(char)` (voa para os olhos e passa a seguir o personagem), `followChar(char)`, `cinematic(a, b)` (plano lateral da luta), `look(dyaw, dpitch)`, `shake`, `update(dt)`; tweens com easing cúbico e slerp.
+- `input.js`: `pointerdown/up` com raycast (peça ou casa via `instanceId`), arrasto para olhar, Esc. Em 1ª pessoa ignora as malhas do próprio personagem (`getIgnored`).
+- `animations.js`: `Animator.playMove(move, { firstPerson })`: andar até a casa (cavalo pula), roque com a torre em paralelo, en passant, promoção; captura = aproximação até o alcance da arma, a vítima se vira, golpe (`combat`), poeira e tremor no impacto, queda, gesto de vitória, remoção da vítima e passo até a casa final. `kingFall` no mate. Poeira em `Points`.
 - `hud.js`, `menu.js`: DOM. `main.js`: estados `loading → menu → playing ↔ animating/thinking → gameover`.
 
 ## Fluxo de um lance
@@ -32,3 +38,4 @@ visto de cima parece um tabuleiro comum, e em primeira pessoa as peças são est
 ## Testes
 - `npm run test:xadrez`: regras (perft, roque, en passant, promoção, mate, afogamento, repetição, SAN) e IA.
 - O 3D e o Stockfish só rodam no navegador (o CDN precisa estar acessível). `window.__xadrez` expõe estado, `fen()` e `play('e2e4')` para depuração.
+- `dev/chars.html?type=p&color=both&view=three` visualiza os personagens; `anim=attack&victim=p&t=0.8` e `view=fp` testam as animações de batalha (`stub=1` usa as cópias de `dev/stubchars/`).

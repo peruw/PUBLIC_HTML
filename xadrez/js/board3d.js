@@ -1,7 +1,9 @@
 // Cena: praça de mármore, tabuleiro, peças Staunton procedurais, realces e cenário.
 // Tudo procedural (sem arquivos). Casa = SQUARE m. a1 em x=-7, z=+7; brancas olham para -Z.
 import * as THREE from './three.js';
-import { SQUARE, BOARD_HALF, PIECE_HEIGHT, EYE_FRACTION, COLORS, LATHE_PROFILES, KNIGHT_SHAPE } from './config.js';
+import { SQUARE, BOARD_HALF, COLORS } from './config.js';
+import { buildCharacter } from './chars/index.js';
+import { setShadows, resetPose } from './rig.js';
 import { typeOf, colorOf, PIECE_LETTERS } from './rules.js';
 
 const _v = new THREE.Vector3();
@@ -17,59 +19,6 @@ export function squareToWorld(sq, out) {
   return out;
 }
 
-// ---------- Geometrias das peças (cache por tipo) ----------
-const geoCache = new Map();
-const RADIUS_SCALE = 1.15; // largura das peças (m) para um perfil de raio 1
-
-function latheGeometry(profile) {
-  const pts = profile.map(([r, y]) => new THREE.Vector2(r * RADIUS_SCALE, y));
-  const g = new THREE.LatheGeometry(pts, 28);
-  g.computeVertexNormals();
-  return g;
-}
-
-function buildPieceParts(letter) {
-  if (geoCache.has(letter)) return geoCache.get(letter);
-  const parts = []; // { geo, y, x, z, rot }
-  parts.push({ geo: latheGeometry(LATHE_PROFILES[letter]) });
-  if (letter === 'r') {
-    const box = new THREE.BoxGeometry(0.16 * RADIUS_SCALE, 0.12, 0.16 * RADIUS_SCALE);
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      parts.push({ geo: box, x: Math.cos(a) * 0.3 * RADIUS_SCALE, y: 0.96, z: Math.sin(a) * 0.3 * RADIUS_SCALE, rotY: -a });
-    }
-  } else if (letter === 'k') {
-    parts.push({ geo: new THREE.BoxGeometry(0.05 * RADIUS_SCALE, 0.16, 0.05 * RADIUS_SCALE), y: 0.96 });
-    parts.push({ geo: new THREE.BoxGeometry(0.16 * RADIUS_SCALE, 0.045, 0.05 * RADIUS_SCALE), y: 0.985 });
-  } else if (letter === 'q') {
-    const s = new THREE.SphereGeometry(0.045 * RADIUS_SCALE, 10, 8);
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      parts.push({ geo: s, x: Math.cos(a) * 0.2 * RADIUS_SCALE, y: 0.93, z: Math.sin(a) * 0.2 * RADIUS_SCALE });
-    }
-    parts.push({ geo: new THREE.SphereGeometry(0.06 * RADIUS_SCALE, 12, 10), y: 1.0 });
-  } else if (letter === 'b') {
-    parts.push({ geo: new THREE.SphereGeometry(0.05 * RADIUS_SCALE, 12, 10), y: 1.0 });
-  } else if (letter === 'n') {
-    const shape = new THREE.Shape();
-    KNIGHT_SHAPE.forEach(([x, y], i) => {
-      if (i === 0) shape.moveTo(x * RADIUS_SCALE, y); else shape.lineTo(x * RADIUS_SCALE, y);
-    });
-    shape.closePath();
-    const depth = 0.26 * RADIUS_SCALE;
-    const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2 });
-    g.translate(0, 0, -depth / 2);
-    g.rotateY(-Math.PI / 2);
-    g.computeVertexNormals();
-    parts.push({ geo: g });
-    // olho
-    parts.push({ geo: new THREE.SphereGeometry(0.03 * RADIUS_SCALE, 8, 6), x: 0.14 * RADIUS_SCALE, y: 0.84, z: -0.2 * RADIUS_SCALE });
-    parts.push({ geo: new THREE.SphereGeometry(0.03 * RADIUS_SCALE, 8, 6), x: -0.14 * RADIUS_SCALE, y: 0.84, z: -0.2 * RADIUS_SCALE });
-  }
-  geoCache.set(letter, parts);
-  return parts;
-}
-
 export function buildBoard(scene, quality) {
   const board = {
     pieces: new Map(),   // sq -> Group
@@ -79,8 +28,6 @@ export function buildBoard(scene, quality) {
   };
 
   // ---------- Materiais ----------
-  const matWhite = new THREE.MeshStandardMaterial({ color: COLORS.whitePiece, roughness: 0.32, metalness: 0.05 });
-  const matBlack = new THREE.MeshStandardMaterial({ color: COLORS.blackPiece, roughness: 0.45, metalness: 0.08 });
   const matSquare = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0.02 });
   const matFrame = new THREE.MeshStandardMaterial({ color: COLORS.frame, roughness: 0.6 });
   const matGrass = new THREE.MeshLambertMaterial({ color: COLORS.grass });
@@ -264,31 +211,21 @@ export function buildBoard(scene, quality) {
     scene.add(m);
   }
 
-  // ---------- Peças ----------
+  // ---------- Peças (personagens) ----------
+  setShadows(!!quality.shadows);
   function createPiece(piece) {
     const letter = PIECE_LETTERS[typeOf(piece)];
     const color = colorOf(piece);
-    const parts = buildPieceParts(letter);
-    const group = new THREE.Group();
-    const mat = color === 'w' ? matWhite : matBlack;
-    for (const p of parts) {
-      const mesh = new THREE.Mesh(p.geo, mat);
-      mesh.position.set(p.x || 0, p.y || 0, p.z || 0);
-      if (p.rotY) mesh.rotation.y = p.rotY;
-      mesh.castShadow = !!quality.shadows;
-      mesh.receiveShadow = true;
-      mesh.userData.pieceGroup = group;
-      group.add(mesh);
-    }
-    const h = PIECE_HEIGHT[letter];
-    group.scale.set(1, h, 1);
-    if (color === 'b') group.rotation.y = Math.PI;
-    group.userData = { isPiece: true, sq: -1, type: letter, color, piece, height: h };
+    const char = buildCharacter(letter, color);
+    const group = char.group;
+    group.traverse((o) => { if (o.isMesh) o.userData.pieceGroup = group; });
+    // personagens são construídos olhando +Z; brancas olham -Z no mundo
+    group.rotation.y = color === 'w' ? Math.PI : 0;
+    group.userData = { isPiece: true, sq: -1, type: letter, color, piece, height: char.height, char };
     return group;
   }
 
   board.pieceAt = (sq) => board.pieces.get(sq) || null;
-  board.eyeHeight = (group) => group.userData.height * EYE_FRACTION;
 
   board.setPosition = function (state) {
     for (const g of board.pieces.values()) scene.remove(g);
@@ -309,8 +246,9 @@ export function buildBoard(scene, quality) {
     group.userData.sq = sq;
     board.pieces.set(sq, group);
     squareToWorld(sq, group.position);
-    group.rotation.set(0, group.userData.color === 'b' ? Math.PI : 0, 0);
-    group.scale.set(1, group.userData.height, 1);
+    group.rotation.set(0, group.userData.color === 'w' ? Math.PI : 0, 0);
+    group.scale.set(1, 1, 1);
+    if (group.userData.char) resetPose(group.userData.char);
   };
 
   board.removePiece = function (sq) {

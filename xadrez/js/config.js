@@ -3,10 +3,6 @@
 export const SQUARE = 2;            // lado de uma casa (m)
 export const BOARD_HALF = SQUARE * 4; // 8 m
 
-// Altura das peças (m) e altura dos "olhos" (fração da altura)
-export const PIECE_HEIGHT = { p: 1.6, n: 2.0, b: 2.2, r: 1.9, q: 2.5, k: 2.7 };
-export const EYE_FRACTION = 0.85;
-
 export const COLORS = {
   sky: 0xbfd8ee,
   fog: 0xd6e4f0,
@@ -29,25 +25,6 @@ export const COLORS = {
   dust: 0xcfc6b8,
 };
 
-// Perfis de torno (LatheGeometry): pontos [raio, altura] em unidades relativas à altura 1.
-// Cada peça é depois escalada para PIECE_HEIGHT. O raio 0 fecha o topo.
-export const LATHE_PROFILES = {
-  p: [[0, 0], [0.42, 0], [0.44, 0.06], [0.36, 0.12], [0.26, 0.16], [0.2, 0.3], [0.16, 0.5], [0.22, 0.56], [0.16, 0.62], [0.24, 0.7], [0.26, 0.8], [0.2, 0.92], [0.1, 0.99], [0, 1]],
-  r: [[0, 0], [0.42, 0], [0.44, 0.07], [0.36, 0.14], [0.3, 0.2], [0.27, 0.5], [0.28, 0.72], [0.34, 0.76], [0.36, 0.78], [0.36, 0.97], [0.3, 0.97], [0.3, 0.9], [0, 0.9]],
-  b: [[0, 0], [0.4, 0], [0.42, 0.06], [0.34, 0.12], [0.22, 0.18], [0.18, 0.32], [0.16, 0.5], [0.24, 0.56], [0.16, 0.62], [0.22, 0.7], [0.2, 0.8], [0.12, 0.9], [0.06, 0.96], [0, 1]],
-  q: [[0, 0], [0.42, 0], [0.44, 0.06], [0.36, 0.12], [0.24, 0.18], [0.2, 0.32], [0.17, 0.52], [0.24, 0.58], [0.17, 0.64], [0.22, 0.74], [0.26, 0.86], [0.22, 0.9], [0.14, 0.93], [0.08, 0.98], [0, 1]],
-  k: [[0, 0], [0.42, 0], [0.44, 0.06], [0.36, 0.12], [0.24, 0.18], [0.2, 0.32], [0.17, 0.52], [0.24, 0.58], [0.17, 0.64], [0.22, 0.74], [0.26, 0.84], [0.22, 0.88], [0.1, 0.9], [0, 0.9]],
-  // cavalo: só a base; a cabeça é extrudada
-  n: [[0, 0], [0.42, 0], [0.44, 0.06], [0.36, 0.12], [0.26, 0.18], [0.22, 0.3], [0, 0.3]],
-};
-
-// Silhueta 2D da cabeça do cavalo (x, y) em unidades relativas à altura 1, olhando para -x
-export const KNIGHT_SHAPE = [
-  [-0.18, 0.28], [0.18, 0.28], [0.2, 0.45], [0.17, 0.6], [0.22, 0.72], [0.18, 0.82], [0.1, 0.9],
-  [0.05, 1.0], [-0.01, 0.92], [-0.09, 0.98], [-0.13, 0.9], [-0.28, 0.84], [-0.4, 0.78], [-0.4, 0.7],
-  [-0.27, 0.67], [-0.17, 0.6], [-0.14, 0.5], [-0.16, 0.4],
-];
-
 export const CAMERA = {
   overheadFov: 45,
   firstPersonFov: 72,
@@ -61,7 +38,6 @@ export const CAMERA = {
 
 export const ANIM = {
   slide: 0.6,
-  slideShort: 0.45,
   shake: 0.5,
   sink: 0.8,
   approach: 0.7,

@@ -76,6 +76,7 @@ const input = new Input({
   dom: renderer.domElement,
   camera,
   getPickables: () => board.pickables(),
+  getIgnored: () => (G.view === 'firstperson' && G.selected >= 0 ? board.pieceAt(G.selected) : null),
   onTap: (hit) => onTap(hit),
   onLook: (dy, dp) => { rig.look(dy, dp); G.dirty = true; },
   onEscape: () => { if (G.view === 'firstperson' && G.status === 'playing') leaveFirstPerson(); },
@@ -197,7 +198,7 @@ async function selectPiece(sq, piece) {
   G.view = 'firstperson';
   hud.setView('firstperson');
   hud.showHint('Voando para a peça…');
-  await rig.flyToPiece(piece, board.eyeHeight(piece));
+  await rig.flyToPiece(piece.userData.char);
   G.status = 'playing';
   updateTurnUi();
 }
@@ -365,8 +366,8 @@ const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, clock.getDelta());
-  let changed = rig.update(dt);
-  if (animator.update(dt)) changed = true;
+  let changed = animator.update(dt);
+  if (rig.update(dt)) changed = true;
   board.update(dt);
   if (changed || G.dirty) {
     renderer.render(scene, camera);

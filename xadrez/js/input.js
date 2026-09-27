@@ -5,10 +5,11 @@ const TAP_PX = 8;
 const TAP_MS = 400;
 
 export class Input {
-  constructor({ dom, camera, getPickables, onTap, onLook, onEscape }) {
+  constructor({ dom, camera, getPickables, getIgnored, onTap, onLook, onEscape }) {
     this.dom = dom;
     this.camera = camera;
     this.getPickables = getPickables;
+    this.getIgnored = getIgnored || (() => null);
     this.onTap = onTap;
     this.onLook = onLook;
     this.onEscape = onEscape;
@@ -51,8 +52,15 @@ export class Input {
     this.ndc.set(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, this.camera);
     const hits = this.raycaster.intersectObjects(this.getPickables(), true);
-    if (!hits.length) { this.onTap({ sq: -1, piece: null }); return; }
-    const h = hits[0];
+    // Em 1ª pessoa o corpo do próprio personagem (braço, escudo) fica na frente da câmera: ignora-o.
+    const ignored = this.getIgnored();
+    let h = null;
+    for (const hit of hits) {
+      if (!hit.object.visible) continue;
+      if (ignored && hit.object.userData && hit.object.userData.pieceGroup === ignored) continue;
+      h = hit; break;
+    }
+    if (!h) { this.onTap({ sq: -1, piece: null }); return; }
     if (h.object.userData && h.object.userData.pieceGroup) {
       const g = h.object.userData.pieceGroup;
       this.onTap({ sq: g.userData.sq, piece: g });

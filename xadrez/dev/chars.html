@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Personagens (dev)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #9fb8cf; overflow: hidden; }
+    canvas { display: block; }
+    #info { position: fixed; left: 8px; top: 8px; font: 12px monospace; color: #fff; background: rgba(0,0,0,.4); padding: 4px 8px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div id="info"></div>
+  <script type="module">
+    // Página de visualização dos personagens e das animações de batalha.
+    // Parâmetros (query string):
+    //   type=p|n|b|r|q|k|all   color=w|b|both   view=front|side|back|three|top|fp   zoom=1.0
+    //   anim=idle|walk|attack|hit|death|victory   victim=p|n|b|r|q|k   t=segundos (avança a animação até t)
+    //   stub=1 (usa dev/stubchars/)   size=1280x800
+    // Expõe window.preview = { THREE, scene, camera, renderer, chars, render(), step(dt), buildCharacter, battle }
+    import * as THREE from '../js/three.js';
+    import { resetPose, snapshotRest } from '../js/rig.js';
+    const q = Object.fromEntries(new URLSearchParams(location.search));
+    // Carrega só os módulos necessários (um arquivo quebrado não derruba os outros).
+    // stub=1 usa as cópias congeladas em dev/stubchars/ (para testar animações sem depender dos personagens finais).
+    const MODULES = { p: ['pawn', 'buildPawn'], n: ['knight', 'buildKnight'], b: ['bishop', 'buildBishop'], r: ['rook', 'buildRook'], q: ['queen', 'buildQueen'], k: ['king', 'buildKing'] };
+    const base = q.stub ? './stubchars/' : '../js/chars/';
+    const builders = {};
+    async function loadBuilder(letter) {
+      if (builders[letter]) return builders[letter];
+      const [file, fn] = MODULES[letter];
+      const mod = await import(base + file + '.js');
+      builders[letter] = mod[fn];
+      return builders[letter];
+    }
+    async function buildCharacter(letter, color) {
+      const build = await loadBuilder(letter);
+      const c = build(color);
+      c.type = letter; c.color = color;
+      if (!c.rest) snapshotRest(c);
+      return c;
+    }
+    const type = q.type || 'all';
+    const colors = q.color === 'both' ? ['w', 'b'] : [q.color || 'w'];
+    const view = q.view || 'three';
+    const zoom = parseFloat(q.zoom || '1');
+    const animName = q.anim || 'idle';
+    const T = parseFloat(q.t || '0');
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xbfd8ee);
+    scene.add(new THREE.HemisphereLight(0xdfeeff, 0x4a6a3a, 0.75));
+    const sun = new THREE.DirectionalLight(0xfff2dc, 1.7);
+    sun.position.set(-8, 14, 10);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 1, far: 60 });
+    scene.add(sun);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0xe9dfc9, roughness: 0.6 }));
+    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+    // grade de casas de 2 m
+    const grid = new THREE.GridHelper(16, 8, 0x6d5a4a, 0x6d5a4a);
+    grid.position.y = 0.005; scene.add(grid);
+
+    const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 200);
+    const chars = [];
+    const types = type === 'all' ? ['p', 'n', 'b', 'r', 'q', 'k'] : type.split(',');
+    let x0 = -(types.length - 1);
+    let zi = 0;
+    for (const color of colors) {
+      for (let i = 0; i < types.length; i++) {
+        const t = types[i];
+        const c = await buildCharacter(t, color);
+        c.group.position.set((x0 + i * 2), 0, zi * 2.5);
+        c.group.rotation.y = color === 'w' ? 0 : Math.PI; // brancas olham +Z aqui (para a câmera frontal)
+        if (colors.length === 2) c.group.rotation.y = 0;
+        scene.add(c.group);
+        chars.push(c);
+      }
+      zi++;
+    }
+    const focus = new THREE.Vector3(0, 1.0, (colors.length - 1) * 1.25);
+    const span = Math.max(3, types.length * 2) * zoom;
+    const poses = {
+      front: [0, 1.3, span * 1.1], side: [span * 1.1, 1.2, 0], back: [0, 1.3, -span * 1.1],
+      three: [span * 0.8, span * 0.45, span * 0.8], top: [0, span * 1.6, 0.01],
+    };
+    // Animações de batalha (opcional): atacante = chars[0], vítima = personagem extra
+    let battle = null, anims = [];
+    let victim = null;
+    if (animName !== 'idle' || q.victim) {
+      try { battle = await import('../js/battle.js'); } catch (e) { console.warn('battle.js indisponível', e); }
+    }
+    if (battle && chars.length) {
+      const att = chars[0];
+      if (q.victim) {
+        victim = await buildCharacter(q.victim, att.color === 'w' ? 'b' : 'w');
+        victim.group.position.set(att.group.position.x, 0, att.group.position.z + 2);
+        victim.group.rotation.y = Math.PI;
+        scene.add(victim.group);
+        chars.push(victim);
+      }
+      const dir = new THREE.Vector3(0, 0, 1);
+      if (animName === 'walk') anims.push(battle.createWalk(att));
+      else if (animName === 'attack' && victim) anims.push(battle.createAttack(att, victim, { onHit: () => { anims.push(battle.createDeath(victim, dir)); } }));
+      else if (animName === 'hit' && victim) anims.push(battle.createHit(victim, dir));
+      else if (animName === 'death' && victim) anims.push(battle.createDeath(victim, dir));
+      else if (animName === 'victory') anims.push(battle.createVictory(att));
+      else anims.push(battle.createIdle(att));
+    }
+    function step(dt) {
+      for (const a of anims) if (a && a.update) a.update(dt, 1);
+    }
+    // avança até t em passos fixos
+    for (let t = 0; t < T; t += 1 / 60) step(1 / 60);
+
+    if (view === 'fp' && chars.length) {
+      const c = chars[0];
+      c.group.updateMatrixWorld(true);
+      c.getEye(camera.position);
+      camera.lookAt(camera.position.x, camera.position.y - 0.4, camera.position.z + 6);
+      camera.fov = 72; camera.updateProjectionMatrix();
+      c.setHeadVisible(false);
+    } else {
+      const p = poses[view] || poses.three;
+      camera.position.set(p[0], p[1], p[2]).add(new THREE.Vector3(0, 0, focus.z));
+      camera.lookAt(focus);
+    }
+    document.getElementById('info').textContent = `type=${type} color=${colors.join('+')} view=${view} anim=${animName} t=${T}`;
+    function render() { renderer.render(scene, camera); }
+    render();
+    // Estatísticas (impressas pelo harness): malhas, altura, caixa envolvente
+    window.__stats = chars.map((c) => {
+      let meshes = 0; c.group.traverse((o) => { if (o.isMesh) meshes++; });
+      c.group.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(c.group);
+      const size = box.getSize(new THREE.Vector3());
+      return { type: c.type, color: c.color, meshes, height: +c.height.toFixed(2), eyeHeight: +c.eyeHeight.toFixed(2), bboxW: +size.x.toFixed(2), bboxH: +size.y.toFixed(2), bboxD: +size.z.toFixed(2), minY: +box.min.y.toFixed(2), weapon: c.weaponKind, weaponLength: c.weaponLength, headMeshes: c.headMeshes.length };
+    });
+    window.preview = { THREE, scene, camera, renderer, chars, victim, render, step, buildCharacter, battle, anims, resetPose };
+    window.__ready = true;
+  </script>
+</body>
+</html>
