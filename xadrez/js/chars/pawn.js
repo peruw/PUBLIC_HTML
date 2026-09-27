@@ -16,8 +16,9 @@ const KETTLE_PROFILE = [
   [1.06, 0.42], [0.9, 0.66], [0.62, 0.84], [0.3, 0.94], [0, 0.97], // calota
 ].map(([r, y]) => new THREE.Vector2(r, y));
 const KETTLE = new THREE.LatheGeometry(KETTLE_PROFILE, 12);
-// Coifa acolchoada: esfera com abertura de 120° para o rosto (centrada em +Z).
-const COIF = new THREE.SphereGeometry(1, 10, 8, Math.PI / 2 + Math.PI / 3, Math.PI * 2 - (Math.PI * 2) / 3);
+// Coifa acolchoada: esfera com abertura de 100° para o rosto (centrada em +Z).
+const COIF_OPEN = (100 / 180) * Math.PI;
+const COIF = new THREE.SphereGeometry(1, 10, 8, Math.PI / 2 + COIF_OPEN / 2, Math.PI * 2 - COIF_OPEN);
 // Meia-esfera (umbo do escudo), eixo +Y.
 const HEMI = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
 // Painel do tabardo: casca de cilindro aberta cobrindo ±46° em torno de +Z, levemente afunilada em cima.
@@ -58,16 +59,20 @@ export function buildPawn(color) {
   const mouth = mesh(G.box(r * 0.3, r * 0.05, r * 0.05), M.leather, { y: r * 0.5, z: r * 0.9 });
   J.head.add(mouth); hm.push(mouth);
 
-  // ---- Gambesão: costuras horizontais (aparecem nas laterais), tabardo na cor do exército, fivela
-  for (const y of [tH * 0.36, tH * 0.68]) {
-    J.torso.add(mesh(G.torus(tr * 1.09, 0.012, 6, 16), M.cloth, { y, rx: Math.PI / 2, sy: 0.72 }));
-  }
+  // ---- Gambesão: tabardo na cor do exército (painéis da frente e das costas), fivela do cinto
   for (const ry of [0, Math.PI]) {
     J.torso.add(mesh(TABARD, M.accent, { y: tH * 0.56, ry, sx: tr * 1.24, sy: tH * 0.84, sz: tr * 0.97 }));
   }
   J.torso.add(mesh(G.box(0.06, 0.05, 0.02), M.trim, { y: tH / 6, z: tr * 1.02 + 0.01 }));
   // saia do gambesão, abaixo do cinto, até o meio da coxa
   J.hips.add(mesh(G.cyl(tr * 1.18, tr * 1.32, dims.legLen * 0.3, 12), M.cloth, { y: -dims.legLen * 0.09, sz: 0.8 }));
+  // adaga embainhada pendurada no cinto, no quadril esquerdo (bainha + cabo)
+  const dagger = new THREE.Group();
+  dagger.position.set(-tr * 1.35, 0.01, 0.03);
+  dagger.rotation.set(0.2, 0, -0.1);
+  dagger.add(mesh(G.box(0.03, 0.22, 0.045), M.leather, {}));
+  dagger.add(mesh(G.cyl(0.012, 0.015, 0.1, 6), M.wood, { y: 0.16 }));
+  J.hips.add(dagger);
   // canos das botas, logo abaixo do joelho
   for (const knee of [J.kneeL, J.kneeR]) {
     knee.add(mesh(G.cyl(lr * 1.22, lr * 1.22, lr * 0.7, 8), M.leather, { y: -lr * 0.65 }));
@@ -93,9 +98,9 @@ export function buildPawn(color) {
   attachShield(char, shield);
 
   // ---- Pose de sentinela: lança em pé, plantada à frente do ombro direito; escudo erguido diante do peito
-  J.shoulderR.rotation.set(-0.35, 0, -0.06);
+  J.shoulderR.rotation.set(-0.35, 0, 0);
   J.elbowR.rotation.x = -0.85;
-  J.shoulderL.rotation.set(-0.45, 0, -0.12);
+  J.shoulderL.rotation.set(-0.4, 0, -0.25);
   J.elbowL.rotation.x = -1.3;
   // As mãos ficam inclinadas; os joints da arma e do escudo compensam para a lança ficar na vertical
   // e o escudo de frente (+Z do personagem), com o topo levemente inclinado para trás.
