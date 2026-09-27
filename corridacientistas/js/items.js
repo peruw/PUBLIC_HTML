@@ -23,7 +23,19 @@ const BOX_RADIUS = 1.8; // raio de coleta
 const APPLE_HIT = 1.3;
 const PROJ_HIT = 1.5;
 // itens fortes: intervalo mínimo (s) entre um uso e o próximo sorteio, e só um por vez na pista
-const ITEM_COOLDOWN = { tesla: 30, buraco: 25 };
+const ITEM_COOLDOWN = { tesla: 20, buraco: 15 };
+// itens que precisam de um adversário ainda correndo (sem ele, o uso não acontece)
+const NEEDS_RIVAL = { buraco: true, eletron: true };
+// item segurado atrás do kart (maçã/alfa): distância, altura e raio do escudo (m)
+const HOLD_BACK = 2.0;
+const HOLD_H = 0.45; // baixo: cobre menos a traseira do kart na câmera de perseguição
+const SHIELD_R = 1.2;
+const HOLD_TAP = 0.25; // soltar antes disso = toque curto (dispara como sempre)
+const MAX_HELD = 8; // instâncias extras para desenhar os itens segurados
+// buraco negro: capota quem está a menos de HOLE_HIT m; até HOLE_TIDE m, a maré só freia
+const HOLE_HIT = 8;
+const HOLE_TIDE = 14;
+const TIDE_KEEP = 0.7; // fração da velocidade que sobra na maré
 
 // temporários (sem alocação por quadro)
 const _v = new THREE.Vector3();
@@ -332,6 +344,7 @@ export class ItemSystem {
     this._warm = false;
     this._viewH = 720;
     this._lastUse = {}; // id -> this.time do último uso (itens com intervalo)
+    this.mode = 'race'; // 'race' | 'timetrial' (contrarrelógio: as caixas só dão foguete)
 
     // brilhos aditivos (núcleos, elétrons, projéteis) num único draw call
     this.glows = new SpriteBatch(360, { additive: true, renderOrder: 13 });
@@ -395,7 +408,7 @@ export class ItemSystem {
     this.appleMesh = this._instanced(
       appleGeometry(),
       new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.25, metalness: 0.05, emissive: 0x220000 }),
-      MAX_APPLES,
+      MAX_APPLES + MAX_HELD, // + maçãs seguradas atrás dos karts
     );
   }
 
@@ -407,6 +420,7 @@ export class ItemSystem {
         type, active: false, pos, prev: new THREE.Vector3(), vel: new THREE.Vector3(),
         s: 0, lateral: 0, owner: null, target: null, age: 0, life: 8, immune: 0.4,
         mode: 'straight', speed: 48, h: 0.65, spin: 0,
+        sdir: 1, // sentido ao seguir a pista: 1 = para a frente, -1 = para trás
         hazard: { position: pos, s: 0, radius: 1.0, type, lateral: 0 },
       };
     };
@@ -415,7 +429,7 @@ export class ItemSystem {
     this.alfaMesh = this._instanced(
       nucleusGeometry(0.2, 0.3, 12),
       new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.1, emissive: 0x3a1400 }),
-      MAX_ALFA,
+      MAX_ALFA + MAX_HELD, // + alfas seguradas atrás dos karts
     );
     this.eCore = this._instanced(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0x46b8ff }), MAX_ELETRON);
     this.eRing = this._instanced(
@@ -510,12 +524,19 @@ export class ItemSystem {
       k.item = null;
       k.itemCount = 0;
       k.roulette = null;
-      if (k.controls) k.controls.useItem = false;
+      k.itemHeld = null;
+      // o kart pode ter sido o jogador na corrida anterior: nada de botão "preso"
+      if (k.controls) k.controls.useItem = k.controls.holdItem = k.controls.itemBack = false;
     }
     this.hazards.length = 0;
     for (const m of [this.appleMesh, this.alfaMesh, this.eCore, this.eRing, this.batMesh]) { m.count = 0; m.visible = false; }
     this.glows.begin();
     this.glows.commit();
+  }
+
+  // 'race' (padrão) ou 'timetrial' (contrarrelógio: as caixas só dão foguete). Vale até mudar de novo.
+  setMode(mode) {
+    this.mode = mode === 'timetrial' ? 'timetrial' : 'race';
   }
 
   giveItem(kart, itemId) {
@@ -524,6 +545,7 @@ export class ItemSystem {
     kart.item = itemId;
     kart.itemCount = it.uses || 1;
     kart.roulette = null;
+    kart.itemHeld = null;
     this.bus?.emit('item:got', { kart, item: itemId });
   }
 
@@ -531,29 +553,43 @@ export class ItemSystem {
     if (!kart || kart.item || kart.roulette) return;
     const i = (Math.random() * ITEM_IDS.length) | 0;
     // o prêmio é sorteado já na coleta (posição de agora); a roleta para nele
-    kart.roulette = { time: RACE.rouletteTime, showing: ITEM_IDS[i], _i: i, _tick: 0.07, result: this.pickItem(kart.place) };
+    const result = this.pickItem(kart.place, kart);
+    const showing = this.mode === 'timetrial' ? result : ITEM_IDS[i];
+    kart.roulette = { time: RACE.rouletteTime, showing, _i: i, _tick: 0.07, result };
   }
 
-  // Sorteio ponderado pela posição (1..8). Público para testes.
-  pickItem(place) {
+  // Há algum adversário de `k` ainda correndo? (alvo para buraco negro e elétron)
+  _hasRival(k) {
+    for (const o of this.karts) if (o !== k && !o.finished) return true;
+    return false;
+  }
+
+  // Sorteio ponderado pela posição (1..8). `kart` (opcional) tira do sorteio os itens sem alvo.
+  // Público para testes.
+  pickItem(place, kart = null) {
+    if (this.mode === 'timetrial') return 'foguete';
     const p = clamp(Math.round(place || 4), 1, 8) - 1;
+    const beginner = this.world?.cc?.id === '50cc';
+    const noRival = !!kart && !this._hasRival(kart);
     // itens com intervalo: fora se usados há pouco, se alguém já tem (ou vai ganhar) um, ou se há buraco ativo
-    const ok = (id) => !(id in ITEM_COOLDOWN) || (
+    const ok = (id) => !(noRival && NEEDS_RIVAL[id]) && (!(id in ITEM_COOLDOWN) || (
       this.time - (this._lastUse[id] ?? -1e9) >= ITEM_COOLDOWN[id] &&
       !this.karts.some((k) => k.item === id || k.roulette?.result === id) &&
-      !(id === 'buraco' && this.holes.some((h) => h.active)));
+      !(id === 'buraco' && this.holes.some((h) => h.active))));
+    const weight = (id) => ((beginner && ITEMS[id].weights50cc) || ITEMS[id].weights)[p] || 0;
     let total = 0;
     let last = 'foguete';
     for (const id of ITEM_IDS) {
       if (!ok(id)) continue;
-      total += ITEMS[id].weights[p] || 0;
-      if (ITEMS[id].weights[p]) last = id;
+      const w = weight(id);
+      total += w;
+      if (w) last = id;
     }
     if (total <= 0) return 'foguete';
     let r = Math.random() * total;
     for (const id of ITEM_IDS) {
       if (!ok(id)) continue;
-      r -= ITEMS[id].weights[p] || 0;
+      r -= weight(id);
       if (r < 0) return id;
     }
     return last;
@@ -577,7 +613,7 @@ export class ItemSystem {
     for (let i = 0; i < karts.length; i++) {
       const k = karts[i];
       if (k.roulette) this._updateRoulette(k, dt);
-      this._checkUse(k);
+      this._checkUse(k, dt);
     }
     this._updateApples(dt, karts);
     this._updateProjectiles(dt, karts);
@@ -654,6 +690,8 @@ export class ItemSystem {
       if (b.alive && b.pop > 0.25) {
         for (let j = 0; j < karts.length; j++) {
           const k = karts[j];
+          // quem já tem item (ou roleta) atravessa a caixa sem quebrá-la
+          if (k.item || k.roulette) continue;
           const dx = k.position.x - b.pos.x;
           const dy = k.position.y + 0.7 - b.pos.y;
           const dz = k.position.z - b.pos.z;
@@ -679,7 +717,7 @@ export class ItemSystem {
     b.alive = false;
     b.timer = RACE.boxRespawn;
     this.bus?.emit('item:pickup', { kart: k, pos: b.pos });
-    if (!k.item && !k.roulette) this.rollItem(k);
+    this.rollItem(k);
   }
 
   // ------------------------------------------------------------ roleta e uso
@@ -689,7 +727,8 @@ export class ItemSystem {
     r._tick -= dt;
     if (r._tick <= 0) {
       r._i = (r._i + 1 + ((Math.random() * 2) | 0)) % ITEM_IDS.length;
-      r.showing = ITEM_IDS[r._i];
+      // no contrarrelógio só sai foguete: a roleta não promete outros itens
+      r.showing = this.mode === 'timetrial' ? r.result || 'foguete' : ITEM_IDS[r._i];
       const frac = 1 - Math.max(0, r.time) / RACE.rouletteTime;
       r._tick += 0.07 + 0.16 * frac * frac; // desacelera no fim
       if (r.time <= r._tick) r.showing = r.result || r.showing; // último giro: para no prêmio
@@ -703,16 +742,39 @@ export class ItemSystem {
     }
   }
 
-  _checkUse(k) {
+  // controls.useItem = pulso do aperto; controls.holdItem = botão de item ainda apertado (só o
+  // jogador: a IA manda só o pulso). Maçã e alfa apertadas com o botão seguro ficam atrás do kart
+  // (escudo) e saem ao soltar; toque curto sai logo ao soltar, como antes.
+  _checkUse(k, dt) {
     const c = k.controls;
     if (!c) return;
     const use = c.useItem;
     c.useItem = false; // pulso consumido sempre
-    if (use && k.item && !k.roulette && !k.stunned && !k.frozen) this._use(k);
+    const held = k.itemHeld;
+    if (held) {
+      if (k.item !== held.item || k.roulette) {
+        k.itemHeld = null; // o item sumiu por fora (reset, giveItem)
+        return;
+      }
+      held.t += dt;
+      // o gesto de "para trás" vale enquanto o dedo está no botão (ao soltar, fica o último valor)
+      if (c.holdItem) held.back = !!c.itemBack;
+      if (k.stunned) this._loseHeld(k); // batida: o item cai da mão
+      else if (!c.holdItem || use || k.finished) this._releaseHeld(k);
+      else this._heldPos(k, held.pos);
+      return;
+    }
+    if (!use || !k.item || k.roulette || k.stunned || k.frozen) return;
+    if (ITEMS[k.item].hold && c.holdItem && !k.finished) this._startHold(k);
+    else this._use(k, { back: !!(c.lookBack || c.itemBack) });
   }
 
-  _use(k) {
+  // Usa o item. back: alfa para trás; from: de onde a maçã/alfa sai (item segurado).
+  // Devolve false se o uso não aconteceu (item fica com o kart).
+  _use(k, { back = false, from = null } = {}) {
     const id = k.item;
+    // sem adversário ainda correndo, buraco negro e elétron não têm alvo: nada acontece
+    if (NEEDS_RIVAL[id] && !this._hasRival(k)) return false;
     if (id in ITEM_COOLDOWN) this._lastUse[id] = this.time;
     switch (id) {
       case 'foguete':
@@ -727,10 +789,10 @@ export class ItemSystem {
         break;
       }
       case 'maca':
-        this._dropApple(k);
+        this._dropApple(k, from);
         break;
       case 'alfa':
-        this._fire(k, 'alfa');
+        this._fire(k, 'alfa', back, from);
         break;
       case 'eletron':
         this._fire(k, 'eletron');
@@ -747,12 +809,87 @@ export class ItemSystem {
       default:
         break;
     }
+    this._consume(k);
+    this.bus?.emit('item:use', { kart: k, item: id });
+    return true;
+  }
+
+  _consume(k) {
     k.itemCount = (k.itemCount || 1) - 1;
     if (k.itemCount <= 0) {
       k.item = null;
       k.itemCount = 0;
     }
-    this.bus?.emit('item:use', { kart: k, item: id });
+  }
+
+  // ------------------------------------------------------------ item segurado (escudo)
+  _startHold(k) {
+    const held = { item: k.item, t: 0, back: false, pos: new THREE.Vector3() };
+    k.itemHeld = held;
+    this._heldPos(k, held.pos);
+  }
+
+  // posição do item segurado: HOLD_BACK m atrás do kart, balançando de leve
+  _heldPos(k, out) {
+    const h = k.heading || 0;
+    const sc = this._scaleOf(k);
+    const bob = Math.sin(this.time * 7 + (k.index || 0)) * 0.06;
+    return out.set(
+      k.position.x - Math.sin(h) * HOLD_BACK * sc,
+      k.position.y + (HOLD_H + bob) * sc,
+      k.position.z - Math.cos(h) * HOLD_BACK * sc,
+    );
+  }
+
+  // Soltou o botão: a maçã cai; a alfa vai para a frente, ou para trás com o gesto/C/FREIO.
+  _releaseHeld(k) {
+    const held = k.itemHeld;
+    k.itemHeld = null;
+    const c = k.controls;
+    // FREIO/ré só conta depois de segurar de verdade (um toque curto freando continua indo para a frente)
+    const back = held.back || !!c.lookBack || (held.t >= HOLD_TAP && (c.brake || 0) >= 0.5);
+    this._use(k, { back, from: held.pos });
+  }
+
+  // Batida com o item na mão: a maçã cai ali mesmo, a alfa se perde.
+  _loseHeld(k) {
+    const held = k.itemHeld;
+    k.itemHeld = null;
+    if (held.item === 'maca') this._dropApple(k, held.pos);
+    else this.effects?.burst('smoke', held.pos, { scale: 0.5 });
+    this._consume(k);
+  }
+
+  // Um projétil bateu no item segurado: os dois explodem e o kart fica sem o item.
+  _breakHeld(k) {
+    const held = k.itemHeld;
+    k.itemHeld = null;
+    this.bus?.emit('item:explode', { pos: held.pos, item: held.item });
+    this._consume(k);
+  }
+
+  // Desenha os itens `type` segurados a partir da instância n; devolve o novo total.
+  _drawHeld(karts, type, mesh, n) {
+    const t = this.time;
+    const cap = mesh.instanceMatrix.count;
+    for (let i = 0; i < karts.length && n < cap; i++) {
+      const k = karts[i];
+      const held = k.itemHeld;
+      if (!held || held.item !== type) continue;
+      const pop = Math.max(0.01, easeOutBack(Math.min(1, held.t / 0.18)));
+      const sc = this._scaleOf(k) * pop * (type === 'alfa' ? 0.85 : 1);
+      if (type === 'maca') _e.set(Math.sin(t * 5) * 0.2, (k.heading || 0) + t * 1.5, Math.cos(t * 4) * 0.15);
+      else _e.set(t * 9, t * 6.3, 0); // alfa girando
+      _q.setFromEuler(_e);
+      _s.setScalar(sc);
+      _m.compose(held.pos, _q, _s);
+      mesh.setMatrixAt(n++, _m);
+      const p = held.pos;
+      if (type === 'alfa') this.glows.push(p.x, p.y, p.z, 0, 0, 0, 1, 0.5, 0.04, 0.7, -2.4 * sc, 0, SHAPE.GLOW, 0.35);
+      // anel fraquinho: mostra que o item segurado protege a traseira
+      this.glows.push(p.x, p.y, p.z, 0, 0, 0, 0.55, 0.85, 1, 0.24, -2.0 * sc, t * 2, SHAPE.RING, 0);
+    }
+    return n;
   }
 
   _scaleOf(k) {
@@ -868,7 +1005,8 @@ export class ItemSystem {
   }
 
   // ------------------------------------------------------------ maçã
-  _dropApple(k) {
+  // from: posição de onde a maçã cai (item segurado); sem ela, sai de trás do piloto.
+  _dropApple(k, from = null) {
     let a = this.apples.find((x) => !x.active);
     if (!a) {
       a = this.apples[0];
@@ -879,9 +1017,12 @@ export class ItemSystem {
     const fx = Math.sin(h);
     const fz = Math.cos(h);
     const sc = this._scaleOf(k);
-    a.from.copy(k.position).addScaledVector(UP, 1.1 * sc);
-    a.from.x -= fx * 0.8;
-    a.from.z -= fz * 0.8;
+    if (from) a.from.copy(from);
+    else {
+      a.from.copy(k.position).addScaledVector(UP, 1.1 * sc);
+      a.from.x -= fx * 0.8;
+      a.from.z -= fz * 0.8;
+    }
     _v.copy(k.position);
     _v.x -= fx * 2.5;
     _v.z -= fz * 2.5;
@@ -933,7 +1074,7 @@ export class ItemSystem {
           const dy = k.position.y - a.ground;
           if (dx * dx + dz * dz > APPLE_HIT * APPLE_HIT || dy > 1.3 || dy < -1.2) continue;
           if (k.stunned || k.recovering) continue; // protegido logo após uma batida
-          if (!k.invincible) k.hit('spin', a.owner);
+          if (!k.invincible) k.hit('spin', a.owner, 'maca');
           hit = true;
           break;
         }
@@ -953,6 +1094,7 @@ export class ItemSystem {
       _m.compose(_v, _q, _s);
       this.appleMesh.setMatrixAt(n++, _m);
     }
+    n = this._drawHeld(karts, 'maca', this.appleMesh, n);
     this.appleMesh.count = n;
     this.appleMesh.visible = n > 0;
     if (n) this.appleMesh.instanceMatrix.needsUpdate = true;
@@ -969,13 +1111,30 @@ export class ItemSystem {
     return best; // reaproveita o mais velho
   }
 
-  _fire(k, type) {
+  // back: dispara para trás (alfa); from: sai do item segurado atrás do kart.
+  _fire(k, type, back = false, from = null) {
     const p = this._take(type);
     if (!p) return;
+    let target = null;
+    if (type === 'eletron') {
+      // persegue o kart logo à frente que ainda está correndo; sem ninguém à frente (1º lugar),
+      // o que vem logo atrás, disparando para trás
+      const place = k.place || 0;
+      let ahead = null;
+      let behind = null;
+      for (const o of this.karts) {
+        if (o === k || o.finished) continue;
+        if (o.place < place) {
+          if (!ahead || o.place > ahead.place) ahead = o;
+        } else if (!behind || o.place < behind.place) behind = o;
+      }
+      target = ahead || behind;
+      back = !ahead && !!behind;
+      from = null;
+    }
     const h = k.heading || 0;
     const fx = Math.sin(h);
     const fz = Math.cos(h);
-    const back = type === 'alfa' && !!k.controls?.lookBack;
     const dir = back ? -1 : 1;
     const sc = this._scaleOf(k);
     p.active = true;
@@ -984,15 +1143,19 @@ export class ItemSystem {
     p.immune = 0.4;
     p.spin = Math.random() * TAU;
     p.h = type === 'alfa' ? 0.65 : 0.8;
-    p.pos.copy(k.position);
-    p.pos.x += fx * dir * (back ? 1.9 : 1.5);
-    p.pos.z += fz * dir * (back ? 1.9 : 1.5);
-    p.pos.y += p.h * sc;
+    if (back && from) p.pos.copy(from);
+    else {
+      p.pos.copy(k.position);
+      p.pos.x += fx * dir * (back ? 1.9 : 1.5);
+      p.pos.z += fz * dir * (back ? 1.9 : 1.5);
+      p.pos.y += p.h * sc;
+    }
     const pr = this.track.project(p.pos, k.s);
     p.s = pr.s;
     p.lateral = pr.lateral;
     p.prev.copy(p.pos);
-    p.target = null;
+    p.target = target;
+    p.sdir = dir;
     if (type === 'alfa') {
       p.life = 8;
       p.speed = back ? 40 : 48 + Math.max(0, k.speed || 0) * 0.3;
@@ -1000,12 +1163,7 @@ export class ItemSystem {
     } else {
       p.life = 12;
       p.speed = 52;
-      const place = k.place || 0;
-      // persegue o kart logo à frente que ainda está correndo
-      if (place > 1) {
-        p.target = this.karts.filter((o) => o !== k && !o.finished && o.place < place).sort((a, b) => b.place - a.place)[0] || null;
-      }
-      p.mode = p.target ? 'track' : 'straight';
+      p.mode = target ? 'track' : 'straight';
     }
     p.vel.set(fx * dir * p.speed, 0, fz * dir * p.speed);
   }
@@ -1029,7 +1187,8 @@ export class ItemSystem {
       // --- movimento
       if (p.mode === 'track' && p.target) {
         const tg = p.target;
-        p.s = (p.s + p.speed * dt) % track.length;
+        const L = track.length;
+        p.s = (((p.s + p.sdir * p.speed * dt) % L) + L) % L;
         p.lateral += (tg.lateral - p.lateral) * Math.min(1, dt * 2.2);
         const smp = track.sample(p.s);
         const lim = smp.wallDist - 0.8;
@@ -1085,7 +1244,16 @@ export class ItemSystem {
 
       // --- colisões
       let dead = false;
+      // escudo: maçã/alfa segurada atrás de um kart segura o projétil antes de ele chegar ao kart
       for (let i = 0; i < karts.length; i++) {
+        const k = karts[i];
+        if (!k.itemHeld || (k === p.owner && p.age < p.immune)) continue;
+        if (k.itemHeld.pos.distanceToSquared(p.pos) > SHIELD_R * SHIELD_R) continue;
+        this._breakHeld(k);
+        dead = true;
+        break;
+      }
+      for (let i = 0; i < karts.length && !dead; i++) {
         const k = karts[i];
         if (k === p.owner && p.age < p.immune) continue;
         const dx = k.position.x - p.pos.x;
@@ -1094,7 +1262,7 @@ export class ItemSystem {
         if (dx * dx + dy * dy + dz * dz > PROJ_HIT * PROJ_HIT) continue;
         if (k.invincible) { dead = true; break; } // quebra na gaiola, sem efeito
         if (k.stunned || k.recovering) continue; // passa direto por quem acabou de apanhar
-        k.hit('spin', p.owner);
+        k.hit('spin', p.owner, p.type);
         dead = true;
         break;
       }
@@ -1145,6 +1313,7 @@ export class ItemSystem {
         fx?.trail(p.prev, p.pos, 0x5cc8ff, 0x1d4dff, 0.7, 0.26, 0.3, 0.55, 0.25);
       }
     }
+    na = this._drawHeld(karts, 'alfa', this.alfaMesh, na);
     this.alfaMesh.count = na;
     this.alfaMesh.visible = na > 0;
     if (na) this.alfaMesh.instanceMatrix.needsUpdate = true;
@@ -1163,15 +1332,28 @@ export class ItemSystem {
       if (o === k || o.invincible || o.finished) continue;
       const pl = clamp(o.place || 4, 1, 8);
       o.shrink(3.5 + (8 - pl) * 0.35);
-      o.hit('shock', k);
+      o.hit('shock', k, 'tesla');
     }
     this.bus?.emit('item:lightning', { by: k });
   }
 
   // ------------------------------------------------------------ buraco negro
+  // Alvo: o mais bem colocado que ainda corre, fora o dono, de preferência sem Gaiola de Faraday.
+  // strict: só aceita alvo sem gaiola (troca de alvo em voo); senão aceita um com gaiola se for o único.
+  _holeTarget(owner, strict) {
+    let best = null;
+    let any = null;
+    for (const o of this.karts) {
+      if (o === owner || o.finished) continue;
+      if (!any || (o.place || 99) < (any.place || 99)) any = o;
+      if (o.invincible) continue;
+      if (!best || (o.place || 99) < (best.place || 99)) best = o;
+    }
+    return best || (strict ? null : any);
+  }
+
   _launchHole(k) {
-    // o primeiro colocado que ainda não cruzou a chegada
-    const target = this.karts.filter((o) => o !== k && !o.finished).sort((a, b) => (a.place || 99) - (b.place || 99))[0];
+    const target = this._holeTarget(k, false);
     if (!target) return false;
     let h = this.holes.find((x) => !x.active);
     if (!h) {
@@ -1191,6 +1373,8 @@ export class ItemSystem {
     h.age = 0;
     h.scale = 0.2;
     h.heading = k.heading || 0;
+    h.fade = 1;
+    h.diskMat.uniforms.uAlpha.value = 1;
     h.group.visible = true;
     h.group.position.copy(h.pos);
     h.group.scale.setScalar(0.2);
@@ -1204,8 +1388,40 @@ export class ItemSystem {
     for (const h of this.holes) {
       if (!h.active) continue;
       h.age += dt;
+      // alvo que cruzou a chegada (ou ganhou a gaiola durante o voo): vai atrás do próximo
+      // colocado; sem ninguém, o buraco se dissipa sem explodir
+      if (h.phase !== 'fade') {
+        const t0 = h.target;
+        if (t0.finished || (h.phase === 'fly' && t0.invincible)) {
+          const nt = this._holeTarget(h.owner, true);
+          if (nt) {
+            h.target = nt;
+            if (h.phase !== 'fly') {
+              h.phase = 'fly';
+              h.t = 0;
+            }
+          } else {
+            h.phase = 'fade';
+            h.t = 0;
+            h.fade = h.scale;
+            this.effects?.burst('smoke', h.pos, { scale: 0.9 });
+          }
+        }
+      }
       const tg = h.target;
-      if (h.phase === 'fly') {
+      if (h.phase === 'fade') {
+        h.t += dt;
+        const f = Math.min(1, h.t / 0.5);
+        h.scale = Math.max(0.01, h.fade * (1 - f));
+        h.diskMat.uniforms.uAlpha.value = 1 - f;
+        h.pos.y += dt * 1.5; // sobe e some
+        if (f >= 1) {
+          h.active = false;
+          h.group.visible = false;
+          h.diskMat.uniforms.uAlpha.value = 1;
+          continue;
+        }
+      } else if (h.phase === 'fly') {
         let d = (((tg.s - h.s) % L) + L * 1.5) % L - L * 0.5; // distância com sinal (curta)
         const step = 75 * dt;
         if (Math.abs(d) <= step + 1 || h.age > 19) {
@@ -1261,7 +1477,7 @@ export class ItemSystem {
       // halo roxo atrás da esfera (sem deslocamento: a esfera preta o encobre) + anel de fótons
       this.glows.push(h.pos.x, h.pos.y, h.pos.z, 0, 0, 0, 0.22, 0.03, 0.6, 0.35, -3.4 * s * pulse, 0, SHAPE.GLOW, -1);
       this.glows.push(h.pos.x, h.pos.y, h.pos.z, 0, 0, 0, 1, 0.42, 0.08, 0.8, -1.6 * s, this.time * 2, SHAPE.RING, -1);
-      if (h.age > 20) this._holeBoom(h, karts);
+      if (h.age > 20 && h.phase !== 'fade') this._holeBoom(h, karts);
     }
   }
 
@@ -1269,11 +1485,15 @@ export class ItemSystem {
     const tg = h.target;
     const c = tg.position;
     for (const o of karts) {
-      if (o.invincible) continue;
+      // o dono nunca se machuca; quem já chegou também não
+      if (o === h.owner || o.invincible || o.finished) continue;
       const dx = o.position.x - c.x;
       const dy = o.position.y - c.y;
       const dz = o.position.z - c.z;
-      if (dx * dx + dy * dy + dz * dz < 64) o.hit('tumble', h.owner);
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < HOLE_HIT * HOLE_HIT) o.hit('tumble', h.owner, 'buraco');
+      // maré: um pouco mais longe, só perde velocidade (no mesmo nível; o viaduto fica a 13,5 m)
+      else if (d2 < HOLE_TIDE * HOLE_TIDE && Math.abs(dy) < 4 && !o.stunned) o.speed *= TIDE_KEEP;
     }
     h.boom.copy(c).addScaledVector(UP, 1);
     h.active = false;

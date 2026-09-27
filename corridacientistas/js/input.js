@@ -1,5 +1,7 @@
 // Entrada: teclado, gamepad (mapeamento padrão) e toque (botões na tela).
 // poll() junta tudo; useItem, pause, mute e confirm são pulsos de 1 leitura.
+// holdItem = botão de item ainda apertado (items.js usa para segurar maçã/alfa atrás do kart);
+// itemBack = no toque, dedo arrastado para baixo no ITEM (atirar para trás, como a tecla C).
 
 const KEYMAP = {
   KeyW: 'up', ArrowUp: 'up',
@@ -53,10 +55,18 @@ const CSS = `
 .tc-gas{width:clamp(70px,20vmin,84px);height:clamp(70px,20vmin,84px);font-size:clamp(24px,7vmin,30px);
   border-color:rgba(120,255,160,.8);background:rgba(10,90,40,.32)}
 .tc-gas.tc-on{background:rgba(90,230,130,.55)}
+.tc-item.tc-back::after{content:'▼';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);
+  font-size:14px;color:#ffe27a;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.tc-cursor{position:absolute;left:0;top:0;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
+  background:rgba(255,255,255,.9);box-shadow:0 0 0 3px rgba(18,26,60,.4),0 0 10px rgba(255,255,255,.5);
+  pointer-events:none;opacity:0;transition:opacity .12s ease}
+.tc-cursor.tc-show{opacity:.9}
 `;
 
 // Área de toque = botão + margem generosa
 const PAD = 14;
+const STEER_DEAD = 8; // zona morta (px) no meio da direção de toque
+const ITEM_DRAG = 22; // px arrastando para baixo no ITEM = atirar para trás
 
 export class Input {
   constructor({ touchLayer = null, bus = null } = {}) {
@@ -66,11 +76,15 @@ export class Input {
     this._autoAccelerate = false;
     this._touchWanted = false;
     this._countdown = false;
+    this._inRace = false; // entre a contagem e a chegada do jogador (bus)
 
-    this.state = { throttle: 0, brake: 0, steer: 0, drift: false, useItem: false, lookBack: false, pause: false, mute: false, confirm: false };
+    this.state = {
+      throttle: 0, brake: 0, steer: 0, drift: false, useItem: false, holdItem: false, itemBack: false, lookBack: false,
+      pause: false, mute: false, confirm: false,
+    };
 
     // teclado
-    this._keys = { up: false, down: false, left: false, right: false, drift: false, look: false };
+    this._keys = { up: false, down: false, left: false, right: false, drift: false, look: false, item: false };
     this._steerOrder = 0; // -1/1: última direção apertada
     this._kbPulse = { item: false, pause: false, mute: false, confirm: false };
     this._downCodes = new Set();
@@ -82,10 +96,14 @@ export class Input {
     // toque
     this._touch = { left: false, right: false, drift: false, item: false, brake: false, gas: false };
     this._touchPulse = { item: false };
-    this._steerPointers = []; // [{ id, side }]
+    this._steerPointers = []; // [{ id, x }] (x = clientX atual do dedo)
     this._btnPointers = new Map(); // pointerId -> nome do botão
+    this._itemPtr = null; // { id, y0, back }: dedo no ITEM (gesto de arrastar para baixo)
     this._safe = { left: 0, right: 0, bottom: 0 };
     this._steerMid = 0;
+    this._steerFull = 60; // px do meio até o esterço cheio
+    this._steerReach = 60; // px do meio até o centro de ◀/▶ (cursor)
+    this._steerY = 0; // altura do centro de ◀/▶ (cursor)
 
     this._onKeyDown = (e) => this._key(e, true);
     this._onKeyUp = (e) => this._key(e, false);
@@ -96,7 +114,12 @@ export class Input {
     this._onAnyPointer = (e) => {
       if (e.pointerType === 'touch') {
         this.lastDevice = 'touch';
-        if (!this._touchEnabled) this.touchEnabled = true;
+        if (!this._touchEnabled) {
+          // notebook/tablet híbrido: o 1º toque no meio da corrida já mostra os botões
+          // (sem esperar pausar). Com um menu aberto (pausa), fica para quando ele fechar.
+          if (this._inRace && !this._overlayOpen()) this._touchWanted = true;
+          this.touchEnabled = true;
+        }
       }
     };
     addEventListener('keydown', this._onKeyDown);
@@ -108,8 +131,21 @@ export class Input {
     this._offs = [];
     if (bus?.on) {
       // durante a contagem a aceleração automática espera o jogador (largada-foguete)
-      this._offs.push(bus.on('race:countdown', () => (this._countdown = true)));
-      this._offs.push(bus.on('race:go', () => (this._countdown = false)));
+      this._offs.push(bus.on('race:countdown', () => {
+        this._countdown = true;
+        this._inRace = true;
+      }));
+      this._offs.push(bus.on('race:go', () => {
+        this._countdown = false;
+        this._inRace = true;
+      }));
+      this._offs.push(bus.on('race:reset', () => {
+        this._countdown = false;
+        this._inRace = false;
+      }));
+      this._offs.push(bus.on('race:finish', (e) => {
+        if (e?.kart?.isPlayer) this._inRace = false;
+      }));
     }
 
     let coarse = false;
@@ -149,6 +185,35 @@ export class Input {
     this._applyTouchVisibility();
   }
 
+  // Vibra o gamepad (se estiver em uso e tiver motor de vibração). ms = duração; strength 0..1.
+  rumble(ms = 120, strength = 0.6) {
+    if (this.lastDevice !== 'gamepad') return;
+    let pads = null;
+    try {
+      pads = navigator.getGamepads ? navigator.getGamepads() : null;
+    } catch {
+      pads = null;
+    }
+    if (!pads) return;
+    const duration = clamp(ms || 0, 0, 5000);
+    const s = clamp(strength ?? 0.6, 0, 1);
+    if (duration <= 0 || s <= 0) return;
+    for (let i = 0; i < pads.length; i++) {
+      const p = pads[i];
+      if (!p || !p.connected) continue;
+      try {
+        const va = p.vibrationActuator;
+        if (va?.playEffect) {
+          // motor forte = intensidade; o fraco dá o "zumbido" por cima
+          va.playEffect('dual-rumble', { startDelay: 0, duration, strongMagnitude: s, weakMagnitude: Math.min(1, s * 0.6 + 0.15) })
+            ?.catch?.(() => {});
+        } else p.hapticActuators?.[0]?.pulse?.(s, duration);
+      } catch {
+        /* sem vibração: silencioso */
+      }
+    }
+  }
+
   poll() {
     const st = this.state;
     const k = this._keys;
@@ -161,8 +226,7 @@ export class Input {
     if (k.left && k.right) kSteer = this._steerOrder;
     else if (k.left) kSteer = -1;
     else if (k.right) kSteer = 1;
-    let tSteer = 0;
-    if (this._steerPointers.length) tSteer = this._steerPointers[this._steerPointers.length - 1].side;
+    const tSteer = this._touchSteer();
 
     let steer = kSteer;
     if (Math.abs(g.steer) > Math.abs(steer)) steer = g.steer;
@@ -185,6 +249,8 @@ export class Input {
     st.drift = k.drift || g.drift || t.drift;
     st.lookBack = k.look || g.look;
     st.useItem = this._kbPulse.item || this._padPulse.item || this._touchPulse.item;
+    st.holdItem = k.item || g.item || t.item;
+    st.itemBack = !!(this._itemPtr && this._itemPtr.back);
     st.pause = this._kbPulse.pause || this._padPulse.pause;
     st.mute = this._kbPulse.mute || this._padPulse.mute;
     st.confirm = this._kbPulse.confirm || this._padPulse.confirm;
@@ -231,6 +297,11 @@ export class Input {
       case 'look':
         this._keys[act] = held;
         break;
+      case 'item':
+        // pulso no aperto + estado segurado (segurar maçã/alfa atrás do kart)
+        this._keys.item = held;
+        if (down) this._kbPulse.item = true;
+        break;
       default:
         if (down) this._kbPulse[act] = true;
     }
@@ -247,17 +318,19 @@ export class Input {
     for (const key in this._touch) this._touch[key] = false;
     this._steerPointers.length = 0;
     this._btnPointers.clear();
+    this._itemPtr = null;
     this._refreshTouchClasses();
   }
 
   // ---------- gamepad ----------
   _pollGamepads() {
-    const g = this._pad || (this._pad = { throttle: 0, brake: 0, steer: 0, drift: false, look: false });
+    const g = this._pad || (this._pad = { throttle: 0, brake: 0, steer: 0, drift: false, look: false, item: false });
     g.throttle = 0;
     g.brake = 0;
     g.steer = 0;
     g.drift = false;
     g.look = false;
+    g.item = false;
     let pads = null;
     try {
       pads = navigator.getGamepads ? navigator.getGamepads() : null;
@@ -291,6 +364,7 @@ export class Input {
       g.brake = Math.max(g.brake, brk);
       g.drift = g.drift || drift;
       g.look = g.look || look;
+      g.item = g.item || !!(mask & 2); // LB/Y segurado
       if (mask || thr > 0.1 || brk > 0.1 || ax !== 0) this.lastDevice = 'gamepad';
     }
   }
@@ -327,6 +401,10 @@ export class Input {
     };
     this._gasBtn = this._btn.gas;
     this._gasBtn.style.display = this._autoAccelerate ? 'none' : '';
+    // cursor da direção analógica: mostra quanto o kart está virando
+    this._cursor = document.createElement('div');
+    this._cursor.className = 'tc-cursor';
+    root.appendChild(this._cursor);
 
     // zonas de toque (invisíveis, maiores que os botões)
     this._steerZone = this._zone('steer');
@@ -412,6 +490,11 @@ export class Input {
     const rr = rect.right;
     setZone(this._steerZone, { x: Math.max(0, rl.x - 8), y: rl.y - 8, w: rr.x + rr.w - Math.max(0, rl.x - 8) + 8, h: H - (rl.y - 8) });
     this._steerMid = (pos.left[0] + size.left / 2 + pos.right[0] + size.right / 2) / 2;
+    // direção analógica: esterço cheio a 0,7 × a largura do botão, mas nunca depois de ~85% do
+    // caminho até o centro de ◀/▶ (um toque no centro do botão continua valendo esterço cheio)
+    this._steerReach = pos.right[0] + size.right / 2 - this._steerMid;
+    this._steerFull = Math.max(STEER_DEAD + 10, Math.min(0.7 * size.left, this._steerReach * 0.85));
+    this._steerY = H - pos.left[1] - size.left / 2;
     // DRIFT e FREIO vão até as bordas da tela
     const rd = rect.drift;
     setZone(this._zones.drift, { x: rd.x, y: rd.y, w: W - rd.x, h: H - rd.y });
@@ -429,6 +512,15 @@ export class Input {
     return !!this._root && !this._root.classList.contains('tc-hidden');
   }
 
+  // Alguma tela do jogo (pausa, resultado...) cobre a corrida?
+  _overlayOpen() {
+    try {
+      return !!document.querySelector('.screen:not(.hidden)');
+    } catch {
+      return false;
+    }
+  }
+
   _applyTouchVisibility() {
     if (!this._root) return;
     const show = this._touchWanted && this._touchEnabled;
@@ -439,6 +531,7 @@ export class Input {
     } else {
       this._steerPointers.length = 0;
       this._btnPointers.clear();
+      this._itemPtr = null;
       for (const key in this._touch) this._touch[key] = false;
       this._refreshTouchClasses();
     }
@@ -467,10 +560,13 @@ export class Input {
     }
     if (name === 'steer') {
       this._removeSteer(e.pointerId);
-      this._steerPointers.push({ id: e.pointerId, side: e.clientX < this._steerMid ? -1 : 1 });
+      this._steerPointers.push({ id: e.pointerId, x: e.clientX });
     } else {
       this._btnPointers.set(e.pointerId, name);
-      if (name === 'item') this._touchPulse.item = true;
+      if (name === 'item') {
+        this._touchPulse.item = true;
+        this._itemPtr = { id: e.pointerId, y0: e.clientY, back: false };
+      }
       if (name === 'drift' || name === 'item') {
         try {
           navigator.vibrate?.(8);
@@ -483,15 +579,24 @@ export class Input {
   }
 
   _pMove(e, name) {
+    if (name === 'item') {
+      // arrastar o dedo para baixo no ITEM = soltar para trás (com folga para não piscar)
+      const ip = this._itemPtr;
+      if (!ip || ip.id !== e.pointerId) return;
+      const dy = e.clientY - ip.y0;
+      const back = ip.back ? dy > ITEM_DRAG * 0.5 : dy > ITEM_DRAG;
+      if (back !== ip.back) {
+        ip.back = back;
+        this._refreshTouchClasses();
+      }
+      return;
+    }
     if (name !== 'steer') return;
-    // deslizar o dedo de ◀ para ▶ troca a direção
+    // direção analógica: acompanha o dedo (deslizar de ◀ para ▶ também troca a direção)
     for (const p of this._steerPointers) {
-      if (p.id === e.pointerId) {
-        const side = e.clientX < this._steerMid ? -1 : 1;
-        if (side !== p.side) {
-          p.side = side;
-          this._recomputeTouch();
-        }
+      if (p.id === e.pointerId && p.x !== e.clientX) {
+        p.x = e.clientX;
+        this._recomputeTouch();
       }
     }
   }
@@ -499,7 +604,18 @@ export class Input {
   _pUp(e) {
     const a = this._removeSteer(e.pointerId);
     const b = this._btnPointers.delete(e.pointerId);
+    if (this._itemPtr && this._itemPtr.id === e.pointerId) this._itemPtr = null;
     if (a || b) this._recomputeTouch();
+  }
+
+  // Esterço do último dedo na zona de direção: -1..1, com zona morta no meio.
+  _touchSteer() {
+    const n = this._steerPointers.length;
+    if (!n) return 0;
+    const dx = this._steerPointers[n - 1].x - this._steerMid;
+    const a = Math.abs(dx);
+    if (a <= STEER_DEAD) return 0;
+    return Math.sign(dx) * clamp((a - STEER_DEAD) / (this._steerFull - STEER_DEAD), 0, 1);
   }
 
   _removeSteer(id) {
@@ -515,14 +631,23 @@ export class Input {
     const t = this._touch;
     t.drift = t.item = t.brake = t.gas = false;
     for (const name of this._btnPointers.values()) t[name] = true;
-    const last = this._steerPointers.length ? this._steerPointers[this._steerPointers.length - 1].side : 0;
-    t.left = last < 0;
-    t.right = last > 0;
+    const v = this._touchSteer();
+    t.left = v < -0.1;
+    t.right = v > 0.1;
     this._refreshTouchClasses();
+    // cursor entre os botões: posição = esterço atual
+    const cur = this._cursor;
+    if (cur) {
+      const on = this._steerPointers.length > 0;
+      cur.classList.toggle('tc-show', on);
+      if (on) cur.style.transform = `translate(${(this._steerMid + v * this._steerReach).toFixed(1)}px, ${this._steerY.toFixed(1)}px)`;
+    }
   }
 
   _refreshTouchClasses() {
     if (!this._btn) return;
     for (const k of ['left', 'right', 'drift', 'item', 'brake', 'gas']) this._btn[k].classList.toggle('tc-on', !!this._touch[k]);
+    this._btn.item.classList.toggle('tc-back', !!(this._itemPtr && this._itemPtr.back));
+    if (this._cursor && !this._steerPointers.length) this._cursor.classList.remove('tc-show');
   }
 }

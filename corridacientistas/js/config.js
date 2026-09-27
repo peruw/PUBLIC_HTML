@@ -150,13 +150,14 @@ export const CHARACTERS = [
 export const CHARACTER_BY_ID = Object.fromEntries(CHARACTERS.map((c) => [c.id, c]));
 
 // Itens das caixas. `weights[p]` = peso no sorteio para quem está na posição p+1 (8 karts).
+// `weights50cc` (opcional) substitui `weights` no 50cc. `hold`: dá para segurar atrás do kart como escudo.
 // Equivalência com o Mario Kart entre parênteses.
 export const ITEMS = {
   foguete: {
     id: 'foguete', name: 'Foguete', icon: '🚀', color: 0xff7b29,
     effect: 'Turbo instantâneo.', // (cogumelo)
     fact: '3ª Lei de Newton: o foguete empurra os gases para trás, e os gases empurram o foguete para a frente. Ação e reação!',
-    weights: [0, 20, 25, 25, 20, 15, 10, 5],
+    weights: [3, 20, 25, 25, 20, 15, 10, 5], // 3 no 1º lugar compensa o elétron, que saiu de lá
   },
   pilha3: {
     id: 'pilha3', name: 'Pilha de Volta ×3', icon: '🔋', color: 0x3ddc84, uses: 3,
@@ -165,40 +166,42 @@ export const ITEMS = {
     weights: [0, 5, 10, 15, 20, 25, 25, 20],
   },
   maca: {
-    id: 'maca', name: 'Maçã de Newton', icon: '🍎', color: 0xe63946,
-    effect: 'Deixa uma maçã na pista. Quem passar por cima derrapa.', // (banana)
+    id: 'maca', name: 'Maçã de Newton', icon: '🍎', color: 0xe63946, hold: true,
+    effect: 'Deixa uma maçã na pista: quem passa por cima derrapa. Segure o botão de item para levá-la atrás do kart como escudo.', // (banana)
     fact: 'Newton contou que ver uma maçã cair o fez pensar: a mesma força que puxa a maçã mantém a Lua em órbita. É a gravitação universal!',
     weights: [45, 20, 10, 5, 0, 0, 0, 0],
   },
   alfa: {
-    id: 'alfa', name: 'Partícula Alfa', icon: 'α', color: 0xffd23f,
-    effect: 'Disparo em linha reta que ricocheteia nos muros. No computador, segure C para atirar para trás.', // (casco verde)
+    id: 'alfa', name: 'Partícula Alfa', icon: 'α', color: 0xffd23f, hold: true,
+    effect: 'Tiro reto que ricocheteia nos muros. Segure o botão de item para levá-la atrás como escudo. Para atirar para trás, solte segurando FREIO ou C (no celular, arraste o dedo para baixo no ITEM).', // (casco verde)
     fact: 'Em 1909, a equipe de Rutherford disparou partículas alfa contra uma folha de ouro. Algumas ricochetearam: o átomo tem um núcleo pequeno e denso!',
     weights: [40, 25, 20, 15, 10, 5, 0, 0],
   },
   eletron: {
     id: 'eletron', name: 'Elétron Teleguiado', icon: 'e⁻', color: 0x4cc9f0,
-    effect: 'Persegue o kart da frente.', // (casco vermelho)
-    fact: 'Cargas opostas se atraem (Lei de Coulomb). O elétron, de carga negativa, é puxado por cargas positivas.',
-    weights: [5, 20, 25, 25, 25, 20, 15, 10],
+    effect: 'Persegue o kart da frente. Em 1º lugar, vai atrás de quem vem logo depois.', // (casco vermelho)
+    fact: 'Cargas opostas se atraem (Lei de Coulomb). No jogo, o kart da frente faz o papel da carga positiva que puxa o elétron.',
+    weights: [0, 20, 25, 25, 25, 20, 15, 10],
   },
   faraday: {
     id: 'faraday', name: 'Gaiola de Faraday', icon: '🛡️', color: 0xc0c7d1,
     effect: 'Por 7 segundos: invencível e mais rápido. Quem você encostar capota!', // (estrela)
-    fact: 'Numa casca de metal, a carga elétrica fica do lado de fora e protege quem está dentro. Por isso um carro fechado é um lugar seguro durante uma tempestade de raios.',
+    fact: 'Numa carcaça de metal, as cargas se redistribuem na superfície e o campo elétrico externo não entra. Por isso um carro com carroceria metálica protege de raios.',
     weights: [0, 0, 0, 5, 10, 15, 25, 30],
+    // no 50cc, um pouco também na frente: o iniciante conhece o item
+    weights50cc: [4, 4, 4, 5, 10, 15, 25, 30],
   },
   tesla: {
     id: 'tesla', name: 'Bobina de Tesla', icon: '⚡', color: 0xb388ff,
     effect: 'Um raio atinge todos os adversários: eles rodopiam, encolhem e ficam lentos. Quem está na Gaiola de Faraday fica protegido!', // (raio)
     fact: 'Nikola Tesla criou a bobina que gera faíscas de alta tensão. Um raio de verdade aquece o ar a cerca de 30.000 °C, cinco vezes a temperatura da superfície do Sol.',
-    weights: [0, 0, 0, 0, 0, 2, 5, 8], // só um por vez e 30 s de intervalo (items.js)
+    weights: [0, 0, 0, 0, 1, 4, 8, 14], // só um por vez e 20 s de intervalo (items.js)
   },
   buraco: {
     id: 'buraco', name: 'Buraco Negro', icon: '🕳️', color: 0x7b2cbf,
     effect: 'Voa até o 1º colocado e o derruba, junto com quem estiver perto dele.', // (casco azul)
     fact: 'A gravidade de um buraco negro é tão forte que nem a luz escapa. Em 2019, foi divulgada a primeira imagem de um, na galáxia M87.',
-    weights: [0, 0, 2, 3, 3, 4, 4, 4], // só um por vez e 25 s de intervalo (items.js)
+    weights: [0, 0, 2, 4, 5, 6, 6, 6], // só um por vez e 15 s de intervalo (items.js)
   },
 };
 
