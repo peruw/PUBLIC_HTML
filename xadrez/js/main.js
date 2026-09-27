@@ -458,6 +458,11 @@ async function boot() {
   }
   G.status = 'menu';
   menu.show('title');
+  // Cenário realista em segundo plano (céu, grama e árvores); o jogo já pode ser usado enquanto carrega.
+  import('./scenery.js')
+    .then(({ upgradeScenery }) => upgradeScenery({ scene, renderer, board, quality, onChange: () => { G.dirty = true; } }))
+    .then(() => { G.sceneryReady = true; })
+    .catch((e) => { console.warn('[cenário]', e); G.sceneryReady = true; });
 }
 boot();
 

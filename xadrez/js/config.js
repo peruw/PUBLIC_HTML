@@ -77,8 +77,8 @@ export const STOCKFISH_CANDIDATES = [
 ];
 
 export const QUALITY = {
-  alta: { shadows: true, shadowMap: 2048, pixelRatio: 2, trees: 60 },
-  baixa: { shadows: false, shadowMap: 1024, pixelRatio: 1.5, trees: 24 },
+  alta: { shadows: true, shadowMap: 2048, pixelRatio: 2, trees: 60, realTrees: 34 },
+  baixa: { shadows: false, shadowMap: 1024, pixelRatio: 1.5, trees: 24, realTrees: 12 },
 };
 
 export const STORE_PREFIX = 'xadrez-';

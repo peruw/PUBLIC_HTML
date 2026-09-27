@@ -200,6 +200,7 @@ export function buildBoard(scene, quality) {
   leaves.instanceMatrix.needsUpdate = true;
   leaves.instanceColor.needsUpdate = true;
   scene.add(trunks, leaves);
+  board.scenery = { grass, plaza, trunks, leaves, mountains: [], hemi, sun, treeRadius: R };
 
   // Montanhas ao longe (cones grandes, sem sombra)
   const mtGeo = new THREE.ConeGeometry(30, 22, 6);
@@ -210,6 +211,7 @@ export function buildBoard(scene, quality) {
     m.position.set(Math.cos(a) * 120, 8, Math.sin(a) * 120);
     m.scale.set(1 + (i % 3) * 0.4, 1 + (i % 2) * 0.5, 1);
     scene.add(m);
+    board.scenery.mountains.push(m);
   }
 
   // ---------- Peças (personagens) ----------
