@@ -10,10 +10,10 @@ import * as THREE from '../three.js';
 import { humanoid, horse, attachWeapon, attachShield, mesh, G, snapshotRest } from '../rig.js';
 
 // ---------- Material extra (no máximo 2; criado uma vez, igual nas duas cores) ----------
-const MAT_DARK = new THREE.MeshStandardMaterial({ color: 0x15130f, roughness: 0.7 }); // cascos, fenda do elmo, narinas
+const MAT_DARK = new THREE.MeshStandardMaterial({ color: 0x15130f, roughness: 0.7 }); // cascos e fenda de visão do elmo
 
 // ---------- Dimensões principais ----------
-const RIDER_H = 1.55;                 // altura do esqueleto do cavaleiro (em pé); sentado fica ~2.55 m no total
+const RIDER_H = 1.55;                 // altura do esqueleto do cavaleiro (em pé); montado, o conjunto tem ~2.5 m
 const BODY_Y = 1.07, BODY_Z = -0.15;  // centro do corpo do cavalo no espaço da raiz (recuado para centrar a pegada)
 const BODY_SY = 1.15;                 // o tronco do cavalo é mais alto do que largo
 const LEG_Y = -0.12;                  // altura do pivô das pernas no espaço do corpo
@@ -70,7 +70,7 @@ function pennonGeo(len, h, depth) {
   s.moveTo(0, h / 2); s.lineTo(len, 0); s.lineTo(0, -h / 2); s.closePath();
   return new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false });
 }
-const GEO_SHIELD = heaterGeo(0.50, 0.62, 0.03);
+const GEO_SHIELD = heaterGeo(0.46, 0.60, 0.03);
 const GEO_EMBLEM = knightEmblemGeo(0.30, 0.012);
 const GEO_PENNON = pennonGeo(0.36, 0.12, 0.006);
 
@@ -101,7 +101,7 @@ function stripMeshes(obj) {
 export function buildKnight(color) {
   const rider = humanoid({ type: 'n', color, height: RIDER_H, build: 'medium', armor: 'plate' });
   const { M, dims, joints: J } = rider;
-  const { headR, torsoH, lower } = dims;
+  const { headR, torsoH } = dims;
   const root = rider.group;
 
   // =================== CAVALO ===================
@@ -162,8 +162,8 @@ export function buildKnight(color) {
   // cauda
   const T = HJ.tail;
   T.position.set(0, 0.2, -0.56);
-  T.rotation.set(0.15, 0, 0);
-  T.add(mesh(G.capsule(0.065, 0.40, 6), M.mane, { y: -0.26, sz: 1.25 }));
+  T.rotation.set(0.1, 0, 0);
+  T.add(mesh(G.capsule(0.065, 0.55, 6), M.mane, { y: -0.33, sz: 1.25 }));
 
   // =================== CAVALEIRO ===================
   // A bacia do cavaleiro passa a ser filha do corpo do cavalo (senta na sela e acompanha o galope).
@@ -214,13 +214,13 @@ export function buildKnight(color) {
   attachWeapon(rider, lance, 'lance', TIP);
 
   // ---- Pose de sentinela: lança em pé ao lado do corpo, escudo à frente do antebraço esquerdo
-  J.shoulderR.rotation.set(-0.35, 0, 0.45);
+  J.shoulderR.rotation.set(-0.35, 0, 0.38);
   J.elbowR.rotation.x = -0.8;
   J.shoulderL.rotation.set(-0.35, 0, -0.1);
   J.elbowL.rotation.x = -1.3;
   root.updateMatrixWorld(true);
   level(J.weapon);
-  J.weapon.rotateX(0.08); J.weapon.rotateZ(-0.06); // topo levemente para trás/dentro: a base sai do joelho
+  J.weapon.rotateX(0.1); J.weapon.rotateZ(0.08); // topo levemente à frente e para dentro (base para fora): a lança não bate no joelho
   level(J.shield);
   J.shield.rotateY(-0.4);
 
@@ -244,7 +244,7 @@ export function buildKnight(color) {
   J.mountTail = T;
   // alturas reais (sem a lança): topo da pluma e olho no espaço do mundo
   root.updateMatrixWorld(true);
-  rider.height = +plume.localToWorld(new THREE.Vector3(0, 0.1, 0)).y.toFixed(3);
+  rider.height = +plume.localToWorld(new THREE.Vector3(0, 0.15, 0)).y.toFixed(3);
   rider.eyeHeight = +rider.getEye(new THREE.Vector3()).y.toFixed(3);
   return snapshotRest(rider);
 }
