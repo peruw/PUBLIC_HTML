@@ -1,5 +1,7 @@
 // Efeitos visuais: partículas (pool fixo), faíscas de drift, chamas de turbo, poeira,
 // gaiola de Faraday, raios, ondas de choque e flash de tela. Tudo procedural.
+// API extra: effects.speedFeel (0..1, leitura, para a vinheta do HUD) e
+// effects.podiumConfetti(center, { width, height, duration, right }) para a festa do pódio.
 import * as THREE from './three.js';
 
 const TAU = Math.PI * 2;
@@ -250,8 +252,10 @@ void main() {
   #include <fog_vertex>
 }`;
 
+// uAdd é uniforme (não #define) para os lotes aditivo e normal usarem o MESMO programa de shader.
 const SPRITE_FS = /* glsl */ `
 uniform sampler2D uMap;
+uniform float uAdd; // 1 = mistura aditiva, 0 = normal
 varying vec2 vUv;
 varying float vQ;
 varying vec4 vCol;
@@ -269,11 +273,9 @@ void main() {
     #else
       float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
     #endif
-    #ifdef ADDITIVE
-      gl_FragColor.a *= 1.0 - fogFactor;
-    #else
-      gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, fogFactor);
-    #endif
+    // aditivo: some na neblina (somar menos); normal: mistura com a cor da neblina
+    gl_FragColor.a *= 1.0 - fogFactor * uAdd;
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, fogFactor * (1.0 - uAdd));
   #endif
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -301,7 +303,7 @@ export class SpriteBatch {
     this._ranges = this._attrs.map(() => ({ start: 0, count: 0 }));
     g.instanceCount = 0;
     this.geometry = g;
-    const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uMap: { value: null } }]);
+    const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uMap: { value: null }, uAdd: { value: additive ? 1 : 0 } }]);
     uniforms.uMap.value = getAtlas();
     this.material = new THREE.ShaderMaterial({
       uniforms,
@@ -311,7 +313,6 @@ export class SpriteBatch {
       depthWrite: false,
       fog: true,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
-      defines: additive ? { ADDITIVE: '' } : {},
     });
     this.mesh = new THREE.Mesh(g, this.material);
     this.mesh.frustumCulled = false;
@@ -362,6 +363,8 @@ export class SpriteBatch {
 const S = 26; // floats por partícula
 // 0-2 pos, 3-5 vel, 6 idade, 7 vida (<0 = só 1 quadro), 8 tam0, 9 tam1, 10-12 cor0, 13-15 cor1,
 // 16 alfa, 17 arrasto, 18 gravidade, 19 rotação, 20 giro, 21 forma, 22 esticar, 23 núcleo, 24 balanço, 25 fade-in
+// esticar < 0: o rastro usa a velocidade RELATIVA a pool.refVel (linhas de velocidade presas à câmera
+// ficam do mesmo tamanho em qualquer classe, em vez de sumirem quando o kart anda quase junto com elas).
 
 class ParticlePool {
   constructor(max, additive, renderOrder) {
@@ -369,6 +372,7 @@ class ParticlePool {
     this.n = 0;
     this.d = new Float32Array(max * S);
     this.batch = new SpriteBatch(max, { additive, renderOrder });
+    this.refVel = new THREE.Vector3();
   }
 
   spawn(p) {
@@ -425,6 +429,7 @@ class ParticlePool {
   commit() {
     const d = this.d;
     const b = this.batch;
+    const rv = this.refVel;
     b.begin();
     for (let i = 0; i < this.n; i++) {
       const o = i * S;
@@ -436,9 +441,12 @@ class ParticlePool {
       const fi = d[o + 25];
       const fade = (fi > 0 ? Math.min(1, age / fi) : 1) * (life > 0 ? Math.min(1, u * 2) : 1);
       const st = d[o + 22];
+      const rel = st < 0; // rastro relativo à refVel
       b.push(
         d[o], d[o + 1], d[o + 2],
-        d[o + 3] * st, d[o + 4] * st, d[o + 5] * st,
+        rel ? (rv.x - d[o + 3]) * st : d[o + 3] * st,
+        rel ? (rv.y - d[o + 4]) * st : d[o + 4] * st,
+        rel ? (rv.z - d[o + 5]) * st : d[o + 5] * st,
         d[o + 10] * u + d[o + 13] * t, d[o + 11] * u + d[o + 14] * t, d[o + 12] * u + d[o + 15] * t,
         d[o + 16] * fade, size, d[o + 19], d[o + 21], d[o + 23],
       );
@@ -918,13 +926,14 @@ export class Effects {
     this.flames.count = 0;
     this.root.add(this.flames);
 
-    // ondas de choque (anéis no chão)
+    // ondas de choque (anéis no chão). Plano virado para cima (a câmera nunca fica embaixo do chão):
+    // um lado só e sem tone mapping = mesma variante de shader das placas de turbo da pista.
     const ringGeo = new THREE.PlaneGeometry(2, 2);
     ringGeo.rotateX(-Math.PI / 2);
     const ringTex = ringTexture();
     this.rings = [];
     for (let i = 0; i < 10; i++) {
-      const mat = new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, forceSinglePass: true });
+      const mat = new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
       const mesh = new THREE.Mesh(ringGeo, mat);
       mesh.visible = false;
       mesh.renderOrder = 10;
@@ -934,7 +943,10 @@ export class Effects {
 
     // gaiolas de Faraday (uma por kart ativo)
     const cageGeo = buildCageGeometry(lowQ);
-    const cageMat = new THREE.MeshStandardMaterial({ color: 0xdfe6ef, metalness: 0.55, roughness: 0.28, emissive: 0x5a8cff, emissiveIntensity: 0.55 });
+    // qualidade baixa: Lambert (reaproveita o programa de shader do cenário; o metal PBR custa caro no celular)
+    const cageMat = lowQ
+      ? new THREE.MeshLambertMaterial({ color: 0xc9d6e6, emissive: 0x5a8cff, emissiveIntensity: 0.6 })
+      : new THREE.MeshStandardMaterial({ color: 0xdfe6ef, metalness: 0.55, roughness: 0.28, emissive: 0x5a8cff, emissiveIntensity: 0.55 });
     const shellGeo = new THREE.SphereGeometry(1, lowQ ? 20 : 28, lowQ ? 14 : 20);
     const shellBase = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uAlpha: { value: 1 }, uColor: { value: new THREE.Color(0x7fb8ff) } },
@@ -964,6 +976,10 @@ export class Effects {
     this._frame = 0;
     this._confAcc = 0;
     this._strAcc = 0;
+    // 0..1: sensação de velocidade do jogador (1 = turbo; ~0,55 no limite de velocidade). O HUD usa para a vinheta.
+    this.speedFeel = 0;
+    // confete do pódio (ver podiumConfetti)
+    this._pod = { t: 0, age: 0, center: new THREE.Vector3(), right: new THREE.Vector3(1, 0, 0), w: 7, h: 6, acc: 0, volley: 0 };
     this._flashEl = null;
     this._off = [];
     if (bus) this._listen(bus);
@@ -1032,6 +1048,9 @@ export class Effects {
     this.kstate.clear();
     this.confettiT = 0;
     this.confettiKart = null;
+    this._pod.t = 0;
+    this._strAcc = 0;
+    this.speedFeel = 0;
     if (this._flashEl) {
       this._flashEl.style.transition = 'none';
       this._flashEl.style.opacity = '0';
@@ -1082,6 +1101,79 @@ export class Effects {
         e.grav = 6; e.drag = 0; e.life = rand(1.2, 1.8);
         this.alpha.spawn(e);
       }
+    }
+  }
+
+  // Confete do pódio: dois canhões (em ~0 s e ~2,4 s) e chuva sobre a área por `duration` segundos.
+  //   center: Vector3 no chão, no meio do pódio (é copiado).
+  //   opts: { width = 7 (m, largura da área e distância entre os canhões), height = 6 (m, de onde cai a chuva),
+  //           duration = 6 (s), right = Vector3 (eixo dos canhões; padrão: direita da câmera atual) }
+  // Chamar de novo recomeça; reset() para. A quantidade segue o multiplicador de partículas da qualidade.
+  podiumConfetti(center, { width = 7, height = 6, duration = 6, right = null } = {}) {
+    if (!center) return;
+    const P = this._pod;
+    P.center.copy(center);
+    P.w = width;
+    P.h = height;
+    P.t = Math.max(0.1, duration);
+    P.age = 0;
+    P.acc = 0;
+    P.volley = 0;
+    const cam = this.world?.camera;
+    if (right) P.right.copy(right);
+    else if (cam) P.right.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    else P.right.set(1, 0, 0);
+    P.right.y = 0;
+    if (P.right.lengthSq() < 1e-6) P.right.set(1, 0, 0);
+    P.right.normalize();
+  }
+
+  _podiumVolley() {
+    const P = this._pod;
+    const e = this._e;
+    const n = Math.round(60 * this.q);
+    for (const side of [-1, 1]) {
+      // canhão no chão, na lateral, atirando para cima e para o meio
+      _v.copy(P.center).addScaledVector(P.right, side * P.w * 0.5);
+      _v.y += 0.6;
+      for (let i = 0; i < n; i++) {
+        const inward = rand(1, 3.5);
+        e.reset().at(_v).vel(-P.right.x * side * inward + rand(-1.2, 1.2), rand(7, 11), -P.right.z * side * inward + rand(-1.2, 1.2));
+        this._confettiP(e);
+        e.grav = 5; e.life = rand(2.2, 3.2);
+        this.alpha.spawn(e);
+      }
+      // clarão do disparo
+      e.reset().at(_v).col(PAL.confetti[(Math.random() * 6) | 0]);
+      e.life = 0.2; e.s0 = 1.6; e.s1 = 2.4; e.hot = 0.8; e.a = 0.7;
+      this.add.spawn(e);
+    }
+  }
+
+  _podiumUpdate(dt) {
+    const P = this._pod;
+    if (P.t <= 0) return;
+    if (P.volley === 0 || (P.volley === 1 && P.age >= 2.4)) {
+      this._podiumVolley();
+      P.volley++;
+    }
+    P.age += dt;
+    P.t -= dt;
+    const e = this._e;
+    P.acc += 70 * this.q * dt;
+    while (P.acc >= 1) {
+      P.acc -= 1;
+      // disco sobre o pódio (não depende de para onde o pódio está virado)
+      const a = Math.random() * TAU;
+      const r = Math.sqrt(Math.random()) * P.w * 0.6;
+      e.reset();
+      e.x = P.center.x + Math.cos(a) * r;
+      e.y = P.center.y + P.h * rand(0.75, 1.1);
+      e.z = P.center.z + Math.sin(a) * r;
+      e.vel(rand(-0.5, 0.5), rand(-0.8, 0), rand(-0.5, 0.5));
+      this._confettiP(e);
+      e.fadeIn = 0.2;
+      this.alpha.spawn(e);
     }
   }
 
@@ -1395,6 +1487,7 @@ export class Effects {
     for (const c of this.cages) if (c.used && c._seen !== this._frame) { c.used = false; c.group.visible = false; }
 
     this._confettiUpdate(dt);
+    this._podiumUpdate(dt);
     this._streaks(dt, world);
     this.bolts.update(dt, world?.camera);
     this._ringsUpdate(dt);
@@ -1820,14 +1913,36 @@ export class Effects {
     }
   }
 
+  // Linhas de velocidade presas à câmera e this.speedFeel (0..1).
+  // No turbo: como sempre. Fora dele, só perto da velocidade máxima normal (k), mais raras, curtas e fracas.
   _streaks(dt, world) {
     const p = world?.player;
     const cam = world?.camera;
-    if (!p || !cam || !(p.boostTime > 0) || p.stunned) return;
+    let k = 0;
+    let boosting = false;
+    // nada atordoado, na contagem e depois da chegada (câmera de festa)
+    if (p && cam && !p.stunned && !p.frozen && !p.finished) {
+      const ref = p.baseMaxSpeed > 0 ? p.baseMaxSpeed : p.maxSpeed || 25;
+      k = clamp((Math.abs(p.speed || 0) / ref - 0.82) / 0.18, 0, 1);
+      boosting = p.boostTime > 0;
+    }
+    // sobe rápido (~0,1 s) e desce devagar (~0,4 s)
+    const feelT = boosting ? 1 : 0.55 * k;
+    const tau = feelT > this.speedFeel ? 0.06 : 0.2;
+    this.speedFeel += (feelT - this.speedFeel) * (1 - Math.exp(-dt / tau));
+    if (feelT === 0 && this.speedFeel < 0.002) this.speedFeel = 0;
+
+    if (p?.velocity) this.add.refVel.copy(p.velocity); // mesmo sem emitir: as linhas ainda vivas usam
+    // olhando para trás as linhas viriam na direção errada
+    const rate = p?.controls?.lookBack ? 0 : (boosting ? 55 : 55 * 0.35 * k) * this.q;
+    if (rate <= 0) {
+      this._strAcc = 0;
+      return;
+    }
     const e = this._e;
     cam.matrixWorld.extractBasis(_camR, _camU, _camF);
     _camF.negate(); // câmera olha para -Z
-    this._strAcc += 55 * this.q * dt;
+    this._strAcc += rate * dt;
     while (this._strAcc >= 1) {
       this._strAcc -= 1;
       const a = Math.random() * TAU;
@@ -1841,7 +1956,10 @@ export class Effects {
       e.vel(-_camF.x * sp, -_camF.y * sp, -_camF.z * sp);
       if (p.velocity) { e.vx += p.velocity.x; e.vy += p.velocity.y; e.vz += p.velocity.z; }
       e.col(0xffffff);
-      e.life = rand(0.18, 0.3); e.s0 = 0.035; e.a = 0.4; e.stretch = 0.05; e.fadeIn = 0.05; e.shape = SHAPE.SPARK;
+      // esticar negativo: comprimento pela velocidade relativa ao kart (ver ParticlePool)
+      if (boosting) { e.life = rand(0.18, 0.3); e.s0 = 0.035; e.a = 0.4; e.stretch = -0.035; }
+      else { e.life = rand(0.14, 0.24); e.s0 = 0.03; e.a = 0.25; e.stretch = -0.022; }
+      e.fadeIn = 0.05; e.shape = SHAPE.SPARK;
       this.add.spawn(e);
     }
   }

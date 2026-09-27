@@ -1,5 +1,6 @@
 // Câmera do jogo: perseguição (chase), órbita, pódio e sobrevoo (demo da tela inicial).
 // Suavização por molas criticamente amortecidas; nada é alocado por quadro.
+// Leitura pública: rig.kick (0..1, envelope do "soco" do turbo no modo chase).
 import * as THREE from './three.js';
 
 const TAU = Math.PI * 2;
@@ -48,6 +49,12 @@ const wob = (t, a, b, c) => Math.sin(t * a) * 0.5 + Math.sin(t * b + 1.3) * 0.3 
 
 const SHOTS = ['chase', 'front', 'side', 'crane', 'trackside'];
 
+// "Soco" do turbo: a câmera recua e abaixa um pouco, e o FOV abre.
+// Ataque rápido (~0,1 s) e retorno lento (~0,5 s): damp1 chega a ~90% em 2× o tempo dado.
+const KICK = { dist: 0.9, height: -0.2, fov: 11, attack: 0.05, release: 0.25, star: 0.45 };
+const DRIFT_ROLL = 0.04; // rad de inclinação extra no drift (sensação de derrapagem)
+const PODIUM_INTRO = 2.4; // s de aproximação ao entrar no modo pódio
+
 export class CameraRig {
   constructor(camera) {
     this.camera = camera;
@@ -64,12 +71,14 @@ export class CameraRig {
     this.vel = new THREE.Vector3();
     this.look = new THREE.Vector3();
     this.lookVel = new THREE.Vector3();
-    this.st = { yaw: 0, y: 0, ly: 0, fov: 0, punch: 0, dist: 0, roll: 0 };
+    this.st = { yaw: 0, y: 0, ly: 0, fov: 0, kick: 0, dist: 0, roll: 0 };
     this.yaw = 0;
     this.camY = 0;
     this.lookY = 0;
     this.fov = camera.fov || this.baseFov;
-    this.punch = 0;
+    // envelope do turbo 0..1 (somente leitura fora daqui); fovAdd = graus somados depois da suavização do FOV
+    this.kick = 0;
+    this.fovAdd = 0;
     this.extraDist = 0;
     this.topRef = 0; // velocidade máxima de referência (sem turbo)
     this.roll = 0;
@@ -89,6 +98,7 @@ export class CameraRig {
     this.fixed = new THREE.Vector3();
     this.shotSide = 1;
     this.shotCount = 0;
+    this.podT = 0;
   }
 
   follow(kart) {
@@ -96,10 +106,14 @@ export class CameraRig {
     this.target = kart;
   }
 
+  // 'podium': opts = { position: Vector3, lookAt: Vector3, fov = 42, orbit = 0.14 (rad de vaivém),
+  //   intro = true (entra de mais longe e se aproxima em ~2,4 s) }. Os vetores são lidos a cada
+  //   quadro: quem chamou pode movê-los depois.
   setMode(mode, opts = {}) {
     this.mode = mode;
     this.opts = opts || {};
     this._snap = true;
+    if (mode === 'podium') this.podT = 0;
     if (mode === 'orbit') this.orbitAngle = this.opts.angle ?? this.orbitAngle;
     if (mode === 'flyover') {
       this.shotIndex = -1;
@@ -129,6 +143,7 @@ export class CameraRig {
       this._snap = true;
     }
     let fovT = this.baseFov;
+    this.fovAdd = 0; // só o modo chase soma o "soco" do turbo
     switch (this.mode) {
       case 'orbit': fovT = this._orbit(dt); break;
       case 'podium': fovT = this._podium(dt); break;
@@ -161,16 +176,26 @@ export class CameraRig {
     }
     _f.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     _r.set(-_f.z, 0, _f.x);
-    // velocidade relativa (abre o FOV e afasta um pouco)
-    const boosting = (kart.boostTime || 0) > 0 || (kart.starTime || 0) > 0;
-    const ms = kart.maxSpeed || 25;
-    if (!boosting || this.topRef <= 0 || snap) this.topRef = Math.max(8, ms);
+    // velocidade relativa (abre o FOV e afasta um pouco). Referência = máxima normal do kart:
+    // no acostamento (máxima menor) o FOV não abre como se estivesse rápido.
+    const boostOn = (kart.boostTime || 0) > 0;
+    const boosting = boostOn || (kart.starTime || 0) > 0;
+    if (kart.baseMaxSpeed > 0) this.topRef = Math.max(8, kart.baseMaxSpeed);
+    else if (!boosting || this.topRef <= 0 || snap) this.topRef = Math.max(8, kart.maxSpeed || 25);
     const ratio = Math.min(1.3, Math.abs(kart.speed || 0) / this.topRef);
     const aspect = this.camera.aspect || 16 / 9;
     // tela em pé: câmera um pouco mais perto, mais alta e olhando mais para baixo
     const tall = aspect < 1 ? 1 - aspect : 0;
     const distT = (opts?.distance ?? this.distance) * (1 - tall * 0.15) + Math.min(1, ratio) * 0.35;
     this.extraDist = snap ? distT : damp1(this.extraDist, distT, this.st, 'dist', 0.35, dt);
+    // soco do turbo (envelope próprio, somado depois das outras suavizações para não ficar lento)
+    const kickT = kart.stunned ? 0 : boostOn ? 1 : boosting ? KICK.star : 0;
+    if (snap) {
+      this.kick = kickT;
+      this.st.kick = 0;
+    } else {
+      this.kick = damp1(this.kick, kickT, this.st, 'kick', kickT > this.kick ? KICK.attack : KICK.release, dt);
+    }
     const h = (opts?.height ?? this.height) + tall * 1.4;
     const air = kart.onGround === false;
 
@@ -185,10 +210,10 @@ export class CameraRig {
       this.camY = _desired.y;
       this.lookY = _look.y;
     } else {
-      _desired.copy(pos).addScaledVector(_f, -this.extraDist);
+      _desired.copy(pos).addScaledVector(_f, -(this.extraDist + this.kick * KICK.dist));
       const yT = pos.y + h;
       this.camY = snap ? yT : damp1(this.camY, yT, this.st, 'y', air ? 0.32 : 0.12, dt);
-      _desired.y = this.camY;
+      _desired.y = this.camY + this.kick * KICK.height;
       _look.copy(pos).addScaledVector(_f, this.lookAhead);
       const lyT = pos.y + 1 - tall * 1.1;
       this.lookY = snap ? lyT : damp1(this.lookY, lyT, this.st, 'ly', air ? 0.25 : 0.08, dt);
@@ -199,11 +224,11 @@ export class CameraRig {
     this._keepInside(world, kart.s);
     // leve inclinação lateral nas curvas
     const steer = kart.controls ? kart.controls.steer || 0 : 0;
-    const rollT = lookBack ? 0 : -steer * 0.025 - (kart.drifting ? (kart.driftDir || 0) * 0.02 : 0);
+    const rollT = lookBack ? 0 : -steer * 0.025 - (kart.drifting ? (kart.driftDir || 0) * DRIFT_ROLL : 0);
     this.roll = snap ? rollT : damp1(this.roll, rollT, this.st, 'roll', 0.3, dt);
-    // FOV: 68 → ~80 com a velocidade, com um "soco" extra no turbo
-    this.punch = damp1(this.punch, boosting ? 6 : 0, this.st, 'punch', boosting ? 0.12 : 0.5, dt);
-    return (opts?.fov ?? this.baseFov) + 10 * Math.min(1, ratio) * Math.min(1, ratio) + this.punch;
+    // FOV: 64 → 74 com a velocidade (suavizado em _apply) + o soco do turbo (~11°, já suavizado)
+    this.fovAdd = lookBack ? 0 : this.kick * KICK.fov;
+    return (opts?.fov ?? this.baseFov) + 10 * Math.min(1, ratio) * Math.min(1, ratio);
   }
 
   // Mantém a câmera acima do chão e dentro do corredor da pista (sem atravessar muros)
@@ -238,17 +263,26 @@ export class CameraRig {
     return o.fov ?? 50;
   }
 
-  // ---- pódio ----
+  // ---- pódio: entra de mais longe e se aproxima; depois "respira" num vaivém lento em volta do lookAt ----
+  // Chame setMode('podium', ...) uma vez só: cada chamada recomeça a aproximação.
   _podium(dt) {
     const o = this.opts;
     const p = o.position || _t.set(0, 3, 8);
     const l = o.lookAt || _v.set(0, 1, 0);
-    const t = this.time;
-    _desired.set(p.x + Math.sin(t * 0.45) * 0.25, p.y + Math.sin(t * 0.7) * 0.08, p.z + Math.cos(t * 0.45) * 0.12);
-    _look.copy(l);
-    this._moveTo(_desired, _look, o.smooth ?? 0.8, dt);
+    this.podT += dt;
+    const t = this.podT;
+    // far: 1 no início da aproximação → 0 no fim (desacelera no final, como um travelling)
+    const u = o.intro === false ? 1 : Math.min(1, t / PODIUM_INTRO);
+    const far = (1 - u) * (1 - u) * (1 - u);
+    // posição em coordenadas "cilíndricas" em volta do ponto olhado
+    const ox = p.x - l.x, oz = p.z - l.z;
+    const r = Math.hypot(ox, oz) * (1 + 0.6 * far);
+    const a = Math.atan2(ox, oz) + Math.sin(t * 0.32) * (o.orbit ?? 0.14) + far * 0.4;
+    _desired.set(l.x + Math.sin(a) * r, p.y + far * 1.6 + Math.sin(t * 0.7) * 0.06, l.z + Math.cos(a) * r);
+    _look.set(l.x, l.y + far * 0.4 + Math.sin(t * 0.5 + 1) * 0.03, l.z);
+    this._moveTo(_desired, _look, o.smooth ?? 0.3, dt);
     this.roll = 0;
-    return o.fov ?? 45;
+    return (o.fov ?? 42) + far * 6;
   }
 
   _moveTo(p, l, smooth, dt) {
@@ -343,13 +377,15 @@ export class CameraRig {
   _apply(dt, fovT) {
     const cam = this.camera;
     const aspect = cam.aspect || 16 / 9;
+    this.fov = this._snap ? fovT : damp1(this.fov, fovT, this.st, 'fov', 0.25, dt);
+    // o soco do turbo entra depois da suavização (senão o ataque ficaria lento)
+    let fov = this.fov + this.fovAdd;
     // em telas estreitas (celular em pé), garante um campo horizontal utilizável
     if (aspect < 1) {
-      const hRef = fovT * DEG * 0.9;
+      const hRef = fov * DEG * 0.9;
       const vNeed = (2 * Math.atan(Math.tan(hRef / 2) / aspect)) / DEG;
-      fovT = Math.min(100, Math.max(fovT, vNeed));
+      fov = Math.min(100 + this.fovAdd * 0.5, Math.max(fov, vNeed));
     }
-    this.fov = this._snap ? fovT : damp1(this.fov, fovT, this.st, 'fov', 0.25, dt);
     cam.position.copy(this.pos);
     let roll = this.roll;
     if (this.shakeT > 0) {
@@ -363,8 +399,8 @@ export class CameraRig {
     }
     cam.lookAt(this.look);
     if (roll) cam.rotateZ(roll);
-    if (Math.abs(cam.fov - this.fov) > 0.01) {
-      cam.fov = this.fov;
+    if (Math.abs(cam.fov - fov) > 0.01) {
+      cam.fov = fov;
       cam.updateProjectionMatrix();
     }
   }
