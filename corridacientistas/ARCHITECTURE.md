@@ -219,6 +219,7 @@ export class AudioSystem {
 - Itens: `items.setMode('race'|'timetrial')`; caixa não é consumida por quem já tem item; Buraco Negro troca de alvo se o 1º chegar e não fere o dono; item sem alvo não é gasto; `ITEMS[id].hold` e `weights50cc`.
 - Entrada: `input.poll()` devolve também `holdItem` e `itemBack`; `input.rumble(ms, força)`; direção analógica no toque.
 - Modelos: proporções do kart pelos atributos; LOD barato (baixa: 8/14 m); `model.setHero(on)`.
+- Câmera/efeitos: `rig.setMode('podium', { position, lookAt })` (chamar uma vez), `rig.kick` (soco do turbo), `effects.speedFeel` (0..1, vinheta), `effects.podiumConfetti(centro, { duration })`.
 
 ## Jogo e interface (integração)
 `main.js` (loop, estados, renderer), `race.js` (contagem, voltas, posições, chegada, largada-foguete), `hud.js`, `menu.js`, `facts.js`, `index.html`, `css/styles.css`.

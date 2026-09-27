@@ -371,8 +371,10 @@ export class Hud {
 
     // vinheta de velocidade (mais forte perto da velocidade máxima e no turbo)
     if (this.el.vignette) {
-      const top = p.maxSpeed || 1;
-      const feel = p.boostTime > 0 ? 1 : Math.min(1, Math.max(0, (Math.abs(p.speed) / top - 0.82) / 0.18));
+      // effects.speedFeel já vem suavizado e zera na contagem, atordoado e depois da chegada
+      const top = p.baseMaxSpeed || p.maxSpeed || 1;
+      const feel = typeof world.effects?.speedFeel === 'number' ? world.effects.speedFeel
+        : p.boostTime > 0 ? 1 : Math.min(1, Math.max(0, (Math.abs(p.speed) / top - 0.82) / 0.18));
       this._feel = (this._feel || 0) + (feel - (this._feel || 0)) * Math.min(1, dt * 4);
       const op = (this._feel * 0.8).toFixed(2);
       if (op !== this.last.vig) {

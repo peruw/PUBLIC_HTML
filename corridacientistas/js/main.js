@@ -426,9 +426,10 @@ async function init() {
     const center = base.pos.clone().addScaledVector(base.right, -shift);
     const lookAt = center.clone().addScaledVector(up, 1.0);
     const position = center.clone().addScaledVector(base.tangent, dist).addScaledVector(up, 2.8);
+    // uma chamada só: a câmera entra de longe e se aproxima (efeitos/câmera)
     rig.setMode('podium', { position, lookAt });
-    rig.snap();
-    effects.confetti?.(top[0]);
+    if (effects.podiumConfetti) effects.podiumConfetti(base.pos, { duration: 6 });
+    else effects.confetti?.(top[0]);
   }
 
   // ---------- recordes, medalhas, ranking e desafio ----------
