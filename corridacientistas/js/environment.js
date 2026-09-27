@@ -107,6 +107,8 @@ const ELEMENTS = [
   ['Md', 101, 'Mendelévio', '#ff8fd0'], ['Ne', 10, 'Neônio', '#b388ff'], ['Si', 14, 'Silício', '#9be7ff'], ['U', 92, 'Urânio', '#ff8fd0'],
 ];
 export const ELEMENT_TILES = ELEMENTS;
+// Logo da Quanta Aulas pintado no gramado da universidade (ads.js desenha; aqui não nascem flores nele)
+export const LAWN_LOGO = { x: -10.2, z: -36.2, size: 19 };
 const ENV_FONT = '"Trebuchet MS", "Segoe UI", "DejaVu Sans", Arial, sans-serif';
 // Azulejo de um elemento (w × h a partir da origem atual); também usado nas placas temáticas de ads.js
 export function paintElementTile(gg, w, h, [sym, num, name, color]) {
@@ -1877,6 +1879,13 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     const x = campus.x + (rand() - 0.5) * 60, z = campus.z + 22 + rand() * 18;
     if (clearance(x, z) < 1 || Math.abs(x - campus.x) < 6) continue;
     lists.flower.push([x, groundAt(x, z) - 0.05, z, rand() * TAU, 1 + rand() * 0.5]);
+  }
+  // nada baixo atravessando o logo pintado no gramado (filtro depois do sorteio: as posições do resto
+  // da vegetação não mudam; na alta o sorteio já não punha nada ali)
+  {
+    const h = LAWN_LOGO.size / 2 + 1.5;
+    const off = ([x, , z]) => Math.abs(x - LAWN_LOGO.x) > h || Math.abs(z - LAWN_LOGO.z) > h;
+    for (const k of ['flower', 'bush', 'rock']) lists[k] = lists[k].filter(off);
   }
   const greens = (c) => c.setHSL(0.26 + (rand() - 0.5) * 0.06, 0.5 + rand() * 0.25, 0.75 + rand() * 0.25).lerp(col(0xffffff), 0.35);
   instanced('arvores', geoTree, vegMat, lists.tree, greens);

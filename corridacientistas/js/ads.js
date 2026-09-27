@@ -7,7 +7,7 @@
 // "Respiro": nas zonas temáticas, a cada 2 ou 3 placas da marca entra uma placa do próprio campus
 // (tabela periódica, céu do observatório, tentilhões da lagoa, raios de Tesla), no mesmo atlas.
 import * as THREE from './three.js';
-import { ELEMENT_TILES, paintElementTile } from './environment.js';
+import { ELEMENT_TILES, paintElementTile, LAWN_LOGO } from './environment.js';
 import { drawStars } from './track.js';
 
 const TAU = Math.PI * 2;
@@ -1720,7 +1720,7 @@ function build(scene, track, quality, env, opts, hold) {
       }
     };
     // jardim: entre a ala oeste do prédio e a pista, longe dos canteiros, árvores e pedras
-    const cx = -10.2, cz = -36.2, S = 19;
+    const cx = LAWN_LOGO.x, cz = LAWN_LOGO.z, S = LAWN_LOGO.size; // environment.js deixa este quadrado sem flores
     const n = hi ? 12 : 6;
     patch(n, n, (u, v) => {
       const x = cx - S / 2 + u * S, z = cz + S / 2 - v * S;
