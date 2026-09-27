@@ -247,6 +247,15 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   sky.name = 'ceu';
   group.add(sky);
 
+  // Clima do dia: [meio-dia, hora dourada]. setMood(t) interpola só cores e intensidades (barato,
+  // pode ser chamado a cada quadro). A direção do sol não muda: sombras e relevo continuam iguais.
+  const MOOD = {
+    top: [col(0x2f86e8), col(0x4a63b8)], horizon: [col(0xcdeeff), col(0xffc38a)], bottom: [col(0xa9d8f0), col(0xe9a77c)],
+    sunGlow: [col(0xfff1c9), col(0xffb070)], sun: [col(0xfff0d8), col(0xffbe80)], sunI: [2.35, 2.15],
+    hemiSky: [col(0xd6ecff), col(0xffd9b8)], hemiGround: [col(0x6f8f4a), col(0x7a6a45)], hemiI: [1.55, 1.3],
+    shallow: [col(0x5fe6e0), col(0x7fd6c4)], deep: [col(0x138fc4), col(0x1f6f9e)], foam: [col(0xffffff), col(0xfff0dc)],
+    far: [col(0xffffff), col(0xffdcc2)], // tinta das montanhas e nuvens (cores gravadas nos vértices)
+  };
   const hemi = new THREE.HemisphereLight(0xd6ecff, 0x6f8f4a, 1.55);
   group.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.35);
@@ -265,7 +274,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     sun.shadow.normalBias = 0.03;
     sc.updateProjectionMatrix();
   }
-  const baseSun = sun.intensity, baseHemi = hemi.intensity;
+  let baseSun = sun.intensity, baseHemi = hemi.intensity;
 
   // ------------------------------------------------------------ campo de distância à pista
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -566,7 +575,9 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     g.setIndex(idx);
     g.computeBoundingSphere();
     const mat = keep(new THREE.ShaderMaterial({
-      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, waterUniforms]),
+      // os uniforms da água são os mesmos objetos de waterUniforms (UniformsUtils.merge clonaria e a
+      // água ficaria parada: update() e setMood() escrevem em waterUniforms)
+      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), ...waterUniforms },
       vertexShader: /* glsl */`
         attribute float depth;
         varying float vDepth;
@@ -618,8 +629,11 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const farGroup = new THREE.Group();
   farGroup.name = 'horizonte';
   group.add(farGroup);
+  // montanhas e nuvens numa malha só (mesmo material): uma chamada de desenho a menos
+  const farB = new Merge();
+  const farMat = keep(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }));
   {
-    const b = new Merge();
+    const b = farB;
     const haze = skyHorizon.clone();
     const layers = [
       { r: 1000, hMin: 70, hMax: 190, colA: col(0x7f9fc4), seed: 1, n: hi ? 110 : 60 },
@@ -653,16 +667,11 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
         b.idx.push(v0, v2, v1, v0, v3, v2);
       }
     }
-    const g = keep(b.build(false));
-    const m = new THREE.Mesh(g, keep(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide })));
-    m.frustumCulled = false;
-    m.renderOrder = -5;
-    m.name = 'montanhas';
-    farGroup.add(m);
   }
-  // nuvens: aglomerados low-poly
+  // nuvens: aglomerados low-poly (na mesma malha, depois das montanhas)
   {
-    const b = new Merge();
+    const b = farB;
+    const first = b.count;
     const ico = keep(new THREE.IcosahedronGeometry(1, hi ? 1 : 0));
     const white = col(0xffffff), under = col(0xdde8f5);
     const n = hi ? 26 : 14;
@@ -679,18 +688,16 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
         b.add(ico, mat4(cx + ox * Math.cos(a) - oz * Math.sin(a), cy + oy, cz + ox * Math.sin(a) + oz * Math.cos(a), 0, rand() * 3, 0, s, s * 0.62, s), p % 2 ? white : under);
       }
     }
-    const g = keep(b.build(false));
     // clareia a parte de cima das nuvens pela normal
-    const cattr = g.attributes.color, nattr = g.attributes.normal;
-    for (let i = 0; i < cattr.count; i++) {
-      const up = nattr.getY(i);
+    for (let i = first; i < b.count; i++) {
+      const up = b.n[i * 3 + 1];
       const k = 0.86 + 0.14 * up;
-      cattr.setXYZ(i, cattr.getX(i) * k, cattr.getY(i) * k, Math.min(1, cattr.getZ(i) * (k + 0.03)));
+      b.c[i * 3] *= k; b.c[i * 3 + 1] *= k; b.c[i * 3 + 2] = Math.min(1, b.c[i * 3 + 2] * (k + 0.03));
     }
-    const m = new THREE.Mesh(g, keep(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })));
+    const m = new THREE.Mesh(keep(b.build(false)), farMat);
     m.frustumCulled = false;
-    m.renderOrder = -4;
-    m.name = 'nuvens';
+    m.renderOrder = -5;
+    m.name = 'montanhas';
     farGroup.add(m);
   }
 
@@ -1820,12 +1827,37 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     camHint = r.s;
     const inT = r.s > tunnelS[0] + 3 && r.s < tunnelS[1] - 3 && camera.position.y < r.groundY + 11 && Math.abs(r.lateral) < 20;
     dim += ((inT ? 1 : 0) - dim) * Math.min(1, dt * 4);
+    applyLight();
+  }
+  function applyLight() {
     sun.intensity = baseSun * (1 - 0.72 * dim);
     hemi.intensity = baseHemi * (1 - 0.5 * dim);
   }
 
-  return {
+  // Hora do dia: t = 0 (meio-dia) a 1 (entardecer, hora dourada). Só cores e uniforms, sem alocar.
+  let mood = 0;
+  function setMood(t) {
+    t = clamp(Number(t) || 0, 0, 1);
+    if (t === mood) return;
+    mood = t;
+    const L = (dst, [a, b]) => dst.lerpColors(a, b, t);
+    L(skyTop, MOOD.top); L(skyHorizon, MOOD.horizon); L(skyBottom, MOOD.bottom);
+    L(skyMat.uniforms.sunColor.value, MOOD.sunGlow);
+    // neblina e fundo acompanham o horizonte (sem emenda no fim do alcance)
+    if (scene.fog) scene.fog.color.copy(skyHorizon);
+    if (scene.background && scene.background.isColor) scene.background.copy(skyHorizon);
+    L(sun.color, MOOD.sun); L(hemi.color, MOOD.hemiSky); L(hemi.groundColor, MOOD.hemiGround);
+    baseSun = lerp(MOOD.sunI[0], MOOD.sunI[1], t);
+    baseHemi = lerp(MOOD.hemiI[0], MOOD.hemiI[1], t);
+    applyLight();
+    L(waterUniforms.uShallow.value, MOOD.shallow); L(waterUniforms.uDeep.value, MOOD.deep); L(waterUniforms.uFoam.value, MOOD.foam);
+    L(farMat.color, MOOD.far);
+  }
+
+  const api = {
     update,
+    setMood,
+    get mood() { return mood; },
     sun,
     hemi,
     groundAt,
@@ -1835,4 +1867,6 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
       disposables.forEach((d) => d && d.dispose && d.dispose());
     },
   };
+  group.userData.api = api; // depuração/testes: scene.getObjectByName('ambiente').userData.api
+  return api;
 }
