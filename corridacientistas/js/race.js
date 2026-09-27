@@ -33,6 +33,7 @@ export class RaceManager {
     this._lastCount = 0;
     this._throttleStart = -1;
     this._finalLapShown = false;
+    this._lastPlace = 0;
     for (const k of karts) { k.lapTimes = []; k._lapStart = 0; }
     const L = track.length;
     for (const k of karts) {
@@ -128,7 +129,8 @@ export class RaceManager {
           }
         }
       }
-      k.lap = Math.min(Math.max(1, lapNow), this.totalLaps);
+      // usa a maior volta já alcançada: dar ré atrás da linha não "desfaz" a volta no HUD
+      k.lap = Math.min(Math.max(1, k.maxLap), this.totalLaps);
     }
   }
 
@@ -150,6 +152,12 @@ export class RaceManager {
     });
     sorted.forEach((k, i) => (k.place = i + 1));
     this.sorted = sorted;
+    // ultrapassagem do jogador (o áudio toca um sinal; só durante a corrida)
+    const p = this.player;
+    if (p && this.phase === 'racing' && !p.finished) {
+      if (this._lastPlace && p.place !== this._lastPlace) this.bus.emit('race:place', { kart: p, from: this._lastPlace, to: p.place });
+      this._lastPlace = p.place;
+    }
   }
 
   // Lista final: quem não terminou recebe tempo estimado pela distância que falta.

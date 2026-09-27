@@ -1,6 +1,7 @@
 // HUD da corrida (DOM): item, posição, volta, tempo, minimapa, mensagens e curiosidades.
 import { ITEMS } from './config.js';
 import { formatTime } from './race.js';
+import { ITEM_FACTS, ZONE_FACTS, pickFact } from './facts.js';
 
 const $ = (id) => document.getElementById(id);
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
@@ -33,6 +34,8 @@ export class Hud {
       toasts: $('hud-toasts'),
       map: $('hud-minimap'),
       warn: $('hud-warn'),
+      drift: $('hud-drift'),
+      vignette: $('hud-vignette'),
     };
     this.warnItem = null; // item que está vindo na direção do jogador
     this.warnBeep = 0;
@@ -44,9 +47,17 @@ export class Hud {
     this.active = false;
     this.player = null;
     this.toastList = []; // toasts ativos com tempo de vida (em ms de jogo)
+    this.raceFacts = []; // curiosidades mostradas nesta corrida (vão para a tela de resultado)
+    this.tips = null; // dicas da primeira corrida (Set com as já mostradas) ou null
+    this.driftTip = 0; // ms restantes da dica/indicador de drift
+    this._frame = 0;
 
     // No "2" acende o sinal da largada-foguete: é a hora de acelerar.
-    bus.on('race:countdown', ({ n }) => this.center(n === 2 ? '2<small>acelere agora!</small>' : String(n), n === 2 ? 'pop go' : 'pop', RACE_COUNT_MS));
+    bus.on('race:countdown', ({ n }) => {
+      // nas primeiras corridas o "2" também diz qual tecla segurar
+      const how = this.tips ? (this.isTouch ? 'segure DRIFT agora!' : 'segure W ou ↑ agora!') : 'acelere agora!';
+      this.center(n === 2 ? `2<small>${how}</small>` : String(n), n === 2 ? 'pop go' : 'pop', RACE_COUNT_MS);
+    });
     bus.on('race:go', () => this.center('VAI!', 'pop', 900));
     bus.on('race:rocketEarly', ({ kart }) => {
       if (kart === this.player) setTimeout(() => this.center('Cedo demais! Acelere no 2', 'msg pop', 1500), 950);
@@ -71,6 +82,75 @@ export class Hud {
     bus.on('kart:trick', ({ kart }) => {
       if (kart === this.player) this.center('Manobra!', 'msg pop', 800);
     });
+    bus.on('kart:hit', (e) => this.onHit(e));
+    // nível do mini-turbo: 3 pontos que acendem azul, laranja e roxo
+    bus.on('kart:driftStart', ({ kart }) => {
+      if (kart === this.player) this.setDriftDots(0);
+    });
+    bus.on('kart:driftLevel', ({ kart, level }) => {
+      if (kart !== this.player) return;
+      this.setDriftDots(level);
+      if (level >= 1) this.tip('release', this.isTouch ? 'Solte o DRIFT para o turbo!' : 'Solte o ESPAÇO para o turbo!');
+    });
+    bus.on('kart:driftEnd', ({ kart }) => {
+      if (kart === this.player) this.setDriftDots(-1);
+    });
+  }
+
+  // ---------- quem acertou quem ----------
+  onHit({ kart, by, item }) {
+    const p = this.player;
+    if (!p || !this.active || !item || !ITEMS[item]) return;
+    const it = ITEMS[item];
+    const ico = itemIconHTML(item);
+    if (kart === p) {
+      const who = by && by !== p ? ` <span class="who">de ${by.character.name}</span>` : by === p ? ' <span class="who">(foi você mesmo!)</span>' : '';
+      this.toast(`<div class="item-ico">${ico}</div><div><b>${it.name}${who}</b></div>`, 1900, 'hit');
+      // quem lidera quase nunca pega Tesla/Buraco: aprende sobre o item ao ser atingido
+      this.noteItemFact(item);
+    } else if (by === p && !kart.finished) {
+      const now = performance.now();
+      if (item === 'tesla') {
+        if (now - (this._teslaToast || 0) < 1500) return;
+        this._teslaToast = now;
+        this.toast(`<div class="item-ico">${ico}</div><div><b>Raio em todos os adversários!</b></div>`, 1600, 'good');
+      } else {
+        this.toast(`<div class="item-ico">${ico}</div><div><b>Você acertou ${kart.character.name}!</b></div>`, 1600, 'good');
+      }
+    }
+  }
+
+  // Registra (uma vez por corrida) uma curiosidade do item para a tela de resultado.
+  noteItemFact(id) {
+    if (this.raceFacts.some((f) => f.kind === 'item' && f.id === id)) return null;
+    const fact = pickFact('item:' + id, ITEM_FACTS[id]);
+    if (!fact) return null;
+    this.raceFacts.push({ kind: 'item', id, title: ITEMS[id].name, icon: itemIconHTML(id), ...fact });
+    return fact;
+  }
+
+  setDriftDots(level) {
+    const el = this.el.drift;
+    if (!el) return;
+    if (level < 0) {
+      el.classList.add('hidden');
+      el.innerHTML = '';
+      return;
+    }
+    this.driftTip = 0;
+    el.className = 'dots';
+    el.innerHTML = [1, 2, 3].map((i) => `<i class="${i <= level ? 'on l' + i : ''}"></i>`).join('');
+  }
+
+  // Dica da primeira corrida (cada uma aparece uma vez).
+  tip(key, text, ms = 3000) {
+    if (!this.tips || this.tips.has(key) || !this.active) return;
+    this.tips.add(key);
+    const el = this.el.drift;
+    if (!el || (el.className === 'dots' && key !== 'release')) return;
+    el.className = 'tip';
+    el.textContent = text;
+    this.driftTip = ms;
   }
 
   show(on) {
@@ -83,10 +163,19 @@ export class Hud {
     }
   }
 
-  setRace({ player, karts, totalLaps, track }) {
+  setRace({ player, karts, totalLaps, track, tutorial = false, touch = false }) {
     this.player = player;
     this.karts = karts;
     this.totalLaps = totalLaps;
+    this.raceFacts = [];
+    this.seenFacts = new Set(); // a cada corrida o fato do item volta a aparecer
+    this.zonesSeen = new Set(['largada']);
+    this.zonePending = null;
+    this.isTouch = touch;
+    this.tips = tutorial ? new Set() : null;
+    this.driftTip = 0;
+    this.setDriftDots(-1);
+    if (this.el.vignette) this.el.vignette.style.opacity = 0;
     this.el.total.textContent = `/${karts.length}`;
     this.last = {};
     this.el.center.textContent = '';
@@ -137,6 +226,54 @@ export class Hud {
     c.strokeStyle = '#5b6b8c';
     c.lineWidth = 5;
     c.stroke();
+    // trecho da ponte do "8" por cima, mais claro, para ler o cruzamento
+    const meta = track.meta || {};
+    if (meta.bridgeS && track.sample) {
+      const [a, b] = meta.bridgeS;
+      const seg = (w, col) => {
+        c.beginPath();
+        for (let s = a, i = 0; s <= b; s += 3, i++) {
+          const q = track.sample(s).pos;
+          const [x, y] = this.mapXY(q.x, q.z);
+          if (i === 0) c.moveTo(x, y);
+          else c.lineTo(x, y);
+        }
+        c.strokeStyle = col;
+        c.lineWidth = w;
+        c.stroke();
+      };
+      seg(13, 'rgba(0,0,0,0.55)');
+      seg(9, '#ffffff');
+      seg(5, '#8fa3cc');
+    }
+    // setinhas do sentido da corrida
+    if (track.sample && track.length) {
+      c.fillStyle = '#ffffff';
+      for (let i = 1; i < 6; i++) {
+        const smp = track.sample((i / 6) * track.length);
+        const [x, y] = this.mapXY(smp.pos.x, smp.pos.z);
+        const ang = Math.atan2(smp.tangent.z, smp.tangent.x);
+        c.save();
+        c.translate(x, y);
+        c.rotate(ang);
+        c.beginPath();
+        c.moveTo(4, 0);
+        c.lineTo(-3, -3);
+        c.lineTo(-3, 3);
+        c.closePath();
+        c.fillStyle = '#1a2233';
+        c.fill();
+        c.restore();
+      }
+    }
+    // fileiras de caixas de item
+    if (track.itemBoxSlots) {
+      c.fillStyle = 'rgba(255,210,63,0.9)';
+      for (const b of track.itemBoxSlots) {
+        const [x, y] = this.mapXY(b.pos.x, b.pos.z);
+        c.fillRect(x - 1.5, y - 1.5, 3, 3);
+      }
+    }
     // linha de chegada
     const [sx, sy] = this.mapXY(pts[0].x, pts[0].z);
     c.fillStyle = '#ffd23f';
@@ -160,7 +297,26 @@ export class Hud {
       c.stroke();
     };
     for (const k of this.karts) if (k !== this.player) drawDot(k, 4.5, 1.5);
-    if (this.player) drawDot(this.player, 7, 3);
+    const p = this.player;
+    if (p) {
+      // jogador: seta apontando para onde o kart vai
+      const [x, y] = this.mapXY(p.position.x, p.position.z);
+      c.save();
+      c.translate(x, y);
+      c.rotate(Math.atan2(Math.cos(p.heading), Math.sin(p.heading)));
+      c.beginPath();
+      c.moveTo(9, 0);
+      c.lineTo(-6, -6.5);
+      c.lineTo(-3, 0);
+      c.lineTo(-6, 6.5);
+      c.closePath();
+      c.fillStyle = p.character.colors.ui;
+      c.fill();
+      c.lineWidth = 2.5;
+      c.strokeStyle = '#fff';
+      c.stroke();
+      c.restore();
+    }
   }
 
   update(dt, world, race) {
@@ -195,8 +351,37 @@ export class Hud {
       this.last.lap = lapTxt;
       this.el.lap.textContent = lapTxt;
     }
-    const t = p.finished ? p.finishTime : race.time;
-    this.el.time.textContent = formatTime(t);
+    // tempo e minimapa a ~30 Hz: menos trabalho de layout/canvas por quadro
+    const half = (this._frame++ & 1) === 0;
+    if (half) {
+      const t = p.finished ? p.finishTime : race.time;
+      const tt = formatTime(t);
+      if (tt !== this.last.time) {
+        this.last.time = tt;
+        this.el.time.textContent = tt;
+      }
+    }
+
+    // vinheta de velocidade (mais forte perto da velocidade máxima e no turbo)
+    if (this.el.vignette) {
+      const top = p.maxSpeed || 1;
+      const feel = p.boostTime > 0 ? 1 : Math.min(1, Math.max(0, (Math.abs(p.speed) / top - 0.82) / 0.18));
+      this._feel = (this._feel || 0) + (feel - (this._feel || 0)) * Math.min(1, dt * 4);
+      const op = (this._feel * 0.8).toFixed(2);
+      if (op !== this.last.vig) {
+        this.last.vig = op;
+        this.el.vignette.style.opacity = op;
+      }
+    }
+
+    if (race.phase === 'racing' && !p.finished) {
+      this.updateZones(world, p);
+      this.updateTips(world, p);
+    }
+    if (this.driftTip > 0) {
+      this.driftTip -= dt * 1000;
+      if (this.driftTip <= 0 && this.el.drift.className === 'tip') this.setDriftDots(-1);
+    }
 
     // contramão
     const wrong = p.wrongWay > 45 && race.phase === 'racing';
@@ -223,8 +408,44 @@ export class Hud {
       this.centerTimer -= dt * 1000;
       if (this.centerTimer <= 0 && !this.centerSticky) this.el.center.textContent = '';
     }
+    // mensagem grande no centro: as curiosidades recuam para não brigar com ela
+    const busy = !!this.el.center.textContent;
+    if (busy !== this.last.busy) {
+      this.last.busy = busy;
+      this.el.toasts.classList.toggle('dim', busy);
+    }
 
-    this.drawMinimap();
+    if (half) this.drawMinimap();
+  }
+
+  // Curiosidade do setor da pista, na primeira passagem de cada corrida (só na 1ª volta).
+  updateZones(world, p) {
+    const meta = world.track?.meta;
+    if (!meta?.zoneOf || p.lap > 1) return;
+    const z = meta.zoneOf(p.s);
+    if (!this.zonesSeen.has(z) && ZONE_FACTS[z]) {
+      this.zonesSeen.add(z);
+      this.zonePending = z;
+    }
+    // espera a tela ficar livre (sem outra curiosidade nem mensagem central)
+    const z2 = this.zonePending;
+    if (z2 && !this.el.toasts.children.length && this.centerTimer <= 0) {
+      this.zonePending = null;
+      const f = ZONE_FACTS[z2];
+      this.raceFacts.push({ kind: 'zone', id: z2, title: f.name, icon: '📍', text: f.text, quiz: f.quiz });
+      this.toast(`<div class="item-ico">📍</div><div><small>${f.name}</small><p>${f.short}</p></div>`, 4000);
+    }
+  }
+
+  // Dicas contextuais das primeiras corridas.
+  updateTips(world, p) {
+    if (!this.tips) return;
+    const tr = world.track;
+    if (!this.tips.has('drift') && tr?.curvature && !p.drifting && Math.abs(p.speed) > 12) {
+      let k = 0;
+      for (let d = 10; d <= 40; d += 10) k = Math.max(k, Math.abs(tr.curvature(p.s + d)));
+      if (k > 1 / 45) this.tip('drift', this.isTouch ? 'Curva! Segure DRIFT e vire' : 'Curva! Segure ESPAÇO e vire (drift)');
+    }
   }
 
   // Aviso de elétron teleguiado ou buraco negro vindo na direção do jogador.
@@ -273,26 +494,35 @@ export class Hud {
     this.centerSticky = sticky;
   }
 
-  // Curiosidade do item: texto completo na primeira vez, curto nas outras.
+  // Curiosidade do item: frase curta na primeira vez da corrida (o texto completo vai para
+  // a tela de resultado); nas outras vezes, só o que o item faz.
   toastItem(id) {
     const it = ITEMS[id];
     if (!it) return;
     const first = !this.seenFacts.has(id);
     this.seenFacts.add(id);
-    const body = first ? `<small>Você sabia?</small><b>${it.name}</b><p>${it.fact}</p>` : `<b>${it.name}</b><p>${it.effect}</p>`;
-    this.toast(`<div class="item-ico">${itemIconHTML(id)}</div><div>${body}</div>`, first ? 7000 : 2200);
+    const fact = first ? this.noteItemFact(id) : null;
+    const body = fact ? `<small>Você sabia?</small><b>${it.name}</b><p>${fact.short}</p>` : `<b>${it.name}</b><p>${it.effect}</p>`;
+    this.toast(`<div class="item-ico">${itemIconHTML(id)}</div><div>${body}</div>`, fact ? 4500 : 2000);
+    if (this.tips) this.tip('item', this.isTouch ? 'Toque em ITEM para usar' : 'Aperte E para usar o item', 2600);
   }
 
-  toast(html, ms) {
+  // Um aviso por vez, na coluna da direita. Tocar/clicar fecha.
+  toast(html, ms, cls = '') {
     const box = this.el.toasts;
-    // tela baixa (celular deitado): um toast por vez para não cobrir a pista
-    const max = innerHeight < 520 ? 1 : 2;
-    while (box.children.length >= max) box.firstChild.remove();
+    while (box.children.length) box.firstChild.remove();
+    this.toastList = [];
     const div = document.createElement('div');
-    div.className = 'toast';
-    div.innerHTML = html;
+    div.className = 'toast' + (cls ? ' ' + cls : '');
+    // conteúdo sem ícone (ex.: avisos do sistema) ganha um ícone padrão para caber no grid
+    div.innerHTML = /class="item-ico"/.test(html) ? html : `<div class="item-ico">ℹ️</div><div>${html}</div>`;
+    const entry = { div, t: ms, out: false };
+    div.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      entry.t = 0;
+    });
     box.appendChild(div);
-    this.toastList.push({ div, t: ms, out: false });
+    this.toastList.push(entry);
   }
 }
 

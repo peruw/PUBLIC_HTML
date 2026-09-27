@@ -2,6 +2,7 @@
 import { CHARACTERS, CLASSES, ITEMS, RACE } from './config.js';
 import { itemIconHTML } from './hud.js';
 import { formatTime } from './race.js';
+import { SCIENTIST_FACTS, pickFact, shuffledQuiz } from './facts.js';
 
 const $ = (id) => document.getElementById(id);
 const SCREENS = ['loading', 'title', 'select', 'howto', 'pause', 'results', 'error'];
@@ -16,7 +17,12 @@ const FLAGS = {
       '<path d="M30 0V30M0 15H60" stroke="#c8102e" stroke-width="6"/>',
     '0 0 60 30',
   ),
-  'Polônia / França': svgFlag(hStripes('#fff', '#dc143c')),
+  // metade Polônia (onde nasceu), metade França (onde viveu e pesquisou)
+  'Polônia / França': svgFlag(
+    '<rect width="15" height="10" fill="#fff"/><rect y="10" width="15" height="10" fill="#dc143c"/>' +
+      '<rect x="15" width="5" height="20" fill="#0055a4"/><rect x="20" width="5" height="20" fill="#fff"/><rect x="25" width="5" height="20" fill="#ef4135"/>' +
+      '<rect x="14.6" width="0.8" height="20" fill="rgba(0,0,0,0.35)"/>',
+  ),
   Rússia: svgFlag(hStripes('#fff', '#0039a6', '#d52b1e')),
   Alemanha: svgFlag(hStripes('#000', '#dd0000', '#ffce00')),
   Itália: svgFlag(vStripes('#009246', '#fff', '#ce2b37')),
@@ -46,6 +52,16 @@ const store = {
 };
 export { store };
 
+const MEDAL_RANK = { bronze: 1, prata: 2, ouro: 3 };
+const MEDAL_ICON = { ouro: '🥇', prata: '🥈', bronze: '🥉' };
+const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+const GAME_URL = 'https://quantaaulas.com/kart-cientifico/';
+
+// 150cc liberado depois de vencer uma corrida no 100cc (quem já jogava em 150cc continua com ele).
+export function is150Unlocked() {
+  return !!store.get('unlock150', false) || store.get('cc', '') === '150cc';
+}
+
 export class Menu {
   // handlers: { onStart(opts), onResume, onRestart, onQuit, onToggleSound, onToggleQuality, onToggleAuto, sfx(name) }
   constructor(handlers) {
@@ -57,9 +73,11 @@ export class Menu {
       character: store.get('character', 'newton'),
       cc: store.get('cc', '50cc'), // primeira vez: classe mais tranquila
       laps: store.get('laps', RACE.defaultLaps),
+      mode: store.get('mode', 'race'), // 'race' | 'timetrial'
     };
+    if (this.opts.mode !== 'timetrial') this.opts.mode = 'race';
     if (!CHARACTERS.some((c) => c.id === this.opts.character)) this.opts.character = 'newton';
-    if (!CLASSES[this.opts.cc]) this.opts.cc = '100cc';
+    if (!CLASSES[this.opts.cc] || (this.opts.cc === '150cc' && !is150Unlocked())) this.opts.cc = CLASSES[this.opts.cc] ? '100cc' : '50cc';
     if (!RACE.lapOptions.includes(this.opts.laps)) this.opts.laps = RACE.defaultLaps;
 
     this.tabNav = false; // foco veio do Tab (não do mouse/toque)
@@ -74,6 +92,19 @@ export class Menu {
       this.action(btn.dataset.action, btn);
     });
     document.addEventListener('keydown', (e) => this.onKey(e));
+    // volumes de música e efeitos (tela inicial e pausa)
+    document.addEventListener('input', (e) => {
+      const r = e.target.closest?.('input[data-vol]');
+      if (!r) return;
+      const v = Number(r.value) / 100;
+      for (const o of document.querySelectorAll(`input[data-vol="${r.dataset.vol}"]`)) if (o !== r) o.value = r.value;
+      this.h.onVolume?.(r.dataset.vol, v);
+    });
+  }
+
+  setVolumes(music, sfx) {
+    for (const r of document.querySelectorAll('input[data-vol="music"]')) r.value = Math.round(music * 100);
+    for (const r of document.querySelectorAll('input[data-vol="sfx"]')) r.value = Math.round(sfx * 100);
   }
 
   // Botão de duas etapas: o 1º toque troca o rótulo por 'label' e só o 2º (em 3 s) confirma.
@@ -121,13 +152,34 @@ export class Menu {
         store.set('character', this.opts.character);
         store.set('cc', this.opts.cc);
         store.set('laps', this.opts.laps);
+        store.set('mode', this.opts.mode);
         h.onStart({ ...this.opts });
+        break;
+      case 'daily':
+        h.sfx('menuSelect');
+        h.onDaily?.();
+        break;
+      case 'share':
+        this.share(btn);
+        break;
+      case 'quiz':
+        this.startQuiz();
+        break;
+      case 'slow-yes':
+        store.set('slowHint', false);
+        h.onSetQuality?.('baixa');
+        break;
+      case 'slow-no':
+        store.set('slowHint', false);
+        $('slow-hint')?.classList.add('hidden');
         break;
       case 'resume':
         h.onResume();
         break;
       case 'restart':
         h.sfx('menuSelect');
+        // na pausa, reiniciar também joga a corrida fora
+        if (this.current === 'pause' && !this._confirm(btn, 'Reiniciar mesmo?')) break;
         h.onRestart();
         break;
       case 'quit':
@@ -157,7 +209,26 @@ export class Menu {
     this.current = name;
     for (const s of SCREENS) $('screen-' + s)?.classList.toggle('hidden', s !== name);
     if (name === 'select') this.refreshSelect();
+    if (name === 'title') this.refreshTitle();
     this.h.onScreen?.(name);
+    // teclado: foco no botão principal da tela (pausa e resultado)
+    if (name === 'results') requestAnimationFrame(() => $('screen-results')?.querySelector('.btn-primary')?.focus({ preventScroll: true }));
+  }
+
+  // Tela inicial: acertos no quiz, desafio do dia e sugestão de qualidade.
+  refreshTitle() {
+    const q = store.get('quiz', { right: 0, total: 0 });
+    const qs = $('title-quiz');
+    if (qs) {
+      qs.classList.toggle('hidden', !q.total);
+      qs.textContent = `🧠 Quiz: ${q.right} de ${q.total} acertos`;
+    }
+    const d = this.h.dailyInfo?.();
+    const db = $('btn-daily');
+    if (db && d) {
+      db.innerHTML = `⭐ Desafio do dia <small>${esc(d.label)}${d.done ? ' · ✅ feito' : ''}${d.streak > 1 ? ` · ${d.streak} dias seguidos` : ''}</small>`;
+    }
+    $('slow-hint')?.classList.toggle('hidden', !store.get('slowHint', false) || this.h.qualityId?.() === 'baixa');
   }
 
   hideAll() {
@@ -201,8 +272,9 @@ export class Menu {
   buildSelect() {
     this.grid = $('char-grid');
     this.grid.innerHTML = CHARACTERS.map(
-      (c) => `<button class="char-card" data-id="${c.id}" style="--c:${c.colors.ui}">
+      (c) => `<button class="char-card" data-id="${c.id}" style="--c:${c.colors.ui}" aria-label="${c.fullName}">
         <span class="flag">${FLAGS[c.country] || ''}</span>
+        <span class="medals" aria-hidden="true"></span>
         <div class="ph" style="--c:${c.colors.ui}">${c.name[0]}</div>
         <span>${c.short || c.name}</span>
       </button>`,
@@ -233,13 +305,18 @@ export class Menu {
     cc.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
+      if (b.dataset.cc === '150cc' && !is150Unlocked()) {
+        this.h.sfx('menuMove');
+        this.flashHint('Vença uma corrida no 100cc para liberar o 150cc.');
+        return;
+      }
       this.opts.cc = b.dataset.cc;
       this.h.sfx('menuMove');
       this.refreshSelect();
     });
 
     const laps = $('opt-laps');
-    laps.innerHTML = RACE.lapOptions.map((n) => `<button data-laps="${n}">${n}</button>`).join('');
+    laps.innerHTML = RACE.lapOptions.map((n) => `<button data-laps="${n}">${n}<small></small></button>`).join('');
     laps.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
@@ -247,6 +324,42 @@ export class Menu {
       this.h.sfx('menuMove');
       this.refreshSelect();
     });
+
+    const mode = $('opt-mode');
+    if (mode) {
+      mode.innerHTML = '<button data-mode="race">Corrida<small>8 karts</small></button><button data-mode="timetrial">Contra o relógio<small>com fantasma</small></button>';
+      mode.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        this.opts.mode = b.dataset.mode;
+        this.h.sfx('menuMove');
+        this.refreshSelect();
+      });
+    }
+  }
+
+  flashHint(text) {
+    const el = $('select-note');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('warn');
+    clearTimeout(this._noteT);
+    this._noteT = setTimeout(() => {
+      el.classList.remove('warn');
+      this.refreshSelect();
+    }, 2500);
+  }
+
+  cycleOpt(kind, dir = 1) {
+    if (kind === 'cc') {
+      const ids = Object.keys(CLASSES).filter((id) => id !== '150cc' || is150Unlocked());
+      this.opts.cc = ids[(ids.indexOf(this.opts.cc) + dir + ids.length) % ids.length];
+    } else {
+      const L = RACE.lapOptions;
+      this.opts.laps = L[(L.indexOf(this.opts.laps) + dir + L.length) % L.length];
+    }
+    this.h.sfx('menuMove');
+    this.refreshSelect();
   }
 
   refreshSelect() {
@@ -254,6 +367,37 @@ export class Menu {
     for (const card of this.grid.children) card.classList.toggle('selected', card.dataset.id === c.id);
     for (const b of $('opt-cc').children) b.classList.toggle('on', b.dataset.cc === this.opts.cc);
     for (const b of $('opt-laps').children) b.classList.toggle('on', Number(b.dataset.laps) === this.opts.laps);
+    for (const b of $('opt-mode')?.children || []) b.classList.toggle('on', b.dataset.mode === this.opts.mode);
+    const unlocked = is150Unlocked();
+    for (const b of $('opt-cc').children) {
+      const locked = b.dataset.cc === '150cc' && !unlocked;
+      b.classList.toggle('locked', locked);
+      b.querySelector('small').textContent = locked ? '🔒 vença no 100cc' : CLASSES[b.dataset.cc].hint;
+    }
+    // duração aproximada de cada opção de voltas
+    const lapS = (RACE.lapSeconds || {})[this.opts.cc] || 70;
+    for (const b of $('opt-laps').children) {
+      const min = (Number(b.dataset.laps) * lapS) / 60;
+      b.querySelector('small').textContent = `≈${min < 1.25 ? '1' : (Math.round(min * 2) / 2).toString().replace('.5', '½')} min`;
+    }
+    // medalhas nos cartões e total de troféus
+    const medals = store.get('medals', {});
+    let got = 0;
+    for (const card of this.grid.children) {
+      const m = medals[card.dataset.id] || {};
+      card.querySelector('.medals').innerHTML = Object.keys(CLASSES).map((cc) => (m[cc] ? `<i title="${cc}">${MEDAL_ICON[m[cc]]}</i>` : '')).join('');
+      got += Object.keys(m).length;
+    }
+    const total = CHARACTERS.length * Object.keys(CLASSES).length;
+    const tro = $('select-trophies');
+    if (tro) tro.textContent = got ? `🏆 ${got}/${total}` : '';
+    // recorde da combinação escolhida
+    const note = $('select-note');
+    if (note && !note.classList.contains('warn')) {
+      const rec = store.get('records', {})[`${this.opts.mode === 'timetrial' ? 'tt-' : ''}${this.opts.cc}-${this.opts.laps}`];
+      const v = this.opts.laps === 1 ? '1 volta' : `${this.opts.laps} voltas`;
+      note.textContent = rec ? `Seu recorde (${this.opts.cc}, ${v}): ${formatTime(rec.time)}` : this.opts.mode === 'timetrial' ? 'Sozinho na pista, só com foguetes. Bata o seu fantasma!' : '';
+    }
 
     this.h.onCharacter?.(c.id);
     const img = $('detail-portrait');
@@ -268,6 +412,13 @@ export class Menu {
     $('detail-name').textContent = c.fullName;
     $('detail-meta').textContent = `${c.years} · ${c.country} · ${c.field}`;
     $('detail-bio').textContent = c.bio;
+    // uma curiosidade diferente a cada vez que o cientista é escolhido
+    if (this._factFor !== c.id) {
+      this._factFor = c.id;
+      const f = pickFact('sci:' + c.id, SCIENTIST_FACTS[c.id]);
+      const el = $('detail-fact');
+      if (el) el.innerHTML = f ? `<b>Você sabia?</b> ${esc(f.text)}` : '';
+    }
     $('detail-stats').innerHTML = STAT_LABELS.map(
       ([k, label]) =>
         `<div class="stat"><span>${label}</span><div class="stat-bar">${[1, 2, 3, 4, 5]
@@ -300,41 +451,161 @@ export class Menu {
   }
 
   // ---------- resultado ----------
-  showResults(results, player, rec = null) {
+  // info: { rec, facts, mode, rival, medal, unlocked150, daily, ghost, rankKey }
+  showResults(results, player, info = {}) {
     const me = results.find((r) => r.kart === player);
     const place = me ? me.place : 0;
-    $('results-title').textContent = place === 1 ? 'Você venceu! 🏆' : `Você chegou em ${place}º lugar`;
+    const tt = info.mode === 'timetrial';
+    this.lastRun = { place, time: me?.time, character: player.character, cc: info.cc, laps: info.laps, mode: info.mode, estimated: me?.estimated };
+    $('results-title').textContent = tt ? `Tempo: ${formatTime(me?.time)}` : place === 1 ? 'Você venceu! 🏆' : `Você chegou em ${place}º lugar`;
+    const rec = info.rec;
     const recEl = $('results-record');
-    recEl.classList.toggle('hidden', !rec);
+    const parts = [];
     if (rec) {
       const v = rec.laps === 1 ? '1 volta' : `${rec.laps} voltas`;
-      const parts = [];
       if (rec.newTotal) parts.push(`🏁 Novo recorde no ${rec.cc} (${v}): <b>${formatTime(rec.time)}</b>`);
       else if (rec.prevTotal) parts.push(`Seu recorde no ${rec.cc} (${v}): ${formatTime(rec.prevTotal.time)}`);
       if (rec.bestLap > 0) {
         if (rec.newLap) parts.push(`⚡ Melhor volta nova: <b>${formatTime(rec.bestLap)}</b>`);
-        else parts.push(`melhor volta ${formatTime(rec.bestLap)} (recorde ${formatTime(rec.prevLap.time)})`);
+        else if (rec.prevLap) parts.push(`melhor volta ${formatTime(rec.bestLap)} (recorde ${formatTime(rec.prevLap.time)})`);
       }
-      recEl.innerHTML = parts.join(' · ');
-      recEl.classList.toggle('new', rec.newTotal || rec.newLap);
     }
-    $('results-list').innerHTML = results
-      .map(
-        (r) => `<li class="${r.kart === player ? 'me' : ''}">
+    if (info.ghost != null) parts.push(info.ghost < 0 ? `👻 ${formatTime(-info.ghost).replace(/^0:/, '')} s mais rápido que o fantasma` : `👻 ${formatTime(info.ghost).replace(/^0:/, '')} s atrás do fantasma`);
+    if (info.rival && !tt) {
+      const d = info.rival.delta;
+      const n = info.rival.name;
+      parts.push(d < 0 ? `⚔️ Você venceu o rival ${n} por ${Math.abs(d).toFixed(1).replace('.', ',')} s` : `⚔️ O rival ${n} chegou ${d.toFixed(1).replace('.', ',')} s na sua frente`);
+    }
+    if (info.medal) parts.push(`${MEDAL_ICON[info.medal.type]} Medalha de ${info.medal.type} com ${player.character.name} no ${info.cc}!`);
+    if (info.unlocked150) parts.push('🔓 150cc liberado!');
+    if (info.daily) parts.push(info.daily.done ? '⭐ Desafio do dia cumprido!' : `⭐ Desafio do dia: ${esc(info.daily.goal)}`);
+    recEl.classList.toggle('hidden', !parts.length);
+    recEl.innerHTML = parts.join(' · ');
+    recEl.classList.toggle('new', !!(rec && (rec.newTotal || rec.newLap)) || !!info.medal || !!info.unlocked150);
+
+    const list = tt ? results.filter((r) => r.kart === player) : results;
+    $('results-list').innerHTML = list
+      .map((r) => {
+        const c = r.kart.character;
+        const face = this.portraits[c.id] ? `<img class="face" src="${this.portraits[c.id]}" alt="" style="--c:${c.colors.ui}">` : `<span class="dot" style="background:${c.colors.ui}"></span>`;
+        return `<li class="${r.kart === player ? 'me' : ''}">
           <span class="p">${r.place}º</span>
-          <span class="dot" style="background:${r.kart.character.colors.ui}"></span>
-          <span>${r.kart.character.name}${r.kart === player ? ' (você)' : ''}</span>
+          ${face}
+          <span>${c.name}${r.kart === player ? ' (você)' : ''}</span>
           <span class="t">${r.estimated ? '~' : ''}${formatTime(r.time)}</span>
-        </li>`,
-      )
+        </li>`;
+      })
       .join('');
+
+    // curiosidades: vencedor, o seu cientista e o que apareceu na corrida
     const winner = results[0].kart.character;
     const mine = player.character;
-    const art = winner.gender === 'f' ? 'a vencedora' : 'o vencedor';
-    let html = `<b>Você sabia? Sobre ${winner.name}, ${art}:</b> ${winner.fact}`;
-    if (mine.id !== winner.id) html += `<br><br><b>E sobre ${mine.name}:</b> ${mine.fact}`;
-    $('results-fact').innerHTML = html;
+    const facts = [];
+    const wf = pickFact('sci:' + winner.id, SCIENTIST_FACTS[winner.id]);
+    if (wf && !tt) facts.push({ title: `${winner.name}, ${winner.gender === 'f' ? 'a vencedora' : 'o vencedor'}`, icon: '🏆', ...wf });
+    if (mine.id !== winner.id || tt) {
+      const mf = pickFact('sci:' + mine.id, SCIENTIST_FACTS[mine.id]);
+      if (mf) facts.push({ title: mine.name, icon: '🧑‍🔬', ...mf });
+    }
+    for (const f of info.facts || []) facts.push(f);
+    this.resultFacts = facts;
+    $('results-fact').innerHTML =
+      '<b class="fact-head">Você sabia?</b>' +
+      facts.map((f) => `<p><span class="fi">${f.icon || '•'}</span> <b>${esc(f.title)}:</b> ${esc(f.text)}</p>`).join('');
+
+    // quiz opcional (só se houver pergunta entre as curiosidades)
+    const qz = $('results-quiz');
+    this.quizPool = facts.filter((f) => f.quiz);
+    qz.innerHTML = this.quizPool.length ? '<button class="btn btn-small" data-action="quiz">🧠 Responder 1 pergunta (opcional)</button>' : '';
+
+    // ranking deste aparelho
+    this.renderRanking(info.rankKey, info.rankIndex);
     this.show('results');
+  }
+
+  // ---------- quiz ----------
+  startQuiz() {
+    const pool = this.quizPool || [];
+    if (!pool.length) return;
+    const f = pool[Math.floor(Math.random() * pool.length)];
+    const q = shuffledQuiz(f.quiz);
+    const box = $('results-quiz');
+    box.innerHTML = `<p class="quiz-q">${esc(q.q)}</p><div class="quiz-opts">${q.options
+      .map((o, i) => `<button class="btn btn-small" data-i="${i}">${esc(o)}</button>`)
+      .join('')}</div>`;
+    box.querySelector('button')?.focus({ preventScroll: true });
+    box.querySelector('.quiz-opts').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-i]');
+      if (!b || box.dataset.done === '1') return;
+      box.dataset.done = '1';
+      const ok = Number(b.dataset.i) === q.answer;
+      const st = store.get('quiz', { right: 0, total: 0 });
+      st.total++;
+      if (ok) st.right++;
+      store.set('quiz', st);
+      this.h.sfx(ok ? 'menuSelect' : 'menuMove');
+      for (const o of box.querySelectorAll('button[data-i]')) {
+        o.disabled = true;
+        if (Number(o.dataset.i) === q.answer) o.classList.add('right');
+      }
+      if (!ok) b.classList.add('wrong');
+      box.insertAdjacentHTML('beforeend', `<p class="quiz-fb ${ok ? 'ok' : 'no'}">${ok ? '✅ Certo!' : '❌ Não foi dessa vez.'} ${esc(f.text)} <small>(acertos: ${st.right}/${st.total})</small></p>`);
+    });
+    box.dataset.done = '';
+  }
+
+  // ---------- compartilhar ----------
+  async share(btn) {
+    const r = this.lastRun;
+    if (!r) return;
+    const v = r.laps === 1 ? '1 volta' : `${r.laps} voltas`;
+    const what = r.mode === 'timetrial' ? `fiz ${formatTime(r.time)} no contra o relógio` : `cheguei em ${r.place}º lugar${r.estimated ? '' : ` em ${formatTime(r.time)}`}`;
+    const text = `No Kart Científico, ${what} com ${r.character.name} (${r.cc}, ${v})! Você consegue?`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Kart Científico', text, url: GAME_URL });
+        return;
+      }
+      await navigator.clipboard.writeText(`${text} ${GAME_URL}`);
+      if (btn) {
+        const old = btn.innerHTML;
+        btn.innerHTML = '✅ Copiado!';
+        setTimeout(() => { btn.innerHTML = old; }, 1800);
+      }
+    } catch {
+      /* compartilhamento cancelado ou bloqueado */
+    }
+  }
+
+  // ---------- ranking local (top 5 deste aparelho) ----------
+  renderRanking(key, idx) {
+    const box = $('results-rank');
+    if (!box) return;
+    const list = (store.get('ranking', {})[key] || []).slice(0, 5);
+    if (!key || !list.length) {
+      box.innerHTML = '';
+      return;
+    }
+    const rows = list
+      .map((e, i) => `<li class="${i === idx ? 'me' : ''}"><span>${i + 1}º</span><span>${i === idx && !e.name ? `<input id="rank-name" maxlength="14" placeholder="Seu nome" value="${esc(store.get('nick', ''))}" aria-label="Seu nome no ranking" /><button class="btn btn-small" id="rank-save">Salvar</button>` : esc(e.name || 'Jogador')}</span><span class="t">${formatTime(e.time)}</span></li>`)
+      .join('');
+    box.innerHTML = `<details ${idx >= 0 ? 'open' : ''}><summary>🏆 Ranking deste aparelho</summary><ol class="rank-list">${rows}</ol></details>`;
+    const save = $('rank-save');
+    if (save) {
+      const commit = () => {
+        const name = ($('rank-name').value || '').trim().slice(0, 14) || 'Jogador';
+        store.set('nick', name);
+        const all = store.get('ranking', {});
+        if (all[key] && all[key][idx]) all[key][idx].name = name;
+        store.set('ranking', all);
+        this.renderRanking(key, -1);
+      };
+      save.addEventListener('click', commit);
+      $('rank-name').addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') commit();
+      });
+    }
   }
 
   // ---------- teclado nos menus ----------
@@ -362,12 +633,20 @@ export class Menu {
       else if (k === 'ArrowDown' || k === 's') this.moveSelection(0, 1);
       else if (k === 'Enter' || k === ' ') this.action('start');
       else if (k === 'Escape') this.action('back');
+      else if (k === 'q' || k === 'Q') this.cycleOpt('cc', -1);
+      else if (k === 'e' || k === 'E') this.cycleOpt('cc', 1);
+      else if (k === 'z' || k === 'Z') this.cycleOpt('laps', -1);
+      else if (k === 'x' || k === 'X') this.cycleOpt('laps', 1);
       else return;
       e.preventDefault();
     } else if (this.current === 'howto' && (k === 'Escape' || k === 'Enter')) {
       this.action('back');
-    } else if (this.current === 'results' && k === 'Enter') {
+    } else if (this.current === 'results' && k === 'Enter' && !e.target.closest?.('input')) {
       this.action('restart');
+    } else if (this.current === 'results' && k === 'Escape') {
+      this.action('quit');
+    } else if (this.current === 'pause' && k === 'Enter' && !this.tabNav) {
+      this.action('resume');
     }
   }
 

@@ -1,6 +1,8 @@
 // Gera a versão do Kart Científico que vai para o site (poucas requisições ao servidor):
 // - index.html com o CSS embutido;
-// - um único game.<hash>.js com todos os módulos (o Three.js continua vindo do CDN);
+// - um único game.<hash>.js com todos os módulos E o Three.js (sem depender do CDN, que
+//   algumas redes de escola bloqueiam, e sem o segundo download em série);
+// - manifest.webmanifest e ícones (tela cheia e "Adicionar à tela inicial" no celular);
 // - .htaccess com cache longo para o game.<hash>.js (o nome muda a cada versão).
 //
 // Uso: node corridacientistas/build-site.mjs <pasta-de-saída> [url-pública]
@@ -10,6 +12,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(process.argv[2] || '');
@@ -19,6 +22,41 @@ if (!process.argv[2]) {
   process.exit(1);
 }
 
+// Three.js da mesma versão do CDN (js/three.js). Procura em node_modules; se não houver,
+// baixa o pacote do npm uma vez para node_modules/.cache/kart-three.
+const THREE_VERSION = '0.170.0';
+const THREE_CDN = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/build/three.module.min.js`;
+function findThree() {
+  const tryDir = (dir) => {
+    const pkg = path.join(dir, 'package.json');
+    const mod = path.join(dir, 'build/three.module.min.js');
+    if (!fs.existsSync(pkg) || !fs.existsSync(mod)) return null;
+    return JSON.parse(fs.readFileSync(pkg, 'utf8')).version === THREE_VERSION ? mod : null;
+  };
+  const root = path.resolve(SRC, '..');
+  const found = tryDir(path.join(root, 'node_modules/three'));
+  if (found) return found;
+  const cache = path.join(root, 'node_modules/.cache/kart-three');
+  const cached = tryDir(path.join(cache, 'package'));
+  if (cached) return cached;
+  fs.mkdirSync(cache, { recursive: true });
+  const tgz = execFileSync('npm', ['pack', `three@${THREE_VERSION}`, '--silent'], { cwd: cache, encoding: 'utf8' }).trim().split('\n').pop();
+  execFileSync('tar', ['-xzf', tgz], { cwd: cache });
+  const got = tryDir(path.join(cache, 'package'));
+  if (!got) throw new Error('não foi possível obter o three ' + THREE_VERSION);
+  return got;
+}
+const THREE_FILE = findThree();
+const threeLocal = {
+  name: 'three-local',
+  setup(b) {
+    b.onResolve({ filter: /^https:\/\/cdn\.jsdelivr\.net\/npm\/three@/ }, (args) => {
+      if (args.path !== THREE_CDN) throw new Error(`versão do three diferente da esperada: ${args.path}`);
+      return { path: THREE_FILE };
+    });
+  },
+};
+
 const result = await build({
   entryPoints: [path.join(SRC, 'js/main.js')],
   bundle: true,
@@ -26,6 +64,7 @@ const result = await build({
   minify: true,
   target: 'es2020',
   legalComments: 'none',
+  plugins: [threeLocal],
   external: ['https://*'],
   write: false,
 });
@@ -66,6 +105,10 @@ fs.writeFileSync(
 </IfModule>
 `,
 );
+
+// Manifest e ícones do aplicativo (Adicionar à tela inicial).
+fs.copyFileSync(path.join(SRC, 'manifest.webmanifest'), path.join(OUT, 'manifest.webmanifest'));
+for (const f of ['icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join(SRC, f), path.join(OUT, f));
 
 // Remove sobras da versão antiga (módulos soltos).
 for (const dir of ['js', 'css']) fs.rmSync(path.join(OUT, dir), { recursive: true, force: true });

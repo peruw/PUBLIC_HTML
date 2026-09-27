@@ -99,7 +99,7 @@ export const CHARACTERS = [
     country: 'Inglaterra',
     field: 'Biologia',
     stats: { speed: 4, accel: 2, handling: 3, weight: 4 },
-    colors: { kart: 0x3a7d44, kartAccent: 0xe9c46a, ui: '#3a9d4e' },
+    colors: { kart: 0x8a6d3b, kartAccent: 0xe9c46a, ui: '#a07a3c' }, // marrom-oliva do Beagle (distinto da Curie)
     look: {
       skin: 0xf0c6a0, hair: 0xefefef, hairStyle: 'calvo no topo, cabelo branco nas laterais',
       beard: 'barba branca enorme e cheia',
@@ -220,6 +220,8 @@ export const RACE = {
   defaultLaps: 2,
   lapOptions: [1, 2, 3, 5],
   countdownStep: 1.0, // segundos entre 3, 2, 1, VAI!
+  // duração típica de uma volta por classe (s), para estimar o tempo de corrida no menu
+  lapSeconds: { '50cc': 88, '100cc': 67, '150cc': 57 },
   rouletteTime: 1.6,
   boxRespawn: 2.0,
 };

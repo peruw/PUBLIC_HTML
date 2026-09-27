@@ -16,11 +16,34 @@ import { CameraRig } from './camera.js';
 import { AudioSystem } from './audio.js';
 import { RaceManager } from './race.js';
 import { Hud } from './hud.js';
-import { Menu, store } from './menu.js';
+import { Menu, store, is150Unlocked } from './menu.js';
 
 const STEP = 1 / 60; // passo fixo da simulação
 const PLAYER_SLOT = 5; // o jogador larga em 6º
 const RESULTS_DELAY = 3.2; // s entre a chegada e a tela de resultado
+// Escada de habilidade dos 7 adversários em torno de CLASSES[cc].aiSkill: sempre há um mais forte
+// (o rival) para perseguir e um mais fraco para ultrapassar.
+const AI_LADDER = [0.12, 0.06, 0.02, 0, -0.04, -0.08, -0.12];
+const GHOST_DT = 0.1; // s entre as amostras do fantasma do contrarrelógio
+
+// Desafio do dia: o mesmo para todo mundo (semente = data).
+function dailyChallenge() {
+  const d = new Date();
+  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  let x = Number(key.replace(/-/g, '')) >>> 0;
+  const rnd = () => {
+    x = (x + 0x6d2b79f5) >>> 0;
+    let t = x;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const ch = CHARACTERS[Math.floor(rnd() * CHARACTERS.length)];
+  const ccs = is150Unlocked() ? ['50cc', '100cc', '150cc'] : ['50cc', '100cc'];
+  const cc = ccs[Math.floor(rnd() * ccs.length)];
+  const podium = rnd() < 0.5;
+  return { key, character: ch.id, cc, laps: 2, maxPlace: podium ? 3 : 1, label: `${ch.name} · ${cc} · ${podium ? 'chegar no pódio' : 'vencer'}` };
+}
 
 // Só 'pointer: coarse' conta como celular/tablet (notebooks com tela de toque têm ontouchstart).
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -61,6 +84,24 @@ async function init() {
       input.setAutoAccelerate(!input.autoAccelerate);
       store.set('auto', input.autoAccelerate);
       menu.setAutoLabel(input.autoAccelerate);
+    },
+    onVolume: (kind, v) => {
+      audio?.setVolume?.(kind, v);
+      store.set('vol-' + kind, v);
+    },
+    onDaily: () => {
+      const d = dailyChallenge();
+      startRace({ character: d.character, cc: d.cc, laps: d.laps, mode: 'race', daily: d });
+    },
+    dailyInfo: () => {
+      const d = dailyChallenge();
+      const st = store.get('daily', {});
+      return { label: d.label, done: !!st[d.key], streak: store.get('dailyStreak', { n: 0 }).n };
+    },
+    qualityId: () => qualityId,
+    onSetQuality: (id) => {
+      store.set('quality', id);
+      setTimeout(() => location.reload(), 150);
     },
   });
   menu.show('loading');
@@ -151,6 +192,11 @@ async function init() {
 
   audio.setMuted(store.get('muted', false));
   menu.setSoundLabel(audio.muted);
+  const volMusic = store.get('vol-music', 1);
+  const volSfx = store.get('vol-sfx', 1);
+  audio.setVolume?.('music', volMusic);
+  audio.setVolume?.('sfx', volSfx);
+  menu.setVolumes(volMusic, volSfx);
 
   const world = {
     scene, camera, renderer, track, karts, player: null, items, effects, bus,
@@ -189,7 +235,12 @@ async function init() {
     for (const k of karts) {
       k.isPlayer = false;
       k.frozen = false;
+      k.object3d.visible = true;
     }
+    setGhost(null);
+    env.setMood?.(0);
+    items.setMode?.('race');
+    world.rival = null;
     const order = karts.slice().sort(() => Math.random() - 0.5);
     setupGrid(order);
     items.reset(karts);
@@ -207,35 +258,55 @@ async function init() {
   }
 
   function startRace(opts) {
+    opts = { mode: 'race', ...opts };
     game.opts = opts;
     game.state = 'race';
     setPaused(false, true);
     pendingUse = false;
     bus.emit('race:reset');
+    const tt = opts.mode === 'timetrial';
     const cc = CLASSES[opts.cc] || CLASSES['100cc'];
     world.cc = cc;
     world.totalLaps = opts.laps;
+    world.mode = opts.mode;
     const player = karts.find((k) => k.character.id === opts.character) || karts[0];
-    const others = karts.filter((k) => k !== player).sort(() => Math.random() - 0.5);
+    // contrarrelógio: sozinho na pista (os outros karts somem)
+    const others = tt ? [] : karts.filter((k) => k !== player).sort(() => Math.random() - 0.5);
+    for (const k of karts) {
+      k.object3d.visible = !tt || k === player;
+      k.frozen = false;
+    }
     // karts[0] é o jogador; o grid tem o jogador em PLAYER_SLOT
     world.karts = [player, ...others];
     const grid = others.slice();
-    grid.splice(PLAYER_SLOT, 0, player);
+    grid.splice(tt ? 0 : PLAYER_SLOT, 0, player);
     setupGrid(grid);
     for (const k of karts) k.isPlayer = k === player;
     world.player = player;
+    items.setMode?.(tt ? 'timetrial' : 'race');
     items.reset(karts);
     effects.reset();
+    env.setMood?.(0);
+    moodT = -1;
     drivers = new Map(
       others.map((k, i) => [k, new AIDriver(k, track, {
-        skill: THREE.MathUtils.clamp(cc.aiSkill + (Math.random() - 0.5) * 0.16, 0.2, 1),
+        skill: THREE.MathUtils.clamp(cc.aiSkill + AI_LADDER[i % AI_LADDER.length], 0.2, 1),
         lane: i, // faixa sorteada a cada corrida (others já vem embaralhado)
       })]),
     );
+    // o rival é o adversário mais forte da escada
+    world.rival = others[0] || null;
     playerAI = new AIDriver(player, track, { skill: 0.9 });
     race.start(world.karts, { laps: opts.laps, player, track, cc });
     world.phase = 'countdown';
-    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track });
+    // dicas contextuais nas duas primeiras corridas
+    const played = store.get('played', 0);
+    store.set('played', played + 1);
+    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tutorial: played < 2, touch: input.touchEnabled });
+    // fantasma do recorde (contrarrelógio)
+    ghostRec = tt ? [] : null;
+    ghostSampleT = 0;
+    setGhost(tt ? store.get(ghostKey(opts), null) : null);
     hud.show(true);
     input.showTouch(input.touchEnabled);
     rig.follow(player);
@@ -257,8 +328,9 @@ async function init() {
     if (!me || !p.finished || me.estimated || !game.opts) return null;
     const { cc, laps } = game.opts;
     const rec = store.get('records', {});
-    const keyT = `${cc}-${laps}`;
-    const keyL = `lap-${cc}`;
+    const pre = game.opts.mode === 'timetrial' ? 'tt-' : '';
+    const keyT = `${pre}${cc}-${laps}`;
+    const keyL = `${pre}lap-${cc}`;
     const bestLap = p.lapTimes && p.lapTimes.length ? Math.min(...p.lapTimes) : 0;
     const info = { cc, laps, time: me.time, bestLap, newTotal: false, newLap: false, prevTotal: rec[keyT] || null, prevLap: rec[keyL] || null };
     if (!rec[keyT] || me.time < rec[keyT].time) {
@@ -276,12 +348,208 @@ async function init() {
   function showResults() {
     game.state = 'results';
     const results = race.buildResults();
+    const opts = game.opts;
+    const tt = opts.mode === 'timetrial';
+    const p = world.player;
+    const me = results.find((r) => r.kart === p);
     hud.show(false);
     input.showTouch(false);
-    rig.setMode('orbit', { target: world.player, radius: 7, height: 2.6, speed: 0.35 });
-    menu.showResults(results, world.player, saveRecords(results));
+    setGhost(null);
+    const rec = saveRecords(results);
+    const info = { rec, cc: opts.cc, laps: opts.laps, mode: opts.mode, facts: hud.raceFacts.slice() };
+    const valid = me && p.finished && !me.estimated;
+    if (valid && !tt) {
+      info.medal = awardMedal(p.character.id, opts.cc, me.place);
+      if (opts.cc === '100cc' && me.place === 1 && !is150Unlocked()) {
+        store.set('unlock150', true);
+        info.unlocked150 = true;
+      }
+    }
+    // rival: diferença de tempo na chegada (estimada se ele não terminou)
+    const rv = world.rival && results.find((r) => r.kart === world.rival);
+    if (rv && me && !tt) info.rival = { name: rv.kart.character.name, delta: me.time - rv.time };
+    // desafio do dia
+    if (opts.daily) {
+      const ok = valid && me.place <= opts.daily.maxPlace;
+      info.daily = { done: ok, goal: opts.daily.label };
+      if (ok) markDaily(opts.daily.key);
+    }
+    // fantasma
+    if (tt && valid) {
+      const prev = ghostPrevTime;
+      if (prev) info.ghost = me.time - prev;
+      if (!prev || me.time < prev) saveGhost(me.time);
+    }
+    // ranking deste aparelho
+    if (valid) Object.assign(info, addRanking(recordKey(opts), me.time, p.character.id));
+    menu.showResults(results, p, info);
     audio.playMusic('results');
+    if (tt) rig.setMode('orbit', { target: p, radius: 7, height: 2.6, speed: 0.35 });
+    else podium(results);
   }
+
+  // Os três primeiros lado a lado depois da linha de chegada, com câmera de pódio e confete.
+  function podium(results) {
+    const top = results.slice(0, 3).map((r) => r.kart);
+    const base = track.sample(22);
+    const heading = Math.atan2(base.tangent.x, base.tangent.z);
+    const spots = [[0, 0], [-2.4, -0.9], [2.4, -1.4]]; // [lateral, recuo]
+    for (const k of world.karts) k.frozen = true;
+    top.forEach((k, i) => {
+      const [lat, back] = spots[i];
+      const pos = base.pos.clone().addScaledVector(base.right, lat).addScaledVector(base.tangent, back);
+      k.placeAt({ pos, heading, s: 22 + back });
+      k.object3d.visible = true;
+    });
+    // os demais saem de cena para não atravessarem o pódio
+    for (const k of world.karts) if (!top.includes(k)) k.object3d.visible = false;
+    const up = new THREE.Vector3(0, 1, 0);
+    // tela larga: o painel ocupa a direita, então o pódio vai para a esquerda da imagem
+    // (a direita da tela, olhando para trás na pista, é o lado -right da pista)
+    const dist = 12;
+    const aspect = innerWidth / innerHeight;
+    const shift = !isTouch && aspect > 1.3 ? 0.6 * Math.tan((45 / 2) * (Math.PI / 180)) * aspect * dist : 0;
+    const center = base.pos.clone().addScaledVector(base.right, -shift);
+    const lookAt = center.clone().addScaledVector(up, 1.0);
+    const position = center.clone().addScaledVector(base.tangent, dist).addScaledVector(up, 2.8);
+    rig.setMode('podium', { position, lookAt });
+    rig.snap();
+    effects.confetti?.(top[0]);
+  }
+
+  // ---------- recordes, medalhas, ranking e desafio ----------
+  function recordKey(o) {
+    return `${o.mode === 'timetrial' ? 'tt-' : ''}${o.cc}-${o.laps}`;
+  }
+
+  function awardMedal(charId, cc, place) {
+    const type = place === 1 ? 'ouro' : place === 2 ? 'prata' : place === 3 ? 'bronze' : null;
+    if (!type) return null;
+    const all = store.get('medals', {});
+    const mine = all[charId] || (all[charId] = {});
+    const rank = { bronze: 1, prata: 2, ouro: 3 };
+    if (mine[cc] && rank[mine[cc]] >= rank[type]) return null;
+    mine[cc] = type;
+    store.set('medals', all);
+    return { type };
+  }
+
+  function addRanking(key, time, character) {
+    const all = store.get('ranking', {});
+    const list = all[key] || [];
+    const nick = store.get('nick', '');
+    const entry = { name: nick, time, character };
+    list.push(entry);
+    list.sort((a, b) => a.time - b.time);
+    all[key] = list.slice(0, 5);
+    store.set('ranking', all);
+    return { rankKey: key, rankIndex: all[key].indexOf(entry) };
+  }
+
+  function markDaily(key) {
+    const st = store.get('daily', {});
+    if (st[key]) return;
+    st[key] = true;
+    // mantém só os últimos 30 dias
+    const keys = Object.keys(st).sort();
+    while (keys.length > 30) delete st[keys.shift()];
+    store.set('daily', st);
+    const streak = store.get('dailyStreak', { last: '', n: 0 });
+    const y = new Date(Date.now() - 864e5);
+    const yKey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+    streak.n = streak.last === yKey ? streak.n + 1 : 1;
+    streak.last = key;
+    store.set('dailyStreak', streak);
+  }
+
+  // ---------- fantasma do contrarrelógio ----------
+  let ghostRec = null; // amostras da corrida atual [x, y, z, heading, ...]
+  let ghostSampleT = 0;
+  let ghost = null; // { data, model, time }
+  let ghostPrevTime = 0;
+  const ghostKey = (o) => `ghost-${o.cc}-${o.laps}`;
+  function setGhost(g) {
+    if (ghost?.model) {
+      scene.remove(ghost.model.group);
+      ghost.model.dispose?.();
+    }
+    ghost = null;
+    ghostPrevTime = g?.time || 0;
+    if (!g || !g.frames?.length) return;
+    const model = createKartModel(g.character, { quality });
+    // materiais próprios e translúcidos (os do kart são compartilhados)
+    model.group.traverse((o) => {
+      if (!o.material) return;
+      o.material = o.material.clone();
+      o.material.transparent = true;
+      o.material.opacity = 0.38;
+      o.material.depthWrite = false;
+      o.castShadow = false;
+    });
+    model.group.visible = false;
+    scene.add(model.group);
+    ghost = { data: g.frames, model, time: g.time, laps: g.lapTimes || [] };
+  }
+  function saveGhost(time) {
+    if (!ghostRec?.length) return;
+    const p = world.player;
+    store.set(ghostKey(game.opts), { time, character: p.character.id, lapTimes: p.lapTimes || [], frames: ghostRec });
+  }
+  // grava o jogador a 10 Hz (chamado pelo passo fixo da simulação)
+  function recordGhost(h) {
+    const p = world.player;
+    if (!ghostRec || !p || race.phase !== 'racing' || p.finished) return;
+    ghostSampleT -= h;
+    if (ghostSampleT <= 0) {
+      ghostSampleT += GHOST_DT;
+      const r = (v) => Math.round(v * 100) / 100;
+      ghostRec.push(r(p.position.x), r(p.position.y), r(p.position.z), r(p.heading));
+    }
+  }
+  function updateGhost(dt) {
+    const p = world.player;
+    if (!p || game.opts?.mode !== 'timetrial') return;
+    const t = race.time;
+    // reproduz o recorde
+    if (!ghost) return;
+    const d = ghost.data;
+    const n = d.length / 4;
+    const f = t / GHOST_DT;
+    const i = Math.floor(f);
+    const show = race.phase !== 'countdown' && i < n - 1;
+    ghost.model.group.visible = show;
+    if (!show) return;
+    const a = i * 4, b = a + 4, u = f - i;
+    const g = ghost.model.group;
+    g.position.set(d[a] + (d[b] - d[a]) * u, d[a + 1] + (d[b + 1] - d[a + 1]) * u, d[a + 2] + (d[b + 2] - d[a + 2]) * u);
+    let dh = d[b + 3] - d[a + 3];
+    if (dh > Math.PI) dh -= Math.PI * 2;
+    else if (dh < -Math.PI) dh += Math.PI * 2;
+    g.rotation.set(0, d[a + 3] + dh * u, 0);
+    const spd = Math.hypot(d[b] - d[a], d[b + 2] - d[a + 2]) / GHOST_DT;
+    ghost.model.update(dt, { speed: spd });
+  }
+  // diferença para o fantasma a cada volta
+  bus.on('race:lap', ({ kart, lap }) => {
+    if (kart !== world.player || game.opts?.mode !== 'timetrial' || !ghost?.laps?.length) return;
+    const n = lap - 1;
+    if (ghost.laps.length < n) return;
+    const gT = ghost.laps.slice(0, n).reduce((a, b) => a + b, 0);
+    const dT = race.time - gT;
+    const txt = `${dT < 0 ? '−' : '+'}${Math.abs(dT).toFixed(2).replace('.', ',')} s`;
+    hud.center(`Volta ${lap}<small class="${dT < 0 ? 'ahead' : 'behind'}">👻 ${txt}</small>`, 'msg pop', 1800);
+  });
+
+  // ---------- rival e hora dourada ----------
+  bus.on('race:go', () => {
+    if (game.state === 'race' && world.rival) {
+      hud.toast(`<div class="item-ico">⚔️</div><div><small>Seu rival</small><b>${world.rival.character.name}</b><p>O adversário mais rápido desta corrida.</p></div>`, 3200);
+    }
+  });
+  let moodT = -1; // -1 = parado; 0..1 animando para a hora dourada
+  bus.on('race:finalLap', ({ kart }) => {
+    if (kart === world.player && game.state === 'race') moodT = 0;
+  });
 
   function setPaused(on, silent) {
     if (on && game.state !== 'race') return;
@@ -484,6 +752,7 @@ async function init() {
     items.update(h, world);
     if (game.state === 'race' || game.state === 'results') {
       race.update(h, world);
+      recordGhost(h);
       world.phase = race.phase === 'countdown' ? 'countdown' : race.phase === 'finished' ? 'finished' : 'racing';
     }
   }
@@ -498,7 +767,10 @@ async function init() {
   bus.on('kart:wall', ({ kart, strength }) => {
     if (!isP(kart)) return;
     rig.shake(0.06 + 0.16 * strength, 0.25);
-    if (strength > 0.4) buzz(25);
+    if (strength > 0.4) {
+      buzz(25);
+      input.rumble?.(90, 0.3 + 0.4 * strength);
+    }
   });
   bus.on('kart:bump', ({ a, b, strength }) => {
     if (!isP(a) && !isP(b)) return;
@@ -509,6 +781,7 @@ async function init() {
     const big = type === 'tumble' || type === 'shock';
     rig.shake(big ? 0.4 : 0.25, big ? 0.6 : 0.4);
     buzz(big ? [70, 40, 70] : 60);
+    input.rumble?.(big ? 300 : 180, big ? 0.9 : 0.6);
   });
   bus.on('kart:land', ({ kart, airTime }) => {
     if (!isP(kart) || !(airTime > 0.3)) return;
@@ -532,6 +805,9 @@ async function init() {
   let noLower = false; // limite de quadros (ex.: 30 Hz) ou CPU: reduzir não adianta
   let slowWarned = false;
   let dtAvg = 1 / 60;
+  let frameNo = 0;
+  let noLowerT = 0; // noLower expira: a adaptação volta a tentar depois de um tempo
+  let shadowsCut = false;
   function frame() {
     const dt = Math.min(clock.getDelta(), 0.1);
     const t = clock.elapsedTime;
@@ -565,6 +841,12 @@ async function init() {
         resultsTimer -= dt;
         if (resultsTimer <= 0) showResults();
       }
+      if (game.state === 'race') updateGhost(dt);
+      // hora dourada na última volta (~4 s de transição)
+      if (moodT >= 0 && moodT < 1) {
+        moodT = Math.min(1, moodT + dt / 4);
+        env.setMood?.(moodT * moodT * (3 - 2 * moodT));
+      }
     }
 
     rig.update(dt, world, { lookBack: !!(world.player && !game.autopilot && ctrl.lookBack && game.state === 'race') });
@@ -575,7 +857,9 @@ async function init() {
     if (!game.paused) audio.update(dt, world);
     // Pausa e telas que cobrem o jogo: não redesenha a cena 3D (economiza bateria).
     const idle = game.paused || menu.current === 'select' || menu.current === 'howto';
-    if (!idle || needsRender) {
+    // celular no título/resultado: 30 quadros por segundo bastam (menos bateria e calor)
+    const halfRate = isTouch && (game.state === 'title' || game.state === 'results') && (++frameNo & 1);
+    if ((!idle && !halfRate) || needsRender) {
       renderer.render(scene, camera);
       needsRender = false;
     }
@@ -585,7 +869,7 @@ async function init() {
     adaptResolution(dt);
   }
 
-  const PR_MIN = 0.75;
+  const PR_MIN = quality.id === 'baixa' ? 0.6 : 0.75;
   function setPR(r) {
     pixelRatio = r;
     renderer.setPixelRatio(r);
@@ -595,16 +879,19 @@ async function init() {
       slowTime = fastTime = 0;
       return;
     }
+    if (noLower && (noLowerT -= dt) <= 0) noLower = false;
     if (checkTime > 0) {
-      // Reduziu e não melhorou pelo menos 8%: volta e para de reduzir.
+      // Reduziu e não melhorou pelo menos 8%: volta e para de reduzir por 20 s.
       checkTime -= dt;
       if (checkTime <= 0 && dtAvg > dtBefore * 0.92) {
         setPR(prBefore);
         noLower = true;
+        noLowerT = 20;
       }
       return;
     }
-    if (dtAvg > 1 / 28) {
+    // abaixo de ~45 quadros por segundo já trepida: reage antes de ficar injogável
+    if (dtAvg > 1 / 45) {
       fastTime = 0;
       slowTime += dt;
       if (slowTime > 2.5) {
@@ -614,11 +901,19 @@ async function init() {
           prBefore = pixelRatio;
           setPR(Math.max(PR_MIN, pixelRatio - 0.15));
           checkTime = 3;
-        } else if (quality.id === 'alta' && !slowWarned) {
-          // Ainda lento em 'alta' (reduzir não resolve mais): a próxima visita já começa em 'baixa'.
+        } else if (renderer.shadowMap.enabled && !shadowsCut && dtAvg > 1 / 35) {
+          // resolução no mínimo e ainda lento: desliga as sombras sem recarregar
+          shadowsCut = true;
+          renderer.shadowMap.enabled = false;
+          scene.traverse((o) => {
+            const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+            for (const m of ms) m.needsUpdate = true;
+          });
+        } else if (quality.id === 'alta' && !slowWarned && dtAvg > 1 / 32) {
+          // Ainda lento em 'alta': sugere a qualidade baixa (sem trocar sozinho).
           slowWarned = true;
-          store.set('quality', 'baixa');
-          hud.toast?.('<div class="item-ico">🐢</div><div><b>Jogo lento?</b><p>Da próxima vez o jogo abre em qualidade baixa (dá para trocar no menu inicial).</p></div>', 6000);
+          store.set('slowHint', true);
+          hud.toast?.('<div class="item-ico">🐢</div><div><b>Jogo lento?</b><p>No menu inicial dá para usar a qualidade baixa.</p></div>', 5000);
         }
       }
     } else if (dtAvg < 1 / 50 && pixelRatio < maxPR) {
@@ -671,11 +966,30 @@ async function init() {
     setPixelRatio(r) {
       setPR(r);
     },
+    hud,
+    env,
+    effects,
   };
 
   menu.setLoading(1, 'Pronto!');
   await nextFrame();
   enterTitle();
+  // Link do professor: ?cientista=curie&motor=50cc&voltas=1&modo=contrarrelogio abre direto a escolha.
+  try {
+    const q = new URLSearchParams(location.search);
+    const ch = q.get('cientista');
+    const mo = q.get('motor');
+    const vo = Number(q.get('voltas'));
+    const md = q.get('modo');
+    let any = false;
+    if (ch && CHARACTERS.some((c) => c.id === ch)) { menu.opts.character = ch; any = true; }
+    if (mo && CLASSES[mo]) { menu.opts.cc = mo; any = true; }
+    if (RACE.lapOptions.includes(vo)) { menu.opts.laps = vo; any = true; }
+    if (md) { menu.opts.mode = /relogio|timetrial/i.test(md) ? 'timetrial' : 'race'; any = true; }
+    if (any) menu.show('select');
+  } catch {
+    /* parâmetros inválidos: segue no título */
+  }
   window.__gameReady = true;
 }
 
