@@ -960,6 +960,11 @@ export function buildTrack(scene, quality = {}) {
       itemBoxSlots.push({ pos: p.pos.clone().addScaledVector(p.right, lat).addScaledVector(UP, 1.2), s: wrapS(s), lateral: lat });
     }
   }
+  // fileiras de caixas (minimapa): s do centro da fileira, quantidade e posição no mundo (centro)
+  const itemBoxRows = boxRows.map(([s, n]) => {
+    const p = sample(s).pos;
+    return { s: wrapS(s), count: n, x: p.x, z: p.z };
+  }).sort((a, b) => a.s - b.s);
   const padDefs = [
     [ctrlS[4] + 4, 'line'], [ctrlS[6] + 26, 'line'], [ctrlS[10] + 10, 'line'], [ctrlS[14] + 8, 'inside'],
     [(bridgeS[0] + bridgeS[1]) / 2 + 12, 'center'], [ctrlS[21] + 4, 'inside'], [tunnelS[0] + 36, 'center'], [ctrlS[30] + 6, 'inside'],
@@ -976,10 +981,44 @@ export function buildTrack(scene, quality = {}) {
   ramps.push({ s: wrapS(ctrlS[13] + 12), lateral: 0, length: 6, width: 12, launch: 8.5 });
   ramps.push({ s: wrapS(ctrlS[27] + 18), lateral: -3.5, length: 6, width: 8, launch: 7.5 });
 
+  // Cruzamento do "8" para o minimapa: trecho de s da pista de cima (viaduto) que passa sobre a de
+  // baixo (túnel) e o trecho de baixo que fica embaixo. Pontos da linha central a menos de meio
+  // corredor (+ 3 m) da outra pista, em torno do cruzamento.
+  const overpass = (() => {
+    const near = (sa, sb) => {
+      const ia = Math.round(sa / ds), ib = Math.round(sb / ds), W = Math.ceil(90 / ds);
+      let s0 = Infinity, s1 = -Infinity;
+      for (let k = -W; k <= W; k++) {
+        const i = idx(ia + k);
+        let best = Infinity, bj = ib;
+        for (let q = -W; q <= W; q++) {
+          const j = idx(ib + q);
+          const d = (X[i] - X[j]) ** 2 + (Z[i] - Z[j]) ** 2;
+          if (d < best) { best = d; bj = j; }
+        }
+        if (Math.sqrt(best) < WD[bj] + 3) { s0 = Math.min(s0, (ia + k) * ds); s1 = Math.max(s1, (ia + k) * ds); }
+      }
+      return [wrapS(s0), wrapS(s1)];
+    };
+    const [upperS0, upperS1] = near(crossing.upperS, crossing.lowerS);
+    const [lowerS0, lowerS1] = near(crossing.lowerS, crossing.upperS);
+    return { upperS: crossing.upperS, lowerS: crossing.lowerS, upperS0, upperS1, lowerS0, lowerS1, x: crossing.x, z: crossing.z };
+  })();
+  const inRange = (s, a, b) => (a <= b ? s >= a && s <= b : s >= a || s <= b);
+
+  // 256 pontos da linha central; over/under marcam os trechos de cima e de baixo do cruzamento,
+  // com 12 m de folga de cada lado (o HUD desenha o de baixo primeiro e o de cima por último, com
+  // contorno, e o traço de cima fica comprido o bastante para parecer uma ponte)
   const minimapPoints = [];
+  const PAD = 12;
   for (let i = 0; i < 256; i++) {
-    const p = sample((i / 256) * length).pos;
-    minimapPoints.push({ x: p.x, z: p.z });
+    const s = (i / 256) * length;
+    const p = sample(s).pos;
+    minimapPoints.push({
+      x: p.x, z: p.z, s,
+      over: inRange(s, wrapS(overpass.upperS0 - PAD), wrapS(overpass.upperS1 + PAD)),
+      under: inRange(s, wrapS(overpass.lowerS0 - PAD), wrapS(overpass.lowerS1 + PAD)),
+    });
   }
 
   // ------------------------------------------------------------ zonas temáticas
@@ -2398,9 +2437,12 @@ export function buildTrack(scene, quality = {}) {
     itemBoxSlots,
     boostPads,
     ramps,
-    minimapPoints,
+    minimapPoints, // [{ x, z, s, over, under }]
+    // minimapa: cruzamento do "8" { upperS0, upperS1 (trecho de cima), lowerS0, lowerS1 (de baixo), upperS, lowerS, x, z }
+    overpass,
+    itemBoxRows, // minimapa: [{ s, count, x, z }] fileiras de caixas, em ordem de s
     update,
-    setViewHint,
+    setViewHint, // (s, lateral, altura) da câmera: o ambiente chama a cada quadro
     group,
     // Extras (fora do contrato) usados por environment.js e testes
     meta: {
