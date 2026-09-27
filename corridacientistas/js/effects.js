@@ -1933,8 +1933,9 @@ export class Effects {
     if (feelT === 0 && this.speedFeel < 0.002) this.speedFeel = 0;
 
     if (p?.velocity) this.add.refVel.copy(p.velocity); // mesmo sem emitir: as linhas ainda vivas usam
-    // olhando para trás as linhas viriam na direção errada
-    const rate = p?.controls?.lookBack ? 0 : (boosting ? 55 : 55 * 0.35 * k) * this.q;
+    // olhando para trás as linhas viriam na direção errada; na tela dividida elas ficariam
+    // presas à câmera do J1 e cruzariam a visão do J2 (lá a vinheta do HUD basta)
+    const rate = p?.controls?.lookBack || world?.split ? 0 : (boosting ? 55 : 55 * 0.35 * k) * this.q;
     if (rate <= 0) {
       this._strAcc = 0;
       return;

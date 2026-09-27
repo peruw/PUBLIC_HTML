@@ -488,7 +488,12 @@ export class AudioSystem {
     e.sub.connect(e.gs).connect(e.filter);
     e.am = ctx.createGain();
     e.am.gain.value = 1;
-    e.filter.connect(e.am).connect(e.out).connect(this.sfxGain);
+    // pan do motor: 0 com 1 jogador; na tela dividida o J1 fica à esquerda (o J2 tem o eng2, à direita)
+    const ePan = this._pan(0.001);
+    e.pan = ePan.out.pan || null;
+    if (e.pan) e.pan.value = 0;
+    e.filter.connect(e.am).connect(e.out).connect(ePan.in);
+    ePan.out.connect(this.sfxGain);
     e.lfo = ctx.createOscillator();
     e.lfo.type = 'sine';
     e.lfoDepth = ctx.createGain();
@@ -678,6 +683,7 @@ export class AudioSystem {
   _silenceLoops(tc = 0.08) {
     const t = this.ctx.currentTime;
     this.eng.out.gain.setTargetAtTime(0, t, tc);
+    if (this.eng2) this.eng2.out.gain.setTargetAtTime(0, t, tc);
     this.drift.out.gain.setTargetAtTime(0, t, tc);
     this.drift.sqOut.gain.setTargetAtTime(0, t, tc);
     this.rumble.out.gain.setTargetAtTime(0, t, tc);
@@ -700,14 +706,19 @@ export class AudioSystem {
       if (this._loopsOn) this._silenceLoops();
       return;
     }
+    // tela dividida: motor do J2 à direita, com o timbre do cientista dele
+    const two = world.split && world.players && world.players[1];
+    this._engine2(two && !two.finished ? two : null, world);
     // Já cruzou a chegada: na tela de resultado a IA dirige o kart do jogador e
     // o motor embolaria a fanfarra. Tudo do jogador some devagar.
     if (p.finished) {
       if (this._loopsOn) this._silenceLoops(0.25);
+      if (two && !two.finished) this._loopsOn = true; // o motor do J2 continua
       return;
     }
     this._loopsOn = true;
     const t = this.ctx.currentTime;
+    if (this.eng.pan) this.eng.pan.setTargetAtTime(two ? -0.55 : 0, t, 0.1);
     const pf = this._profile(p, world.cc);
     this._applyProfile(pf);
     const c = p.controls || {};
@@ -770,6 +781,52 @@ export class AudioSystem {
         this.sfx('roulette');
       }
     } else this._rShow = undefined;
+  }
+
+  // Motor do 2º jogador (tela dividida): serra + quadrada filtradas, à direita. null = silencia.
+  _engine2(k, world) {
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    if (!k) {
+      if (this.eng2) this.eng2.out.gain.setTargetAtTime(0, t, 0.15);
+      return;
+    }
+    let e = this.eng2;
+    if (!e) {
+      e = this.eng2 = {};
+      e.a = ctx.createOscillator();
+      e.a.type = 'sawtooth';
+      e.b = ctx.createOscillator();
+      e.b.type = 'square';
+      e.b.detune.value = 9;
+      e.gb = ctx.createGain();
+      e.gb.gain.value = 0.3;
+      e.filter = ctx.createBiquadFilter();
+      e.filter.type = 'lowpass';
+      e.filter.frequency.value = 500;
+      e.filter.Q.value = 2.5;
+      e.out = ctx.createGain();
+      e.out.gain.value = 0;
+      const pan = this._pan(0.55);
+      e.a.connect(e.filter);
+      e.b.connect(e.gb).connect(e.filter);
+      e.filter.connect(e.out).connect(pan.in);
+      pan.out.connect(this.sfxGain);
+      e.a.start();
+      e.b.start();
+    }
+    const pf = this._profile(k, world.cc);
+    const boosting = (k.boostTime || 0) > 0 || (k.starTime || 0) > 0;
+    const thr = Math.max(0, Math.min(1, (k.controls && k.controls.throttle) || 0));
+    let ratio = Math.min(1.35, Math.abs(k.speed || 0) / Math.max(8, k.baseMaxSpeed || k.maxSpeed || 20));
+    if (k.frozen) ratio = thr > 0 ? 0.45 : 0;
+    let f = (55 + 155 * Math.pow(Math.min(ratio, 1), 0.85) + (ratio > 1 ? (ratio - 1) * 120 : 0)) * pf.pitch;
+    if (boosting) f *= 1.12;
+    e.a.frequency.setTargetAtTime(f, t, 0.05);
+    e.b.frequency.setTargetAtTime(f * 1.004, t, 0.05);
+    e.filter.frequency.setTargetAtTime((380 + 2300 * Math.min(1, ratio) + thr * 450 + (boosting ? 900 : 0)) * pf.bright, t, 0.08);
+    const drive = Math.min(1, Math.min(1, ratio) * 5 + thr * 2);
+    e.out.gain.setTargetAtTime((0.02 + 0.025 * drive + thr * 0.04 + Math.min(1, ratio) * 0.045) * 0.9, t, 0.06);
   }
 
   // Pan (-0,8 a 0,8) de um vetor jogador → fonte pela direita da câmera
@@ -1301,7 +1358,8 @@ export class AudioSystem {
     if (!w) return { vol: 0.6, pan: 0 };
     if (w.phase === 'title') return { vol: 0, pan: 0 };
     // o kart do jogador, depois da chegada, é dirigido pela IA: bem mais baixo
-    if (kart && kart === w.player) return { vol: kart.finished ? 0.4 : 1, pan: 0 };
+    if (kart && kart === w.player) return { vol: kart.finished ? 0.4 : 1, pan: w.split ? -0.4 : 0 };
+    if (kart && w.split && w.players && kart === w.players[1]) return { vol: kart.finished ? 0.4 : 1, pan: 0.4 };
     const src = pos || (kart && kart.position);
     const lis = (w.player && w.player.position) || (w.camera && w.camera.position);
     if (!src || !lis) return { vol: 0.5, pan: 0 };
@@ -1359,6 +1417,12 @@ export class AudioSystem {
     });
     bus.on('race:finish', (d) => {
       if (!isMe(d && d.kart)) return; // o kart já vem com finished = true
+      // tela dividida: o outro jogador ainda corre, então a música segue
+      const ps = this._world && this._world.split && this._world.players;
+      if (ps && ps.some((k) => !k.finished)) {
+        this.sfx('finish');
+        return;
+      }
       this.duck();
       this._stopSong(0.4);
       this.musicName = null;

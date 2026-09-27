@@ -503,7 +503,7 @@ export class AIDriver {
   // Item guardado (IA pouco agressiva): libera quando o jogador abriu mais de 60 m
   // ou quando a penúltima volta acabou.
   _holdOver(k, world) {
-    const p = world.player;
+    const p = humanRef(world, k);
     if (!p || p === k) return true;
     if (k.lap >= (world.totalLaps || 1)) return true;
     const pd = typeof p.progress === 'number' ? p.progress : p.distance;
@@ -537,7 +537,7 @@ export class AIDriver {
   // ---------- rubber-band ----------
   _rubberBand(dt, world) {
     const k = this.kart;
-    const p = world.player;
+    const p = humanRef(world, k);
     let target = 1;
     if (p && p !== k) {
       const sk = this.skill;
@@ -565,4 +565,19 @@ export class AIDriver {
     }
     k.speedFactor = damp(k.speedFactor, target, 0.6, dt);
   }
+}
+
+// Humano de referência para o elástico e os itens guardados: o jogador (1 jogador) ou,
+// na tela dividida, o humano mais próximo deste kart na corrida (cada IA disputa com quem está perto).
+function humanRef(world, k) {
+  const ps = world.players;
+  if (!ps || ps.length < 2) return world.player;
+  let best = null;
+  let bd = Infinity;
+  for (const p of ps) {
+    if (p === k) continue;
+    const d = Math.abs((p.progress || 0) - (k.progress || 0));
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best || world.player;
 }

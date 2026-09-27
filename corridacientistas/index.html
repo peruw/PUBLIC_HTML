@@ -32,25 +32,28 @@
   <div id="touch-layer"></div>
   <div id="flash"></div>
 
-  <!-- HUD da corrida -->
+  <!-- HUD da corrida: um painel por jogador (o do J2, na tela dividida, é uma cópia sem ids feita pelo hud.js) -->
   <div id="hud" class="hidden" aria-hidden="true">
-    <div id="hud-vignette"></div>
-    <div class="hud-item" id="hud-item">
-      <div class="hud-item-slot"><span id="hud-item-icon"></span><span id="hud-item-count" class="hidden"></span></div>
-      <div class="hud-item-name" id="hud-item-name"></div>
-      <div class="hud-item-key"><kbd>E</kbd> ou <kbd>Shift</kbd> usa o item</div>
+    <div class="hud-panel" data-p="1">
+      <div id="hud-vignette" class="hud-vignette"></div>
+      <div class="hud-item" id="hud-item">
+        <div class="hud-item-slot"><span id="hud-item-icon" class="hud-item-icon"></span><span id="hud-item-count" class="hud-item-count hidden"></span></div>
+        <div class="hud-item-name" id="hud-item-name"></div>
+        <div class="hud-item-key"><kbd>E</kbd> ou <kbd>Shift</kbd> usa o item</div>
+      </div>
+      <div class="hud-race">
+        <div class="hud-pos"><span id="hud-pos-num" class="hud-pos-num">1</span><span class="hud-pos-suf">º</span><span class="hud-pos-total">/8</span></div>
+        <div class="hud-lap">Volta <span id="hud-lap" class="hud-lap-num">1/3</span></div>
+        <div class="hud-time" id="hud-time">0:00.00</div>
+      </div>
+      <div class="hud-tag"></div>
+      <div id="hud-center" class="hud-center"></div>
+      <div id="hud-warn" class="hud-warn hidden"></div>
+      <div id="hud-drift" class="hud-drift hidden"></div>
     </div>
     <canvas id="hud-minimap" width="180" height="180"></canvas>
-    <div class="hud-race">
-      <div class="hud-pos"><span id="hud-pos-num">1</span><span class="hud-pos-suf">º</span><span class="hud-pos-total">/8</span></div>
-      <div class="hud-lap">Volta <span id="hud-lap">1/3</span></div>
-      <div class="hud-time" id="hud-time">0:00.00</div>
-    </div>
     <button class="hud-pause" id="hud-pause" aria-label="Pausar">❚❚</button>
     <div id="hud-toasts"></div>
-    <div id="hud-center"></div>
-    <div id="hud-warn" class="hidden"></div>
-    <div id="hud-drift" class="hidden"></div>
   </div>
 
   <!-- Carregando -->
@@ -121,6 +124,8 @@
         <h2 id="select-title">Escolha seu cientista</h2>
         <span class="trophies" id="select-trophies"></span>
       </header>
+      <!-- dois jogadores: de quem é a ficha mostrada (cada um escolhe o seu cientista) -->
+      <div class="select-tabs hidden" id="select-tabs" role="tablist" aria-label="Jogadores"></div>
       <div class="select-body">
         <div class="char-grid" id="char-grid"></div>
         <div class="char-detail" id="char-detail">
@@ -135,6 +140,10 @@
         </div>
       </div>
       <footer class="select-foot">
+        <div class="opt opt-players">
+          <span class="opt-label">Jogadores</span>
+          <div class="seg" id="opt-players"></div>
+        </div>
         <div class="opt">
           <span class="opt-label">Modo</span>
           <div class="seg" id="opt-mode"></div>
@@ -233,6 +242,16 @@
               <li>Segure <b>ITEM</b> para levar o item atrás como escudo; arraste para baixo e solte para atirar para trás.</li>
               <li>Na largada, <b>segure ◀, ▶ ou DRIFT</b> logo depois do <b>2</b> para largar com turbo.</li>
               <li>No menu de pausa (❚❚) dá para desligar a aceleração automática.</li>
+            </ul>
+          </div>
+          <div class="howto-box howto-duo">
+            <h3>👥 Dois jogadores (mesmo PC)</h3>
+            <ul>
+              <li>Na escolha, marque <b>Jogadores: 2</b>. Cada um escolhe o seu cientista: J1 com <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, J2 com as setas.</li>
+              <li><b>J1</b> (esquerda): <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> dirige · <kbd>Espaço</kbd> drift · <kbd>E</kbd> item · <kbd>Q</kbd> olha para trás</li>
+              <li><b>J2</b> (direita): setas dirigem · <kbd>Ctrl</kbd> direito ou <kbd>.</kbd> drift · <kbd>Enter</kbd> ou <kbd>Shift</kbd> direito item · <kbd>,</kbd> ou <kbd>End</kbd> olha para trás</li>
+              <li>Com controles: o 1º é do J1 e o 2º é do J2. <kbd>Esc</kbd>/<kbd>P</kbd> de qualquer um pausa.</li>
+              <li>No modo 2 jogadores, recordes, medalhas e rankings não contam: vale o duelo!</li>
             </ul>
           </div>
           <div class="howto-box">

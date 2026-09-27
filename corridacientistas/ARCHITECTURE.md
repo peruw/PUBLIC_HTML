@@ -228,6 +228,17 @@ export class AudioSystem {
 - `localStorage` (prefixo `kartcientifico-`): `records`, `ranking`, `medals`, `unlock150`, `quiz`, `daily`, `dailyStreak`, `played`, `nick`, `vol-music`, `vol-sfx`, `ghost-<cc>-<voltas>`, `slowHint`, além das preferências antigas.
 - Parâmetros de URL para o professor: `?cientista=curie&motor=50cc&voltas=1&modo=contrarrelogio` abre direto a escolha.
 
+## Dois jogadores no mesmo PC (tela dividida)
+- Escolha: `menu.opts.players` (1 | 2) e `menu.opts.character2`; `menu.duo()` diz se vale (só PC, modo corrida, fora de sala de turma; o desafio do dia corre sempre sozinho). Abas "Jogador 1 / Jogador 2", marcadores J1/J2 nos cartões; WASD move o J1 e as setas o J2; `moveSelection(dx, dy, who)`.
+- `world.players` = humanos (`[J1]` ou `[J1, J2]`, com `isPlayer = true`); `world.player` continua sendo o J1. `world.split` = tela dividida ativa; `world.camera2` = câmera do J2.
+- `main.js`: um renderer, duas metades com `setViewport`/`setScissor`, dois `CameraRig` (`rig`, `rig2`, `rig.fovScale` abre o FOV na metade estreita). Antes da 2ª metade chama `env.update(0, t, camera2, true)` (só a parte da câmera: céu, sombra, túnel). 6 IA com `AI_LADDER_2P`; J1 e J2 largam lado a lado. Sem rival, recordes, medalhas, ranking, desafio nem online.
+- `race.start(karts, { players })`: largada-foguete, `race:finalLap` e `race:place` para cada humano; a fase vira `'finished'` quando todos os humanos cruzam a chegada.
+- `Input.setSplit(on)`: `poll()` devolve só o J1 (WASD, Espaço, E, Q, 1º controle) e `input.state2` recebe o J2 (setas, Ctrl direito/ponto, Enter/Shift direito, vírgula/End, 2º controle). Esc/P e Start de qualquer um pausam. `rumble(ms, força, jogador)`.
+- `Hud({ bus, index })`: um por jogador. O `index 0` usa o painel `.hud-panel[data-p="1"]` do `index.html` e cuida do minimapa (setas dos dois, com a cor de cada jogador) e das curiosidades (uma por vez, no centro de cima, com etiqueta J1/J2); o `index 1` clona o painel sem ids. `setRace({ ..., split, players })`. Com 1 jogador tudo fica como antes (`#hud` sem a classe `split`).
+- IA: elástico e item guardado em relação ao humano mais próximo (`humanRef`). Itens: as caixas não são escondidas pela câmera do J1 na tela dividida. Áudio: motor do J1 à esquerda e do J2 (`eng2`) à direita.
+- `PLAYER_COLORS` (hud.js) e `--p1`/`--p2` (CSS): azul (J1) e rosa (J2).
+- Um cientista sem modelo 3D em `models.js` usa um kart reserva (`kartModel` em main.js) e fica fora da IA e da demo.
+
 ## Eventos do bus
 | Evento | Dados |
 |---|---|
@@ -267,3 +278,4 @@ Em `main.js`, `window.__game` expõe:
 - `finishRace()`
 - `fastForward(segundos)` (simula sem renderizar)
 - `hud`, `env`, `effects`, `items`, `race`, `audio`
+- Dois jogadores: `startRace({ players: 2, character, character2 })`, `autopilot2(on)`, `giveItem(id, jogador)`, `finishRace(jogador)`, `players`, `rig2`, `camera2`, `hud2`

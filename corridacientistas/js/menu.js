@@ -1,6 +1,6 @@
 // Telas de menu (DOM): inicial, escolha do cientista, como jogar, pausa e resultado.
 import { CHARACTERS, CLASSES, ITEMS, RACE } from './config.js';
-import { itemIconHTML } from './hud.js';
+import { itemIconHTML, PLAYER_COLORS } from './hud.js';
 import { formatTime } from './race.js';
 import { SCIENTIST_FACTS, pickFact, shuffledQuiz } from './facts.js';
 import { Online, ERR_TEXT, boardOf, parseBoard } from './online.js';
@@ -78,9 +78,15 @@ export class Menu {
       cc: store.get('cc', '50cc'), // primeira vez: classe mais tranquila
       laps: store.get('laps', RACE.defaultLaps),
       mode: store.get('mode', 'race'), // 'race' | 'timetrial'
+      players: store.get('players', 1) === 2 ? 2 : 1, // 2 = tela dividida no mesmo PC
+      character2: store.get('character2', 'curie'), // cientista do J2
     };
     if (this.opts.mode !== 'timetrial') this.opts.mode = 'race';
     if (!CHARACTERS.some((c) => c.id === this.opts.character)) this.opts.character = 'newton';
+    if (!CHARACTERS.some((c) => c.id === this.opts.character2) || this.opts.character2 === this.opts.character) {
+      this.opts.character2 = CHARACTERS.find((c) => c.id !== this.opts.character).id;
+    }
+    this.editing = 0; // dois jogadores: de quem é a ficha mostrada (0 = J1, 1 = J2)
     if (!CLASSES[this.opts.cc] || (this.opts.cc === '150cc' && !is150Unlocked())) this.opts.cc = CLASSES[this.opts.cc] ? '100cc' : '50cc';
     if (!RACE.lapOptions.includes(this.opts.laps)) this.opts.laps = RACE.defaultLaps;
 
@@ -152,14 +158,20 @@ export class Menu {
         h.sfx('menuMove');
         this.show('title');
         break;
-      case 'start':
+      case 'start': {
         h.sfx('menuSelect');
         store.set('character', this.opts.character);
         store.set('cc', this.opts.cc);
         store.set('laps', this.opts.laps);
         store.set('mode', this.opts.mode);
-        h.onStart({ ...this.opts, room: this.room || null });
+        const duo = this.duo();
+        if (this.opts.players === 2 && duo) {
+          store.set('players', 2);
+          store.set('character2', this.opts.character2);
+        } else if (this.duoAllowed()) store.set('players', 1);
+        h.onStart({ ...this.opts, players: duo ? 2 : 1, room: this.room || null });
         break;
+      }
       case 'daily':
         h.sfx('menuSelect');
         h.onDaily?.();
@@ -316,9 +328,8 @@ export class Menu {
     this.grid.addEventListener('click', (e) => {
       const card = e.target.closest('.char-card');
       if (!card) return;
-      if (this.opts.character !== card.dataset.id) this.h.sfx('menuMove');
-      this.opts.character = card.dataset.id;
-      this.refreshSelect();
+      // dois jogadores: o clique vale para a aba aberta (Jogador 1 ou 2)
+      this.choose(this.duo() ? this.editing : 0, card.dataset.id);
     });
     this.grid.addEventListener('dblclick', (e) => {
       if (e.target.closest('.char-card')) this.action('start');
@@ -326,11 +337,38 @@ export class Menu {
     // Tab num cartão já escolhe o cientista (a ficha acompanha o foco)
     this.grid.addEventListener('focusin', (e) => {
       const card = e.target.closest('.char-card');
-      if (!card || !this.tabNav || card.dataset.id === this.opts.character) return;
-      this.opts.character = card.dataset.id;
-      this.h.sfx('menuMove');
-      this.refreshSelect();
+      const who = this.duo() ? this.editing : 0;
+      if (!card || !this.tabNav || card.dataset.id === this.pick(who)) return;
+      this.choose(who, card.dataset.id);
     });
+
+    // Jogadores: 1 ou 2 (tela dividida no mesmo PC)
+    const pl = $('opt-players');
+    if (pl) {
+      pl.innerHTML = '<button data-players="1">1<small>sozinho</small></button><button data-players="2">2<small>tela dividida</small></button>';
+      pl.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        const n = Number(b.dataset.players);
+        if (n === 2 && !this.duoAllowed()) {
+          this.h.sfx('menuMove');
+          this.flashHint(this.room ? 'Na sala de turma cada aluno corre sozinho.' : 'Dois jogadores só no modo Corrida.');
+          return;
+        }
+        this.setPlayers(n);
+      });
+    }
+    // abas "Jogador 1 / Jogador 2": de quem é a ficha (e para quem vale o clique nos cartões)
+    const tabs = $('select-tabs');
+    if (tabs) {
+      tabs.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-tab]');
+        if (!b) return;
+        this.editing = Number(b.dataset.tab);
+        this.h.sfx('menuMove');
+        this.refreshSelect();
+      });
+    }
 
     const cc = $('opt-cc');
     cc.innerHTML = Object.values(CLASSES)
@@ -372,6 +410,54 @@ export class Menu {
     }
   }
 
+  setPlayers(n) {
+    n = n === 2 ? 2 : 1;
+    if (n === this.opts.players) return;
+    this.opts.players = n;
+    this.editing = 0;
+    // o J2 não pode começar com o mesmo cientista do J1
+    if (n === 2 && this.opts.character2 === this.opts.character) {
+      this.opts.character2 = CHARACTERS.find((c) => c.id !== this.opts.character).id;
+    }
+    this.h.sfx('menuMove');
+    this.refreshSelect();
+  }
+
+  // ---------- dois jogadores (mesmo PC) ----------
+  // Só no PC (sem toque), no modo corrida e fora de sala de turma (lá cada aluno corre sozinho).
+  duoAllowed() {
+    return !document.body.classList.contains('touch') && this.opts.mode === 'race' && !this.room;
+  }
+
+  duo() {
+    return this.opts.players === 2 && this.duoAllowed();
+  }
+
+  // id do cientista de um jogador (0 = J1, 1 = J2)
+  pick(who) {
+    return who ? this.opts.character2 : this.opts.character;
+  }
+
+  setPick(who, id) {
+    if (who) this.opts.character2 = id;
+    else this.opts.character = id;
+  }
+
+  // Escolhe o cientista para o jogador 'who'; recusa o que já é do outro.
+  choose(who, id) {
+    if (this.duo() && this.pick(1 - who) === id) {
+      const c = CHARACTERS.find((x) => x.id === id);
+      this.h.sfx('menuMove');
+      this.flashHint(`${c ? c.name : 'Esse cientista'} já é do Jogador ${2 - who}. Escolha outro.`);
+      return false;
+    }
+    if (this.pick(who) !== id) this.h.sfx('menuMove');
+    this.setPick(who, id);
+    this.editing = this.duo() ? who : 0;
+    this.refreshSelect();
+    return true;
+  }
+
   flashHint(text) {
     const el = $('select-note');
     if (!el) return;
@@ -398,8 +484,35 @@ export class Menu {
   }
 
   refreshSelect() {
-    const c = CHARACTERS.find((x) => x.id === this.opts.character);
-    for (const card of this.grid.children) card.classList.toggle('selected', card.dataset.id === c.id);
+    const duo = this.duo();
+    if (!duo) this.editing = 0;
+    const c = CHARACTERS.find((x) => x.id === this.pick(this.editing));
+    for (const card of this.grid.children) {
+      card.classList.toggle('selected', card.dataset.id === c.id);
+      // dois jogadores: marcador colorido J1/J2 em cada cartão escolhido
+      card.querySelector('.pick')?.remove();
+      const who = !duo ? -1 : card.dataset.id === this.opts.character ? 0 : card.dataset.id === this.opts.character2 ? 1 : -1;
+      card.classList.toggle('pick1', who === 0);
+      card.classList.toggle('pick2', who === 1);
+      if (who >= 0) card.insertAdjacentHTML('afterbegin', `<span class="pick p${who + 1}">J${who + 1}</span>`);
+    }
+    const pl = $('opt-players');
+    if (pl) {
+      for (const b of pl.children) b.classList.toggle('on', Number(b.dataset.players) === (duo ? 2 : 1));
+      pl.classList.toggle('locked', !this.duoAllowed());
+    }
+    const tabs = $('select-tabs');
+    if (tabs) {
+      tabs.classList.toggle('hidden', !duo);
+      if (duo) {
+        const name = (id) => CHARACTERS.find((x) => x.id === id)?.name || '';
+        tabs.innerHTML = [0, 1]
+          .map((i) => `<button role="tab" data-tab="${i}" aria-selected="${i === this.editing}" class="${i === this.editing ? 'on' : ''}" style="--pc:${PLAYER_COLORS[i]}"><i></i>Jogador ${i + 1} <small>${esc(name(this.pick(i)))}</small> <kbd>${i ? '← ↑ → ↓' : 'W A S D'}</kbd></button>`)
+          .join('');
+      }
+    }
+    const st = $('select-title');
+    if (st) st.textContent = duo ? 'Escolham seus cientistas' : 'Escolha seu cientista';
     for (const b of $('opt-cc').children) b.classList.toggle('on', b.dataset.cc === this.opts.cc);
     for (const b of $('opt-laps').children) b.classList.toggle('on', Number(b.dataset.laps) === this.opts.laps);
     for (const b of $('opt-mode')?.children || []) b.classList.toggle('on', b.dataset.mode === this.opts.mode);
@@ -473,18 +586,24 @@ export class Menu {
     ).join('');
   }
 
-  moveSelection(dx, dy) {
-    const i = CHARACTERS.findIndex((x) => x.id === this.opts.character);
+  // who: jogador que se move (dois jogadores: 0 = WASD/1º controle, 1 = setas/2º controle)
+  moveSelection(dx, dy, who = 0) {
+    const duo = this.duo();
+    if (!duo) who = 0;
+    const i = CHARACTERS.findIndex((x) => x.id === this.pick(who));
     // colunas reais da grade (4 ou 5 conforme a tela)
     const cols = getComputedStyle(this.grid).gridTemplateColumns.split(' ').length || 4;
-    let n = i + dx + dy * cols;
-    n = (n + CHARACTERS.length) % CHARACTERS.length;
-    this.opts.character = CHARACTERS[n].id;
+    const N = CHARACTERS.length;
+    let n = (i + dx + dy * cols + N * 4) % N;
+    // o cientista do outro jogador é pulado (mesmo sentido)
+    if (duo && CHARACTERS[n].id === this.pick(1 - who)) n = (n + dx + dy * cols + N * 4) % N;
+    this.setPick(who, CHARACTERS[n].id);
+    this.editing = who;
     this.h.sfx('menuMove');
     this.refreshSelect();
     // com foco de Tab num cartão, o foco acompanha a seleção
     if (this.tabNav && document.activeElement?.classList.contains('char-card')) {
-      this.grid.querySelector(`[data-id="${this.opts.character}"]`)?.focus();
+      this.grid.querySelector(`[data-id="${this.pick(who)}"]`)?.focus();
     }
   }
 
@@ -500,6 +619,7 @@ export class Menu {
   // ---------- resultado ----------
   // info: { rec, facts, mode, rival, medal, unlocked150, daily, ghost, rankKey }
   showResults(results, player, info = {}) {
+    if (info.players?.length > 1) return this.showDuelResults(results, info);
     const me = results.find((r) => r.kart === player);
     const place = me ? me.place : 0;
     const tt = info.mode === 'timetrial';
@@ -570,6 +690,68 @@ export class Menu {
     this.show('results');
   }
 
+  // Resultado de 2 jogadores: J1 e J2 destacados e quem venceu o duelo. Recordes, medalhas,
+  // rankings e desafio do dia não contam (dois alunos no mesmo aparelho, sem conta de cada um).
+  showDuelResults(results, info) {
+    const ps = info.players;
+    const rs = ps.map((k) => results.find((r) => r.kart === k));
+    const wi = rs[0] && rs[1] ? (rs[1].place < rs[0].place ? 1 : 0) : 0;
+    const w = ps[wi];
+    const tagOf = (k) => ps.indexOf(k);
+    const v = info.laps === 1 ? '1 volta' : `${info.laps} voltas`;
+    this.lastRun = {
+      duel: ps.map((k, i) => ({ name: k.character.name, place: rs[i]?.place })),
+      cc: info.cc, laps: info.laps, mode: info.mode,
+    };
+    $('results-title').textContent = `${w.character.name} (J${wi + 1}) venceu o duelo!${rs[wi]?.place === 1 ? ' 🏆' : ''}`;
+    const parts = ps.map((k, i) => `<b style="color:${PLAYER_COLORS[i]}">J${i + 1}</b> ${esc(k.character.name)}: ${rs[i]?.place || '?'}º`);
+    if (rs[0] && rs[1]) {
+      const d = Math.abs(rs[0].time - rs[1].time);
+      const best = rs[wi];
+      parts.push(`🏁 Melhor entre os dois: <b>${esc(w.character.name)} (J${wi + 1}) · ${best.estimated ? '~' : ''}${formatTime(best.time)}</b>, ${d.toFixed(2).replace('.', ',')} s na frente`);
+    }
+    parts.push(`<small>${info.cc}, ${v} · no modo 2 jogadores, recordes e rankings não contam</small>`);
+    const recEl = $('results-record');
+    recEl.classList.remove('hidden');
+    recEl.classList.add('new');
+    recEl.innerHTML = parts.join(' · ');
+
+    $('results-list').innerHTML = results
+      .map((r) => {
+        const c = r.kart.character;
+        const t = tagOf(r.kart);
+        const face = this.portraits[c.id] ? `<img class="face" src="${this.portraits[c.id]}" alt="" style="--c:${c.colors.ui}">` : `<span class="dot" style="background:${c.colors.ui}"></span>`;
+        return `<li class="${t >= 0 ? `me p${t + 1}` : ''}">
+          <span class="p">${r.place}º</span>
+          ${face}
+          <span>${c.name}${t >= 0 ? ` <b class="ptag p${t + 1}">(J${t + 1})</b>` : ''}</span>
+          <span class="t">${r.estimated ? '~' : ''}${formatTime(r.time)}</span>
+        </li>`;
+      })
+      .join('');
+
+    // curiosidades: vencedor da corrida e os cientistas dos dois jogadores
+    const winner = results[0].kart.character;
+    const facts = [];
+    const wf = pickFact('sci:' + winner.id, SCIENTIST_FACTS[winner.id]);
+    if (wf) facts.push({ title: `${winner.name}, ${winner.gender === 'f' ? 'a vencedora' : 'o vencedor'}`, icon: '🏆', ...wf });
+    ps.forEach((k, i) => {
+      if (k.character.id === winner.id) return;
+      const f = pickFact('sci:' + k.character.id, SCIENTIST_FACTS[k.character.id]);
+      if (f) facts.push({ title: `${k.character.name} (J${i + 1})`, icon: '🧑‍🔬', ...f });
+    });
+    for (const f of info.facts || []) facts.push(f);
+    this.resultFacts = facts;
+    $('results-fact').innerHTML =
+      '<b class="fact-head">Você sabia?</b>' +
+      facts.map((f) => `<p><span class="fi">${f.icon || '•'}</span> <b>${esc(f.title)}:</b> ${esc(f.text)}</p>`).join('');
+    const qz = $('results-quiz');
+    this.quizPool = facts.filter((f) => f.quiz);
+    qz.innerHTML = this.quizPool.length ? '<button class="btn btn-small" data-action="quiz">🧠 Responder 1 pergunta (opcional)</button>' : '';
+    this.renderRanking(null, -1);
+    this.show('results');
+  }
+
   // ---------- quiz ----------
   startQuiz() {
     const pool = this.quizPool || [];
@@ -607,7 +789,9 @@ export class Menu {
     if (!r) return;
     const v = r.laps === 1 ? '1 volta' : `${r.laps} voltas`;
     const what = r.mode === 'timetrial' ? `fiz ${formatTime(r.time)} no contra o relógio` : `cheguei em ${r.place}º lugar${r.estimated ? '' : ` em ${formatTime(r.time)}`}`;
-    const text = `No Kart Científico, ${what} com ${r.character.name} (${r.cc}, ${v})! Você consegue?`;
+    const text = r.duel
+      ? `No Kart Científico, corremos em dupla: ${r.duel[0].name} (J1) chegou em ${r.duel[0].place}º e ${r.duel[1].name} (J2) em ${r.duel[1].place}º (${r.cc}, ${v})! Topa o desafio?`
+      : `No Kart Científico, ${what} com ${r.character.name} (${r.cc}, ${v})! Você consegue?`;
     try {
       if (navigator.share) {
         await navigator.share({ title: 'Kart Científico', text, url: GAME_URL });
@@ -886,10 +1070,12 @@ export class Menu {
       e.preventDefault();
       this.action('play');
     } else if (this.current === 'select') {
-      if (k === 'ArrowLeft' || k === 'a') this.moveSelection(-1, 0);
-      else if (k === 'ArrowRight' || k === 'd') this.moveSelection(1, 0);
-      else if (k === 'ArrowUp' || k === 'w') this.moveSelection(0, -1);
-      else if (k === 'ArrowDown' || k === 's') this.moveSelection(0, 1);
+      // dois jogadores: WASD move o J1 e as setas movem o J2 (com 1 jogador, os dois movem o mesmo)
+      const p2 = this.duo() && k.startsWith('Arrow') ? 1 : 0;
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') this.moveSelection(-1, 0, p2);
+      else if (k === 'ArrowRight' || k === 'd' || k === 'D') this.moveSelection(1, 0, p2);
+      else if (k === 'ArrowUp' || k === 'w' || k === 'W') this.moveSelection(0, -1, p2);
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') this.moveSelection(0, 1, p2);
       else if (k === 'Enter' || k === ' ') this.action('start');
       else if (k === 'Escape') this.action('back');
       else if (k === 'q' || k === 'Q') this.cycleOpt('cc', -1);

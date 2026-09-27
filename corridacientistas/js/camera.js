@@ -66,6 +66,8 @@ export class CameraRig {
     this.height = 2.3;
     this.lookAhead = 4;
     this.baseFov = 64;
+    // tela dividida (metade estreita): abre o FOV para não parecer um "túnel"; 1 = normal
+    this.fovScale = 1;
     // estado suavizado
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
@@ -379,7 +381,7 @@ export class CameraRig {
     const aspect = cam.aspect || 16 / 9;
     this.fov = this._snap ? fovT : damp1(this.fov, fovT, this.st, 'fov', 0.25, dt);
     // o soco do turbo entra depois da suavização (senão o ataque ficaria lento)
-    let fov = this.fov + this.fovAdd;
+    let fov = (this.fov + this.fovAdd) * this.fovScale;
     // em telas estreitas (celular em pé), garante um campo horizontal utilizável
     if (aspect < 1) {
       const hRef = fov * DEG * 0.9;

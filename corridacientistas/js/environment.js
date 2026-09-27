@@ -1973,13 +1973,22 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   const target = new THREE.Vector3();
   let camHint;
   let dim = 0;
+  // tela dividida: cada câmera guarda o próprio s (busca local da projeção) e a própria penumbra do túnel
+  const views = new WeakMap();
   const tunnelS = meta.tunnelS;
   const texel = (2 * SHADOW_HALF) / (quality.shadowMapSize || 2048);
-  function update(dt, t, camera) {
-    waterUniforms.uTime.value = t;
-    crowdTime.value = t;
-    for (let k = 0; k < animated.length; k++) animated[k](dt, t);
+  // viewOnly: só a parte que depende da câmera (2ª câmera da tela dividida, sem animar de novo)
+  function update(dt, t, camera, viewOnly = false) {
+    if (!viewOnly) {
+      waterUniforms.uTime.value = t;
+      crowdTime.value = t;
+      for (let k = 0; k < animated.length; k++) animated[k](dt, t);
+    }
     if (!camera) return;
+    let view = views.get(camera);
+    if (!view) views.set(camera, (view = { hint: camHint, dim }));
+    camHint = view.hint;
+    dim = view.dim;
     for (let k = 0; k < farCull.length; k++) {
       const f = farCull[k];
       f.o.visible = camera.position.distanceTo(f.c) - f.r < drawDist;
@@ -2005,9 +2014,10 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     sun.target.updateMatrixWorld();
     // dentro do túnel: luz do dia reduzida
     const r = track.project(camera.position, camHint);
-    camHint = r.s;
+    camHint = view.hint = r.s;
     const inT = r.s > tunnelS[0] + 3 && r.s < tunnelS[1] - 3 && camera.position.y < r.groundY + 11 && Math.abs(r.lateral) < 20;
     dim += ((inT ? 1 : 0) - dim) * Math.min(1, dt * 4);
+    view.dim = dim;
     applyLight();
     // interior do túnel (céu estrelado, luzes, planetas) só perto das bocas ou dentro (a pista decide)
     if (track.setViewHint) track.setViewHint(r.s, r.lateral, camera.position.y - r.groundY);

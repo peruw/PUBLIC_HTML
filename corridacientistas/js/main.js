@@ -25,6 +25,10 @@ const RESULTS_DELAY = 3.2; // s entre a chegada e a tela de resultado
 // Escada de habilidade dos 7 adversários em torno de CLASSES[cc].aiSkill: sempre há um mais forte
 // (o rival) para perseguir e um mais fraco para ultrapassar.
 const AI_LADDER = [0.12, 0.06, 0.02, 0, -0.04, -0.08, -0.12];
+// Dois jogadores: 6 adversários, a mesma ideia (um forte para perseguir, um fraco para passar).
+const AI_LADDER_2P = [0.12, 0.06, 0.01, -0.03, -0.08, -0.12];
+const DUO_SLOTS = 4; // tela dividida: J1 larga em 5º e J2 em 6º, lado a lado
+const SPLIT_FOV = 1.1; // metade estreita da tela: FOV um pouco mais aberto
 const GHOST_DT = 0.1; // s entre as amostras do fantasma do contrarrelógio
 
 // Desafio do dia: o mesmo para todo mundo (semente = data).
@@ -162,10 +166,23 @@ async function init() {
 
   menu.setLoading(0.7, 'Chamando os cientistas…');
   await nextFrame();
+  // Modelo 3D com reserva: um cientista ainda sem modelo próprio em models.js não pode
+  // derrubar o jogo. Ele usa um kart reserva e fica fora da IA e da demo (não "vira" outro).
+  const noModel = new Set();
+  function kartModel(id) {
+    try {
+      return createKartModel(id, { quality });
+    } catch (err) {
+      if (!noModel.has(id)) console.warn(`modelo 3D de "${id}" indisponível; usando um reserva`, err?.message || err);
+      noModel.add(id);
+      const c = CHARACTERS.find((x) => x.id === id);
+      return createKartModel(c?.gender === 'f' ? 'curie' : 'newton', { quality });
+    }
+  }
   const effects = new Effects({ scene, bus, quality });
   const items = new ItemSystem({ scene, track, bus, effects, quality });
   const karts = CHARACTERS.map((character, index) => {
-    const model = createKartModel(character.id, { quality });
+    const model = kartModel(character.id);
     const kart = new Kart({ character, isPlayer: false, model, bus, index });
     scene.add(kart.object3d);
     return kart;
@@ -182,6 +199,9 @@ async function init() {
   }
 
   const rig = new CameraRig(camera);
+  // tela dividida: segunda câmera (J2), com o próprio CameraRig
+  const camera2 = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, quality.drawDistance + 400);
+  const rig2 = new CameraRig(camera2);
   audio = new AudioSystem({ bus });
   input = new Input({ touchLayer: document.getElementById('touch-layer'), bus });
   // pointerdown: o toque com outro dedo segurando um botão não gera 'click'
@@ -201,6 +221,7 @@ async function init() {
   Online.init();
   let runTicket = null; // promessa do bilhete da corrida atual (kart_start_run)
   const hud = new Hud({ bus });
+  const hud2 = new Hud({ bus, index: 1 }); // painel do J2 (só aparece na tela dividida)
 
   audio.setMuted(store.get('muted', false));
   menu.setSoundLabel(audio.muted);
@@ -213,11 +234,34 @@ async function init() {
   const world = {
     scene, camera, renderer, track, karts, player: null, items, effects, bus,
     time: 0, phase: 'title', quality, cc: CLASSES['100cc'], totalLaps: RACE.defaultLaps,
+    players: [], // humanos da corrida: [J1] ou [J1, J2] (tela dividida)
+    split: false, // tela dividida ativa (2 jogadores no mesmo PC)
+    camera2,
   };
   let drivers = new Map(); // kart -> AIDriver
   let playerAI = null;
+  let playerAI2 = null; // piloto automático do J2 (depois da chegada e nos testes)
   let resultsTimer = -1;
   let pendingUse = false; // aperto de item guardado até o próximo passo (telas > 60 Hz)
+  let pendingUse2 = false;
+  // cientistas com modelo 3D próprio: só eles entram como IA e na demo do título
+  const racers = () => karts.filter((k) => !noModel.has(k.character.id));
+
+  // Liga/desliga a tela dividida: teclado dividido, FOV mais aberto e proporção da metade.
+  function setSplit(on) {
+    world.split = on;
+    input.setSplit(on);
+    rig.fovScale = rig2.fovScale = on ? SPLIT_FOV : 1;
+    applyAspect();
+    needsRender = true;
+  }
+  function applyAspect() {
+    const a = (world.split ? Math.floor(innerWidth / 2) : innerWidth) / innerHeight;
+    for (const c of [camera, camera2]) {
+      c.aspect = a;
+      c.updateProjectionMatrix();
+    }
+  }
 
   // Pré-compila os shaders para evitar travadas na primeira corrida.
   try {
@@ -237,12 +281,16 @@ async function init() {
     game.state = 'title';
     setPaused(false, true);
     world.player = null;
+    world.players = [];
     hud.player = null; // sem toasts de itens do antigo jogador no demo
+    hud2.player = null;
+    hud2.show(false);
+    setSplit(false);
     introTimer = 0;
-    pendingUse = false;
+    pendingUse = pendingUse2 = false;
     bus.emit('race:reset');
     // demo do título: 8 cientistas sorteados entre todos (a pista tem 8 posições de largada)
-    const order = shuffle(karts.slice()).slice(0, RACE.kartCount);
+    const order = shuffle(racers()).slice(0, RACE.kartCount);
     world.karts = order;
     world.phase = 'title';
     world.cc = CLASSES['100cc'];
@@ -273,66 +321,85 @@ async function init() {
 
   function startRace(opts) {
     opts = { mode: 'race', ...opts };
+    const tt = opts.mode === 'timetrial';
+    // dois jogadores só no PC, no modo corrida, fora do desafio do dia e de sala de turma
+    const duo = opts.players === 2 && !tt && !opts.daily && !opts.room && !isTouch;
+    opts.players = duo ? 2 : 1;
     game.opts = opts;
     game.state = 'race';
     setPaused(false, true);
-    pendingUse = false;
+    pendingUse = pendingUse2 = false;
     bus.emit('race:reset');
-    const tt = opts.mode === 'timetrial';
     const cc = CLASSES[opts.cc] || CLASSES['100cc'];
     world.cc = cc;
     world.totalLaps = opts.laps;
     world.mode = opts.mode;
     const player = karts.find((k) => k.character.id === opts.character) || karts[0];
+    const player2 = duo
+      ? karts.find((k) => k.character.id === opts.character2 && k !== player) || racers().find((k) => k !== player)
+      : null;
+    const humans = duo ? [player, player2] : [player];
     // contrarrelógio: sozinho na pista (os outros karts somem)
-    // 7 adversários sorteados entre os demais cientistas; quem não corre fica fora de cena
-    const others = tt ? [] : shuffle(karts.filter((k) => k !== player)).slice(0, RACE.kartCount - 1);
+    // adversários sorteados entre os demais cientistas (7, ou 6 com dois jogadores); quem não corre fica fora de cena
+    const others = tt ? [] : shuffle(racers().filter((k) => !humans.includes(k))).slice(0, RACE.kartCount - humans.length);
     for (const k of karts) {
-      k.object3d.visible = k === player || others.includes(k);
+      k.object3d.visible = humans.includes(k) || others.includes(k);
       k.frozen = false;
     }
-    // karts[0] é o jogador; o grid tem o jogador em PLAYER_SLOT
-    world.karts = [player, ...others];
+    // karts[0] é o jogador (J1); o grid tem o jogador em PLAYER_SLOT (J1 e J2 lado a lado em DUO_SLOTS)
+    world.karts = [...humans, ...others];
     const grid = others.slice();
-    grid.splice(tt ? 0 : PLAYER_SLOT, 0, player);
+    grid.splice(tt ? 0 : duo ? DUO_SLOTS : PLAYER_SLOT, 0, ...humans);
     setupGrid(grid);
     for (const k of karts) {
-      k.isPlayer = k === player;
+      k.isPlayer = humans.includes(k);
       // o kart do jogador fica no nível de detalhe cheio mesmo na câmera da largada
       k.model?.setHero?.(k.isPlayer);
     }
     world.player = player;
+    world.players = humans;
     items.setMode?.(tt ? 'timetrial' : 'race');
     items.reset(world.karts);
     effects.reset();
     env.setMood?.(0);
     moodT = -1;
+    const ladder = duo ? AI_LADDER_2P : AI_LADDER;
     drivers = new Map(
       others.map((k, i) => [k, new AIDriver(k, track, {
-        skill: THREE.MathUtils.clamp(cc.aiSkill + AI_LADDER[i % AI_LADDER.length], 0.2, 1),
+        skill: THREE.MathUtils.clamp(cc.aiSkill + ladder[i % ladder.length], 0.2, 1),
         lane: i, // faixa sorteada a cada corrida (others já vem embaralhado)
       })]),
     );
-    // o rival é o adversário mais forte da escada
-    world.rival = others[0] || null;
+    // o rival é o adversário mais forte da escada (com dois jogadores, o rival é o colega)
+    world.rival = duo ? null : others[0] || null;
     playerAI = new AIDriver(player, track, { skill: 0.9 });
-    race.start(world.karts, { laps: opts.laps, player, track, cc });
+    playerAI2 = duo ? new AIDriver(player2, track, { skill: 0.9 }) : null;
+    race.start(world.karts, { laps: opts.laps, player, players: humans, track, cc });
     world.phase = 'countdown';
+    setSplit(duo);
     // dicas contextuais nas duas primeiras corridas
     const played = store.get('played', 0);
     store.set('played', played + 1);
-    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tutorial: played < 2, touch: input.touchEnabled });
+    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tutorial: !duo && played < 2, touch: input.touchEnabled, split: duo, players: humans });
+    if (duo) hud2.setRace({ player: player2, karts: world.karts, totalLaps: opts.laps, track, split: true, players: humans });
+    else hud2.player = null;
     // fantasma do recorde (contrarrelógio)
-    // bilhete do ranking online: o servidor marca a hora da largada
-    runTicket = Online.user ? Online.startRun(boardOf(opts)) : null;
+    // bilhete do ranking online: o servidor marca a hora da largada (2 jogadores não contam)
+    runTicket = Online.user && !duo ? Online.startRun(boardOf(opts)) : null;
     ghostRec = tt ? [] : null;
     ghostSampleT = 0;
     setGhost(tt ? store.get(ghostKey(opts), null) : null);
     hud.show(true);
+    hud2.show(duo);
     input.showTouch(input.touchEnabled);
     rig.follow(player);
     rig.setMode('orbit', { target: player, radius: 9, height: 3.5, speed: 0.6 });
     rig.snap();
+    if (duo) {
+      rig2.follow(player2);
+      rig2.setMode('orbit', { target: player2, radius: 9, height: 3.5, speed: 0.6, angle: Math.PI });
+      rig2.snap();
+    }
     introTimer = 1.6;
     menu.hideAll();
     audio.playMusic('race');
@@ -370,6 +437,7 @@ async function init() {
     game.state = 'results';
     const results = race.buildResults();
     const opts = game.opts;
+    if (world.players.length > 1) return showDuelResults(results, opts);
     const tt = opts.mode === 'timetrial';
     const p = world.player;
     const me = results.find((r) => r.kart === p);
@@ -409,6 +477,23 @@ async function init() {
     audio.playMusic('results');
     if (tt) rig.setMode('orbit', { target: p, radius: 7, height: 2.6, speed: 0.35 });
     else podium(results);
+  }
+
+  // Resultado de 2 jogadores: sem recordes, medalhas, rankings nem desafio (não contam).
+  function showDuelResults(results, opts) {
+    hud.show(false);
+    hud2.show(false);
+    input.showTouch(false);
+    setSplit(false); // pódio numa câmera só, tela inteira
+    // curiosidades dos dois jogadores, sem repetir
+    const facts = [];
+    for (const f of [...hud.raceFacts, ...hud2.raceFacts]) {
+      if (!facts.some((o) => o.kind === f.kind && o.id === f.id)) facts.push(f);
+    }
+    menu.showResults(results, world.player, { cc: opts.cc, laps: opts.laps, mode: opts.mode, facts, players: world.players.slice() });
+    menu.renderOnlineResult(null);
+    audio.playMusic('results');
+    podium(results);
   }
 
   // Os três primeiros lado a lado depois da linha de chegada, com câmera de pódio e confete.
@@ -536,7 +621,7 @@ async function init() {
     ghost = null;
     ghostPrevTime = g?.time || 0;
     if (!g || !g.frames?.length) return;
-    const model = createKartModel(g.character, { quality });
+    const model = kartModel(g.character);
     // materiais próprios e translúcidos (os do kart são compartilhados)
     model.group.traverse((o) => {
       if (!o.material) return;
@@ -608,11 +693,15 @@ async function init() {
   });
   let moodT = -1; // -1 = parado; 0..1 animando para a hora dourada
   bus.on('race:finalLap', ({ kart }) => {
-    if (kart === world.player && game.state === 'race') moodT = 0;
+    // (com dois jogadores, só o primeiro a chegar na última volta começa a transição)
+    if (world.players.includes(kart) && game.state === 'race' && moodT < 0) moodT = 0;
   });
 
+  let resumeFlush = false; // ao sair da pausa, descarta o aperto de item do mesmo quadro
   function setPaused(on, silent) {
     if (on && game.state !== 'race') return;
+    // (na tela dividida, o Enter que fecha a pausa também é a tecla de item do J2)
+    if (!on && game.paused) resumeFlush = true;
     game.paused = on;
     audio.pauseAll?.(on);
     needsRender = true;
@@ -693,8 +782,7 @@ async function init() {
   function onResize() {
     renderer.setSize(innerWidth, innerHeight);
     needsRender = true; // setSize limpa o canvas
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
+    applyAspect(); // (metade da largura na tela dividida)
     portraitNow = isTouch && innerHeight > innerWidth && Math.min(screen.width, screen.height) < 600;
     updateRotateHint();
     if (portraitNow && !rotateDismissed && game.state === 'race' && !game.paused) setPaused(true);
@@ -722,20 +810,46 @@ async function init() {
   }
 
   // Navegação: direcional/analógico escolhe o cientista, LB/RB trocam motor/voltas, B volta.
+  // Dois jogadores na escolha: o 1º controle move o J1 e o 2º move o J2.
   const padPrev = { b: false, lb: false, rb: false };
-  let padDir = null;
-  let padRepeat = 0;
+  const padNav = [{ dir: null, rep: 0 }, { dir: null, rep: 0 }, { dir: null, rep: 0 }]; // [todos, J1, J2]
+  // direção com repetição ao segurar
+  function navStep(st, dx, dy, dt) {
+    const dir = dx || dy ? `${dx},${dy}` : null;
+    if (dir !== st.dir) {
+      st.dir = dir;
+      st.rep = 0.35;
+      return !!dir;
+    }
+    if (dir) {
+      st.rep -= dt;
+      if (st.rep <= 0) {
+        st.rep = 0.2;
+        return true;
+      }
+    }
+    return false;
+  }
   function pollPadMenu(dt, act) {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     let dx = 0, dy = 0, b = false, lb = false, rb = false;
+    const per = [[0, 0], [0, 0]]; // direção de cada controle (J1, J2)
+    let slot = 0;
     for (const p of pads) {
       if (!p) continue;
       const bt = (i) => !!p.buttons[i]?.pressed;
       const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
-      if (bt(14) || ax < -0.5) dx = -1;
-      else if (bt(15) || ax > 0.5) dx = 1;
-      if (bt(12) || ay < -0.5) dy = -1;
-      else if (bt(13) || ay > 0.5) dy = 1;
+      let px = 0, py = 0;
+      if (bt(14) || ax < -0.5) px = -1;
+      else if (bt(15) || ax > 0.5) px = 1;
+      if (bt(12) || ay < -0.5) py = -1;
+      else if (bt(13) || ay > 0.5) py = 1;
+      if (px) dx = px;
+      if (py) dy = py;
+      const d = per[Math.min(slot, 1)];
+      if (px) d[0] = px;
+      if (py) d[1] = py;
+      slot++;
       b = b || bt(1);
       lb = lb || bt(4);
       rb = rb || bt(5);
@@ -744,24 +858,16 @@ async function init() {
     padPrev.b = b;
     padPrev.lb = lb;
     padPrev.rb = rb;
-    // direção com repetição ao segurar
-    const dir = dx || dy ? `${dx},${dy}` : null;
-    let move = false;
-    if (dir !== padDir) {
-      padDir = dir;
-      padRepeat = 0.35;
-      move = !!dir;
-    } else if (dir) {
-      padRepeat -= dt;
-      if (padRepeat <= 0) {
-        padRepeat = 0.2;
-        move = true;
-      }
-    }
+    const move = navStep(padNav[0], dx, dy, dt);
+    const move1 = navStep(padNav[1], per[0][0], per[0][1], dt);
+    const move2 = navStep(padNav[2], per[1][0], per[1][1], dt);
     const cur = menu.current;
     if (!cur || !act) return;
     if (cur === 'select') {
-      if (move) menu.moveSelection(dx, dy);
+      if (menu.duo?.()) {
+        if (move1) menu.moveSelection(per[0][0], per[0][1], 0);
+        if (move2) menu.moveSelection(per[1][0], per[1][1], 1);
+      } else if (move) menu.moveSelection(dx, dy);
       if (edgeLB || edgeRB) {
         const o = menu.opts;
         if (edgeLB) {
@@ -785,6 +891,19 @@ async function init() {
 
   // ---------- simulação ----------
   let ctrl = null;
+  let ctrl2 = null; // controles do J2 (tela dividida)
+  // Copia a entrada do jogador para os controles do kart (item guardado até o próximo passo).
+  function applyCtrl(k, cs, pending) {
+    const c = k.controls;
+    c.throttle = cs.throttle;
+    c.brake = cs.brake;
+    c.steer = cs.steer;
+    c.drift = cs.drift;
+    c.lookBack = cs.lookBack;
+    c.holdItem = !!cs.holdItem;
+    c.itemBack = !!cs.itemBack;
+    if (pending) c.useItem = true;
+  }
   function simulate(h) {
     const player = world.player;
     world.time = race.time;
@@ -809,6 +928,18 @@ async function init() {
         }
       }
     }
+    // J2 (tela dividida): teclado/controle próprio; piloto automático depois da chegada
+    const p2 = world.split ? world.players[1] : null;
+    if (p2) {
+      if (game.autopilot2 || p2.finished) {
+        p2.controls.holdItem = p2.controls.itemBack = false;
+        playerAI2.update(h, world);
+        pendingUse2 = false;
+      } else if (ctrl2) {
+        applyCtrl(p2, ctrl2, pendingUse2);
+        pendingUse2 = false;
+      }
+    }
     for (const [k, ai] of drivers) ai.update(h, world);
     // Fora da corrida (demo do título, resultado) ninguém usa itens: sem flashes/trovões nos menus.
     if (game.state !== 'race') for (const k of world.karts) k.controls.useItem = false;
@@ -822,43 +953,49 @@ async function init() {
   }
 
   bus.on('race:finish', ({ kart }) => {
-    if (kart === world.player) resultsTimer = RESULTS_DELAY;
+    // resultado quando todos os humanos cruzaram a chegada (a IA que falta ganha tempo estimado)
+    const hs = world.players;
+    if (hs.includes(kart) && hs.every((k) => k.finished)) resultsTimer = RESULTS_DELAY;
   });
 
   // ---------- tremor de câmera e vibração nos impactos do jogador ----------
-  const isP = (k) => k && k === world.player && game.state === 'race';
+  // (com dois jogadores, na câmera e no controle de quem levou o impacto)
+  const isP = (k) => k && game.state === 'race' && world.players.includes(k);
+  const pIdx = (k) => (world.split && k === world.players[1] ? 1 : 0);
+  const rigOf = (k) => (pIdx(k) ? rig2 : rig);
+  const rumble = (k, ms, str) => input.rumble?.(ms, str, world.split ? pIdx(k) : -1);
   const buzz = (ms) => { if (isTouch) navigator.vibrate?.(ms); };
   bus.on('kart:wall', ({ kart, strength }) => {
     if (!isP(kart)) return;
-    rig.shake(0.06 + 0.16 * strength, 0.25);
+    rigOf(kart).shake(0.06 + 0.16 * strength, 0.25);
     if (strength > 0.4) {
       buzz(25);
-      input.rumble?.(90, 0.3 + 0.4 * strength);
+      rumble(kart, 90, 0.3 + 0.4 * strength);
     }
   });
   bus.on('kart:bump', ({ a, b, strength }) => {
-    if (!isP(a) && !isP(b)) return;
-    rig.shake(0.05 + 0.1 * strength, 0.2);
+    for (const k of [a, b]) if (isP(k)) rigOf(k).shake(0.05 + 0.1 * strength, 0.2);
   });
   bus.on('kart:hit', ({ kart, type }) => {
     if (!isP(kart)) return;
     const big = type === 'tumble' || type === 'shock';
-    rig.shake(big ? 0.4 : 0.25, big ? 0.6 : 0.4);
+    rigOf(kart).shake(big ? 0.4 : 0.25, big ? 0.6 : 0.4);
     buzz(big ? [70, 40, 70] : 60);
-    input.rumble?.(big ? 300 : 180, big ? 0.9 : 0.6);
+    rumble(kart, big ? 300 : 180, big ? 0.9 : 0.6);
   });
   bus.on('kart:boost', ({ kart }) => {
-    if (isP(kart)) input.rumble?.(120, 0.35);
+    if (isP(kart)) rumble(kart, 120, 0.35);
   });
   bus.on('kart:land', ({ kart, airTime }) => {
     if (!isP(kart) || !(airTime > 0.3)) return;
-    rig.shake(0.1, 0.2);
+    rigOf(kart).shake(0.1, 0.2);
   });
   bus.on('item:explode', ({ pos }) => {
-    const p = world.player;
-    if (!p || game.state !== 'race' || !pos) return;
-    const d = Math.hypot(pos.x - p.position.x, pos.z - p.position.z);
-    if (d < 14) rig.shake(0.2 * (1 - d / 14) + 0.05, 0.3);
+    if (game.state !== 'race' || !pos) return;
+    for (const p of world.players) {
+      const d = Math.hypot(pos.x - p.position.x, pos.z - p.position.z);
+      if (d < 14) rigOf(p).shake(0.2 * (1 - d / 14) + 0.05, 0.3);
+    }
   });
 
   // ---------- loop ----------
@@ -879,6 +1016,12 @@ async function init() {
     const dt = Math.min(clock.getDelta(), 0.1);
     const t = clock.elapsedTime;
     ctrl = input.poll();
+    ctrl2 = world.split ? input.state2 : null;
+    if (resumeFlush) {
+      resumeFlush = false;
+      ctrl.useItem = false;
+      if (ctrl2) ctrl2.useItem = false;
+    }
 
     if (ctrl.mute) toggleSound();
     const pauseToggled = game.state === 'race' && ctrl.pause;
@@ -888,6 +1031,7 @@ async function init() {
     if (confirmed) menu.confirm();
     pollPadMenu(dt, !confirmed && !pauseToggled);
     if (ctrl.useItem && game.state === 'race' && !game.paused) pendingUse = true;
+    if (ctrl2?.useItem && game.state === 'race' && !game.paused) pendingUse2 = true;
 
     if (!game.paused) {
       acc += dt;
@@ -902,7 +1046,10 @@ async function init() {
 
       if (introTimer > 0) {
         introTimer -= dt;
-        if (introTimer <= 0 && game.state === 'race') rig.setMode('chase');
+        if (introTimer <= 0 && game.state === 'race') {
+          rig.setMode('chase');
+          if (world.split) rig2.setMode('chase');
+        }
       }
       if (resultsTimer > 0) {
         resultsTimer -= dt;
@@ -917,23 +1064,46 @@ async function init() {
     }
 
     rig.update(dt, world, { lookBack: !!(world.player && !game.autopilot && ctrl.lookBack && game.state === 'race') });
+    if (world.split) rig2.update(dt, world, { lookBack: !!(!game.autopilot2 && ctrl2?.lookBack && game.state === 'race') });
     env.update(dt, t, camera);
     ads.update(dt, t, camera);
     track.update(dt, t);
-    if (game.state === 'race') hud.update(game.paused ? 0 : dt, world, race);
+    if (game.state === 'race') {
+      hud.update(game.paused ? 0 : dt, world, race);
+      if (world.split) hud2.update(game.paused ? 0 : dt, world, race);
+    }
     if (!game.paused) audio.update(dt, world);
     // Pausa e telas que cobrem o jogo: não redesenha a cena 3D (economiza bateria).
     const idle = game.paused || menu.current === 'select' || menu.current === 'howto';
     // celular no título/resultado: 30 quadros por segundo bastam (menos bateria e calor)
     const halfRate = isTouch && (game.state === 'title' || game.state === 'results') && (++frameNo & 1);
     if ((!idle && !halfRate) || needsRender) {
-      renderer.render(scene, camera);
+      if (world.split) renderSplit(t);
+      else renderer.render(scene, camera);
       needsRender = false;
     }
 
     // Resolução adaptativa: reduz se o aparelho não aguenta e volta a subir quando melhora.
     dtAvg += (dt - dtAvg) * 0.05;
     adaptResolution(dt);
+  }
+
+  // Tela dividida: um renderer, duas metades (scissor) e duas câmeras. O ambiente (céu, sombra,
+  // túnel) é reposicionado para a câmera do J2 antes da segunda metade, sem animar de novo.
+  function renderSplit(t) {
+    const W = innerWidth;
+    const H = innerHeight;
+    const hw = Math.floor(W / 2);
+    renderer.setScissorTest(true);
+    renderer.setViewport(0, 0, hw, H);
+    renderer.setScissor(0, 0, hw, H);
+    renderer.render(scene, camera);
+    env.update(0, t, camera2, true);
+    renderer.setViewport(hw, 0, W - hw, H);
+    renderer.setScissor(hw, 0, W - hw, H);
+    renderer.render(scene, camera2);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, W, H);
   }
 
   const PR_MIN = quality.id === 'baixa' ? 0.6 : 0.75;
@@ -996,8 +1166,9 @@ async function init() {
 
   // ---------- depuração / testes ----------
   window.__game = {
-    game, world, race, rig, audio, items, input, menu,
+    game, world, race, rig, rig2, camera2, audio, items, input, menu, hud2,
     get state() { return game.state; },
+    // dois jogadores: startRace({ players: 2, character: 'newton', character2: 'curie' })
     startRace: (o = {}) => startRace({ character: 'newton', cc: '100cc', laps: 3, ...o }),
     enterTitle,
     autopilot(on = true, skill) {
@@ -1005,7 +1176,16 @@ async function init() {
       if (skill !== undefined && world.player) playerAI = new AIDriver(world.player, track, { skill });
       return on;
     },
-    giveItem: (id) => world.player && items.giveItem(world.player, id),
+    // piloto automático do J2 (tela dividida)
+    autopilot2(on = true, skill) {
+      game.autopilot2 = on;
+      const p2 = world.players[1];
+      if (skill !== undefined && p2) playerAI2 = new AIDriver(p2, track, { skill });
+      return on;
+    },
+    get players() { return world.players; },
+    // who: 0 = J1, 1 = J2
+    giveItem: (id, who = 0) => world.players[who] && items.giveItem(world.players[who], id),
     itemIds: ITEM_IDS,
     skipToLastLap() {
       const L = track.length;
@@ -1014,10 +1194,12 @@ async function init() {
         k.progress += add;
         k.maxLap = Math.floor(k.progress / L) + 1;
       }
-      if (world.player) bus.emit('race:finalLap', { kart: world.player });
+      for (const p of world.players) bus.emit('race:finalLap', { kart: p });
     },
-    finishRace() {
-      if (world.player && !world.player.finished) race.finishKart(world.player);
+    // who: 0 = J1, 1 = J2; sem argumento, todos os humanos cruzam a chegada
+    finishRace(who) {
+      const ps = who === undefined ? world.players : [world.players[who]];
+      for (const p of ps) if (p && !p.finished) race.finishKart(p);
     },
     // Avança a simulação rapidamente (testes automáticos).
     fastForward(seconds) {

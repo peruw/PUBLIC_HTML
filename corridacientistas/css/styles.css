@@ -892,6 +892,24 @@ kbd {
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 12px rgba(0, 0, 0, 0.35);
 }
 
+/* painel de um jogador: ocupa a tela toda (1 jogador) ou uma metade (tela dividida).
+   Sem z-index: não cria contexto de empilhamento, a ordem de desenho continua a do #hud. */
+.hud-panel {
+  position: absolute;
+  inset: 0;
+}
+
+/* mensagens do centro, aviso de item e drift ficam por cima do minimapa e das curiosidades */
+.hud-center,
+.hud-warn,
+.hud-drift {
+  z-index: 1;
+}
+
+.hud-tag {
+  display: none;
+}
+
 .hud-item {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
@@ -923,14 +941,14 @@ kbd {
   to { box-shadow: 0 0 0 5px rgba(31, 214, 133, 0.8), 0 8px 18px rgba(0, 0, 0, 0.4); }
 }
 
-#hud-item-icon.txt {
+.hud-item-icon.txt {
   font-size: 34px;
   color: #fff;
   font-weight: 700;
   text-shadow: 0 0 10px var(--glow, #fff), 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 
-#hud-item-count {
+.hud-item-count {
   position: absolute;
   right: -8px;
   bottom: -8px;
@@ -1060,7 +1078,7 @@ body.touch .hud-item-key {
 }
 
 /* vinheta de velocidade (opacidade controlada pelo hud.js) */
-#hud-vignette {
+.hud-vignette {
   position: absolute;
   inset: 0;
   opacity: 0;
@@ -1134,7 +1152,7 @@ body.touch .hud-item-key {
   from { opacity: 0; transform: translateY(-12px) scale(0.96); }
 }
 
-#hud-center {
+.hud-center {
   position: absolute;
   left: 0;
   right: 0;
@@ -1146,19 +1164,19 @@ body.touch .hud-item-key {
   text-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
 }
 
-#hud-center.pop span {
+.hud-center.pop span {
   display: inline-block;
   animation: pop 0.9s ease both;
 }
 
-#hud-center.msg {
+.hud-center.msg {
   font-size: clamp(30px, 6vw, 64px);
   color: var(--yellow);
 }
 
 /* "2": sinal da largada-foguete */
-#hud-center.go span { color: var(--yellow); }
-#hud-center small {
+.hud-center.go span { color: var(--yellow); }
+.hud-center small {
   display: block;
   font-size: clamp(16px, 2.6vw, 26px);
   font-weight: 700;
@@ -1169,7 +1187,7 @@ body.touch .hud-item-key {
 }
 
 /* mensagens (VITÓRIA, ÚLTIMA VOLTA…): só a entrada; o hud.js apaga o texto no tempo certo */
-#hud-center.msg.pop span {
+.hud-center.msg.pop span {
   animation: popIn 0.5s ease both;
 }
 
@@ -1189,7 +1207,7 @@ body.touch .hud-item-key {
 }
 
 /* aviso de item vindo */
-#hud-warn {
+.hud-warn {
   position: absolute;
   left: 50%;
   bottom: 24%;
@@ -1208,9 +1226,9 @@ body.touch .hud-item-key {
   pointer-events: none;
 }
 
-#hud-warn.near { animation-duration: 0.45s; background: rgba(170, 20, 30, 0.9); }
-#hud-warn .ico { font-size: 22px; line-height: 1; display: inline-flex; }
-#hud-warn .ico .item-svg, #hud-warn .ico svg { width: 24px; height: 24px; }
+.hud-warn.near { animation-duration: 0.45s; background: rgba(170, 20, 30, 0.9); }
+.hud-warn .ico { font-size: 22px; line-height: 1; display: inline-flex; }
+.hud-warn .ico .item-svg, .hud-warn .ico svg { width: 24px; height: 24px; }
 
 @keyframes warnPulse {
   0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.85; }
@@ -1228,7 +1246,7 @@ body.touch .hud-item-key {
   font-weight: 700;
 }
 
-#hud-drift {
+.hud-drift {
   position: absolute;
   bottom: 18%;
   left: 50%;
@@ -1238,13 +1256,13 @@ body.touch .hud-item-key {
 }
 
 /* nível do mini-turbo: três pontos */
-#hud-drift.dots {
+.hud-drift.dots {
   display: flex;
   gap: 10px;
   bottom: 14%;
 }
 
-#hud-drift.dots i {
+.hud-drift.dots i {
   width: 16px;
   height: 16px;
   border-radius: 50%;
@@ -1253,12 +1271,12 @@ body.touch .hud-item-key {
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
-#hud-drift.dots i.on.l1 { background: #4cc9f0; box-shadow: 0 0 10px #4cc9f0; }
-#hud-drift.dots i.on.l2 { background: #ff9f1c; box-shadow: 0 0 10px #ff9f1c; }
-#hud-drift.dots i.on.l3 { background: #c77dff; box-shadow: 0 0 12px #c77dff; }
+.hud-drift.dots i.on.l1 { background: #4cc9f0; box-shadow: 0 0 10px #4cc9f0; }
+.hud-drift.dots i.on.l2 { background: #ff9f1c; box-shadow: 0 0 10px #ff9f1c; }
+.hud-drift.dots i.on.l3 { background: #c77dff; box-shadow: 0 0 12px #c77dff; }
 
 /* dicas da primeira corrida */
-#hud-drift.tip {
+.hud-drift.tip {
   padding: 8px 16px;
   border-radius: 999px;
   background: rgba(12, 24, 18, 0.85);
@@ -1377,14 +1395,14 @@ body.touch .touch-only {
   .results-wrap > .row .btn { font-size: 14px; padding: 7px 12px; }
 
   .hud-item-slot { width: 64px; height: 64px; font-size: 34px; border-radius: 16px; border-width: 3px; }
-  #hud-item-icon.txt { font-size: 26px; }
+  .hud-item-icon.txt { font-size: 26px; }
   .hud-item-name { font-size: 12px; }
   .hud-pos { font-size: 46px; }
   .hud-lap { font-size: 17px; }
   .hud-time { font-size: 14px; }
   #hud-minimap { width: 110px; height: 110px; }
   #hud-toasts { top: max(96px, calc(env(safe-area-inset-top) + 88px)); width: min(300px, 40vw); }
-  #hud-drift.tip { font-size: 15px; padding: 6px 12px; }
+  .hud-drift.tip { font-size: 15px; padding: 6px 12px; }
   .toast { padding: 6px 10px; grid-template-columns: 36px 1fr; }
   .toast .item-ico { width: 36px; height: 36px; font-size: 20px; }
   .toast b { font-size: 14px; }
@@ -1494,7 +1512,7 @@ body.touch {
 
 .hud-pos,
 .hud-lap,
-#hud-center,
+.hud-center,
 .btn-go {
   font-family: var(--display);
 }
@@ -1712,8 +1730,8 @@ body.touch {
 }
 
 /* diferença para o fantasma do contrarrelógio */
-#hud-center small.ahead { color: #7dffb5; }
-#hud-center small.behind { color: #ffb4b4; }
+.hud-center small.ahead { color: #7dffb5; }
+.hud-center small.behind { color: #ffb4b4; }
 
 /* item seguro atrás do kart (escudo) */
 .hud-item-slot.held { border-color: #7dffb5; box-shadow: 0 0 0 3px rgba(125, 255, 181, 0.35); }
@@ -1829,3 +1847,166 @@ table.report th, table.report td { text-align: left; padding: 3px 6px; border-bo
   .online-body { padding: 4px 12px 12px; gap: 8px; }
   .online-list li { font-size: 13px; padding: 2px 8px; }
 }
+
+/* ---------- Dois jogadores: tela dividida (esquerda J1, direita J2) ---------- */
+:root {
+  --p1: #3da5ff;
+  --p2: #ff5a8a;
+}
+
+#hud.split .hud-panel[data-p="1"] { right: 50%; }
+#hud.split .hud-panel[data-p="2"] { left: 50%; }
+
+/* faixa entre as duas metades */
+#hud.split::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  margin-left: -2px;
+  background: #0b1511;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+#hud.split .hud-item-slot { width: 66px; height: 66px; font-size: 36px; border-radius: 16px; border-width: 3px; }
+#hud.split .hud-item-icon.txt { font-size: 27px; }
+#hud.split .hud-item-name { font-size: 12px; }
+#hud.split .hud-item-key { font-size: 12px; }
+#hud.split .hud-pos { font-size: 52px; }
+#hud.split .hud-lap { font-size: 18px; }
+#hud.split .hud-time { font-size: 15px; }
+#hud.split .hud-center { font-size: clamp(40px, 7vw, 110px); }
+#hud.split .hud-center.msg { font-size: clamp(22px, 3.2vw, 50px); }
+#hud.split .hud-center small { font-size: clamp(13px, 1.5vw, 20px); }
+#hud.split .hud-warn { font-size: 14px; }
+#hud.split .hud-drift.tip { font-size: 15px; }
+
+/* etiqueta do jogador no canto de baixo de cada metade */
+#hud.split .hud-tag {
+  display: block;
+  position: absolute;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(12px, env(safe-area-inset-left));
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--pc, var(--p1));
+  color: #fff;
+  font: 700 15px var(--display);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+#hud.split .hud-panel[data-p="2"] .hud-tag { --pc: var(--p2); left: auto; right: max(12px, env(safe-area-inset-right)); }
+#hud.split .hud-panel[data-p="1"] .hud-item-slot { box-shadow: 0 0 0 3px var(--p1), 0 8px 18px rgba(0, 0, 0, 0.4); }
+#hud.split .hud-panel[data-p="2"] .hud-item-slot { box-shadow: 0 0 0 3px var(--p2), 0 8px 18px rgba(0, 0, 0, 0.4); }
+#hud.split .hud-item-slot.held { border-color: #7dffb5; }
+
+/* pausa: acima do minimapa (no alto ficaria sobre a posição do J1) */
+#hud.split .hud-pause {
+  top: auto;
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 158px);
+}
+
+/* minimapa único no centro de baixo, com os dois jogadores */
+#hud.split #hud-minimap {
+  left: 50%;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: 150px;
+  height: 150px;
+}
+
+/* curiosidades: uma de cada vez, no centro de cima, abaixo do item e da posição de cada metade */
+#hud.split #hud-toasts {
+  top: max(132px, calc(env(safe-area-inset-top) + 124px));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(380px, 32vw);
+  justify-items: center;
+  z-index: 2;
+}
+.toast[data-tag] { position: relative; }
+.toast[data-tag]::after {
+  content: attr(data-tag);
+  position: absolute;
+  top: -9px;
+  left: -8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--p1);
+  color: #fff;
+  font: 700 11px var(--display);
+}
+.toast[data-tag="J2"]::after { background: var(--p2); }
+
+@media (max-width: 1100px) {
+  #hud.split .hud-pos { font-size: 44px; }
+  #hud.split .hud-item-slot { width: 56px; height: 56px; font-size: 30px; }
+  #hud.split #hud-minimap { width: 120px; height: 120px; }
+  #hud.split .hud-pause { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 128px); }
+}
+
+/* ---------- Escolha para dois jogadores ---------- */
+body.touch .opt-players { display: none; }
+.seg.locked button { opacity: 0.45; }
+.select-tabs {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin: -4px 0 6px;
+}
+.select-tabs.hidden { display: none; }
+.select-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.select-tabs button i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--pc);
+}
+.select-tabs button small { font-weight: 500; opacity: 0.85; }
+.select-tabs button.on { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 22%, transparent); }
+.select-tabs kbd {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  font: 700 11px var(--display);
+}
+.char-card .pick {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #fff;
+  font: 700 11px var(--display);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.char-card .pick.p1 { background: var(--p1); }
+.char-card .pick.p2 { background: var(--p2); }
+.char-card.pick1 { box-shadow: 0 0 0 3px var(--p1); }
+.char-card.pick2 { box-shadow: 0 0 0 3px var(--p2); }
+.char-card.pick1.pick2 { box-shadow: 0 0 0 3px var(--p1), 0 0 0 6px var(--p2); }
+
+/* resultado de 2 jogadores */
+.results-list li.me.p1 { outline-color: var(--p1); background: rgba(61, 165, 255, 0.2); }
+.results-list li.me.p2 { outline-color: var(--p2); background: rgba(255, 90, 138, 0.2); }
+.results-list .ptag { font-weight: 700; }
+.results-list .ptag.p1 { color: var(--p1); }
+.results-list .ptag.p2 { color: var(--p2); }
+
+body.touch .howto-duo { display: none; }

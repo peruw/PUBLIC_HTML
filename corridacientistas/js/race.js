@@ -9,6 +9,7 @@ export class RaceManager {
     this.phase = 'idle'; // 'countdown' | 'racing' | 'finished'
     this.karts = [];
     this.player = null;
+    this.players = [];
     this.totalLaps = RACE.defaultLaps;
     this.countdown = 0;
     this.time = 0;
@@ -19,9 +20,11 @@ export class RaceManager {
   }
 
   // Prepara os karts (já posicionados no grid) e começa a contagem.
-  start(karts, { laps, player, track, cc }) {
+  // players: humanos da corrida (2 na tela dividida); player = o primeiro deles.
+  start(karts, { laps, player, players, track, cc }) {
     this.karts = karts;
     this.player = player;
+    this.players = players && players.length ? players : player ? [player] : [];
     this.track = track;
     this.cc = cc;
     this.totalLaps = laps;
@@ -34,6 +37,10 @@ export class RaceManager {
     this._throttleStart = -1;
     this._finalLapShown = false;
     this._lastPlace = 0;
+    for (const p of this.players) {
+      p._thrStart = -1; // largada-foguete de cada humano
+      p._lastPlace = 0;
+    }
     for (const k of karts) { k.lapTimes = []; k._lapStart = 0; }
     const L = track.length;
     for (const k of karts) {
@@ -71,21 +78,22 @@ export class RaceManager {
       this._lastCount = n;
       this.bus.emit('race:countdown', { n });
     }
-    // Largada-foguete do jogador: acelerar logo depois do "2" (entre 1,0 e 2,6 passos).
-    if (this.player) {
-      const held = this.player.controls.throttle > 0.5;
-      if (held && this._throttleStart < 0) this._throttleStart = this.countdown;
-      if (!held) this._throttleStart = -1;
+    // Largada-foguete de cada jogador: acelerar logo depois do "2" (entre 1,0 e 2,6 passos).
+    for (const p of this.players) {
+      const held = p.controls.throttle > 0.5;
+      if (held && p._thrStart < 0) p._thrStart = this.countdown;
+      if (!held) p._thrStart = -1;
     }
+    this._throttleStart = this.player ? this.player._thrStart : -1;
     if (this.countdown >= step * 3) {
       this.phase = 'racing';
       this.time = 0;
       for (const k of this.karts) k.frozen = false;
       this.bus.emit('race:go', {});
-      if (this.player) {
-        const ts = this._throttleStart;
-        if (ts >= step * 0.9 && ts <= step * 2.85) this.player.applyBoost(1.1, 1, 'rocket');
-        else if (ts >= 0 && ts < step * 0.9) this.bus.emit('race:rocketEarly', { kart: this.player });
+      for (const p of this.players) {
+        const ts = p._thrStart;
+        if (ts >= step * 0.9 && ts <= step * 2.85) p.applyBoost(1.1, 1, 'rocket');
+        else if (ts >= 0 && ts < step * 0.9) this.bus.emit('race:rocketEarly', { kart: p });
       }
       for (const k of this.karts) if (k._aiRocket) k.applyBoost(0.8 + Math.random() * 0.3, 1, 'rocket');
     }
@@ -124,7 +132,7 @@ export class RaceManager {
         }
         if (lapNow >= 2) {
           this.bus.emit('race:lap', { kart: k, lap: lapNow, lapTime });
-          if (k === this.player && lapNow === this.totalLaps && this.totalLaps > 1) {
+          if (this.players.includes(k) && lapNow === this.totalLaps && this.totalLaps > 1) {
             this.bus.emit('race:finalLap', { kart: k });
           }
         }
@@ -140,7 +148,8 @@ export class RaceManager {
     this.finishOrder.push(k);
     k.place = this.finishOrder.length;
     this.bus.emit('race:finish', { kart: k, place: k.place, time: k.finishTime });
-    if (k === this.player) this.phase = 'finished';
+    // a corrida acaba quando todos os humanos cruzam a chegada
+    if (this.players.includes(k) && this.players.every((p) => p.finished)) this.phase = 'finished';
   }
 
   updatePlaces() {
@@ -152,12 +161,14 @@ export class RaceManager {
     });
     sorted.forEach((k, i) => (k.place = i + 1));
     this.sorted = sorted;
-    // ultrapassagem do jogador (o áudio toca um sinal; só durante a corrida)
-    const p = this.player;
-    if (p && this.phase === 'racing' && !p.finished) {
-      if (this._lastPlace && p.place !== this._lastPlace) this.bus.emit('race:place', { kart: p, from: this._lastPlace, to: p.place });
-      this._lastPlace = p.place;
+    // ultrapassagem de cada jogador (o áudio toca um sinal; só durante a corrida)
+    if (this.phase !== 'racing') return;
+    for (const p of this.players) {
+      if (p.finished) continue;
+      if (p._lastPlace && p.place !== p._lastPlace) this.bus.emit('race:place', { kart: p, from: p._lastPlace, to: p.place });
+      p._lastPlace = p.place;
     }
+    this._lastPlace = this.player ? this.player._lastPlace : 0;
   }
 
   // Lista final: quem não terminou recebe tempo estimado pela distância que falta.

@@ -609,7 +609,8 @@ export class ItemSystem {
       this._viewH = world.renderer.getDrawingBufferSize(_v2d).y || 720;
     }
     this.glows.begin();
-    this._updateBoxes(dt, karts, world?.camera);
+    // tela dividida: duas câmeras olham a pista, então nenhuma caixa é escondida por uma delas
+    this._updateBoxes(dt, karts, world?.split ? null : world?.camera);
     for (let i = 0; i < karts.length; i++) {
       const k = karts[i];
       if (k.roulette) this._updateRoulette(k, dt);

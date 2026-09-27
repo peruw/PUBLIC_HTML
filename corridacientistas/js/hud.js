@@ -5,6 +5,8 @@ import { ITEM_FACTS, ZONE_FACTS, pickFact } from './facts.js';
 
 const $ = (id) => document.getElementById(id);
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
+// Cores dos jogadores na tela dividida (marcadores da escolha, HUD, minimapa e resultado).
+export const PLAYER_COLORS = ['#3da5ff', '#ff5a8a'];
 
 // Ícone de item: emoji ou texto estilizado (α, e⁻).
 export function itemIconHTML(id) {
@@ -16,30 +18,51 @@ export function itemIconHTML(id) {
     : it.icon;
 }
 
+// Um Hud por jogador. index 0 (J1) usa o painel do index.html e cuida do que é comum
+// (minimapa, curiosidades, mostrar/esconder o #hud); index 1 (J2, tela dividida) cria uma
+// cópia do painel sem ids. Com 1 jogador, só o index 0 existe e tudo fica como sempre foi.
 export class Hud {
-  constructor({ bus }) {
+  constructor({ bus, index = 0 }) {
     this.bus = bus;
+    this.index = index;
     this.root = $('hud');
+    const tpl = this.root.querySelector('.hud-panel');
+    let panel = tpl;
+    if (index > 0) {
+      panel = tpl.cloneNode(true);
+      for (const e of panel.querySelectorAll('[id]')) e.removeAttribute('id');
+      panel.dataset.p = String(index + 1);
+      panel.classList.add('hidden');
+      this.root.querySelector(`.hud-panel[data-p="${index}"]`)?.after(panel);
+    }
+    this.panel = panel;
+    const q = (sel) => panel.querySelector(sel);
     this.el = {
-      slot: this.root.querySelector('.hud-item-slot'),
-      icon: $('hud-item-icon'),
-      count: $('hud-item-count'),
-      name: $('hud-item-name'),
-      posBox: this.root.querySelector('.hud-pos'),
-      pos: $('hud-pos-num'),
-      total: this.root.querySelector('.hud-pos-total'),
-      lap: $('hud-lap'),
-      time: $('hud-time'),
-      center: $('hud-center'),
-      toasts: $('hud-toasts'),
-      map: $('hud-minimap'),
-      warn: $('hud-warn'),
-      drift: $('hud-drift'),
-      vignette: $('hud-vignette'),
+      slot: q('.hud-item-slot'),
+      icon: q('.hud-item-icon'),
+      count: q('.hud-item-count'),
+      name: q('.hud-item-name'),
+      key: q('.hud-item-key'),
+      posBox: q('.hud-pos'),
+      pos: q('.hud-pos-num'),
+      total: q('.hud-pos-total'),
+      lap: q('.hud-lap-num'),
+      time: q('.hud-time'),
+      center: q('.hud-center'),
+      toasts: $('hud-toasts'), // comum aos dois jogadores
+      map: index === 0 ? $('hud-minimap') : null, // minimapa único (do J1)
+      warn: q('.hud-warn'),
+      drift: q('.hud-drift'),
+      vignette: q('.hud-vignette'),
+      tag: q('.hud-tag'),
     };
+    this.keyHTML = this.el.key ? this.el.key.innerHTML : '';
+    this.split = false;
+    this.tag = ''; // 'J1' / 'J2' na tela dividida
+    this.mapPlayers = null; // humanos destacados no minimapa (tela dividida)
     this.warnItem = null; // item que está vindo na direção do jogador
     this.warnBeep = 0;
-    this.ctx = this.el.map.getContext('2d');
+    this.ctx = this.el.map ? this.el.map.getContext('2d') : null;
     this.seenFacts = new Set();
     this.centerTimer = 0;
     this.centerSticky = false;
@@ -62,7 +85,9 @@ export class Hud {
     bus.on('race:rocketEarly', ({ kart }) => {
       if (kart === this.player) setTimeout(() => this.center('Cedo demais! Acelere no 2', 'msg pop', 1500), 950);
     });
-    bus.on('race:finalLap', () => this.center('ÚLTIMA VOLTA!', 'msg pop', 1800));
+    bus.on('race:finalLap', ({ kart } = {}) => {
+      if (!kart || kart === this.player) this.center('ÚLTIMA VOLTA!', 'msg pop', 1800);
+    });
     bus.on('race:lap', ({ kart, lap, lapTime }) => {
       if (kart !== this.player || lap >= this.totalLaps) return;
       const t = lapTime > 0 ? `<small>${formatTime(lapTime)}</small>` : '';
@@ -105,7 +130,7 @@ export class Hud {
     const ico = itemIconHTML(item);
     if (kart === p) {
       const who = by && by !== p ? ` <span class="who">de ${by.character.name}</span>` : by === p ? ' <span class="who">(foi você mesmo!)</span>' : '';
-      this.toast(`<div class="item-ico">${ico}</div><div><b>${it.name}${who}</b></div>`, 1900, 'hit');
+      this.toast(`<div class="item-ico">${ico}</div><div><b>${it.name}${who}</b></div>`, 1900, 'hit', this.tag);
       // quem lidera quase nunca pega Tesla/Buraco: aprende sobre o item ao ser atingido
       this.noteItemFact(item);
     } else if (by === p && !kart.finished) {
@@ -113,9 +138,9 @@ export class Hud {
       if (item === 'tesla') {
         if (now - (this._teslaToast || 0) < 1500) return;
         this._teslaToast = now;
-        this.toast(`<div class="item-ico">${ico}</div><div><b>Raio em todos os adversários!</b></div>`, 1600, 'good');
+        this.toast(`<div class="item-ico">${ico}</div><div><b>Raio em todos os adversários!</b></div>`, 1600, 'good', this.tag);
       } else {
-        this.toast(`<div class="item-ico">${ico}</div><div><b>Você acertou ${kart.character.name}!</b></div>`, 1600, 'good');
+        this.toast(`<div class="item-ico">${ico}</div><div><b>Você acertou ${kart.character.name}!</b></div>`, 1600, 'good', this.tag);
       }
     }
   }
@@ -138,7 +163,7 @@ export class Hud {
       return;
     }
     this.driftTip = 0;
-    el.className = 'dots';
+    el.className = 'hud-drift dots';
     el.innerHTML = [1, 2, 3].map((i) => `<i class="${i <= level ? 'on l' + i : ''}"></i>`).join('');
   }
 
@@ -147,15 +172,22 @@ export class Hud {
     if (!this.tips || this.tips.has(key) || !this.active) return;
     this.tips.add(key);
     const el = this.el.drift;
-    if (!el || (el.className === 'dots' && key !== 'release')) return;
-    el.className = 'tip';
+    if (!el || (el.classList.contains('dots') && key !== 'release')) return;
+    el.className = 'hud-drift tip';
     el.textContent = text;
     this.driftTip = ms;
   }
 
   show(on) {
     this.active = on;
+    if (this.index > 0) {
+      // J2: só o próprio painel (as curiosidades e o #hud são do J1)
+      this.panel.classList.toggle('hidden', !on);
+      if (!on) this.el.center.textContent = '';
+      return;
+    }
     this.root.classList.toggle('hidden', !on);
+    this.root.classList.toggle('split', on && this.split);
     if (!on) {
       this.toastList = [];
       this.el.toasts.innerHTML = '';
@@ -163,8 +195,20 @@ export class Hud {
     }
   }
 
-  setRace({ player, karts, totalLaps, track, tutorial = false, touch = false }) {
+  // split: tela dividida (2 jogadores); players: os dois humanos (minimapa e etiquetas).
+  setRace({ player, karts, totalLaps, track, tutorial = false, touch = false, split = false, players = null }) {
     this.player = player;
+    this.split = split;
+    this.tag = split ? `J${this.index + 1}` : '';
+    this.mapPlayers = split && players ? players : null;
+    if (this.el.tag) {
+      this.el.tag.textContent = split ? `J${this.index + 1} · ${player.character.name}` : '';
+    }
+    if (this.el.key) {
+      // tecla do item de cada jogador na tela dividida; com 1 jogador, o texto original
+      this.el.key.innerHTML = !split ? this.keyHTML : this.index === 0 ? '<kbd>E</kbd> usa o item' : '<kbd>Enter</kbd> usa o item';
+    }
+    if (this.index === 0) this.root.classList.toggle('split', split && this.active);
     this.karts = karts;
     this.totalLaps = totalLaps;
     this.raceFacts = [];
@@ -179,9 +223,12 @@ export class Hud {
     this.el.total.textContent = `/${karts.length}`;
     this.last = {};
     this.el.center.textContent = '';
-    this.toastList = [];
-    this.el.toasts.innerHTML = '';
-    if (track !== this.track) this.prepareMinimap(track);
+    if (this.index === 0) {
+      this.toastList = [];
+      this.el.toasts.innerHTML = '';
+      this.el.toasts.classList.remove('dim');
+    }
+    if (this.el.map && track !== this.track) this.prepareMinimap(track);
   }
 
   // Desenha a pista do minimapa uma vez num canvas separado.
@@ -299,27 +346,31 @@ export class Hud {
       c.strokeStyle = '#fff';
       c.stroke();
     };
-    for (const k of this.karts) if (k !== this.player) drawDot(k, 4.5, 1.5);
-    const p = this.player;
-    if (p) {
-      // jogador: seta apontando para onde o kart vai
-      const [x, y] = this.mapXY(p.position.x, p.position.z);
-      c.save();
-      c.translate(x, y);
-      c.rotate(Math.atan2(Math.cos(p.heading), Math.sin(p.heading)));
-      c.beginPath();
-      c.moveTo(9, 0);
-      c.lineTo(-6, -6.5);
-      c.lineTo(-3, 0);
-      c.lineTo(-6, 6.5);
-      c.closePath();
-      c.fillStyle = p.character.colors.ui;
-      c.fill();
-      c.lineWidth = 2.5;
-      c.strokeStyle = '#fff';
-      c.stroke();
-      c.restore();
-    }
+    const humans = this.mapPlayers || (this.player ? [this.player] : []);
+    for (const k of this.karts) if (!humans.includes(k)) drawDot(k, 4.5, 1.5);
+    // tela dividida: J2 primeiro, para a seta do J1 ficar por cima quando se cruzam
+    for (let i = humans.length - 1; i >= 0; i--) this.drawArrow(humans[i], humans.length > 1 ? PLAYER_COLORS[i] : '#fff');
+  }
+
+  // Jogador: seta apontando para onde o kart vai (contorno branco; na tela dividida, a cor do jogador).
+  drawArrow(p, ring) {
+    const c = this.ctx;
+    const [x, y] = this.mapXY(p.position.x, p.position.z);
+    c.save();
+    c.translate(x, y);
+    c.rotate(Math.atan2(Math.cos(p.heading), Math.sin(p.heading)));
+    c.beginPath();
+    c.moveTo(9, 0);
+    c.lineTo(-6, -6.5);
+    c.lineTo(-3, 0);
+    c.lineTo(-6, 6.5);
+    c.closePath();
+    c.fillStyle = p.character.colors.ui;
+    c.fill();
+    c.lineWidth = ring === '#fff' ? 2.5 : 3;
+    c.strokeStyle = ring;
+    c.stroke();
+    c.restore();
   }
 
   update(dt, world, race) {
@@ -373,7 +424,8 @@ export class Hud {
     if (this.el.vignette) {
       // effects.speedFeel já vem suavizado e zera na contagem, atordoado e depois da chegada
       const top = p.baseMaxSpeed || p.maxSpeed || 1;
-      const feel = typeof world.effects?.speedFeel === 'number' ? world.effects.speedFeel
+      // (na tela dividida cada metade calcula a própria, pelo kart do seu jogador)
+      const feel = typeof world.effects?.speedFeel === 'number' && !this.split ? world.effects.speedFeel
         : p.boostTime > 0 ? 1 : Math.min(1, Math.max(0, (Math.abs(p.speed) / top - 0.82) / 0.18));
       this._feel = (this._feel || 0) + (feel - (this._feel || 0)) * Math.min(1, dt * 4);
       const op = (this._feel * 0.8).toFixed(2);
@@ -384,12 +436,12 @@ export class Hud {
     }
 
     if (race.phase === 'racing' && !p.finished) {
-      this.updateZones(world, p);
+      if (this.index === 0) this.updateZones(world, p);
       this.updateTips(world, p);
     }
     if (this.driftTip > 0) {
       this.driftTip -= dt * 1000;
-      if (this.driftTip <= 0 && this.el.drift.className === 'tip') this.setDriftDots(-1);
+      if (this.driftTip <= 0 && this.el.drift.classList.contains('tip')) this.setDriftDots(-1);
     }
 
     // contramão
@@ -418,13 +470,14 @@ export class Hud {
       if (this.centerTimer <= 0 && !this.centerSticky) this.el.center.textContent = '';
     }
     // mensagem grande no centro: as curiosidades recuam para não brigar com ela
-    const busy = !!this.el.center.textContent;
-    if (busy !== this.last.busy) {
+    // (na tela dividida as curiosidades ficam no alto, longe das mensagens de cada metade)
+    const busy = !!this.el.center.textContent && !this.split;
+    if (this.index === 0 && busy !== this.last.busy) {
       this.last.busy = busy;
       this.el.toasts.classList.toggle('dim', busy);
     }
 
-    if (half) this.drawMinimap();
+    if (half && this.ctx) this.drawMinimap();
   }
 
   // Curiosidade do setor da pista, na primeira passagem de cada corrida (só na 1ª volta).
@@ -497,7 +550,7 @@ export class Hud {
 
   center(text, cls = 'pop', ms = 1000, sticky = false) {
     const el = this.el.center;
-    el.className = cls;
+    el.className = 'hud-center ' + cls;
     el.innerHTML = `<span>${text}</span>`;
     this.centerTimer = ms;
     this.centerSticky = sticky;
@@ -512,17 +565,19 @@ export class Hud {
     this.seenFacts.add(id);
     const fact = first ? this.noteItemFact(id) : null;
     const body = fact ? `<small>Você sabia?</small><b>${it.name}</b><p>${fact.short}</p>` : `<b>${it.name}</b><p>${it.effect}</p>`;
-    this.toast(`<div class="item-ico">${itemIconHTML(id)}</div><div>${body}</div>`, fact ? 4500 : 2000);
+    this.toast(`<div class="item-ico">${itemIconHTML(id)}</div><div>${body}</div>`, fact ? 4500 : 2000, '', this.tag);
     if (this.tips) this.tip('item', this.isTouch ? 'Toque em ITEM para usar' : 'Aperte E para usar o item', 2600);
   }
 
-  // Um aviso por vez, na coluna da direita. Tocar/clicar fecha.
-  toast(html, ms, cls = '') {
+  // Um aviso por vez, na coluna da direita (tela dividida: no centro de cima). Tocar/clicar fecha.
+  // tag: 'J1'/'J2' na tela dividida (de quem é a curiosidade).
+  toast(html, ms, cls = '', tag = '') {
     const box = this.el.toasts;
     while (box.children.length) box.firstChild.remove();
     this.toastList = [];
     const div = document.createElement('div');
     div.className = 'toast' + (cls ? ' ' + cls : '');
+    if (tag) div.dataset.tag = tag;
     // conteúdo sem ícone (ex.: avisos do sistema) ganha um ícone padrão para caber no grid
     div.innerHTML = /class="item-ico"/.test(html) ? html : `<div class="item-ico">ℹ️</div><div>${html}</div>`;
     const entry = { div, t: ms, out: false };

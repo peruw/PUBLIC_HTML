@@ -48,7 +48,13 @@ export class KartPreview {
     if (this.current) this.turntable.remove(this.current.group);
     let m = this.models.get(id);
     if (!m) {
-      m = createKartModel(id, { quality: this.quality });
+      try {
+        m = createKartModel(id, { quality: this.quality });
+      } catch {
+        // cientista ainda sem modelo 3D: a ficha fica só com o retrato
+        this.current = null;
+        return;
+      }
       this.models.set(id, m);
     }
     this.current = m;

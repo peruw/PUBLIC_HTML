@@ -15,8 +15,23 @@ const KEYMAP = {
   KeyM: 'mute',
   Enter: 'confirm', NumpadEnter: 'confirm',
 };
+// Dois jogadores no mesmo teclado: cada tecla é de um jogador ([jogador, ação]).
+// J1 = WASD, Espaço (drift), E (item), Q (olhar para trás).
+// J2 = setas, Ctrl direito ou ponto (drift), Enter ou Shift direito (item), vírgula ou End (olhar para trás).
+const KEYMAP_SPLIT = {
+  KeyW: [0, 'up'], KeyS: [0, 'down'], KeyA: [0, 'left'], KeyD: [0, 'right'],
+  Space: [0, 'drift'], KeyE: [0, 'item'], KeyQ: [0, 'look'],
+  ArrowUp: [1, 'up'], ArrowDown: [1, 'down'], ArrowLeft: [1, 'left'], ArrowRight: [1, 'right'],
+  ControlRight: [1, 'drift'], Period: [1, 'drift'], NumpadDecimal: [1, 'drift'],
+  Enter: [1, 'item'], NumpadEnter: [1, 'item'], ShiftRight: [1, 'item'],
+  Comma: [1, 'look'], End: [1, 'look'],
+  Escape: [0, 'pause'], KeyP: [0, 'pause'],
+  KeyM: [0, 'mute'],
+};
 // teclas que rolariam a página
 const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
+// no modo de 2 jogadores, também End (rola a página) e Enter (clicaria num botão focado)
+const PREVENT_SPLIT = new Set([...PREVENT, 'End', 'Enter', 'NumpadEnter']);
 const DEADZONE = 0.2;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -88,6 +103,14 @@ export class Input {
     this._steerOrder = 0; // -1/1: última direção apertada
     this._kbPulse = { item: false, pause: false, mute: false, confirm: false };
     this._downCodes = new Set();
+
+    // dois jogadores no mesmo PC (tela dividida): J2 tem teclas e controle próprios
+    this._split = false;
+    this._keys2 = { up: false, down: false, left: false, right: false, drift: false, look: false, item: false };
+    this._steerOrder2 = 0;
+    this._kbPulse2 = { item: false };
+    this._padPulse2 = { item: false };
+    this.state2 = { throttle: 0, brake: 0, steer: 0, drift: false, useItem: false, holdItem: false, itemBack: false, lookBack: false };
 
     // gamepad
     this._padPrev = new Map(); // índice -> bitmask de botões
@@ -185,9 +208,23 @@ export class Input {
     this._applyTouchVisibility();
   }
 
+  // Dois jogadores (tela dividida): poll() devolve só o J1 e state2 recebe o J2.
+  // Solta tudo ao trocar: uma tecla segurada não pode mudar de dono no meio.
+  get split() {
+    return this._split;
+  }
+
+  setSplit(on) {
+    on = !!on;
+    if (on === this._split) return;
+    this._split = on;
+    this._releaseAll();
+  }
+
   // Vibra o gamepad (se estiver em uso e tiver motor de vibração). ms = duração; strength 0..1.
-  rumble(ms = 120, strength = 0.6) {
-    if (this.lastDevice !== 'gamepad') return;
+  // player (0 ou 1): na tela dividida, vibra só o controle desse jogador.
+  rumble(ms = 120, strength = 0.6, player = -1) {
+    if (this.lastDevice !== 'gamepad' && !(this._split && player >= 0)) return;
     let pads = null;
     try {
       pads = navigator.getGamepads ? navigator.getGamepads() : null;
@@ -198,9 +235,13 @@ export class Input {
     const duration = clamp(ms || 0, 0, 5000);
     const s = clamp(strength ?? 0.6, 0, 1);
     if (duration <= 0 || s <= 0) return;
+    let slot = 0; // ordem entre os controles conectados: 0 = J1, 1 = J2
     for (let i = 0; i < pads.length; i++) {
       const p = pads[i];
       if (!p || !p.connected) continue;
+      const mine = !this._split || player < 0 || Math.min(slot, 1) === player;
+      slot++;
+      if (!mine) continue;
       try {
         const va = p.vibrationActuator;
         if (va?.playEffect) {
@@ -227,6 +268,8 @@ export class Input {
     else if (k.left) kSteer = -1;
     else if (k.right) kSteer = 1;
     const tSteer = this._touchSteer();
+
+    if (this._split) return this._pollSplit(kSteer);
 
     let steer = kSteer;
     if (Math.abs(g.steer) > Math.abs(steer)) steer = g.steer;
@@ -260,6 +303,49 @@ export class Input {
     return st;
   }
 
+  // Tela dividida: J1 = WASD + 1º controle; J2 = setas + 2º controle (sem toque).
+  _pollSplit(kSteer) {
+    const st = this.state;
+    const s2 = this.state2;
+    const k = this._keys;
+    const k2 = this._keys2;
+    const g = this._pad;
+    const g2 = this._pad2;
+    let steer = kSteer;
+    if (Math.abs(g.steer) > Math.abs(steer)) steer = g.steer;
+    st.throttle = Math.max(k.up ? 1 : 0, g.throttle);
+    st.brake = Math.max(k.down ? 1 : 0, g.brake);
+    st.steer = clamp(steer, -1, 1);
+    st.drift = k.drift || g.drift;
+    st.lookBack = k.look || g.look;
+    st.useItem = this._kbPulse.item || this._padPulse.item;
+    st.holdItem = k.item || g.item;
+    st.itemBack = false;
+    st.pause = this._kbPulse.pause || this._padPulse.pause;
+    st.mute = this._kbPulse.mute || this._padPulse.mute;
+    st.confirm = this._kbPulse.confirm || this._padPulse.confirm;
+
+    let steer2 = 0;
+    if (k2.left && k2.right) steer2 = this._steerOrder2;
+    else if (k2.left) steer2 = -1;
+    else if (k2.right) steer2 = 1;
+    if (Math.abs(g2.steer) > Math.abs(steer2)) steer2 = g2.steer;
+    s2.throttle = Math.max(k2.up ? 1 : 0, g2.throttle);
+    s2.brake = Math.max(k2.down ? 1 : 0, g2.brake);
+    s2.steer = clamp(steer2, -1, 1);
+    s2.drift = k2.drift || g2.drift;
+    s2.lookBack = k2.look || g2.look;
+    s2.useItem = this._kbPulse2.item || this._padPulse2.item;
+    s2.holdItem = k2.item || g2.item;
+    s2.itemBack = false;
+
+    this._kbPulse.item = this._kbPulse.pause = this._kbPulse.mute = this._kbPulse.confirm = false;
+    this._padPulse.item = this._padPulse.pause = this._padPulse.mute = this._padPulse.confirm = false;
+    this._kbPulse2.item = this._padPulse2.item = false;
+    this._touchPulse.item = false;
+    return st;
+  }
+
   destroy() {
     removeEventListener('keydown', this._onKeyDown);
     removeEventListener('keyup', this._onKeyUp);
@@ -272,6 +358,7 @@ export class Input {
 
   // ---------- teclado ----------
   _key(e, down) {
+    if (this._split) return this._keySplit(e, down);
     const act = KEYMAP[e.code];
     if (!act) return;
     if (isEditable(e.target)) return;
@@ -312,9 +399,53 @@ export class Input {
     return false;
   }
 
+  // Teclado dividido entre os dois jogadores (ver KEYMAP_SPLIT).
+  _keySplit(e, down) {
+    const m = KEYMAP_SPLIT[e.code];
+    if (!m) return;
+    if (isEditable(e.target)) return;
+    if (PREVENT_SPLIT.has(e.code)) e.preventDefault();
+    this.lastDevice = 'keyboard';
+    if (down) {
+      if (e.repeat || this._downCodes.has(e.code)) return;
+      this._downCodes.add(e.code);
+    } else {
+      this._downCodes.delete(e.code);
+    }
+    const [who, act] = m;
+    let held = down;
+    if (!held) {
+      for (const code of this._downCodes) {
+        const o = KEYMAP_SPLIT[code];
+        if (o && o[0] === who && o[1] === act) held = true;
+      }
+    }
+    const keys = who ? this._keys2 : this._keys;
+    switch (act) {
+      case 'left':
+      case 'right':
+        keys[act] = held;
+        if (down) this[who ? '_steerOrder2' : '_steerOrder'] = act === 'left' ? -1 : 1;
+        break;
+      case 'up':
+      case 'down':
+      case 'drift':
+      case 'look':
+        keys[act] = held;
+        break;
+      case 'item':
+        keys.item = held;
+        if (down) (who ? this._kbPulse2 : this._kbPulse).item = true;
+        break;
+      default:
+        if (down) this._kbPulse[act] = true;
+    }
+  }
+
   _releaseAll() {
     this._downCodes.clear();
     for (const key in this._keys) this._keys[key] = false;
+    for (const key in this._keys2) this._keys2[key] = false;
     for (const key in this._touch) this._touch[key] = false;
     this._steerPointers.length = 0;
     this._btnPointers.clear();
@@ -324,13 +455,17 @@ export class Input {
 
   // ---------- gamepad ----------
   _pollGamepads() {
-    const g = this._pad || (this._pad = { throttle: 0, brake: 0, steer: 0, drift: false, look: false, item: false });
-    g.throttle = 0;
-    g.brake = 0;
-    g.steer = 0;
-    g.drift = false;
-    g.look = false;
-    g.item = false;
+    const g1 = this._pad || (this._pad = { throttle: 0, brake: 0, steer: 0, drift: false, look: false, item: false });
+    const g2 = this._pad2 || (this._pad2 = { throttle: 0, brake: 0, steer: 0, drift: false, look: false, item: false });
+    for (const g of [g1, g2]) {
+      g.throttle = 0;
+      g.brake = 0;
+      g.steer = 0;
+      g.drift = false;
+      g.look = false;
+      g.item = false;
+    }
+    let slot = 0; // tela dividida: 1º controle conectado = J1, os demais = J2
     let pads = null;
     try {
       pads = navigator.getGamepads ? navigator.getGamepads() : null;
@@ -355,8 +490,11 @@ export class Input {
       const prev = this._padPrev.get(p.index) || 0;
       const edge = mask & ~prev;
       this._padPrev.set(p.index, mask);
+      const two = this._split && slot > 0;
+      slot++;
+      const g = two ? g2 : g1;
       if (edge & 1) this._padPulse.confirm = true;
-      if (edge & 2) this._padPulse.item = true;
+      if (edge & 2) (two ? this._padPulse2 : this._padPulse).item = true;
       if (edge & 4) this._padPulse.pause = true;
       if (edge & 8) this._padPulse.mute = true;
       if (Math.abs(ax) > Math.abs(g.steer)) g.steer = ax;
