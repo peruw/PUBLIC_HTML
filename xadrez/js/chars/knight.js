@@ -214,8 +214,8 @@ export function buildKnight(color) {
   const slit = mesh(GEO_SLIT, MAT_DARK, { y: headR * 1.05, s: headR });
   const nasal = mesh(G.box(0.03, 0.30, 0.012), M.trim, { y: headR * 1.0, z: headR * 1.2 });
   // pluma de justa grande: dois segmentos, sobe do topo do elmo e curva para trás (fica legível à distância)
-  const plume = mesh(G.capsule(0.04, 0.16, 6), M.accent, { y: headR * 2.42 + 0.05, z: -headR * 0.3 - 0.06, rx: -0.95, sx: 0.7, sz: 1.5 });
-  const plume2 = mesh(G.capsule(0.045, 0.26, 6), M.accent, { y: headR * 2.42 + 0.13, z: -headR * 0.3 - 0.30, rx: -1.5, sx: 0.7, sz: 1.6 });
+  const plume = mesh(G.capsule(0.04, 0.14, 6), M.accent, { y: headR * 2.42 + 0.01, z: -headR * 0.3 - 0.05, rx: -1.0, sx: 0.75, sz: 1.5 });
+  const plume2 = mesh(G.capsule(0.04, 0.28, 6), M.accent, { y: headR * 2.42 + 0.075, z: -headR * 0.3 - 0.27, rx: -1.45, sx: 0.7, sz: 1.3 });
   for (const m of [helm, slit, nasal, plume, plume2]) { J.head.add(m); rider.headMeshes.push(m); }
 
   // ---- Escudo heater (joint `shield`, olha +Z): preso ao antebraço esquerdo, virado um pouco para a esquerda
