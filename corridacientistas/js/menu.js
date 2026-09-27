@@ -472,7 +472,10 @@ export class Menu {
         else if (rec.prevLap) parts.push(`melhor volta ${formatTime(rec.bestLap)} (recorde ${formatTime(rec.prevLap.time)})`);
       }
     }
-    if (info.ghost != null) parts.push(info.ghost < 0 ? `👻 ${formatTime(-info.ghost).replace(/^0:/, '')} s mais rápido que o fantasma` : `👻 ${formatTime(info.ghost).replace(/^0:/, '')} s atrás do fantasma`);
+    if (info.ghost != null) {
+      const g = Math.abs(info.ghost).toFixed(2).replace('.', ',');
+      parts.push(info.ghost < 0 ? `👻 ${g} s mais rápido que o fantasma` : `👻 ${g} s atrás do fantasma`);
+    }
     if (info.rival && !tt) {
       const d = info.rival.delta;
       const n = info.rival.name;

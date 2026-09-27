@@ -219,6 +219,7 @@ async function init() {
   let playerAI = null;
   let resultsTimer = -1;
   let pendingUse = false; // aperto de item guardado até o próximo passo (telas > 60 Hz)
+  let holdLatch = false; // item seguro mantido depois da pausa até um novo aperto
 
   // Pré-compila os shaders para evitar travadas na primeira corrida.
   try {
@@ -577,6 +578,9 @@ async function init() {
 
   function setPaused(on, silent) {
     if (on && game.state !== 'race') return;
+    // voltando da pausa com um item seguro atrás do kart: ele continua seguro até um novo
+    // aperto (a pausa solta todas as teclas, e isso dispararia o item sozinho)
+    if (!on && game.paused) holdLatch = !!world.player?.itemHeld;
     game.paused = on;
     audio.pauseAll?.(on);
     needsRender = true;
@@ -755,7 +759,8 @@ async function init() {
         c.drift = ctrl.drift;
         c.lookBack = ctrl.lookBack;
         // segurar o item atrás (escudo) e o gesto de tiro para trás no toque
-        c.holdItem = !!ctrl.holdItem;
+        if (holdLatch && (ctrl.holdItem || ctrl.useItem || !player.itemHeld)) holdLatch = false;
+        c.holdItem = !!ctrl.holdItem || holdLatch;
         c.itemBack = !!ctrl.itemBack;
         if (pendingUse) {
           c.useItem = true;

@@ -250,7 +250,8 @@ export class Input {
     st.lookBack = k.look || g.look;
     st.useItem = this._kbPulse.item || this._padPulse.item || this._touchPulse.item;
     st.holdItem = k.item || g.item || t.item;
-    st.itemBack = !!(this._itemPtr && this._itemPtr.back);
+    st.itemBack = !!(this._itemPtr && this._itemPtr.back) || !!this._itemBackPulse;
+    this._itemBackPulse = false;
     st.pause = this._kbPulse.pause || this._padPulse.pause;
     st.mute = this._kbPulse.mute || this._padPulse.mute;
     st.confirm = this._kbPulse.confirm || this._padPulse.confirm;
@@ -274,8 +275,10 @@ export class Input {
   _key(e, down) {
     const act = KEYMAP[e.code];
     if (!act) return;
-    if (isEditable(e.target)) return;
-    if (PREVENT.has(e.code)) e.preventDefault();
+    // em campo de texto/controle deslizante só o APERTO é ignorado: o SOLTAR sempre é
+    // processado, senão a tecla fica "presa" (ex.: Shift+Tab até o volume segura o item)
+    if (down && isEditable(e.target)) return;
+    if (down && PREVENT.has(e.code)) e.preventDefault();
     this.lastDevice = 'keyboard';
     if (down) {
       if (e.repeat || this._downCodes.has(e.code)) return;
@@ -604,7 +607,11 @@ export class Input {
   _pUp(e) {
     const a = this._removeSteer(e.pointerId);
     const b = this._btnPointers.delete(e.pointerId);
-    if (this._itemPtr && this._itemPtr.id === e.pointerId) this._itemPtr = null;
+    if (this._itemPtr && this._itemPtr.id === e.pointerId) {
+      // arrasto rápido: o dedo saiu antes do próximo poll; guarda o "para trás" para esse quadro
+      if (this._itemPtr.back) this._itemBackPulse = true;
+      this._itemPtr = null;
+    }
     if (a || b) this._recomputeTouch();
   }
 

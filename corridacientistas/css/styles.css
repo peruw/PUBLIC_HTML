@@ -1735,7 +1735,8 @@ body.touch {
 @media (max-width: 760px) and (min-height: 521px) {
   .results-wrap { grid-template-columns: 1fr; padding: 12px; }
   .results-wrap > .row { flex-wrap: wrap; margin: 0 -12px -12px; padding: 8px 12px 12px; bottom: -12px; }
-  .results-wrap > .row .btn { flex: 1 1 40%; padding: 9px 10px; }
+  .results-wrap > .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .results-wrap > .row .btn { width: 100%; min-width: 0; padding: 9px 8px; white-space: normal; font-size: 14px; }
 }
 
 /* celular: avisos no alto, ao centro (os cantos de baixo são dos botões de toque, e sem
@@ -1754,4 +1755,20 @@ body.touch .toast p { font-size: 12px; }
 /* telas baixas: aviso de item vindo acima da dica do tutorial */
 @media (max-height: 520px) {
   #hud-warn { bottom: calc(18% + 50px); }
+}
+
+/* celular deitado: o rodapé da escolha quebra em duas linhas (Modo + Motor | Voltas + CORRER)
+   para o botão não sair da tela; o rodapé não alarga a ficha do cientista */
+@media (max-height: 520px) {
+  .select-foot { flex-wrap: wrap; gap: 6px 12px; min-width: 0; }
+  .select-body { min-width: 0; }
+  .select-wrap { min-width: 0; }
+  #opt-mode button small { display: none; }
+  .select-foot .btn-go { margin-left: auto; }
+}
+
+/* PC: curiosidades com rolagem própria, para o quiz e o ranking aparecerem sem rolar o painel */
+.results-side .fact-card {
+  max-height: min(44vh, 360px);
+  overflow: auto;
 }
