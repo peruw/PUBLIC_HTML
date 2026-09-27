@@ -1,8 +1,10 @@
 // Peão: soldado de infantaria — a peça mais simples e numerosa do exército.
-// Chapéu-de-ferro de aba larga sobre coifa acolchoada; gambesão de tecido com costuras, tabardo
-// na cor do exército e cinto de couro com fivela; calças de tecido, botas e luvas de couro.
-// Lança de 2,3 m com ponta de ferro e escudo redondo de madeira com umbo de ferro.
-// Contrato em ../rig.js: construído olhando para +Z, pés na origem, unidades em metros.
+// Chapéu-de-ferro de aba larga sobre coifa acolchoada; gambesão de tecido com saia, tabardo na cor
+// do exército e cinto de couro com fivela e adaga; calças de tecido, botas e luvas de couro.
+// Lança de 2,3 m com ponta de ferro (mão do joint `weapon`) e escudo redondo de madeira com umbo de
+// ferro (joint `shield`). Contrato em ../rig.js: construído olhando para +Z, pés na origem, metros.
+// Observação: no rig o lado 'R' fica em +X; olhando para +Z isso é anatomicamente a esquerda, então
+// em primeira pessoa a lança aparece à esquerda e o escudo à direita (convenção comum a todo o exército).
 import * as THREE from '../three.js';
 import { humanoid, attachWeapon, attachShield, mesh, G, snapshotRest } from '../rig.js';
 
@@ -21,8 +23,9 @@ const COIF_OPEN = (100 / 180) * Math.PI;
 const COIF = new THREE.SphereGeometry(1, 10, 8, Math.PI / 2 + COIF_OPEN / 2, Math.PI * 2 - COIF_OPEN);
 // Meia-esfera (umbo do escudo), eixo +Y.
 const HEMI = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
-// Painel do tabardo: casca de cilindro aberta cobrindo ±46° em torno de +Z, levemente afunilada em cima.
-const TABARD = new THREE.CylinderGeometry(0.88, 1, 1, 6, 1, true, -0.8, 1.6);
+// Painel do tabardo: casca de cilindro aberta cobrindo ±43° em torno de +Z, afunilada em cima (colarinho)
+// e um pouco embaixo, para a borda ficar dentro do cinto (que é um prisma de 12 lados) e não furá-lo.
+const TABARD = new THREE.CylinderGeometry(0.88, 0.97, 1, 6, 1, true, -0.75, 1.5);
 
 // Primeira malha filha de um joint (as malhas da base não têm nome; a ordem é fixa em rig.js).
 const firstMesh = (j) => j.children.find((o) => o.isMesh);
@@ -61,12 +64,13 @@ export function buildPawn(color) {
 
   // ---- Gambesão: tabardo na cor do exército (painéis da frente e das costas), fivela do cinto
   for (const ry of [0, Math.PI]) {
-    J.torso.add(mesh(TABARD, M.accent, { y: tH * 0.56, ry, sx: tr * 1.24, sy: tH * 0.84, sz: tr * 0.97 }));
+    // vai do meio do cinto (fica preso sob ele) até a base do pescoço
+    J.torso.add(mesh(TABARD, M.accent, { y: tH * 0.575, ry, sx: tr * 1.24, sy: tH * 0.815, sz: tr * 0.97 }));
   }
   J.torso.add(mesh(G.box(0.06, 0.05, 0.02), M.trim, { y: tH / 6, z: tr * 1.02 + 0.01 }));
-  // saia do gambesão, abaixo do cinto, até o meio da coxa
-  J.hips.add(mesh(G.cyl(tr * 1.18, tr * 1.32, dims.legLen * 0.3, 12), M.cloth, { y: -dims.legLen * 0.09, sz: 0.8 }));
-  // adaga embainhada pendurada no cinto, no quadril esquerdo (bainha + cabo)
+  // saia do gambesão: começa dentro do cinto e desce até o meio da coxa
+  J.hips.add(mesh(G.cyl(tr * 1.18, tr * 1.32, dims.legLen * 0.38, 12), M.cloth, { y: -dims.legLen * 0.025, sz: 0.8 }));
+  // adaga embainhada pendurada no cinto, no quadril do lado L do rig (-X): bainha + cabo
   const dagger = new THREE.Group();
   dagger.position.set(-tr * 1.35, 0.01, 0.03);
   dagger.rotation.set(0.2, 0, -0.1);
