@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#1c1a17" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Xadrez em Primeira Pessoa</title>
+  <meta name="description" content="Xadrez 3D onde você vê o tabuleiro pelos olhos da peça. Jogue contra o computador (Stockfish) ou contra um amigo, com gráfico de vantagem e análise de lances." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.quantaaulas.com/xadrez/" />
+  <meta property="og:title" content="Xadrez em Primeira Pessoa" />
+  <meta property="og:description" content="Clique numa peça e veja o tabuleiro pelos olhos dela. Contra o computador ou um amigo, com análise de lances." />
+  <meta property="og:image" content="https://www.quantaaulas.com/assets/logo-quanta.png" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="Quanta Aulas" />
+  <link rel="icon" type="image/png" href="/assets/logo-quanta.png" />
+  <link rel="apple-touch-icon" href="/assets/logo-quanta.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden" aria-hidden="true" data-view="overhead">
+    <div class="hud-top">
+      <div class="hud-turn-wrap">
+        <span class="hud-label">Vez de</span>
+        <span id="hud-turn" class="hud-turn">Brancas</span>
+      </div>
+      <div class="hud-eval">
+        <div class="hud-eval-bar"><div id="hud-eval-fill" class="hud-eval-fill"></div></div>
+        <span id="hud-eval-num" class="hud-eval-num">+0.0</span>
+      </div>
+      <button id="btn-menu" class="hud-btn" aria-label="Menu">☰</button>
+    </div>
+
+    <div id="hud-hint" class="hud-hint"></div>
+
+    <aside class="hud-panel">
+      <h3>Vantagem</h3>
+      <canvas id="hud-graph" class="hud-graph"></canvas>
+      <h3>Melhores lances</h3>
+      <ol id="hud-lines" class="hud-lines"></ol>
+      <h3>Lances</h3>
+      <div id="hud-history" class="hud-history"></div>
+      <div id="hud-engine" class="hud-engine" data-state=""></div>
+    </aside>
+
+    <div class="hud-bottom">
+      <button id="btn-view" class="hud-btn wide">👁 1ª pessoa</button>
+      <button id="btn-flip" class="hud-btn" aria-label="Girar tabuleiro">⟲</button>
+      <button id="btn-undo" class="hud-btn" aria-label="Desfazer">↶</button>
+      <button id="btn-restart" class="hud-btn" aria-label="Reiniciar">↻</button>
+      <button id="btn-panel" class="hud-btn only-mobile" aria-label="Análise">📈</button>
+    </div>
+  </div>
+
+  <!-- Promoção -->
+  <div id="promo" class="hidden" data-color="w">
+    <div class="promo-box">
+      <p>Promover para:</p>
+      <div class="promo-row">
+        <button data-piece="q" title="Dama">♕</button>
+        <button data-piece="r" title="Torre">♖</button>
+        <button data-piece="b" title="Bispo">♗</button>
+        <button data-piece="n" title="Cavalo">♘</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Telas -->
+  <div id="screens">
+    <section class="screen" data-screen="loading">
+      <div class="card">
+        <h1>Xadrez em Primeira Pessoa</h1>
+        <p id="loading-text">Carregando motor…</p>
+        <div class="spinner"></div>
+      </div>
+    </section>
+
+    <section class="screen hidden" data-screen="title">
+      <div class="card">
+        <p class="kicker">Quanta Aulas apresenta</p>
+        <h1>Xadrez em Primeira Pessoa</h1>
+        <p class="lead">Toque numa peça e veja o tabuleiro pelos olhos dela.</p>
+        <div class="stack">
+          <button id="btn-play-cpu" class="btn primary">▶ Jogar contra o computador</button>
+          <button id="btn-play-2p" class="btn">👥 Dois jogadores</button>
+          <button id="btn-howto" class="btn ghost">📖 Como jogar</button>
+        </div>
+        <p class="small"><a href="/">← quantaaulas.com</a></p>
+      </div>
+    </section>
+
+    <section class="screen hidden" data-screen="setup">
+      <div class="card">
+        <h2 id="setup-title">Contra o computador</h2>
+        <div id="setup-cpu-only">
+          <p class="label">Dificuldade</p>
+          <div id="setup-levels" class="chips"></div>
+          <p class="label">Suas peças</p>
+          <div class="chips">
+            <button class="chip" data-color="w">♙ Brancas</button>
+            <button class="chip" data-color="b">♟ Pretas</button>
+            <button class="chip" data-color="random">🎲 Aleatório</button>
+          </div>
+        </div>
+        <div id="setup-2p-only" class="hidden">
+          <label class="check"><input type="checkbox" id="setup-rotate" checked /> Girar a câmera para quem joga</label>
+        </div>
+        <div class="stack row">
+          <button id="btn-setup-back" class="btn ghost">Voltar</button>
+          <button id="btn-setup-start" class="btn primary">Começar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen hidden" data-screen="howto">
+      <div class="card">
+        <h2>Como jogar</h2>
+        <ul class="howto">
+          <li><b>Toque numa peça sua.</b> A câmera desce até os olhos dela e as casas possíveis aparecem em azul (vermelho = captura).</li>
+          <li><b>Toque na casa de destino</b> para mover. Nas capturas você assiste ao duelo em primeira pessoa.</li>
+          <li><b>Arraste</b> para olhar em volta. <b>Esc</b> ou o botão “Vista de cima” volta ao alto.</li>
+          <li>O painel mostra a <b>vantagem</b> ao longo da partida, os <b>melhores lances</b> e o <b>histórico</b>.</li>
+          <li>Roque: mova o rei duas casas. Promoção: escolha a peça no painel.</li>
+        </ul>
+        <button id="btn-howto-back" class="btn primary">Entendi</button>
+      </div>
+    </section>
+
+    <section class="screen hidden" data-screen="pause">
+      <div class="card">
+        <h2>Pausa</h2>
+        <div class="stack">
+          <button id="btn-pause-resume" class="btn primary">Continuar</button>
+          <button id="btn-pause-restart" class="btn">Reiniciar partida</button>
+          <button id="btn-pause-quit" class="btn ghost">Sair para o menu</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen hidden" data-screen="gameover">
+      <div class="card">
+        <h2 id="over-title">Fim de jogo</h2>
+        <p id="over-detail" class="lead"></p>
+        <div class="stack">
+          <button id="btn-over-again" class="btn primary">Jogar de novo</button>
+          <button id="btn-over-menu" class="btn ghost">Menu</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

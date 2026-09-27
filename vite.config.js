@@ -122,6 +122,7 @@ export default defineConfig({
         aventurailhavoadora: resolve(__dirname, 'aventurailhavoadora/index.html'),
         corrida: resolve(__dirname, 'corrida/index.html'),
         corridacientistas: resolve(__dirname, 'corridacientistas/index.html'),
+        xadrez: resolve(__dirname, 'xadrez/index.html'),
         ...professoresInputs(),
       },
     },
