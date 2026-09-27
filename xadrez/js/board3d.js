@@ -28,7 +28,7 @@ export function buildBoard(scene, quality) {
   };
 
   // ---------- Materiais ----------
-  const matSquare = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0.02 });
+  const matSquare = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0.0 });
   const matFrame = new THREE.MeshStandardMaterial({ color: COLORS.frame, roughness: 0.6 });
   const matGrass = new THREE.MeshLambertMaterial({ color: COLORS.grass });
   const matWall = new THREE.MeshStandardMaterial({ color: COLORS.wall, roughness: 0.9 });
@@ -96,6 +96,7 @@ export function buildBoard(scene, quality) {
     scene.add(m);
   }
   const labels = addCoordinates(scene, FW);
+  addBranding(scene, FW);
   board.setLabelSide = (side) => { for (const m of labels) m.rotation.y = side === 'b' ? Math.PI : 0; };
 
   // ---------- Realces ----------
@@ -334,4 +335,125 @@ function addCoordinates(scene, FW) {
     }
   }
   return labels;
+}
+
+// ---------- Marca Quanta: logo no centro, letreiro no piso e placas de estádio ----------
+const LOGO_URL = new URL('../assets/logo-quanta.png', import.meta.url).href;
+let _logoImg = null;
+function withLogo(cb) {
+  if (!_logoImg) {
+    _logoImg = new Image();
+    _logoImg.decoding = 'async';
+    _logoImg.src = LOGO_URL;
+  }
+  if (_logoImg.complete && _logoImg.naturalWidth) cb(_logoImg);
+  else _logoImg.addEventListener('load', () => cb(_logoImg), { once: true });
+}
+
+function canvasTex(c) {
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+function addBranding(scene, FW) {
+  // 1) Logo grande, em marca d'água, sobre as quatro casas centrais.
+  const lc = document.createElement('canvas');
+  lc.width = lc.height = 512;
+  const ltex = canvasTex(lc);
+  const logoMat = new THREE.MeshBasicMaterial({
+    map: ltex, transparent: true, opacity: 0.22, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+  });
+  const logoGeo = new THREE.PlaneGeometry(SQUARE * 2.3, SQUARE * 2.3);
+  logoGeo.rotateX(-Math.PI / 2);
+  const logo = new THREE.Mesh(logoGeo, logoMat);
+  logo.position.y = 0.004;
+  logo.renderOrder = 1;
+  logo.raycast = () => {};
+  scene.add(logo);
+  withLogo((img) => {
+    const ctx = lc.getContext('2d');
+    const k = Math.min(512 / img.naturalWidth, 512 / img.naturalHeight);
+    const w = img.naturalWidth * k, h = img.naturalHeight * k;
+    ctx.drawImage(img, (512 - w) / 2, (512 - h) / 2, w, h);
+    ltex.needsUpdate = true;
+  });
+
+  // 2) Letreiro no piso de pedra, nos quatro lados, logo depois da moldura.
+  const sc = document.createElement('canvas');
+  sc.width = 2048; sc.height = 128;
+  const sctx = sc.getContext('2d');
+  sctx.fillStyle = '#' + new THREE.Color(COLORS.brand).getHexString();
+  sctx.fillRect(0, 0, 2048, 128);
+  sctx.fillStyle = COLORS.brandText;
+  sctx.font = '700 64px Fredoka, Inter, system-ui, sans-serif';
+  sctx.textAlign = 'center';
+  sctx.textBaseline = 'middle';
+  const slogan = 'QUANTA AULAS   \u2022   quantaaulas.com   \u2022   QUANTA AULAS';
+  sctx.fillText(slogan, 1024, 68);
+  const stex = canvasTex(sc);
+  const stripLen = BOARD_HALF * 2 + FW * 2;
+  const stripGeo = new THREE.PlaneGeometry(stripLen, stripLen / 16);
+  stripGeo.rotateX(-Math.PI / 2);
+  const stripMat = new THREE.MeshStandardMaterial({ map: stex, roughness: 0.8 });
+  const d = BOARD_HALF + FW + 0.25 + stripLen / 32;
+  for (const [x, z, ry] of [[0, d, 0], [0, -d, Math.PI], [d, 0, Math.PI / 2], [-d, 0, -Math.PI / 2]]) {
+    const m = new THREE.Mesh(stripGeo, stripMat);
+    m.position.set(x, 0.005, z);
+    m.rotation.y = ry;
+    m.receiveShadow = true;
+    m.raycast = () => {};
+    scene.add(m);
+  }
+
+  // 3) Placas de estádio nas laterais e nos fundos (fora do caminho das câmeras, que ficam em z = ±12).
+  const pc = document.createElement('canvas');
+  pc.width = 1024; pc.height = 256;
+  const ptex = canvasTex(pc);
+  const drawPanel = (img) => {
+    const ctx = pc.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, '#1f5230'); g.addColorStop(1, '#0f2a18');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1024, 256);
+    ctx.fillStyle = COLORS.brandAccent; ctx.fillRect(0, 0, 1024, 10); ctx.fillRect(0, 246, 1024, 10);
+    let x0 = 40;
+    if (img) {
+      const k = 200 / img.naturalHeight;
+      ctx.drawImage(img, 40, 28, img.naturalWidth * k, 200);
+      x0 = 60 + img.naturalWidth * k;
+    }
+    ctx.fillStyle = COLORS.brandText;
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 92px Fredoka, Inter, system-ui, sans-serif';
+    ctx.fillText('QUANTA AULAS', x0, 104);
+    ctx.fillStyle = COLORS.brandAccent;
+    ctx.font = '600 50px Inter, system-ui, sans-serif';
+    ctx.fillText('quantaaulas.com', x0, 186);
+    ptex.needsUpdate = true;
+  };
+  drawPanel(null);
+  withLogo(drawPanel);
+  const PW = 6, PH = 1.5;
+  const faceGeo = new THREE.PlaneGeometry(PW, PH);
+  const backGeo = new THREE.BoxGeometry(PW + 0.12, PH + 0.12, 0.12);
+  const faceMat = new THREE.MeshStandardMaterial({ map: ptex, roughness: 0.5, emissive: 0xffffff, emissiveMap: ptex, emissiveIntensity: 0.35 });
+  const backMat = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.7 });
+  const R = BOARD_HALF + 7.5; // 15,5 m
+  const spots = [];
+  for (const z of [-7, 0, 7]) { spots.push([R, z, -Math.PI / 2]); spots.push([-R, z, Math.PI / 2]); }
+  for (const x of [-7, 7]) { spots.push([x, R + 3, Math.PI]); spots.push([x, -R - 3, 0]); }
+  for (const [x, z, ry] of spots) {
+    const g = new THREE.Group();
+    const back = new THREE.Mesh(backGeo, backMat);
+    back.position.z = -0.07;
+    back.castShadow = true;
+    const face = new THREE.Mesh(faceGeo, faceMat);
+    g.add(back, face);
+    g.position.set(x, PH / 2 + 0.15, z);
+    g.rotation.y = ry;
+    g.traverse((o) => { o.raycast = () => {}; });
+    scene.add(g);
+  }
 }

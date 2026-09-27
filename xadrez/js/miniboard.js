@@ -6,9 +6,9 @@ const GLYPH = { w: { 1: '♙', 2: '♘', 3: '♗', 4: '♖', 5: '♕', 6: '♔' 
   b: { 1: '♟', 2: '♞', 3: '♝', 4: '♜', 5: '♛', 6: '♚' } };
 const TEXT = '︎'; // apresentação de texto (evita emoji)
 const C = {
-  light: '#e9dfc9', dark: '#8b7355', selected: 'rgba(255, 213, 74, 0.75)', target: 'rgba(100, 200, 255, 0.95)',
-  capture: 'rgba(255, 107, 90, 0.95)', last: 'rgba(185, 227, 122, 0.55)', check: 'rgba(255, 59, 59, 0.7)',
-  white: '#f7f2e8', whiteEdge: '#2a2624', black: '#1e1a18', blackEdge: '#d9d0c0', coord: 'rgba(0,0,0,0.45)',
+  light: '#a9d18e', dark: '#2f6b3a', selected: 'rgba(255, 213, 74, 0.75)', target: 'rgba(100, 200, 255, 0.95)',
+  capture: 'rgba(255, 107, 90, 0.95)', last: 'rgba(255, 241, 176, 0.6)', check: 'rgba(255, 59, 59, 0.7)',
+  white: '#f7f2e8', whiteEdge: '#2a2624', black: '#1e1a18', blackEdge: '#d9d0c0', coord: 'rgba(255,255,255,0.7)',
 };
 
 export class MiniBoard {
