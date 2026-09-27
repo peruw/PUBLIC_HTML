@@ -1,6 +1,6 @@
 // IA dos adversários: segue a linha de corrida (perseguição pura), faz drift nas
-// curvas longas, desvia de perigos e de karts, usa itens com tática e aplica um
-// rubber-band leve via kart.speedFactor.
+// curvas longas, desvia de perigos e de karts, usa itens com tática, erra de forma
+// visível conforme a habilidade e aplica um rubber-band leve via kart.speedFactor.
 import { TUNING } from './kart.js';
 
 const TWO_PI = Math.PI * 2;
@@ -297,7 +297,7 @@ export class AIDriver {
       this._errWideT = rand(0.8, 1.2);
       this._errWideDir = dir;
       // m além da borda do asfalto: às vezes só chega perto, às vezes pisa na zebra/grama
-      this._errWideAmt = rand(-1.5, 2.5);
+      this._errWideAmt = rand(-0.8, 3);
       this._driftCd = Math.max(this._driftCd, this._errWideT);
     }
     this._errHoldArmed = Math.random() < 0.3 * m;
@@ -547,16 +547,16 @@ export class AIDriver {
       // ritmo base da classe (aiSpeed) × variação por habilidade
       target = (cc.aiSpeed ?? 1) * (0.93 + 0.07 * sk);
       if (!p.finished) {
+        // últimos ~300 m do jogador: sem elástico nenhum (ultrapassagem no fim só por item ou erro)
+        const L = world.track?.length || this.track.length;
+        const laps = world.totalLaps || 1;
+        const left = laps * L - (typeof p.progress === 'number' ? p.progress : pd);
+        const fade = p.lap >= laps ? clamp((left - 250) / 100, 0, 1) : 1;
         if (gap > 0) {
-          // últimos ~300 m do jogador: sem elástico (ultrapassagem no fim só por item ou erro)
-          const L = world.track?.length || this.track.length;
-          const laps = world.totalLaps || 1;
-          const left = laps * L - (typeof p.progress === 'number' ? p.progress : pd);
-          const fade = p.lap >= laps ? clamp((left - 250) / 100, 0, 1) : 1;
           target *= 1 + (cc.aiCatchUp ?? 0.1) * clamp((gap - 15) / 120, 0, 1) * (0.5 + 0.5 * sk) * fade;
         } else {
           // à frente do jogador: tira o pé (satura em ~80 m), para quem rodou rever o pelotão logo
-          target *= 1 - (cc.aiLeadBrake ?? 0.07) * clamp((-gap - 10) / 70, 0, 1) * (1.25 - 0.5 * sk);
+          target *= 1 - (cc.aiLeadBrake ?? 0.07) * clamp((-gap - 10) / 70, 0, 1) * (1.25 - 0.5 * sk) * fade;
         }
       }
       // teto por classe: a IA pode colar no jogador, mas não ultrapassa só no ritmo do motor

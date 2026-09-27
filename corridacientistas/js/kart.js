@@ -8,13 +8,13 @@ import { statFactor } from './config.js';
 export const TUNING = {
   // velocidade (m/s) em 100cc com atributo 3; ±por ponto de atributo
   topSpeed: 24,
-  topSpeedPerStat: 0.1, // velocidade 5 × 1 = só 1,7%: o atributo não decide a corrida sozinho
+  topSpeedPerStat: 0.08, // velocidade 5 × 1 = só 1,3%: o atributo não decide a corrida sozinho
   // aceleração: a = accel0 * (1 - (v/vmax)²) + accelFloor → ~3 s até a máxima (atributo 3)
   accel0: 16.5,
   accelPerFactor: 0.45, // ±45% com atributo 5/1
-  weightAccelPenalty: 0.07, // peso alto acelera um pouco mais devagar
+  weightAccelPenalty: 0.04, // peso alto acelera um pouco mais devagar (0,07 tornava o peso só desvantagem)
   accelFloor: 0.7,
-  accelFloorPerFactor: 0.9, // perto da máxima, aceleração 5 recupera o embalo bem mais rápido (0,07–1,33 m/s²)
+  accelFloorPerFactor: 0.95, // perto da máxima, aceleração 5 recupera o embalo bem mais rápido (0,04–1,37 m/s²)
   recoverPerFactor: 0.15, // aceleração 5/1: rodada e capotagem ~15% mais curtas/longas
   brakeDecel: 34,
   coastDecel: 4.5,
