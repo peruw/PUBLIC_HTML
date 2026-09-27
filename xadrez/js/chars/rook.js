@@ -148,13 +148,16 @@ export function buildRook(color) {
   attachShield(char, shield);
 
   // ---------- Martelo de guerra de duas mãos (ao longo de +Y, punho na origem) ----------
+  // A mão segura o cabo perto do ponto de equilíbrio (pega natural de um martelo pesado): 0.46 m de cabo abaixo
+  // da mão, cabeça a 0.66 m acima dela. Assim a cabeça fica à altura do peito no repouso e assoma no canto
+  // inferior da visão em primeira pessoa sem tapar a cena.
   const hammer = new THREE.Group();
-  hammer.add(mesh(G.cyl(0.028, 0.032, 1.16, 8), M.wood, { y: 0.44 }));      // haste (-0.14 .. 1.02)
+  hammer.add(mesh(G.cyl(0.028, 0.032, 1.16, 8), M.wood, { y: 0.12 }));      // haste (-0.46 .. 0.70)
   hammer.add(mesh(G.cyl(0.038, 0.04, 0.32, 8), M.leather, { y: 0.0 }));     // empunhadura de couro
-  hammer.add(mesh(G.cyl(0.05, 0.046, 0.12, 8), M.metal, { y: 0.96 }));      // colar
-  hammer.add(mesh(G.box(0.16, 0.22, 0.42), MAT_IRON, { y: 1.09 }));         // cabeça de ferro (face em +Z)
-  hammer.add(mesh(G.cone(0.05, 0.18, 6), M.blade, { y: 1.09, z: -0.30, rx: -Math.PI / 2 })); // espigão traseiro
-  attachWeapon(char, hammer, 'hammer', 1.2);
+  hammer.add(mesh(G.cyl(0.05, 0.046, 0.12, 8), M.metal, { y: 0.55 }));      // colar
+  hammer.add(mesh(G.box(0.16, 0.22, 0.42), MAT_IRON, { y: 0.66 }));         // cabeça de ferro (face em +Z)
+  hammer.add(mesh(G.cone(0.05, 0.18, 6), M.blade, { y: 0.66, z: -0.30, rx: -Math.PI / 2 })); // espigão traseiro
+  attachWeapon(char, hammer, 'hammer', 0.78); // ponta = topo da cabeça
 
   // ---------- Pose de repouso (sentinela) ----------
   J.shoulderR.rotation.set(-0.16, 0, 0.28);  // braços abertos: a haste passa fora da ombreira
@@ -163,8 +166,8 @@ export function buildRook(color) {
   J.elbowL.rotation.x = -0.42;
   char.group.updateMatrixWorld(true);
   level(J.weapon); // martelo em pé ...
-  J.weapon.rotateX(-0.32); // ... levemente inclinado à frente (cabeça entra no campo de visão em 1ª pessoa)
-  J.weapon.rotateZ(-0.06); // ... e um pouco para fora, afastando a haste da ombreira
+  J.weapon.rotateX(0.30);  // ... levemente inclinado à frente (+Y da arma vai para +Z): a cabeça assoma no canto da visão em 1ª pessoa
+  J.weapon.rotateZ(-0.03); // ... e um pouco para fora, afastando a haste da ombreira
   level(J.shield); // escudo vertical olhando +Z
 
   char.height = 1.95; // altura real com o elmo ameado (sem a arma)
