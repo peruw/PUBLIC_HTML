@@ -2,7 +2,7 @@
 // Cada kart é mesclado em poucas malhas com cor por vértice (poucos draw calls).
 // As partes animadas (rodas, volante, tronco, cabeça, braços, acessórios) ficam separadas.
 import * as THREE from './three.js';
-import { CHARACTERS, CHARACTER_BY_ID } from './config.js';
+import { CHARACTERS, CHARACTER_BY_ID, statFactor } from './config.js';
 
 const TAU = Math.PI * 2;
 const HR = 0.3; // raio da cabeça (m)
@@ -220,8 +220,12 @@ function shared() {
   g.fillRect(0, 0, 64, 64);
   const glow = new THREE.CanvasTexture(gc);
   glow.colorSpace = THREE.SRGBColorSpace;
+  // Qualidade baixa: Lambert com a mesma cor por vértice e o mesmo atlas. Sem a rampa toon a
+  // leitura é a mesma, e o programa de shader é o mesmo do cenário (menos programas a compilar).
+  const matLo = new THREE.MeshLambertMaterial({ vertexColors: true, map: atlas });
+  matLo.name = 'kart-lambert';
   // matInst: cópia para o InstancedMesh das rodas (evita trocar de programa a cada kart)
-  SH = { grad, atlas, mat, matInst: mat.clone(), glow, geo: new Map(), models: new Map() };
+  SH = { grad, atlas, mat, matInst: mat.clone(), matLo, matLoInst: matLo.clone(), glow, geo: new Map(), models: new Map() };
   return SH;
 }
 
@@ -325,13 +329,21 @@ const _q = new THREE.Quaternion(), _eu = new THREE.Euler(), _p = new THREE.Vecto
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _col = new THREE.Color(), _oc = new THREE.Color();
 const OUTLINE_K = 0.16;
 
+// Níveis de detalhe: 1 = alta, 0 = baixa, -1 = distância média (LOD), -2 = longe (LOD).
+// Os níveis negativos só existem mesclados e estáticos, sem contornos.
+const DENS = { 1: 1, 0: 0.72, [-1]: 0.5, [-2]: 0.36 };
+const MIN_PART = { 1: 0, 0: 0, [-1]: 0.02, [-2]: 0.04 }; // peças menores (m) somem a essa distância
+
+const byDetail = (d, hi, lo, mid = lo, far = mid) => (d > 0 ? hi : d === 0 ? lo : d === -1 ? mid : far);
+
 class Builder {
   constructor({ detail = 1, outline = true, ol = 0.012, olMin = 0 } = {}) {
     this.detail = detail;
-    this.outline = outline;
+    this.outline = outline && detail >= 0;
     this.ol = ol;
     this.olMin = olMin; // peças menores que isso (m) ficam sem contorno
-    this.dens = detail > 0 ? 1 : 0.72; // densidade de tufos (cabelo/barba)
+    this.dens = DENS[detail] ?? 1; // densidade de tufos (cabelo/barba)
+    this.minPart = MIN_PART[detail] ?? 0;
     this.P = []; this.N = []; this.C = []; this.U = []; this.I = [];
     this.IO = []; // triângulos dos contornos (ficam no fim do índice)
     this.n = 0;
@@ -341,8 +353,18 @@ class Builder {
     this.base.compose(_p.set(x, y, z), _q.setFromEuler(_eu.set(rx, ry, rz)), _sc.set(s, s, s));
     return this;
   }
+  // Valor por nível de detalhe: alta, baixa, média distância, longe
+  lv(hi, lo, mid = lo, far = mid) { return byDetail(this.detail, hi, lo, mid, far); }
   seg(r) {
-    const hi = this.detail > 0;
+    const d = this.detail;
+    if (d < 0) {
+      const far = d < -1;
+      if (r > 0.2) return far ? [8, 5] : [10, 7];
+      if (r > 0.1) return far ? [6, 4] : [8, 5];
+      if (r > 0.045) return far ? [5, 3] : [6, 4];
+      return far ? [4, 3] : [5, 3];
+    }
+    const hi = d > 0;
     if (r > 0.2) return hi ? [20, 14] : [14, 10];
     if (r > 0.1) return hi ? [12, 9] : [10, 7];
     if (r > 0.045) return hi ? [10, 7] : [8, 6];
@@ -356,16 +378,18 @@ class Builder {
     else if (rot) _q.setFromEuler(_eu.set(rot[0], rot[1], rot[2], rot[3] || 'XYZ'));
     else _q.identity();
     _p.set(pos[0], pos[1], pos[2]);
+    const bb = geo.boundingBox;
+    const hx = Math.max(-bb.min.x, bb.max.x) * Math.abs(_sc.x);
+    const hy = Math.max(-bb.min.y, bb.max.y) * Math.abs(_sc.y);
+    const hz = Math.max(-bb.min.z, bb.max.z) * Math.abs(_sc.z);
+    // LOD: detalhes pequenos (brilho do olho, botões...) nem aparecem de longe
+    if (this.minPart > 0 && !opt.keep && Math.max(hx, hy, hz) < this.minPart) return this;
     _mA.compose(_p, _q, _sc);
     _mB.multiplyMatrices(this.base, _mA);
     _col.set(color);
     this._append(geo, _mB, _col, false, opt.uv);
     const t = opt.ol ?? this.ol;
     if (this.outline && t > 0) {
-      const bb = geo.boundingBox;
-      const hx = Math.max(-bb.min.x, bb.max.x) * Math.abs(_sc.x);
-      const hy = Math.max(-bb.min.y, bb.max.y) * Math.abs(_sc.y);
-      const hz = Math.max(-bb.min.z, bb.max.z) * Math.abs(_sc.z);
       if (Math.max(hx, hy, hz) < this.olMin) return this;
       _sc2.set(_sc.x * (hx > 1e-4 ? 1 + t / hx : 1), _sc.y * (hy > 1e-4 ? 1 + t / hy : 1), _sc.z * (hz > 1e-4 ? 1 + t / hz : 1));
       _mA.compose(_p, _q, _sc2);
@@ -404,7 +428,8 @@ class Builder {
   // ---- atalhos ----
   ell(color, pos, scl, rot = null, opt) {
     const r = typeof scl === 'number' ? scl : Math.max(scl[0], scl[1], scl[2]);
-    const [w, h] = opt?.seg || this.seg(r);
+    // nos níveis de LOD o número de segmentos vem sempre do tamanho
+    const [w, h] = (this.detail >= 0 && opt?.seg) || this.seg(r);
     return this.add(sphereG(w, h), color, pos, rot, scl, opt);
   }
   // Tufo (icosfera): cabelo, barba, cachos
@@ -414,7 +439,8 @@ class Builder {
   }
   box(color, pos, size, rad = 0.03, rot = null, opt) {
     const lo = this.detail === 0;
-    const k = rad < (lo ? 0.05 : 0.012) ? 0 : rad < 0.06 || lo ? 1 : 2;
+    // LOD médio: só as caixas bem arredondadas mantêm a curva; longe, todas viram caixas
+    const k = this.detail < -1 ? 0 : this.detail < 0 ? (rad < 0.06 ? 0 : 1) : rad < (lo ? 0.05 : 0.012) ? 0 : rad < 0.06 || lo ? 1 : 2;
     return this.add(rboxG(size[0], size[1], size[2], k ? rad : 0, k), color, pos, rot, 1, opt);
   }
   // Cilindro de a (raio r0) até b (raio r1)
@@ -424,7 +450,7 @@ class Builder {
     const len = _v2.length();
     _v2.divideScalar(len || 1);
     const q = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, _v2);
-    const s = seg || (this.detail > 0 ? (r0 > 0.06 ? 16 : 10) : (r0 > 0.06 ? 10 : 7));
+    const s = (this.detail >= 0 && seg) || (r0 > 0.06 ? this.lv(16, 10, 8, 6) : this.lv(10, 7, 5, 4));
     const top = Math.round((r1 / r0) * 100) / 100;
     return this.add(cylG(top, s, opt?.open), color, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], q, [r0, len, r0], opt);
   }
@@ -436,16 +462,15 @@ class Builder {
     _v2.divideScalar(len || 1);
     const q = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, _v2);
     const ratio = Math.max(0.1, Math.round((len / r) * 5) / 5);
-    const geo = capsG(ratio, this.detail > 0 ? 3 : 2, this.detail > 0 ? 9 : 7);
+    const geo = capsG(ratio, this.lv(3, 2, 1), this.lv(9, 7, 6, 5));
     return this.add(geo, color, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], q, r, opt);
   }
   torus(color, pos, rot, R, tube, arc = TAU, opt) {
     const tr = Math.round((tube / R) * 100) / 100;
-    const hi = this.detail > 0;
-    return this.add(torusG(tr, hi ? 8 : 6, hi ? 20 : 12, arc), color, pos, rot, R, opt);
+    return this.add(torusG(tr, this.lv(8, 6, 4, 3), this.lv(20, 12, 8, 6), arc), color, pos, rot, R, opt);
   }
   decal(uv, pos, rot, w, h = w, round = false) {
-    return this.add(round ? circleG(this.detail > 0 ? 28 : 18) : planeG(), 0xffffff, pos, rot, [w, h, 1], { uv, ol: 0 });
+    return this.add(round ? circleG(this.lv(28, 18, 10, 8)) : planeG(), 0xffffff, pos, rot, [w, h, 1], { uv, ol: 0 });
   }
   build() {
     const g = new THREE.BufferGeometry();
@@ -479,7 +504,7 @@ const alongZ = (x, y, z) => new THREE.Quaternion().setFromUnitVectors(Z_AXIS, _d
 
 // Calota de cabelo: esfera parcial inclinada para trás.
 function hairCap(b, color, theta, tilt, scale = 1.07, dy = 0, dz = 0) {
-  const [w, h] = b.detail > 0 ? [22, 14] : [16, 10];
+  const [w, h] = b.lv([22, 14], [16, 10], [11, 6], [8, 5]);
   b.add(capG(w, h, theta), color, [0, dy, dz], [-tilt, 0, 0], typeof scale === 'number' ? HR * scale : scale.map((s) => s * HR));
 }
 
@@ -515,7 +540,7 @@ function face(b, L, o = {}) {
     b.add(smileG(0.2), o.lip ?? 0x9b2c3a, hp(0, mp + 0.04, -0.004), hr(0, mp + 0.04), [0.058, 0.058, 0.06], { ol: 0 });
   } else if (o.mouth !== 'none') {
     const mw = o.mouthW ?? 0.085;
-    b.add(mouthG(b.detail > 0 ? 14 : 10), 0x6b1f2a, hp(0, mp, -0.01), hr(0, mp), [mw, mw * 0.7, 0.036], { ol: 0.007 });
+    b.add(mouthG(b.lv(14, 10, 6)), 0x6b1f2a, hp(0, mp, -0.01), hr(0, mp), [mw, mw * 0.7, 0.036], { ol: 0.007 });
     b.box(0xffffff, hp(0, mp - 0.03, 0.003), [mw * 1.55, 0.018, 0.02], 0.006, hr(0, mp - 0.03), { ol: 0 });
     b.ell(0xe86a7a, hp(0, mp - 0.13, 0.0), [mw * 0.5, 0.02, 0.02], hr(0, mp - 0.13), { ol: 0, seg: [8, 5] });
   }
@@ -670,7 +695,7 @@ const HEADS = {
     b.ell(CAP, [0, 0.17, -0.03], [0.325, 0.16, 0.33], [-0.18, 0, 0]);
     b.ell(CAP, [0, 0.25, -0.05], [0.26, 0.11, 0.26], [-0.18, 0, 0], { ol: 0 });
     // barba pontuda: casca lisa na mandíbula + ponta
-    const [cw, ch] = b.detail > 0 ? [22, 8] : [14, 5];
+    const [cw, ch] = b.lv([22, 8], [14, 5], [10, 4], [8, 3]);
     b.add(jawShellG(-0.5, -0.02, -1.3, cw, ch), HB, [0, 0, 0], null, [HR * 1.06, HR * 1.05, HR * 1.1], { ol: 0.01 });
     b.cone(HB, [0, -0.24, 0.2], [0, -0.48, 0.28], 0.105, 8, { ol: 0.01 });
     b.blob(HG, [0.04, -0.32, 0.25], [0.022, 0.06, 0.02], [0.3, 0, 0.25], { ol: 0 });
@@ -735,7 +760,7 @@ const HEADS = {
 const TORSO_PROFILE = [[0, 0], [0.19, 0.01], [0.245, 0.1], [0.25, 0.26], [0.225, 0.4], [0.16, 0.5], [0.08, 0.545], [0, 0.55]];
 function torsoBase(b, L, C, o = {}) {
   const w = 0.9 + C.stats.weight * 0.05;
-  b.add(latheG('torso', TORSO_PROFILE, b.detail > 0 ? 18 : 12), o.color ?? L.outfit, [0, 0, 0], null, [w, 1, 0.82 * w]);
+  b.add(latheG('torso', TORSO_PROFILE, b.lv(18, 12, 8, 6)), o.color ?? L.outfit, [0, 0, 0], null, [w, 1, 0.82 * w]);
   // ombros
   for (const s of [1, -1]) b.blob(o.color ?? L.outfit, [s * 0.19 * w, 0.43, 0], [0.1, 0.09, 0.1]);
   // pescoço
@@ -820,22 +845,49 @@ const HAND_A = 0.9; // ângulo das mãos no aro (a partir do topo)
 const ARM_LEN = 0.46;
 const DARK = 0x2a2d34, METAL = 0x5d636e, CHROME = 0xc9ced6, SEAT = 0x26282e;
 
-function kartBody(b, C, num) {
+// Proporções do kart pelos atributos (statFactor: -1 a +1; 3 = kart padrão).
+// Peso: pontões, traseira e rodas maiores (chassi sobe junto); velocidade: bico mais longo e baixo;
+// peso 4 ou 5: motor e escapamentos maiores. Calculado uma vez por personagem.
+function kartDims(C) {
+  const st = C.stats || {};
+  const w = statFactor(st.weight ?? 3), sp = statFactor(st.speed ?? 3);
+  const wide = 1 + 0.12 * w;
+  const rr = RR * (1 + 0.15 * w), rf = RF * (1 + 0.15 * w);
+  const podW = 0.22 * wide;
+  const noseL = 0.66 * (1 + 0.14 * sp), noseH = 0.26 * (1 - 0.12 * sp);
+  const eng = (st.weight ?? 3) >= 4 ? 1 + 0.12 * ((st.weight ?? 3) - 3) : 1;
+  return {
+    rr, rf,
+    wx: WX * (1 + 0.04 * w), // bitola acompanha os pontões
+    wheelShift: rr - RR, // decalques do pontão fogem da roda traseira quando ela cresce
+    lift: (rr - RR) * 0.5, // rodas maiores levantam o chassi (e o piloto)
+    podW, podX: 0.33 + podW / 2, podOut: 0.33 + podW + 0.003, // borda interna fixa; decalques na face externa
+    rearW: 0.84 * wide,
+    noseL, noseH, noseZ: 0.58 + (noseL - 0.66) / 2, noseY: 0.18 + noseH / 2, noseTilt: 0.07 + 0.04 * sp,
+    noseFront: 0.91 + (noseL - 0.66),
+    eng,
+    exhaustTip: -0.95 - 0.14 * (eng - 1),
+  };
+}
+
+function kartBody(b, C, num, D) {
   const K = C.colors.kart, A = C.colors.kartAccent;
   const numUV = cellUV(num - 1, 1);
   // assoalho
   b.box(DARK, [0, 0.19, -0.05], [0.84, 0.12, 1.5], 0.05, null, { ol: 0 });
-  // bico arredondado
-  b.box(K, [0, 0.31, 0.58], [0.92, 0.26, 0.66], 0.12, [0.07, 0, 0]);
-  b.box(A, [0, 0.445, 0.56], [0.16, 0.02, 0.56], 0.01, [0.07, 0, 0], { ol: 0 });
+  // bico arredondado (topo inclinado: altura do topo em cada z)
+  const nTop = (z) => D.noseY + D.noseH / 2 - (z - D.noseZ) * Math.tan(D.noseTilt);
+  const dz = D.noseFront - 0.91, dy = (0.26 - D.noseH) / 2;
+  b.box(K, [0, D.noseY, D.noseZ], [0.92, D.noseH, D.noseL], 0.12, [D.noseTilt, 0, 0]);
+  b.box(A, [0, nTop(D.noseZ - 0.02) + 0.005, D.noseZ - 0.02], [0.16, 0.02, 0.56 * D.noseL / 0.66], 0.01, [D.noseTilt, 0, 0], { ol: 0 });
   // faróis
   for (const s of [1, -1]) {
-    b.ell(0xfff4c2, [s * 0.29, 0.33, 0.9], [0.065, 0.055, 0.03], null, { ol: 0.01 });
-    b.ell(0xffffff, [s * 0.27, 0.35, 0.92], 0.015, null, { ol: 0, seg: [6, 4] });
+    b.ell(0xfff4c2, [s * 0.29, 0.33 - dy, 0.9 + dz], [0.065, 0.055, 0.03], null, { ol: 0.01 });
+    b.ell(0xffffff, [s * 0.27, 0.35 - dy, 0.92 + dz], 0.015, null, { ol: 0, seg: [6, 4] });
   }
   // para-choques
-  b.limb(A, [-0.47, 0.2, 0.9], [0.47, 0.2, 0.9], 0.065);
-  b.limb(A, [-0.36, 0.19, -0.9], [0.36, 0.19, -0.9], 0.055);
+  b.limb(A, [-0.47, 0.2, 0.9 + dz], [0.47, 0.2, 0.9 + dz], 0.065);
+  b.limb(A, [-0.36 * D.rearW / 0.84, 0.19, -0.9], [0.36 * D.rearW / 0.84, 0.19, -0.9], 0.055);
   // painel (cockpit) e coluna de direção
   b.box(K, [0, 0.5, 0.42], [0.62, 0.2, 0.32], 0.08, [0.25, 0, 0]);
   b.box(A, [0, 0.56, 0.43], [0.64, 0.05, 0.2], 0.02, [0.25, 0, 0], { ol: 0.008 });
@@ -843,12 +895,12 @@ function kartBody(b, C, num) {
   // laterais (pontões)
   const numZ = C.id === 'einstein' ? 0.23 : 0.14;
   for (const s of [1, -1]) {
-    b.box(K, [s * 0.44, 0.33, -0.06], [0.22, 0.3, 0.86], 0.06);
-    b.box(A, [s * 0.44, 0.49, -0.06], [0.2, 0.04, 0.8], 0.02, null, { ol: 0.008 });
-    b.decal(numUV, [s * 0.553, 0.33, numZ], [0, s * Math.PI / 2, 0], 0.2, 0.2, true);
+    b.box(K, [s * D.podX, 0.33, -0.06], [D.podW, 0.3, 0.86], 0.06);
+    b.box(A, [s * D.podX, 0.49, -0.06], [D.podW - 0.02, 0.04, 0.8], 0.02, null, { ol: 0.008 });
+    b.decal(numUV, [s * D.podOut, 0.33, numZ], [0, s * Math.PI / 2, 0], 0.2, 0.2, true);
   }
   // traseira + banco
-  b.box(K, [0, 0.35, -0.62], [0.84, 0.28, 0.46], 0.1);
+  b.box(K, [0, 0.35, -0.62], [D.rearW, 0.28, 0.46], 0.1);
   b.box(SEAT, [0, 0.31, -0.33], [0.46, 0.09, 0.38], 0.04, null, { ol: 0 });
   b.box(SEAT, [0, 0.64, -0.53], [0.52, 0.52, 0.1], 0.05, [-0.2, 0, 0]);
   b.box(A, [0, 0.9, -0.58], [0.5, 0.06, 0.1], 0.03, [-0.2, 0, 0], { ol: 0.008 });
@@ -857,19 +909,21 @@ function kartBody(b, C, num) {
   if (C.id === 'einstein') b.decal(cellUV(1, 0, 4, 1), back, backR, 0.46, 0.115);
   else if (C.id === 'dumont') b.decal(cellUV(5, 0, 2, 1), back, backR, 0.34, 0.17);
   else b.decal(cellUV(EMBLEM[C.id] ?? 0, 2), back, backR, 0.23, 0.23, true);
-  b.decal(numUV, [0, 0.458, 0.62], [-Math.PI / 2 + 0.07, 0, 0], 0.2, 0.2, true);
-  // motor e escapamentos (pontas em (±0.3, 0.45, -0.95))
-  b.box(METAL, [0, 0.55, -0.76], [0.44, 0.2, 0.28], 0.05);
-  for (let i = 0; i < 3; i++) b.box(shade(METAL, 0.8), [0, 0.66, -0.68 - i * 0.08], [0.4, 0.03, 0.04], 0, null, { ol: 0 });
-  b.cyl(DARK, [0, 0.64, -0.74], [0, 0.72, -0.74], 0.07, 0.06);
+  b.decal(numUV, [0, nTop(D.noseZ + 0.04) + 0.018, D.noseZ + 0.04], [-Math.PI / 2 + D.noseTilt, 0, 0], 0.2, 0.2, true);
+  // motor e escapamentos (pontas em (±0.3, 0.45, D.exhaustTip)); pesados têm motor maior
+  const e = D.eng, eTop = 0.45 + 0.2 * e;
+  b.box(METAL, [0, 0.45 + 0.1 * e, -0.76], [0.44 * e, 0.2 * e, 0.28 * e], 0.05);
+  for (let i = 0; i < 3; i++) b.box(shade(METAL, 0.8), [0, eTop + 0.01, -0.76 + (0.08 - i * 0.08) * e], [0.4 * e, 0.03, 0.04], 0, null, { ol: 0 });
+  b.cyl(DARK, [0, eTop - 0.01, -0.74], [0, eTop + 0.07 * e, -0.74], 0.07 * e, 0.06 * e);
   for (const s of [1, -1]) {
-    b.cyl(CHROME, [s * 0.2, 0.47, -0.72], [s * 0.3, 0.45, -0.93], 0.045, 0.05);
-    b.cyl(shade(CHROME, 0.8), [s * 0.3, 0.45, -0.92], [s * 0.3, 0.45, -0.95], 0.062, 0.062);
-    b.ell(0x111111, [s * 0.3, 0.45, -0.953], [0.045, 0.045, 0.01], null, { ol: 0 });
+    const tip = D.exhaustTip;
+    b.cyl(CHROME, [s * 0.2 * e, 0.47, -0.72], [s * 0.3, 0.45, tip + 0.02], 0.045 * e, 0.05 * e);
+    b.cyl(shade(CHROME, 0.8), [s * 0.3, 0.45, tip + 0.03], [s * 0.3, 0.45, tip], 0.062 * e, 0.062 * e);
+    b.ell(0x111111, [s * 0.3, 0.45, tip - 0.003], [0.045 * e, 0.045 * e, 0.01], null, { ol: 0 });
   }
-  // eixos
-  b.cyl(DARK, [-WX, RF, ZF], [WX, RF, ZF], 0.035, 0.035, 8, { ol: 0 });
-  b.cyl(DARK, [-WX, RR, ZR], [WX, RR, ZR], 0.04, 0.04, 8, { ol: 0 });
+  // eixos (no centro das rodas; o chassi inteiro está levantado em D.lift)
+  b.cyl(DARK, [-D.wx, D.rf - D.lift, ZF], [D.wx, D.rf - D.lift, ZF], 0.035, 0.035, 8, { ol: 0 });
+  b.cyl(DARK, [-D.wx, D.rr - D.lift, ZR], [D.wx, D.rr - D.lift, ZR], 0.04, 0.04, 8, { ol: 0 });
 }
 
 // Pernas do piloto (fixas no kart)
@@ -886,10 +940,10 @@ function legs(b, id) {
 function wheelGeo(C, detail) {
   const b = new Builder({ detail, ol: 0.035 });
   const K = C.colors.kart, A = C.colors.kartAccent;
-  const hi = detail > 0;
-  b.add(torusG(0.52, hi ? 7 : 6, hi ? 16 : 12), 0x222226, [0, 0, 0], [0, Math.PI / 2, 0], 0.66);
-  b.cyl(A, [-0.34, 0, 0], [0.34, 0, 0], 0.5, 0.5, hi ? 14 : 10, { ol: 0 });
+  b.add(torusG(0.52, b.lv(7, 6, 5, 4), b.lv(16, 12, 10, 8)), 0x222226, [0, 0, 0], [0, Math.PI / 2, 0], 0.66);
+  b.cyl(A, [-0.34, 0, 0], [0.34, 0, 0], 0.5, 0.5, b.lv(14, 10, 8, 6), { ol: 0 });
   b.blob(K, [0.33, 0, 0], [0.12, 0.3, 0.3], null, { ol: 0.03 });
+  if (detail < 0) return b.build(); // de longe: sem raios nem sulcos
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * TAU;
     b.box(0xffffff, [0.36, Math.cos(a) * 0.36, Math.sin(a) * 0.36], [0.04, 0.2, 0.1], 0, [a, 0, 0], { ol: 0 });
@@ -905,7 +959,7 @@ function wheelGeo(C, detail) {
 // Volante com as mãos (gira em torno de Z local)
 function steeringGeo(C, L, detail) {
   const b = new Builder({ detail, ol: 0.01 });
-  b.add(torusG(0.15, detail > 0 ? 6 : 5, detail > 0 ? 18 : 12), 0x1e2026, [0, 0, 0], null, SW_R);
+  b.add(torusG(0.15, b.lv(6, 5, 4, 3), b.lv(18, 12, 8, 6)), 0x1e2026, [0, 0, 0], null, SW_R);
   b.cyl(C.colors.kartAccent, [0, 0, -0.03], [0, 0, 0.02], 0.05, 0.05);
   for (const a of [Math.PI / 2, -Math.PI / 2, Math.PI]) {
     b.box(0x1e2026, [Math.sin(a) * SW_R * 0.5, Math.cos(a) * SW_R * 0.5, 0], [0.025, SW_R, 0.02], 0.008, [0, 0, -a], { ol: 0 });
@@ -927,50 +981,50 @@ function armGeo(L, id, detail) {
 
 // ---- Acessórios de cada kart. ext: registra partes animadas ----
 const KART_EXTRAS = {
-  newton(b, C) {
+  newton(b, C, ext, D) {
     // maçã vermelha no painel
     const p = [0.2, 0.67, 0.43];
     b.ell(0xd62828, p, [0.085, 0.078, 0.085]);
     b.ell(0xff6b6b, [p[0] + 0.03, p[1] + 0.03, p[2] + 0.05], 0.022, null, { ol: 0 });
     b.cyl(0x5b3a29, [p[0], p[1] + 0.06, p[2]], [p[0] + 0.01, p[1] + 0.11, p[2]], 0.01, 0.008, 5);
     b.ell(0x3a9d4e, [p[0] + 0.04, p[1] + 0.1, p[2]], [0.04, 0.012, 0.02], [0, 0, 0.5]);
-    emblemSides(b, C, cellUV(EMBLEM.newton, 2));
+    emblemSides(b, D, cellUV(EMBLEM.newton, 2));
   },
-  curie(b, C, ext) {
+  curie(b, C, ext, D) {
     // suporte do frasco (o líquido brilhante é uma malha separada)
-    const x = 0.32, y = 0.49, z = -0.64;
+    const x = Math.min(0.32, D.rearW / 2 - 0.07), y = 0.49, z = -0.64; // não sobra para fora da traseira estreita
     b.cyl(C.colors.kartAccent, [x, y - 0.02, z], [x, y + 0.03, z], 0.13, 0.13);
     b.cyl(0x8a5a3a, [x, y + 0.36, z], [x, y + 0.42, z], 0.045, 0.05);
     b.torus(0xd0e8ff, [x, y + 0.33, z], [Math.PI / 2, 0, 0], 0.05, 0.012, TAU, { ol: 0 });
     ext.vial = { pos: [x, y + 0.02, z] };
-    emblemSides(b, C, cellUV(EMBLEM.curie, 2));
+    emblemSides(b, D, cellUV(EMBLEM.curie, 2));
   },
-  mendeleev(b, C) {
+  mendeleev(b, C, ext, D) {
     // quadradinhos da tabela periódica
     const sides = [['H', 'He', 'C', 'O'], ['Na', 'Fe', 'Ga', 'Md']];
     for (const s of [1, -1]) {
       const syms = sides[s > 0 ? 0 : 1];
       for (let i = 0; i < 4; i++) {
-        const zz = -0.16 - (i % 2) * 0.13, yy = 0.39 - Math.floor(i / 2) * 0.13;
-        b.decal(tileUV(syms[i]), [s * 0.553, yy, zz], [0, s * Math.PI / 2, 0], 0.12, 0.12);
+        const zz = -0.16 + D.wheelShift - (i % 2) * 0.13, yy = 0.39 - Math.floor(i / 2) * 0.13;
+        b.decal(tileUV(syms[i]), [s * D.podOut, yy, zz], [0, s * Math.PI / 2, 0], 0.12, 0.12);
       }
     }
     const nose = ['Li', 'N', 'Ne', 'Mg', 'Cu', 'Ge'];
     for (let i = 0; i < 6; i++) {
       const s = i < 3 ? 1 : -1, k = i % 3;
-      b.decal(tileUV(nose[i]), [s * 0.462, 0.3, 0.42 + k * 0.13], [0, s * Math.PI / 2, 0], 0.11, 0.11);
+      b.decal(tileUV(nose[i]), [s * 0.462, D.noseY - 0.01, D.noseZ - 0.16 + k * 0.13], [0, s * Math.PI / 2, 0], 0.11, 0.11);
     }
     const back = [['Au', 0.34, 0.34], ['Ra', 0.11, 0.3], ['O', -0.11, 0.3], ['C', -0.34, 0.34]];
     for (const [sym, x, y] of back) b.decal(tileUV(sym), [x, y, -0.853], [0, Math.PI, 0], 0.11, 0.11);
     // placa "Md" no painel
     b.decal(cellUV(EMBLEM.mendeleev, 2), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
   },
-  einstein(b) {
-    for (const s of [1, -1]) b.decal(cellUV(1, 0, 4, 1), [s * 0.553, 0.33, -0.15], [0, s * Math.PI / 2, 0], 0.54, 0.135);
+  einstein(b, C, ext, D) {
+    for (const s of [1, -1]) b.decal(cellUV(1, 0, 4, 1), [s * D.podOut, 0.33, -0.15], [0, s * Math.PI / 2, 0], 0.54, 0.135);
     // átomo no painel
     b.decal(cellUV(EMBLEM.einstein, 2), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
   },
-  galileu(b, C) {
+  galileu(b, C, ext, D) {
     // luneta dourada inclinada para o céu
     const GOLD = 0xe0a526, GOLD2 = 0xb8801a, LEATHER = 0x7a3f22;
     const a = [-0.44, 0.64, -0.7], t = [-0.44, 1.12, 0.1];
@@ -983,9 +1037,9 @@ const KART_EXTRAS = {
     // suporte (forquilha)
     b.cyl(DARK, [-0.44, 0.47, -0.3], [-0.44, 0.86, -0.3], 0.03, 0.025);
     b.ell(GOLD2, [-0.44, 0.88, -0.3], 0.05);
-    emblemSides(b, C, cellUV(EMBLEM.galileu, 2));
+    emblemSides(b, D, cellUV(EMBLEM.galileu, 2));
   },
-  darwin(b, C, ext) {
+  darwin(b, C, ext, D) {
     // galhinho-poleiro e corpo do tentilhão (a cabeça é separada)
     const TW = 0x6b4a2b;
     b.cyl(TW, [0.33, 0.48, -0.66], [0.34, 0.7, -0.66], 0.024, 0.02, 6);
@@ -999,9 +1053,9 @@ const KART_EXTRAS = {
     for (const s of [1, -1]) b.cyl(0x8a6a4a, [s * 0.02, -0.06, 0.0], [s * 0.02, -0.075, 0.01], 0.008, 0.008, 4, { ol: 0 });
     b.setBase();
     ext.finch = { pos: [0.34 + 0.065 * Math.sin(0.9), 0.858, -0.66 + 0.065 * Math.cos(0.9)], yaw: 0.9, s: 1.3 };
-    emblemSides(b, C, cellUV(EMBLEM.darwin, 2));
+    emblemSides(b, D, cellUV(EMBLEM.darwin, 2));
   },
-  dumont(b, C, ext) {
+  dumont(b, C, ext, D) {
     // asinhas em caixa (pipa de Hargrave, como no 14-bis): duas células abertas por lado,
     // com o diedro (inclinação para cima) característico do avião
     const FAB = 0xf7efd9, WOOD = 0x6b4a2b;
@@ -1020,10 +1074,10 @@ const KART_EXTRAS = {
     }
     // mastro da hélice
     b.cyl(WOOD, [0, 0.64, -0.8], [0, 0.86, -0.93], 0.03, 0.025);
-    emblemSides(b, C, cellUV(EMBLEM.dumont, 2));
+    emblemSides(b, D, cellUV(EMBLEM.dumont, 2));
     ext.propeller = { pos: [0, 0.86, -0.97] };
   },
-  oswaldo(b, C) {
+  oswaldo(b, C, ext, D) {
     // microscópio preto e latão
     const BL = 0x1d1f24, BR = 0xc9a54a;
     b.setBase(0.3, 0.49, -0.66, 0, 0.5, 0, 1.3);
@@ -1037,11 +1091,11 @@ const KART_EXTRAS = {
     b.cyl(BR, [0, 0.2, 0.05], [0, 0.17, 0.055], 0.02, 0.014, 0, { ol: 0 });
     b.ell(BR, [0.05, 0.25, -0.05], 0.022, null, { ol: 0.005 });
     b.setBase();
-    emblemSides(b, C, cellUV(EMBLEM.oswaldo, 2));
+    emblemSides(b, D, cellUV(EMBLEM.oswaldo, 2));
   },
 };
-function emblemSides(b, C, uv) {
-  for (const s of [1, -1]) b.decal(uv, [s * 0.553, 0.33, -0.24], [0, s * Math.PI / 2, 0], 0.2, 0.2, true);
+function emblemSides(b, D, uv) {
+  for (const s of [1, -1]) b.decal(uv, [s * D.podOut, 0.33, -0.24 + D.wheelShift], [0, s * Math.PI / 2, 0], 0.2, 0.2, true);
 }
 
 // Propeller (hélice do 14-bis), cabeça do tentilhão e frasco de rádio: malhas separadas.
@@ -1082,12 +1136,13 @@ function buildParts(id, detail) {
   const num = CHARACTERS.indexOf(C) + 1;
   const outline = true;
   const ext = {};
+  const D = kartDims(C);
   // corpo do kart + pernas + acessórios fixos
   const lo = detail === 0;
   const body = new Builder({ detail, outline, ol: 0.014, olMin: lo ? 0.1 : 0.03 });
-  kartBody(body, C, num);
+  kartBody(body, C, num, D);
   legs(body, C.id);
-  KART_EXTRAS[C.id]?.(body, C, ext);
+  KART_EXTRAS[C.id]?.(body, C, ext, D);
   // tronco
   // baixa: só as peças grandes ganham contorno (menos triângulos)
   const torso = new Builder({ detail, outline, ol: 0.012, olMin: lo ? 0.08 : 0 });
@@ -1095,7 +1150,7 @@ function buildParts(id, detail) {
   // cabeça (origem no pescoço; centro da cabeça em (0, 0.3, 0.03))
   const head = new Builder({ detail, outline, ol: 0.012, olMin: lo ? 0.08 : 0 });
   head.setBase(0, 0.3, 0.03);
-  head.ell(L.skin, [0, 0, 0], [HR, HR * 0.97, HR * 0.98], null, { seg: detail > 0 ? [22, 16] : [14, 10] });
+  head.ell(L.skin, [0, 0, 0], [HR, HR * 0.97, HR * 0.98], null, { seg: byDetail(detail, [22, 16], [14, 10]) });
   HEADS[C.id](head, L, rng(num * 7919));
   const parts = {
     body: body.build(),
@@ -1105,6 +1160,7 @@ function buildParts(id, detail) {
     wheel: wheelGeo(C, detail),
     steer: steeringGeo(C, L, detail),
     ext,
+    dims: D,
     extGeo: {
       propeller: ext.propeller ? propellerGeo(detail) : null,
       finch: ext.finch ? finchHeadGeo(detail) : null,
@@ -1161,19 +1217,34 @@ function mergeSolid(items) {
   return g;
 }
 
-// Karts mais longe que isso da câmera usam a versão simplificada (1 draw call, sem contornos).
-// A 25 m o contorno tem menos de 1 px; o kart do jogador (câmera a ~6 m) nunca troca.
-const FAR_DIST = 25;
+// Níveis de detalhe (THREE.LOD) por qualidade: [distância (m), nível do Builder].
+// Além do 1º nível, o kart é uma malha só (1 draw call), estática e sem contornos.
+// O kart do jogador (câmera de perseguição a ~6 m) nunca troca de nível.
+// baixa: detalhado até 8 m, ~4 mil triângulos até 14 m e ~2 mil além disso.
+// alta: detalhado até 25 m (a essa distância o contorno tem menos de 1 px), depois a
+// versão de 'baixa' mesclada e, bem longe, a mais simples.
+const LOD_LEVELS = {
+  baixa: [[8, -1], [14, -2]],
+  alta: [[25, 0], [50, -2]],
+};
 
 export function createKartModel(characterId, { quality } = {}) {
-  const detail = quality && quality.id === 'baixa' ? 0 : 1;
+  const low = !!(quality && quality.id === 'baixa');
+  const detail = low ? 0 : 1;
   const shadows = !!(quality && quality.shadows);
   const parts = buildParts(characterId, detail);
+  const D = parts.dims;
   const sh = shared();
-  const mat = sh.mat;
+  // baixa: Lambert (mesmo programa de shader do cenário, que também usa cor por vértice + textura)
+  const mat = low ? sh.matLo : sh.mat;
+  const matInst = low ? sh.matLoInst : sh.matInst;
   const root = new THREE.Group();
   root.name = `kart-${characterId}`;
   const group = new THREE.Group(); // versão detalhada (animada)
+  // chassi e piloto sobem/descem com o tamanho das rodas; as rodas ficam no chão
+  const chassis = new THREE.Group();
+  chassis.position.y = D.lift;
+  group.add(chassis);
 
   // Sombra sem os contornos: no passe de sombra desenha só a faixa das peças (drawRange);
   // o passe normal volta a desenhar tudo.
@@ -1190,10 +1261,10 @@ export function createKartModel(characterId, { quality } = {}) {
     parent.add(m);
     return m;
   };
-  const bodyMesh = mk(parts.body, group, true);
+  const bodyMesh = mk(parts.body, chassis, true);
 
   // rodas (1 draw call)
-  const wheels = new THREE.InstancedMesh(parts.wheel, sh.matInst, 4);
+  const wheels = new THREE.InstancedMesh(parts.wheel, matInst, 4);
   wheels.castShadow = shadows;
   solidShadow(wheels);
   wheels.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1203,13 +1274,13 @@ export function createKartModel(characterId, { quality } = {}) {
   const steerTilt = new THREE.Group();
   steerTilt.position.copy(SW_POS);
   steerTilt.rotation.x = SW_TILT;
-  group.add(steerTilt);
+  chassis.add(steerTilt);
   const steerMesh = mk(parts.steer, steerTilt, false);
 
   // piloto: inclinação (quadril) > tronco, braços, cabeça
   const lean = new THREE.Group();
   lean.position.copy(LEAN_POS);
-  group.add(lean);
+  chassis.add(lean);
   const torsoMesh = mk(parts.torso, lean, true);
   const neck = new THREE.Group();
   neck.position.copy(NECK_POS);
@@ -1225,11 +1296,11 @@ export function createKartModel(characterId, { quality } = {}) {
   // acessórios animados
   let propeller = null, finch = null, vial = null, glow = null, vialMat = null;
   if (parts.extGeo.propeller) {
-    propeller = mk(parts.extGeo.propeller, group, true);
+    propeller = mk(parts.extGeo.propeller, chassis, true);
     propeller.position.fromArray(parts.ext.propeller.pos);
   }
   if (parts.extGeo.finch) {
-    finch = mk(parts.extGeo.finch, group, false);
+    finch = mk(parts.extGeo.finch, chassis, false);
     finch.position.fromArray(parts.ext.finch.pos);
     finch.rotation.y = parts.ext.finch.yaw;
     finch.scale.setScalar(parts.ext.finch.s || 1);
@@ -1238,6 +1309,7 @@ export function createKartModel(characterId, { quality } = {}) {
     vialMat = new THREE.MeshBasicMaterial({ color: 0x7dff5a });
     vial = new THREE.Mesh(parts.extGeo.vial, vialMat);
     vial.position.fromArray(parts.ext.vial.pos);
+    vial.position.y += D.lift;
     root.add(vial); // frasco e brilho ficam visíveis também na versão distante
     glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sh.glow, color: 0x66ff44, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.85 }));
     glow.position.set(vial.position.x, vial.position.y + 0.1, vial.position.z);
@@ -1252,8 +1324,8 @@ export function createKartModel(characterId, { quality } = {}) {
     for (let i = 0; i < 4; i++) {
       const front = i < 2;
       const s = i % 2 === 0 ? 1 : -1;
-      const r = front ? RF : RR;
-      _wp.set(s * WX, r, front ? ZF : ZR);
+      const r = front ? D.rf : D.rr;
+      _wp.set(s * D.wx, r, front ? ZF : ZR);
       _qY.setFromAxisAngle(Y_AXIS, front ? -steerV * 0.42 : 0);
       _qX.setFromAxisAngle(X_AXIS, front ? spinF : spinR);
       _wq.multiplyQuaternions(_qY, _qX);
@@ -1285,11 +1357,13 @@ export function createKartModel(characterId, { quality } = {}) {
   placeWheels();
   aimArms();
 
-  // Versão distante: peças de 'baixa' sem contornos, na pose de repouso, mescladas (cache por personagem)
-  const farKey = `${characterId}:far`;
-  let farGeo = sh.models.get(farKey);
-  if (!farGeo) {
-    const lp = buildParts(characterId, 0);
+  // Versões distantes: peças do nível dado sem contornos, na pose de repouso, mescladas
+  // numa malha só (cache por personagem e nível)
+  const merged = (lv) => {
+    const key = `${characterId}:m${lv}`;
+    let geo = sh.models.get(key);
+    if (geo) return geo;
+    const lp = buildParts(characterId, lv);
     group.updateMatrixWorld(true);
     const at = (m) => m.matrixWorld.clone();
     const items = [
@@ -1303,14 +1377,19 @@ export function createKartModel(characterId, { quality } = {}) {
     }
     if (propeller && lp.extGeo.propeller) items.push({ geo: lp.extGeo.propeller, m: at(propeller) });
     if (finch && lp.extGeo.finch) items.push({ geo: lp.extGeo.finch, m: at(finch) });
-    farGeo = mergeSolid(items);
-    sh.models.set(farKey, farGeo);
-  }
-  const far = new THREE.Mesh(farGeo, mat);
-  far.castShadow = shadows;
+    geo = mergeSolid(items);
+    sh.models.set(key, geo);
+    return geo;
+  };
   const lod = new THREE.LOD();
   lod.addLevel(group, 0);
-  lod.addLevel(far, FAR_DIST, 0.12); // volta ao detalhado a 22 m
+  const lodMeshes = [];
+  for (const [dist, lv] of LOD_LEVELS[low ? 'baixa' : 'alta']) {
+    const m = new THREE.Mesh(merged(lv), mat);
+    m.castShadow = shadows;
+    lodMeshes.push(m);
+    lod.addLevel(m, dist, 0.1); // histerese: volta ao nível anterior só 10% mais perto
+  }
   root.add(lod);
 
   function update(dt, st = {}) {
@@ -1323,8 +1402,8 @@ export function createKartModel(characterId, { quality } = {}) {
     const dd = st.drifting ? st.driftDir || 0 : 0;
     const stunned = !!st.stunned;
     // rodas
-    spinF += (speed / RF) * dt;
-    spinR += (speed / RR) * dt;
+    spinF += (speed / D.rf) * dt;
+    spinR += (speed / D.rr) * dt;
     if (spinF > TAU * 100 || spinF < -TAU * 100) spinF %= TAU;
     if (spinR > TAU * 100 || spinR < -TAU * 100) spinR %= TAU;
     steerV = damp(steerV, steer, 14, dt);
@@ -1373,14 +1452,23 @@ export function createKartModel(characterId, { quality } = {}) {
   };
   stats.total = Object.values(stats).reduce((a, b) => a + b, 0);
   // Pontos úteis para efeitos: pontas dos escapamentos (local) e o grupo da cabeça
-  const anchors = { exhausts: [new THREE.Vector3(0.3, 0.45, -0.95), new THREE.Vector3(-0.3, 0.45, -0.95)], head: neck };
+  const anchors = {
+    exhausts: [new THREE.Vector3(0.3, 0.45 + D.lift, D.exhaustTip), new THREE.Vector3(-0.3, 0.45 + D.lift, D.exhaustTip)],
+    head: neck,
+  };
   // Geometrias/atlas são compartilhados (cache); só os materiais próprios são liberados
   const dispose = () => {
     if (vialMat) vialMat.dispose();
     if (glow) glow.material.dispose();
     wheels.dispose();
   };
-  return { group: root, update, stats, anchors, dispose };
+  // Kart em destaque (o do jogador): as trocas de nível ficam 2x mais longe, para a câmera de
+  // apresentação da largada (~10 m) não mostrar a versão estática. Sem custo por quadro.
+  const baseDist = lod.levels.map((l) => l.distance);
+  const setHero = (on = true) => {
+    lod.levels.forEach((l, i) => (l.distance = baseDist[i] * (on ? 2 : 1)));
+  };
+  return { group: root, update, stats, anchors, dispose, setHero };
 }
 
 // ---------------------------------------------------------------------------
@@ -1422,6 +1510,9 @@ export function renderPortraits(renderer, size = 256, { ss = 2 } = {}) {
   renderer.getViewport(prevVP);
   const prevAuto = renderer.autoClear;
   const prevShadow = renderer.shadowMap.enabled;
+  // material só dos retratos (luzes próprias = outro programa): descartado no fim, o que
+  // libera o programa em vez de deixá-lo guardado a corrida inteira
+  const pmat = sh.mat.clone();
 
   try {
     renderer.autoClear = true;
@@ -1433,13 +1524,13 @@ export function renderPortraits(renderer, size = 256, { ss = 2 } = {}) {
       const parts = buildParts(C.id, 1);
       parts.torso.drawRange.count = parts.head.drawRange.count = Infinity;
       const bust = new THREE.Group();
-      const torso = new THREE.Mesh(parts.torso, sh.mat);
+      const torso = new THREE.Mesh(parts.torso, pmat);
       bust.add(torso);
       const neck = new THREE.Group();
       neck.position.copy(NECK_POS);
       neck.rotation.set(0.04, 0.12, 0);
       bust.add(neck);
-      neck.add(new THREE.Mesh(parts.head, sh.mat));
+      neck.add(new THREE.Mesh(parts.head, pmat));
       scene.add(bust);
       // enquadramento: centro um pouco abaixo da cabeça, vista 3/4 de frente
       bust.updateMatrixWorld(true);
@@ -1484,6 +1575,7 @@ export function renderPortraits(renderer, size = 256, { ss = 2 } = {}) {
     renderer.autoClear = prevAuto;
     renderer.shadowMap.enabled = prevShadow;
     rt.dispose();
+    pmat.dispose();
   }
   _portraitCache.set(ckey, out);
   return out;
