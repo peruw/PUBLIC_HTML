@@ -134,8 +134,8 @@
 
     // ---------- salas de turma ----------
     // { ok, code, name, mode } ou { ok:false, error }
-    async roomCreate(name, mode) {
-      const r = await rpc('corrida_room_create', { p_name: name, p_mode: mode });
+    async roomCreate(name, mode, exam) {
+      const r = await rpc('corrida_room_create', { p_name: name, p_mode: mode, p_exam: exam || null });
       return r.error ? { ok: false, error: 'offline' } : r.data;
     },
     // { code, name, mode, seed, owner, participants, open } | null (não existe) | undefined (falhou)
@@ -144,10 +144,11 @@
       if (r.error) return undefined;
       return r.data || null;
     },
-    // run como em submitRun + misses [{k,t,x,a}]; guestName só sem conta
-    async roomSubmit(code, run, misses, guestName) {
+    // run como em submitRun + misses [{k,t,x,a}]; guestName só sem conta; student = { id, pin } quando a sala tem lista da turma
+    async roomSubmit(code, run, misses, guestName, student) {
       const r = await rpc('corrida_room_submit', {
         p_code: code, p_name: guestName || '', p_guest_id: user ? null : guestId(),
+        p_student_id: student ? student.id : null, p_pin: student ? student.pin : null,
         p_score: run.score, p_hits: run.hits, p_max_level: run.maxLevel, p_max_combo: run.maxCombo,
         p_max_speed: Math.round(run.maxSpeed * 100) / 100, p_duration_ms: Math.round(run.durationMs), p_skin: run.skin,
         p_misses: misses || [],
@@ -163,6 +164,28 @@
     async roomList() {
       const r = await rpc('corrida_room_list');
       return r.error ? null : (r.data || []);
+    },
+    // aluno da lista da turma: { ok, id, name } ou { ok:false, error:'wrong_pin'|'locked'|'not_found' }
+    async roomCheckStudent(code, id, pin) {
+      const r = await rpc('corrida_room_check_student', { p_code: code, p_student_id: id, p_pin: pin });
+      return r.error ? { ok: false, error: 'offline' } : r.data;
+    },
+    // lista da turma (só quem criou a sala)
+    async roster(code) {
+      const r = await rpc('corrida_room_roster', { p_code: code });
+      return r.error ? { ok: false, error: 'offline' } : r.data;
+    },
+    async rosterAdd(code, names) {
+      const r = await rpc('corrida_room_roster_add', { p_code: code, p_names: names });
+      return r.error ? { ok: false, error: 'offline' } : r.data;
+    },
+    async rosterRemove(code, id) {
+      const r = await rpc('corrida_room_roster_remove', { p_code: code, p_student_id: id });
+      return r.error ? { ok: false, error: 'offline' } : r.data;
+    },
+    async rosterReset(code, id) {
+      const r = await rpc('corrida_room_roster_reset', { p_code: code, p_student_id: id });
+      return r.error ? { ok: false, error: 'offline' } : r.data;
     },
     async roomOpen(code, open) {
       const r = await rpc('corrida_room_close', { p_code: code, p_open: !!open });

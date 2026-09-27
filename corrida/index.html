@@ -161,7 +161,7 @@
   .modes.small .mode { font-size: 12px; padding: 7px 9px 6px; }
   /* erros da corrida, com a explicação de cada um */
   .misses { margin: 0 0 14px; padding: 10px 12px; text-align: left; background: var(--panel-2); border: 2px solid var(--brand-dark); }
-  .misses h3 { margin: 0 0 8px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; letter-spacing: 1px; color: var(--danger); }
+  .misses h3 { line-height: 1.25; margin: 0 0 8px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; letter-spacing: 1px; color: var(--danger); }
   .misses ol { margin: 0; padding: 0 0 0 18px; display: grid; gap: 8px; font-size: 13px; line-height: 1.4; color: var(--ink); }
   .misses li b { color: var(--brand-hi); font-weight: 700; }
   .misses li .you { color: var(--ink-dim); white-space: nowrap; }
@@ -194,7 +194,25 @@
   .rep-badge { display: inline-block; padding: 1px 5px; font-size: 10px; background: var(--brand-dark); color: var(--ink-dim); margin-left: 4px; vertical-align: middle; }
   .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 14px; }
   .btn.share { margin-top: 10px; color: #03140c; background: #25d366; box-shadow: inset -4px -4px 0 #128c4a, inset 4px 4px 0 #7cf0a8, 0 6px 0 #000; }
-  .tabs.modes-tabs { grid-template-columns: 1fr 1fr 1fr; margin-bottom: 8px; }
+  .tabs.modes-tabs { grid-template-columns: repeat(5, 1fr); margin-bottom: 8px; }
+  .tabs.modes-tabs .tab { font-size: 9px; padding: 9px 2px 8px; }
+  .qcount { font-family: var(--pixel); font-size: 12px; color: var(--gold); padding: 0 4px; }
+  #overScreen.train .xp, #overScreen.train #btnShare { display: none; }
+  .train-slot:empty { display: none; }
+  .train-slot { margin-top: 10px; }
+  .btn.train { color: var(--gold); }
+  .room-box select.field { width: 100%; }
+  .rep-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px; }
+  .rep-students details { border-bottom: 1px solid var(--brand-dark); padding: 6px 0; }
+  .rep-students summary { cursor: pointer; font-size: 13px; color: var(--ink); }
+  .rep-students summary b { color: var(--danger); font-weight: 700; }
+  .rep-students ol { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--ink-dim); display: grid; gap: 4px; }
+  .rep-students ol b { color: var(--brand-hi); }
+  .roster-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+  .roster-list li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; align-items: center; font-size: 13px; padding: 6px 8px; background: #0a1f16; border: 2px solid var(--brand-dark); }
+  .roster-list li .pin { font-family: var(--pixel); font-size: 12px; color: var(--gold); letter-spacing: 2px; }
+  .roster-list li.locked .pin { color: var(--danger); }
+  .room-box textarea.field { min-height: 90px; resize: vertical; font: inherit; font-size: 14px; }
   .mode:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
   .q-opts { display: flex; gap: 6px; justify-content: center; }
   .q-opts > span {
@@ -603,6 +621,7 @@
     <h1 class="title">CORRIDA<br><span>QUANTA</span></h1>
     <div class="modes" role="group" aria-label="Modo de jogo"></div>
     <div class="room-line" hidden></div>
+    <div class="train-slot"></div>
     <p id="modeIntro">Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
     <div class="keys">
       <div><span class="kc">◄ ►</span> Setas ou A/D. No celular, toque no lado ou deslize.</div>
@@ -619,7 +638,7 @@
     </div>
     <div class="rec">RECORDE <b id="bestStart">0</b> · XP <b id="xpStart">0</b> · SKINS <b id="skinCount">1/10</b></div>
     <!-- Versão do jogo: troque a cada publicação (o mesmo número vai no ?v= dos scripts abaixo) -->
-    <div class="ver">VERSÃO <span id="gameVersion">2026.09.27-1</span></div>
+    <div class="ver">VERSÃO <span id="gameVersion">2026.09.27-2</span></div>
   </div>
 </div>
 
@@ -643,7 +662,7 @@
       <div><b id="rScore">0</b><small>PONTOS</small></div>
       <div><b id="rHits">0</b><small>ACERTOS</small></div>
       <div><b id="rCombo">0</b><small>COMBO</small></div>
-      <div><b id="rLevel">1</b><small>NÍVEL</small></div>
+      <div><b id="rLevel">1</b><small id="rLevelLbl">NÍVEL</small></div>
     </div>
     <div class="unlocked" id="unlocked"></div>
     <div class="misses" id="misses" hidden></div>
@@ -655,6 +674,7 @@
     <div class="online-line" id="onlineLine"></div>
     <button class="btn" id="btnRetry" type="button">► JOGAR DE NOVO</button>
     <button class="btn share" id="btnShare" type="button">COMPARTILHAR RESULTADO</button>
+    <div class="train-slot"></div>
     <div class="modes" role="group" aria-label="Modo de jogo"></div>
     <div class="room-line" hidden></div>
     <div class="row3">
@@ -722,9 +742,13 @@
 <div class="overlay" id="guestScreen">
   <div class="card">
     <div class="tag">SEU NOME NA SALA</div>
-    <p>Você entrou na sala <b id="guestRoom"></b> sem conta. Escreva seu nome para o professor ver seu resultado.</p>
+    <p id="guestHelp">Você entrou na sala <b id="guestRoom"></b> sem conta. Escreva seu nome para o professor ver seu resultado.</p>
     <form id="guestForm" autocomplete="off">
-      <input class="field" id="guestInput" name="nome" maxlength="24" minlength="2" required spellcheck="false" placeholder="Nome e sobrenome">
+      <div id="guestFree"><input class="field" id="guestInput" name="nome" maxlength="24" spellcheck="false" placeholder="Nome e sobrenome"></div>
+      <div id="guestRoster" hidden>
+        <select class="field" id="guestPick" aria-label="Seu nome na lista da turma"></select>
+        <input class="field" id="guestPin" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="Seu código (3 números)" aria-label="Seu código de 3 números" style="margin-top:8px">
+      </div>
       <div class="err" id="guestErr"></div>
       <button class="btn" type="submit">ENTRAR NA SALA</button>
     </form>
@@ -749,15 +773,15 @@
 
 <noscript><p style="position:fixed;inset:auto 16px 16px;z-index:9">Ative o JavaScript para jogar.</p></noscript>
 
-<script src="js/themes.js?v=2026.09.27-1"></script>
-<script src="js/skins.js?v=2026.09.27-1"></script>
-<script src="js/creatures.js?v=2026.09.27-1"></script>
-<script src="js/music.js?v=2026.09.27-1"></script>
-<script src="js/fx2d.js?v=2026.09.27-1"></script>
-<script src="js/progress.js?v=2026.09.27-1"></script>
-<script src="js/online.js?v=2026.09.27-1"></script>
-<script src="js/banks.js?v=2026.09.27-1"></script>
-<script src="js/modes.js?v=2026.09.27-1"></script>
+<script src="js/themes.js?v=2026.09.27-2"></script>
+<script src="js/skins.js?v=2026.09.27-2"></script>
+<script src="js/creatures.js?v=2026.09.27-2"></script>
+<script src="js/music.js?v=2026.09.27-2"></script>
+<script src="js/fx2d.js?v=2026.09.27-2"></script>
+<script src="js/progress.js?v=2026.09.27-2"></script>
+<script src="js/online.js?v=2026.09.27-2"></script>
+<script src="js/banks.js?v=2026.09.27-2"></script>
+<script src="js/modes.js?v=2026.09.27-2"></script>
 <script>
 (() => {
   'use strict';
@@ -1083,7 +1107,8 @@
     renderer.setSize(Math.ceil(W / PX), Math.ceil(H / PX), false);
     const aspect = W / H;
     camera.aspect = aspect;
-    CAM.baseFov = aspect < 1 ? 62 + (1 - aspect) * 34 : 62;
+    // no celular em pé os portais ficam pequenos: nos modos de texto (ciências) a câmera fecha um pouco
+    CAM.baseFov = aspect < 1 ? 62 + (1 - aspect) * (GM.rich ? 22 : 34) : 62;
     camera.updateProjectionMatrix();
     measureQuestion();
   }
@@ -1417,7 +1442,11 @@
   function paintScore() { $('hudScore').innerHTML = `${fmt(S.shown)}<b> PTS</b>`; }
   function updateHud() {
     paintScore();
-    let h = ''; for (let i = 0; i < CFG.lives; i++) h += heart(i < S.lives); $('hudLives').innerHTML = h;
+    // prova e treino não têm vidas: o placar mostra quantas perguntas já foram
+    let h = '';
+    if (S.kind === 'exam' || S.kind === 'train') h = `<span class="qcount">${S.answered || 0}/${S.total}</span>`;
+    else for (let i = 0; i < CFG.lives; i++) h += heart(i < S.lives);
+    $('hudLives').innerHTML = h;
     $('speedTxt').textContent = 'x' + (S.speed / CFG.startSpeed).toFixed(1);
     const on = Math.round((S.speed - CFG.startSpeed) / (CFG.maxSpeed - CFG.startSpeed) * 11) + 1;
     [...segsEl.children].forEach((el, i) => { el.className = i < on ? (i >= 10 ? 'on max' : i >= 7 ? 'on hot' : 'on') : ''; });
@@ -1568,7 +1597,15 @@
   cv.addEventListener('pointerup', (e) => { if (tx0 !== null && !swiped) setLane(S.lane + (e.clientX < W / 2 ? -1 : 1)); tx0 = null; });
 
   // ================= Fluxo =================
-  function startGame() {
+  // opts.train: treino dos erros guardados (sem ranking, sem sala)
+  function startGame(opts) {
+    const train = !!(opts && opts.train);
+    let trainQ = null;
+    if (train) {
+      trainQ = P.reviewOf(GM.id).slice(0, 20);
+      if (!trainQ.length) { toast('Você não tem erros para treinar neste modo.'); return; }
+      for (let i = trainQ.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [trainQ[i], trainQ[j]] = [trainQ[j], trainQ[i]]; }
+    }
     audio();
     baseScreen = null;
     closePanel();
@@ -1583,13 +1620,17 @@
     clearTimeout(recordTimer);
     runUnlocks = [];
     qctx.recent = []; qctx.index = 0; S.misses = [];
+    // tipo de corrida: normal (3 vidas), prova (sala com nº fixo de perguntas) ou treino dos erros
+    S.kind = train ? 'train' : room && room.exam ? 'exam' : 'race';
+    S.total = train ? trainQ.length : S.kind === 'exam' ? room.exam : 0;
+    S.trainQ = trainQ; S.trainOk = []; S.answered = 0;
     useSkin(P.data.skin);
     setTrackLanes(2);
     // bilhete do ranking: pedido só depois de a corrida anterior terminar de ser enviada
     applyModeSpeed();
     S.speed = S.maxSpeedSeen = CFG.startSpeed;
     // numa sala o resultado vai para a sala (perguntas iguais para todos), não para o ranking geral
-    runTicket = !room && GM.ranked && onlineReady && !embedded && QC.Online.user ? submitting.then(() => QC.Online.startRun()) : null;
+    runTicket = S.kind === 'race' && !room && GM.ranked && onlineReady && !embedded && QC.Online.user ? submitting.then(() => QC.Online.startRun()) : null;
     applyTheme(1, themeIdx === 0);
     if (creatures) creatures.clear();
     if (music) { try { music.resume(); music.play(0); } catch (e) {} }
@@ -1607,7 +1648,9 @@
   function spawnGate() {
     // na sala, nível e nº de portais seguem o nº da pergunta (iguais para todos); fora dela, o nível do jogador
     const lvQ = room ? 1 + Math.floor(qctx.index / CFG.hitsPerLevel) : S.level;
-    const n = portalsFor(lvQ);
+    // treino: a pergunta guardada volta com as mesmas opções (em outra ordem)
+    const tq = S.kind === 'train' ? QC.Modes.shuffled(Object.assign({ kind: 'train' }, S.trainQ[qctx.index])) : null;
+    const n = tq ? tq.answers.length : portalsFor(lvQ);
     if (n !== S.lanes.length) {
       S.lanes = laneXs(n);
       setTrackLanes(n);
@@ -1616,12 +1659,13 @@
       S.lane = bestI;
       setTimeout(() => popText(`AGORA SÃO ${n} PORTAIS!`, '#ffd23f', '64%', false, true), 400);
     }
-    const q = makeQuestion(lvQ, n);
+    let q;
+    if (tq) { q = tq; qctx.index++; } else q = makeQuestion(lvQ, n);
     const answers = q.answers, correct = q.correct;
     S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: 1, obj: makeGate(q, answers, S.lanes) };
     $('qText').innerHTML = (q.title ? `<small class="q-title">${richHtml(q.title)}</small>` : '') + `${richHtml(q.text)} = <span class="qm">?</span>`;
     $('qOpts').innerHTML = answers.map((a) => `<span>${richHtml(a)}</span>`).join('');
-    $('qLevel').textContent = `NÍVEL ${S.level}`;
+    $('qLevel').textContent = S.kind === 'exam' ? `PERGUNTA ${qctx.index}/${S.total}` : S.kind === 'train' ? `TREINO ${qctx.index}/${S.total}` : `NÍVEL ${S.level}`;
     paintOptions();
     const qe = $('question');
     qe.classList.remove('bounce'); void qe.offsetWidth; qe.classList.add('show', 'bounce');
@@ -1658,8 +1702,10 @@
 
   function resolveGate(g) {
     g.chosen = S.lane;
+    S.answered++;
     const lx = S.lanes[S.lane];
     if (S.lane === g.correct) {
+      if (S.kind === 'train') S.trainOk.push(g.q.key);
       g.state = 'pass';
       g.obj.panels[S.lane].visible = false;
       burst(lx, 2.3, g.z, 'good', 34, 1.6);
@@ -1708,7 +1754,8 @@
       setPanel(g, g.correct, 'good');
       burst(lx, 2.3, g.z + 0.3, 'bad', 26, 1.4);
       const lost = S.combo;
-      S.lives--; S.combo = 0; S.fever = false;
+      if (S.kind === 'race') S.lives--;
+      S.combo = 0; S.fever = false;
       S.shake = reduceMotion ? 0 : 0.45 + Math.min(0.4, lost * 0.02); S.stumble = 0.9;
       if (lost >= 3) {
         // perder a sequência dói: texto rachando e onda vermelha
@@ -1724,7 +1771,7 @@
       paintCombo(false);
       flash('rgba(255,77,94,0.9)', 0.35);
       popText(`ERA ${richHtml(g.q.ans)}`, '#ff4d5e', '52%');
-      S.misses.push({ k: g.q.key, t: g.q.title || '', x: g.q.text, a: String(g.q.ans), c: String(g.answers[S.lane]), why: g.q.why || '' });
+      S.misses.push({ k: g.q.key, t: g.q.title || '', x: g.q.text, a: String(g.q.ans), c: String(g.answers[S.lane]), why: g.q.why || '', wrong: g.q.wrong.map(String) });
       sfx.bad();
       if (navigator.vibrate) { try { navigator.vibrate(140); } catch (e) {} }
     }
@@ -1739,6 +1786,10 @@
     document.body.classList.remove('playing');
     dashUp();
     if (music) { try { music.stop(); } catch (e) {} }
+    // as perguntas erradas vão para a lista de treino (no treino, as acertadas saem)
+    P.addReview(GM.id, S.misses.map((m) => ({ key: m.k, title: m.t, text: m.x, ans: m.a, wrong: m.wrong, why: m.why })));
+    if (S.kind === 'train') { P.dropReview(GM.id, S.trainOk.filter((k) => !S.misses.some((m) => m.k === k))); trainOver(); return; }
+    $('overScreen').classList.remove('train');
     const run = {
       score: S.score, hits: S.hits, maxLevel: S.level, maxCombo: S.maxCombo,
       maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, ticket: runTicket,
@@ -1752,11 +1803,18 @@
 
     countUp($('rScore'), S.score, 900); countUp($('rHits'), S.hits, 700); countUp($('rCombo'), S.maxCombo, 700);
     $('rLevel').textContent = S.level;
+    $('rLevelLbl').textContent = 'NÍVEL';
     $('overTag').textContent = `FIM DE CORRIDA · ${GM.name.toUpperCase()}`;
+    if (S.kind === 'exam') {
+      // prova: vale a porcentagem de acertos
+      $('overTag').textContent = `PROVA · ${GM.name.toUpperCase()} · ${room ? room.name.toUpperCase() : ''}`;
+      setTimeout(() => { $('rHits').textContent = `${S.hits}/${S.total}`; $('rLevel').textContent = Math.round(100 * S.hits / S.total) + '%'; }, 750);
+      $('rLevelLbl').textContent = 'ACERTO';
+    }
     S.fever = false; paintCombo(false);
     if (res.record) recordTimer = setTimeout(() => { if (S.mode === 'over') { fxCall('fireworks', 8); fxCall('confetti', 90); } }, 400);
     $('newRecord').classList.toggle('show', res.record);
-    $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
+    $('overTitle').innerHTML = S.kind === 'exam' ? 'PROVA<br><span>ENTREGUE!</span>' : S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
     $('overTip').textContent = pick(GM.tips);
     paintMisses(S.misses);
     countUp($('xpGain'), res.xpGained, 900);
@@ -1776,13 +1834,38 @@
   }
   let recordTimer = 0;
   let lastRun = null;
+  // fim do treino: sem XP, recorde, ranking ou sala
+  function trainOver() {
+    lastRun = null;
+    stinger(S.misses.length ? 'gameover' : 'record');
+    $('overScreen').classList.add('train');
+    $('overTag').textContent = `TREINO · ${GM.name.toUpperCase()}`;
+    $('overTitle').innerHTML = S.misses.length ? 'TREINO<br><span>FEITO</span>' : 'ACERTOU<br><span>TUDO!</span>';
+    $('newRecord').classList.remove('show');
+    $('unlocked').classList.remove('show');
+    countUp($('rScore'), S.score, 700); $('rCombo').textContent = S.maxCombo;
+    $('rHits').textContent = `${S.hits}/${S.total}`;
+    $('rLevel').textContent = Math.round(100 * S.hits / S.total) + '%'; $('rLevelLbl').textContent = 'ACERTO';
+    S.fever = false; paintCombo(false);
+    paintMisses(S.misses);
+    const left = P.reviewOf(GM.id).length;
+    $('onlineLine').textContent = left ? `Ainda ${left === 1 ? 'resta 1 pergunta' : `restam ${left} perguntas`} na sua lista de treino.` : 'Sua lista de treino está vazia. Muito bem!';
+    $('overTip').textContent = pick(GM.tips);
+    $('overScreen').classList.add('show');
+    $('question').classList.remove('show');
+    $('hudMult').classList.remove('show');
+    refreshMenus();
+    if (S.gate) { removeGate(S.gate); S.gate = null; }
+  }
   // erros da corrida com a explicação de cada um (3 vidas = no máximo 3)
   function paintMisses(list) {
     const box = $('misses');
     if (!list.length) { box.hidden = true; box.innerHTML = ''; return; }
     box.hidden = false;
+    const extra = list.length > 15 ? `<small>e mais ${list.length - 15}.</small>` : '';
+    list = list.slice(0, 15);
     box.innerHTML = '<h3>O QUE VOCÊ ERROU</h3><ol>' + list.map((m) =>
-      `<li>${m.t ? `<span class="mt">${richHtml(m.t)}</span> · ` : ''}${richHtml(m.x)} = <b>${richHtml(m.a)}</b> <span class="you">· você: <s>${richHtml(m.c)}</s></span>${m.why ? `<small>${richHtml(m.why)}</small>` : ''}</li>`).join('') + '</ol>';
+      `<li>${m.t ? `<span class="mt">${richHtml(m.t)}</span> · ` : ''}${richHtml(m.x)} = <b>${richHtml(m.a)}</b> <span class="you">· você: <s>${richHtml(m.c)}</s></span>${m.why ? `<small>${richHtml(m.why)}</small>` : ''}</li>`).join('') + '</ol>' + extra;
   }
   // compartilhar o resultado (WhatsApp ou a folha de compartilhar do aparelho)
   function shareResult() {
@@ -1843,9 +1926,17 @@
     if (id === 'roomScreen') paintRoom();
     if (id === 'guestScreen') {
       $('guestRoom').textContent = room ? room.name : '';
+      const ros = hasRoster();
+      $('guestFree').hidden = ros; $('guestRoster').hidden = !ros;
+      $('guestHelp').innerHTML = ros ? `Escolha seu nome na lista da sala <b>${esc(room.name)}</b> e digite o código de 3 números que o professor entregou.` : `Você entrou na sala <b>${esc(room ? room.name : '')}</b> sem conta. Escreva seu nome para o professor ver seu resultado.`;
+      if (ros) {
+        const cur = student();
+        $('guestPick').innerHTML = '<option value="">Seu nome...</option>' + room.roster.map((s) => `<option value="${s.id}"${cur && cur.id === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
+        $('guestPin').value = '';
+      }
       $('guestInput').value = guestName(); $('guestErr').textContent = '';
       $('guestLogin').href = '/conta/?return=' + encodeURIComponent('/corrida/' + (room ? '?sala=' + room.code : ''));
-      setTimeout(() => $('guestInput').focus(), 50);
+      setTimeout(() => (hasRoster() ? $('guestPick') : $('guestInput')).focus(), 50);
     }
     if (id === 'nickScreen') {
       const inp = $('nickInput');
@@ -1966,7 +2057,7 @@
     loadBoard(boardPeriod);
   }));
   function paintRankModes() {
-    $('rankModes').innerHTML = QC.Modes.list.map((id) => `<button class="tab${id === boardMode ? ' on' : ''}" type="button" role="tab" data-rank-mode="${id}" aria-selected="${id === boardMode}">${esc(QC.Modes.get(id).name.toUpperCase())}</button>`).join('');
+    $('rankModes').innerHTML = QC.Modes.list.map((id) => `<button class="tab${id === boardMode ? ' on' : ''}" type="button" role="tab" data-rank-mode="${id}" aria-selected="${id === boardMode}" aria-label="${esc(QC.Modes.get(id).name)}">${esc(QC.Modes.get(id).short)}</button>`).join('');
   }
   $('rankModes').addEventListener('click', (e) => {
     const b = e.target.closest('[data-rank-mode]');
@@ -2036,7 +2127,13 @@
     return `<div class="login-box"><a class="btn alt google" href="${accountUrl}">${GOOGLE_SVG} Entrar com Google</a>
       <small>Um login só para todo o site da Quanta: suas skins, seu XP e o ranking ficam salvos junto com os outros apps.</small></div>`;
   }
+  function paintTrain() {
+    const n = P.reviewOf(GM.id).length;
+    const html = n ? `<button class="btn alt train" type="button" data-act="train">TREINAR MEUS ERROS (${n})</button>` : '';
+    $$('.train-slot').forEach((el) => { el.innerHTML = html; });
+  }
   function refreshMenus() {
+    paintTrain();
     $$('.account-slot').forEach((el) => { el.innerHTML = accountHtml(); });
     $('bestStart').textContent = fmt(P.bestOf(GM.id));
     paintModes();
@@ -2055,8 +2152,8 @@
     $('modeTag').textContent = `QUANTA AULAS · ${GM.tag}`;
     $('modeIntro').textContent = GM.intro;
     // na sala o modo é o da sala
-    const gn = !QC.Online.user && guestName();
-    const rl = room ? `Sala <b>${esc(room.name)}</b> (${room.code}) · ${esc(QC.Modes.get(room.mode).name)}${gn ? ` · você: ${esc(gn)}` : ''} · <button class="link" type="button" data-act="leave-room">sair</button>` : '';
+    const gn = playerName();
+    const rl = room ? `Sala <b>${esc(room.name)}</b> (${room.code}) · ${esc(QC.Modes.get(room.mode).name)}${room.exam ? ` · prova de ${room.exam}` : ''}${gn ? ` · você: ${esc(gn)}` : ''} · <button class="link" type="button" data-act="leave-room">sair</button>` : '';
     $$('.room-line').forEach((el) => { el.innerHTML = rl; el.hidden = !rl; });
   }
   function setMode(id) {
@@ -2065,6 +2162,7 @@
     store.set('quanta-corrida-mode', GM.id);
     applyModeSpeed();
     paintGlyphs();
+    resize();
     refreshMenus();
   }
   document.addEventListener('click', (e) => {
@@ -2076,6 +2174,13 @@
     if (!b) return;
     const act = b.dataset.act;
     if (act === 'nick') openScreen('nickScreen');
+    else if (act === 'train') startGame({ train: true });
+    else if (act === 'rep-view') { repView = b.dataset.view; paintReport(); }
+    else if (act === 'csv') downloadCsv();
+    else if (act === 'roster-add') rosterAdd(b.dataset.code);
+    else if (act === 'roster-reset') QC.Online.rosterReset(b.dataset.code, Number(b.dataset.id)).then((r) => { if (r && r.ok) { toast(`Novo código: ${r.pin}`); loadRoster(b.dataset.code); } else toast('Não deu para gerar o código agora.'); });
+    else if (act === 'roster-remove') { if (confirm('Tirar este aluno da lista? Os resultados dele continuam no relatório.')) QC.Online.rosterRemove(b.dataset.code, Number(b.dataset.id)).then(() => loadRoster(b.dataset.code)); }
+    else if (act === 'roster-copy') copyRoster();
     else if (act === 'guest-name') openScreen('guestScreen');
     else if (act === 'leave-room') { leaveRoom(); if (openPanel === 'roomScreen') paintRoom(); toast('Você saiu da sala.'); }
     else if (act === 'join') joinRoom(b.dataset.code).then((r) => { if (r.ok) { toast(`Você entrou na sala ${esc(r.room.name)}`); if (openPanel === 'roomScreen') paintRoom(); } });
@@ -2096,6 +2201,13 @@
   // e o resultado vai para a sala. Sem conta, o aluno entra como convidado (nome guardado neste aparelho).
   const ROOM_KEY = 'quanta-corrida-room', GUEST_KEY = 'quanta-corrida-guest-name';
   const guestName = () => String(store.get(GUEST_KEY, '') || '');
+  const STUDENT_KEY = 'quanta-corrida-student';
+  // aluno da lista da turma escolhido neste aparelho: { code, id, name, pin }
+  const student = () => { const s = store.get(STUDENT_KEY, null); return s && room && s.code === room.code ? s : null; };
+  const hasRoster = () => !!(room && room.roster && room.roster.length);
+  // com lista da turma, todo mundo (menos quem criou a sala) joga com o nome da lista
+  const needsIdentity = () => !!room && (hasRoster() ? !room.owner && !student() : !QC.Online.user && !guestName());
+  const playerName = () => (!room ? '' : hasRoster() ? (student() || {}).name || '' : QC.Online.user ? '' : guestName());
   let createMode = GM.id;
   function setRoom(r) {
     room = r;
@@ -2110,7 +2222,7 @@
     if (r === undefined) return { error: 'offline' };
     if (!r) return { error: 'not_found' };
     setRoom(r);
-    if (!QC.Online.user && !guestName()) openScreen('guestScreen');
+    if (needsIdentity()) openScreen('guestScreen');
     return { ok: true, room: r };
   }
   function leaveRoom() { setRoom(null); }
@@ -2131,7 +2243,8 @@
         <div class="room-code">${room.code}</div><p class="mono">${link}</p>
         <div class="row2" style="margin-top:6px"><button class="btn alt" type="button" data-act="copy-link">COPIAR LINK</button><button class="btn alt" type="button" data-act="share-room">ENVIAR LINK</button></div>
         ${room.owner ? `<button class="btn" type="button" data-act="report" data-code="${room.code}" style="margin-top:10px">VER RESULTADOS DA TURMA</button>` : ''}
-        ${!u ? `<button class="link" type="button" data-act="guest-name">Seu nome na sala: ${esc(guestName() || 'escolher')}</button><br>` : ''}
+        ${room.exam ? `<p>Prova: <b>${room.exam} perguntas</b>, sem vidas. Vale a porcentagem de acertos.</p>` : ''}
+        ${(hasRoster() && !room.owner) || (!hasRoster() && !u) ? `<button class="link" type="button" data-act="guest-name">Seu nome na sala: ${esc(playerName() || 'escolher')}</button><br>` : ''}
         <button class="link" type="button" data-act="leave-room">Sair da sala</button></div>`;
     } else {
       html += `<div class="room-box"><h3>ENTRAR NUMA SALA</h3><p>Peça o código de 5 letras ao professor ou abra o link que ele mandou.</p>
@@ -2140,7 +2253,9 @@
     html += '<div class="room-box"><h3>CRIAR SALA (PROFESSOR)</h3>';
     if (!u) html += `<p>Entre com sua conta Quanta para criar salas para a sua turma.</p><a class="btn alt google" href="${accountUrl}">${GOOGLE_SVG} Entrar com Google</a>`;
     else html += `<p>Os alunos entram pelo link e jogam as mesmas perguntas. Você vê o ranking da turma e o que mais erraram.</p>
-      <form id="createForm" autocomplete="off"><input class="field" id="createName" maxlength="40" placeholder="Nome da turma (ex.: 9º A)" required><div class="modes create-modes small" id="createModes"></div><div class="err" id="createErr"></div><button class="btn" type="submit">CRIAR SALA</button></form>`;
+      <form id="createForm" autocomplete="off"><input class="field" id="createName" maxlength="40" placeholder="Nome da turma (ex.: 9º A)" required><div class="modes create-modes small" id="createModes"></div>
+        <select class="field" id="createKind" aria-label="Tipo de sala"><option value="">Corrida (3 vidas, vale a pontuação)</option><option value="10">Prova: 10 perguntas, sem vidas</option><option value="15">Prova: 15 perguntas, sem vidas</option><option value="20">Prova: 20 perguntas, sem vidas</option><option value="30">Prova: 30 perguntas, sem vidas</option></select>
+        <div class="err" id="createErr"></div><button class="btn" type="submit">CRIAR SALA</button></form>`;
     html += '</div>';
     if (u) html += '<div class="room-box"><h3>MINHAS SALAS</h3><ul class="room-list" id="roomList"><li class="board-msg">Carregando...</li></ul></div>';
     b.innerHTML = html;
@@ -2158,7 +2273,7 @@
     if (cf) cf.addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = cf.querySelector('button[type=submit]'); btn.disabled = true; $('createErr').textContent = '';
-      const r = await QC.Online.roomCreate($('createName').value, createMode);
+      const r = await QC.Online.roomCreate($('createName').value, createMode, Number($('createKind').value) || null);
       btn.disabled = false;
       if (r && r.ok) { const rr = await QC.Online.roomGet(r.code); if (rr) setRoom(rr); toast(`Sala ${esc(r.name)} criada: ${r.code}`); if (openPanel === 'roomScreen') paintRoom(); }
       else $('createErr').textContent = r && r.error === 'invalid' ? 'Use de 2 a 40 letras ou números no nome da turma.' : ROOM_ERR[r && r.error] || 'Não deu para criar a sala agora.';
@@ -2170,37 +2285,135 @@
     if (!el) return;
     if (!list) { el.innerHTML = '<li class="board-msg">Não deu para carregar suas salas.</li>'; return; }
     if (!list.length) { el.innerHTML = '<li class="board-msg">Você ainda não criou nenhuma sala.</li>'; return; }
-    el.innerHTML = list.map((r) => `<li><span><b>${r.code}</b> ${esc(r.name)}<small>${esc(QC.Modes.get(r.mode).name)} · ${r.participants} aluno${r.participants === 1 ? '' : 's'} · ${r.runs} corrida${r.runs === 1 ? '' : 's'}${r.open ? '' : ' · fechada'}</small></span>
+    el.innerHTML = list.map((r) => `<li><span><b>${r.code}</b> ${esc(r.name)}<small>${esc(QC.Modes.get(r.mode).name)}${r.exam ? ` · prova ${r.exam}` : ''} · ${r.participants} aluno${r.participants === 1 ? '' : 's'} · ${r.runs} corrida${r.runs === 1 ? '' : 's'}${r.open ? '' : ' · fechada'}</small></span>
       <button class="btn alt mini" type="button" data-act="join" data-code="${r.code}">ENTRAR</button><button class="btn alt mini" type="button" data-act="report" data-code="${r.code}">RESULTADOS</button></li>`).join('');
   }
+  let report = null, repView = 'best';
   async function openReport(code) {
     if (openPanel !== 'reportScreen') openScreen('reportScreen');
     const body = $('reportBody');
     body.innerHTML = '<p class="tip">Carregando...</p>';
     const r = await QC.Online.roomReport(code);
     if (openPanel !== 'reportScreen') return;
-    if (!r || !r.ok) { body.innerHTML = `<p class="tip">${r && r.error === 'forbidden' ? 'Só quem criou a sala vê os resultados.' : 'Não deu para carregar os resultados agora.'}</p>`; return; }
-    const rm = r.room, players = r.players || [], misses = r.misses || [];
+    if (!r || !r.ok) { report = null; body.innerHTML = `<p class="tip">${r && r.error === 'forbidden' ? 'Só quem criou a sala vê os resultados.' : 'Não deu para carregar os resultados agora.'}</p>`; return; }
+    report = r;
+    paintReport();
+    loadRoster(r.room.code);
+  }
+  const pct = (h, a) => (a ? Math.round(100 * h / a) + '%' : '—');
+  // resultado de um aluno na visão escolhida (melhor tentativa ou primeira)
+  const repRow = (p) => (repView === 'first' && p.first ? { score: p.first.score, hits: p.first.hits, answered: p.first.answered } : { score: p.score, hits: p.hits, answered: p.answered });
+  function paintReport() {
+    if (!report || openPanel !== 'reportScreen') return;
+    const rm = report.room, misses = report.misses || [];
+    const players = (report.players || []).slice().sort((x, y) => (repRow(y).score ?? -1) - (repRow(x).score ?? -1) || String(x.name).localeCompare(y.name));
+    const played = players.filter((p) => p.runs > 0);
     $('reportTag').textContent = `RESULTADOS · ${rm.code}`;
-    let html = `<div class="room-box"><h3>${esc(rm.name)}</h3><p>${esc(QC.Modes.get(rm.mode).name)} · ${players.length} aluno${players.length === 1 ? '' : 's'} · ${rm.runs} corrida${rm.runs === 1 ? '' : 's'} · ${rm.open ? 'aberta' : 'fechada'}</p>
-      <div class="row2"><button class="btn alt" type="button" data-act="refresh-report" data-code="${rm.code}">ATUALIZAR</button><button class="btn alt" type="button" data-act="toggle-room" data-code="${rm.code}" data-open="${rm.open ? '0' : '1'}">${rm.open ? 'FECHAR SALA' : 'REABRIR SALA'}</button></div></div>`;
+    let html = `<div class="room-box"><h3>${esc(rm.name)}</h3><p>${esc(QC.Modes.get(rm.mode).name)}${rm.exam ? ` · prova de ${rm.exam} perguntas` : ' · corrida'} · ${played.length} aluno${played.length === 1 ? '' : 's'} jogaram · ${rm.runs} tentativa${rm.runs === 1 ? '' : 's'} · ${rm.open ? 'aberta' : 'fechada'}</p>
+      <div class="row3"><button class="btn alt" type="button" data-act="refresh-report" data-code="${rm.code}">ATUALIZAR</button><button class="btn alt" type="button" data-act="csv">PLANILHA</button><button class="btn alt" type="button" data-act="toggle-room" data-code="${rm.code}" data-open="${rm.open ? '0' : '1'}">${rm.open ? 'FECHAR' : 'REABRIR'}</button></div></div>`;
     if (!players.length) html += '<p class="tip">Ninguém jogou ainda. Mande o link da sala para a turma.</p>';
     else {
-      html += '<table class="rep-table"><thead><tr><th>#</th><th>Aluno</th><th class="n">Pontos</th><th class="n">Acertos</th><th class="n">Corridas</th></tr></thead><tbody>';
-      players.forEach((p, i) => { html += `<tr><td class="n">${i + 1}</td><td>${esc(p.name)}${p.guest ? '<span class="rep-badge">sem conta</span>' : ''}</td><td class="n">${fmt(p.score)}</td><td class="n">${p.hits}</td><td class="n">${p.runs}</td></tr>`; });
+      html += `<div class="rep-tabs tabs"><button class="tab${repView === 'best' ? ' on' : ''}" type="button" data-act="rep-view" data-view="best">MELHOR NOTA</button><button class="tab${repView === 'first' ? ' on' : ''}" type="button" data-act="rep-view" data-view="first">1ª TENTATIVA</button></div>`;
+      html += `<table class="rep-table"><thead><tr><th>#</th><th>Aluno</th><th class="n">Pontos</th><th class="n">Acertos</th><th class="n">${rm.exam ? '%' : 'Corridas'}</th></tr></thead><tbody>`;
+      players.forEach((p, i) => {
+        const v = repRow(p);
+        const badge = p.runs === 0 ? '<span class="rep-badge">não jogou</span>' : !p.student && p.guest ? '<span class="rep-badge">sem conta</span>' : '';
+        html += `<tr><td class="n">${p.runs ? i + 1 : ''}</td><td>${esc(p.name)}${badge}</td><td class="n">${v.score == null ? '—' : fmt(v.score)}</td><td class="n">${p.runs ? `${v.hits}${v.answered ? '/' + v.answered : ''}` : '—'}</td><td class="n">${rm.exam ? (p.runs ? pct(v.hits, v.answered) : '—') : p.runs}</td></tr>`;
+      });
       html += '</tbody></table>';
       if (misses.length) {
         html += '<div class="misses"><h3>PERGUNTAS MAIS ERRADAS</h3><ol>' + misses.map((m) =>
           `<li>${m.t ? `<span class="mt">${richHtml(m.t)}</span> · ` : ''}${richHtml(m.x)} = <b>${richHtml(m.a)}</b><small>${m.students} aluno${m.students === 1 ? '' : 's'} errou${m.students === 1 ? '' : 'am'} (${m.total} vez${m.total === 1 ? '' : 'es'})</small></li>`).join('') + '</ol></div>';
+        const withErr = played.filter((p) => p.misses && p.misses.length);
+        if (withErr.length) {
+          html += '<div class="room-box rep-students"><h3>ERROS DE CADA ALUNO</h3>' + withErr.map((p) =>
+            `<details><summary>${esc(p.name)} · <b>${p.misses.reduce((a, m) => a + m.n, 0)} erro${p.misses.reduce((a, m) => a + m.n, 0) === 1 ? '' : 's'}</b></summary><ol>${p.misses.map((m) =>
+              `<li>${m.t ? `${richHtml(m.t)} · ` : ''}${richHtml(m.x)} = <b>${richHtml(m.a)}</b>${m.n > 1 ? ` (${m.n}×)` : ''}</li>`).join('')}</ol></details>`).join('') + '</div>';
+        }
       } else html += '<p class="tip">Nenhum erro registrado até agora.</p>';
     }
-    body.innerHTML = html;
+    html += `<div class="room-box" id="rosterBox"><h3>LISTA DA TURMA</h3><p>Cadastre os alunos: cada um recebe um código de 3 números. Com a lista, cada aluno escolhe o próprio nome e digita o código, e ninguém joga no lugar de outro.</p>
+      <textarea class="field" id="rosterNames" placeholder="Um nome por linha"></textarea><div class="err" id="rosterErr"></div>
+      <button class="btn alt" type="button" data-act="roster-add" data-code="${rm.code}">ADICIONAR À LISTA</button>
+      <ul class="roster-list" id="rosterList"></ul></div>`;
+    $('reportBody').innerHTML = html;
+    if (rosterCache && rosterCache.code === rm.code) paintRoster();
   }
-  $('guestForm').addEventListener('submit', (e) => {
+  function csvCell(v) { const t = v == null ? '' : String(v); return /[;"\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+  function downloadCsv() {
+    if (!report) return;
+    const rm = report.room;
+    const head = ['Aluno', 'Pontos (melhor)', 'Acertos (melhor)', 'Respondidas (melhor)', '% (melhor)', 'Pontos (1ª)', 'Acertos (1ª)', 'Respondidas (1ª)', '% (1ª)', 'Tentativas', 'Última vez', 'Erros (pergunta = resposta certa)'];
+    const lines = [head.join(';')];
+    (report.players || []).forEach((p) => {
+      const f = p.first || {};
+      const erros = (p.misses || []).map((m) => `${QC.Modes.plain(m.t ? m.t + ' · ' : '')}${QC.Modes.plain(m.x)} = ${QC.Modes.plain(m.a)}${m.n > 1 ? ` (${m.n}x)` : ''}`).join(' | ');
+      lines.push([p.name, p.score, p.runs ? p.hits : '', p.runs ? p.answered : '', p.runs ? pct(p.hits, p.answered) : '', f.score, f.hits, f.answered, p.runs ? pct(f.hits, f.answered) : '',
+        p.runs, p.last_at ? new Date(p.last_at).toLocaleString('pt-BR') : '', erros].map(csvCell).join(';'));
+    });
+    const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `corrida-${rm.code}-${String(rm.name).replace(/[^\wÀ-ÿ -]/g, '').trim().replace(/\s+/g, '-')}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  let rosterCache = null;
+  async function loadRoster(code) {
+    const r = await QC.Online.roster(code);
+    if (!r || !r.ok) return;
+    rosterCache = { code, students: r.students || [] };
+    paintRoster();
+  }
+  function paintRoster() {
+    const el = $('rosterList');
+    if (!el || !rosterCache) return;
+    const st = rosterCache.students;
+    el.innerHTML = st.length ? st.map((s) => `<li class="${s.locked ? 'locked' : ''}"><span>${esc(s.name)}${s.locked ? '<span class="rep-badge">bloqueado</span>' : ''}</span><span class="pin">${esc(s.pin)}</span>
+      <button class="btn alt mini" type="button" data-act="roster-reset" data-code="${rosterCache.code}" data-id="${s.id}">NOVO CÓDIGO</button><button class="btn alt mini" type="button" data-act="roster-remove" data-code="${rosterCache.code}" data-id="${s.id}">TIRAR</button></li>`).join('')
+      + `<li style="display:block;background:none;border:0;padding:4px 0"><button class="btn alt" type="button" data-act="roster-copy">COPIAR NOMES E CÓDIGOS</button></li>` : '';
+  }
+  async function rosterAdd(code) {
+    const ta = $('rosterNames');
+    if (!ta || !ta.value.trim()) return;
+    $('rosterErr').textContent = '';
+    const r = await QC.Online.rosterAdd(code, ta.value);
+    if (r && r.ok) {
+      ta.value = '';
+      const bad = r.rejected || [];
+      $('rosterErr').textContent = bad.length ? `Não entraram (nome inválido): ${bad.join(', ')}` : '';
+      toast(`${r.added} aluno${r.added === 1 ? '' : 's'} na lista`);
+      const rr = await QC.Online.roomGet(code);
+      if (rr && room && room.code === code) room = rr;
+      loadRoster(code);
+    } else $('rosterErr').textContent = r && r.error === 'limit' ? 'A lista chegou ao limite de 80 alunos.' : 'Não deu para salvar a lista agora.';
+  }
+  function copyRoster() {
+    if (!rosterCache) return;
+    const text = rosterCache.students.map((s) => `${s.name} — código ${s.pin}`).join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast('Lista copiada!'), () => prompt('Copie a lista:', text));
+  }
+  $('guestForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const v = $('guestInput').value.trim().replace(/\s+/g, ' ');
-    if (v.length < 2) { $('guestErr').textContent = 'Escreva pelo menos 2 letras.'; return; }
-    store.set(GUEST_KEY, v.slice(0, 24));
+    let v;
+    if (hasRoster()) {
+      const id = Number($('guestPick').value), pin = $('guestPin').value.trim();
+      if (!id) { $('guestErr').textContent = 'Escolha seu nome na lista.'; return; }
+      if (!/^[0-9]{3}$/.test(pin)) { $('guestErr').textContent = 'O código tem 3 números.'; return; }
+      const btn = $('guestForm').querySelector('button'); btn.disabled = true;
+      const r = await QC.Online.roomCheckStudent(room.code, id, pin);
+      btn.disabled = false;
+      if (!r || !r.ok) {
+        $('guestErr').textContent = { wrong_pin: 'Código errado. Confira com o professor.', locked: 'Muitas tentativas erradas: peça um código novo ao professor.', not_found: 'Seu nome saiu da lista. Fale com o professor.' }[r && r.error] || 'Sem conexão agora. Tente de novo.';
+        return;
+      }
+      store.set(STUDENT_KEY, { code: room.code, id, name: r.name, pin });
+      v = r.name;
+    } else {
+      v = $('guestInput').value.trim().replace(/\s+/g, ' ');
+      if (v.length < 2) { $('guestErr').textContent = 'Escreva pelo menos 2 letras.'; return; }
+      store.set(GUEST_KEY, v.slice(0, 24));
+    }
     closePanel(); refreshMenus();
     toast(`Bem-vindo à sala, ${esc(v)}!`);
     if (S.mode === 'over' && lastRun && lastRun.room && $('onlineLine').dataset.needsName) { delete $('onlineLine').dataset.needsName; submitOnline(lastRun); }
@@ -2264,16 +2477,22 @@
     if (embedded) { line.textContent = ''; return; }
     delete line.dataset.needsName;
     if (run.room) {
-      if (run.score <= 0) { line.textContent = 'Corrida sem pontos: nada foi para a sala.'; return; }
+      if (run.score <= 0 && !run.room.exam) { line.textContent = 'Corrida sem pontos: nada foi para a sala.'; return; }
       if (!onlineReady) { line.textContent = 'Sem conexão: o resultado não foi para a sala.'; return; }
-      if (!QC.Online.user && !guestName()) {
-        line.innerHTML = '<button class="link" type="button" data-act="guest-name">Escreva seu nome</button> para o resultado entrar na sala.';
+      if (needsIdentity()) {
+        line.innerHTML = `<button class="link" type="button" data-act="guest-name">${hasRoster() ? 'Escolha seu nome e digite seu código' : 'Escreva seu nome'}</button> para o resultado entrar na sala.`;
         line.dataset.needsName = '1';
         return;
       }
       line.textContent = 'Enviando para a sala...';
-      const r = await QC.Online.roomSubmit(run.room.code, run, run.misses, guestName());
-      if (r && r.ok) line.innerHTML = `Sala <b>${esc(run.room.name)}</b>: você está em <b>#${r.rank}</b> de ${r.participants}${r.best > run.score ? ` (seu melhor: ${fmt(r.best)})` : ''}.`;
+      const r = await QC.Online.roomSubmit(run.room.code, run, run.misses, guestName(), hasRoster() && !run.room.owner ? student() : null);
+      if (r && ['wrong_pin', 'locked', 'student_required', 'not_found'].includes(r.error) && hasRoster()) {
+        store.set(STUDENT_KEY, null);
+        line.innerHTML = `${r.error === 'locked' ? 'Seu código foi bloqueado: peça outro ao professor. ' : ''}<button class="link" type="button" data-act="guest-name">Escolha seu nome e digite seu código</button> para o resultado entrar na sala.`;
+        line.dataset.needsName = '1';
+        return;
+      }
+      if (r && r.ok) line.innerHTML = run.room.exam ? `Prova entregue na sala <b>${esc(run.room.name)}</b>: ${run.hits} de ${run.room.exam} (${pct(run.hits, run.room.exam)}).` : `Sala <b>${esc(run.room.name)}</b>: você está em <b>#${r.rank}</b> de ${r.participants}${r.best > run.score ? ` (seu melhor: ${fmt(r.best)})` : ''}.`;
       else line.textContent = {
         closed: 'A sala foi fechada pelo professor: o resultado não entrou.',
         invalid_name: 'Esse nome não é permitido na sala. Escolha outro.',
@@ -2475,15 +2694,18 @@
       if (g.z >= CFG.resolveZ) resolveGate(g);
     } else if (g.state === 'pass') {
       g.z += dz; g.obj.group.position.z = g.z;
-      if (g.z > 11) { removeGate(g); S.gate = null; S.gap = 0.25; }
+      if (g.z > 11) { removeGate(g); S.gate = null; S.gap = 0.25; if (runDone()) gameOver(); }
     } else if (g.state === 'crash') {
       g.timer += dt;
       if (g.timer > 0.95) {
         removeGate(g); S.gate = null; S.gap = 0.4;
-        if (S.lives <= 0) gameOver();
+        if (S.lives <= 0 || runDone()) gameOver();
       }
     }
   }
+
+  // prova e treino acabam quando todas as perguntas foram respondidas
+  function runDone() { return (S.kind === 'exam' || S.kind === 'train') && S.answered >= S.total; }
 
   let last = performance.now();
   function frame(now) {
@@ -2495,8 +2717,8 @@
 
   // ================= Botões =================
   let ready = false;
-  $('btnStart').addEventListener('click', startGame);
-  $('btnRetry').addEventListener('click', startGame);
+  $('btnStart').addEventListener('click', () => startGame());
+  $('btnRetry').addEventListener('click', () => startGame());
   $('btnResume').addEventListener('click', togglePause);
   $('btnPause').addEventListener('click', togglePause);
   const sb = $('btnSound');

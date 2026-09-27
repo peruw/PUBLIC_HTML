@@ -5,10 +5,25 @@
   window.QC = window.QC || {};
 
   const KEY = 'quanta-corrida-profile';
+  const MODES = ['mat', 'quim', 'fis', 'bio', 'geo'];
+  const REVIEW_MAX = 30;
+  // pergunta errada guardada para o treino: { key, title, text, ans, wrong: [...], why }
+  const str = (v, n) => (typeof v === 'string' || typeof v === 'number' ? String(v).slice(0, n) : '');
+  function cleanReview(r) {
+    const out = {};
+    if (!r || typeof r !== 'object') return out;
+    for (const m of MODES) {
+      if (!Array.isArray(r[m])) continue;
+      out[m] = r[m].filter((q) => q && typeof q === 'object' && q.key && Array.isArray(q.wrong) && q.wrong.length >= 1 && q.wrong.length <= 3)
+        .slice(0, REVIEW_MAX)
+        .map((q) => ({ key: str(q.key, 80), title: str(q.title, 80), text: str(q.text, 80), ans: str(q.ans, 40), wrong: q.wrong.slice(0, 3).map((w) => str(w, 40)), why: str(q.why, 160) }));
+    }
+    return out;
+  }
   const LEGACY_BEST = 'quanta-corrida-best';
 
   function blank() {
-    return { v: 1, xp: 0, bestScore: 0, maxLevel: 1, maxCombo: 0, maxSpeed: 1, totalHits: 0, runs: 0, skins: ['quanta'], skin: 'quanta', bests: { mat: 0, quim: 0, fis: 0 }, hitsBy: { mat: 0, quim: 0, fis: 0 }, updatedAt: 0 };
+    return { v: 1, xp: 0, bestScore: 0, maxLevel: 1, maxCombo: 0, maxSpeed: 1, totalHits: 0, runs: 0, skins: ['quanta'], skin: 'quanta', bests: { mat: 0, quim: 0, fis: 0, bio: 0, geo: 0 }, hitsBy: { mat: 0, quim: 0, fis: 0, bio: 0, geo: 0 }, review: {}, updatedAt: 0 };
   }
 
   function sanitize(p) {
@@ -27,13 +42,14 @@
       skins: Array.isArray(p.skins) ? [...new Set(['quanta', ...p.skins.filter((s) => typeof s === 'string' && s.length < 25)])] : b.skins,
       skin: typeof p.skin === 'string' ? p.skin : 'quanta',
       // recorde por modo (mat, quim, fis); antes dos modos todo recorde era de Matemática
-      bests: ['mat', 'quim', 'fis'].reduce((o, m) => {
+      bests: MODES.reduce((o, m) => {
         const v = p.bests && typeof p.bests === 'object' ? num(p.bests[m], 0) : 0;
         o[m] = Math.floor(m === 'mat' && !(p.bests && typeof p.bests === 'object') ? num(p.bestScore, 0) : v);
         return o;
       }, {}),
       // acertos por modo (desbloqueiam as skins de cada matéria)
-      hitsBy: ['mat', 'quim', 'fis'].reduce((o, m) => { o[m] = Math.floor(p.hitsBy && typeof p.hitsBy === 'object' ? num(p.hitsBy[m], 0) : 0); return o; }, {}),
+      review: cleanReview(p.review),
+      hitsBy: MODES.reduce((o, m) => { o[m] = Math.floor(p.hitsBy && typeof p.hitsBy === 'object' ? num(p.hitsBy[m], 0) : 0); return o; }, {}),
       updatedAt: num(p.updatedAt, 0),
     };
   }
@@ -74,6 +90,22 @@
     },
 
     bestOf(mode) { return this.data.bests[mode] || 0; },
+
+    // ---- treino dos erros ----
+    reviewOf(mode) { return (this.data.review[mode] || []).slice(); },
+    // guarda as perguntas erradas (a mais recente primeiro, sem repetir)
+    addReview(mode, qs) {
+      if (!qs.length) return;
+      const cur = (this.data.review[mode] || []).filter((q) => !qs.some((n) => n.key === q.key));
+      this.data.review[mode] = cleanReview({ [mode]: qs.concat(cur) })[mode] || [];
+      this.save();
+    },
+    // acertou no treino: sai da lista
+    dropReview(mode, keys) {
+      if (!keys.length || !this.data.review[mode]) return;
+      this.data.review[mode] = this.data.review[mode].filter((q) => !keys.includes(q.key));
+      this.save();
+    },
 
     isUnlocked(id) { return this.data.skins.includes(id); },
 

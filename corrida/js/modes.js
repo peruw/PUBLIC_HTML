@@ -150,7 +150,7 @@
   }
 
   // ================= Química =================
-  const B = () => QC.Banks || { elements: [], molecules: [], physics: [] };
+  const B = () => QC.Banks || { elements: [], molecules: [], physics: [], bio: [], geo: [] };
   const elsOf = (tiers) => B().elements.filter((e) => tiers.includes(e.tier));
   const molsOf = (tiers) => B().molecules.filter((m) => tiers.includes(m.tier));
 
@@ -360,10 +360,27 @@
     return phys.eq([1, 2, 3, 4], n);
   }
 
+  // ================= Biologia e Geografia (bancos genéricos) =================
+  // item: { title, text, ans, traps: [3], why, tier: 1..4 } — o tier sobe a cada 2 níveis, com revisão dos anteriores
+  function fromBank(name) {
+    return (level, n) => {
+      const bank = B()[name] || [];
+      if (!bank.length) return null;
+      const tier = Math.min(4, 1 + Math.floor((level - 1) / 2));
+      const t = tier > 1 && R.chance(0.25) ? R.int(1, tier - 1) : tier;
+      let pool = bank.filter((it) => it.tier === t);
+      if (!pool.length) pool = bank;
+      const it = R.pick(pool);
+      const same = bank.filter((x) => x !== it && x.text === it.text).map((x) => x.ans);
+      return { key: name + ':' + it.title + ':' + it.text, kind: name, title: it.title, text: it.text, ans: it.ans,
+        wrong: fill(it.ans, it.traps, same, n - 1), why: it.why };
+    };
+  }
+
   // ================= Modos =================
   const MODES = {
     mat: {
-      id: 'mat', name: 'Matemática', tag: 'CÁLCULO MENTAL', ranked: true, rich: false, maxPortals: 4,
+      id: 'mat', name: 'Matemática', short: 'MAT', tag: 'CÁLCULO MENTAL', ranked: true, rich: false, maxPortals: 4,
       intro: 'Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.',
       speed: { start: 16, step: 1.1, max: 46 },
       glyphs: ['π', 'Σ', '√', '∞', '÷', '×', '+', '=', '%', 'Δ', '∫', '7', '3', '9'],
@@ -378,7 +395,7 @@
       ],
     },
     quim: {
-      id: 'quim', name: 'Química', tag: 'ÁTOMOS E MOLÉCULAS', ranked: true, rich: true, maxPortals: 3,
+      id: 'quim', name: 'Química', short: 'QUÍM', tag: 'ÁTOMOS E MOLÉCULAS', ranked: true, rich: true, maxPortals: 3,
       intro: 'Elementos, fórmulas, funções e massa molar. Começa nos símbolos e vai até as moléculas difíceis.',
       speed: { start: 12, step: 0.8, max: 32 },
       glyphs: ['H', 'O', 'C', 'Na', 'Cl', 'Fe', 'Au', 'H₂O', 'CO₂', 'mol', 'pH', 'Ca', 'K', 'N₂'],
@@ -394,7 +411,7 @@
       ],
     },
     fis: {
-      id: 'fis', name: 'Física', tag: 'EQUAÇÕES DA FÍSICA', ranked: true, rich: true, maxPortals: 3,
+      id: 'fis', name: 'Física', short: 'FÍS', tag: 'EQUAÇÕES DA FÍSICA', ranked: true, rich: true, maxPortals: 3,
       intro: 'Equações, unidades e contas com números redondos. As leis ficam mais difíceis a cada nível.',
       speed: { start: 11, step: 0.7, max: 28 },
       glyphs: ['F', 'v', 'a', 'Δ', 'λ', 'ω', 'g', 'Ω', 'J', 'W', 'N', 'θ', 'μ', 'E=mc²'],
@@ -407,6 +424,32 @@
         'Dica: Coulomb e gravitação têm a mesma forma: produto das cargas (ou massas) sobre d².',
         'Dica: com g = 10 m/s², um corpo de 2 kg pesa 20 N.',
         'Dica: potência é energia por tempo: 600 J em 10 s são 60 W.',
+      ],
+    },
+    bio: {
+      id: 'bio', name: 'Biologia', short: 'BIO', tag: 'CÉLULAS, CORPO E VIDA', ranked: true, rich: true, maxPortals: 3,
+      intro: 'Organelas, sistemas do corpo, ecologia e genética. Veja o assunto e atravesse o portal com a resposta certa.',
+      speed: { start: 12, step: 0.8, max: 32 },
+      glyphs: ['DNA', 'RNA', 'ATP', 'A', 'T', 'C', 'G', 'O₂', 'CO₂', '♀', '♂', 'Aa', 'Bb', 'pH'],
+      gen: fromBank('bio'),
+      tips: [
+        'Dica: mitocôndria faz a respiração celular; cloroplasto faz a fotossíntese.',
+        'Dica: no DNA, A pareia com T e C com G. No RNA, a timina vira uracila.',
+        'Dica: produtores fazem o próprio alimento; consumidores comem outros seres.',
+        'Dica: mitose faz 2 células iguais; meiose faz 4 com metade dos cromossomos.',
+      ],
+    },
+    geo: {
+      id: 'geo', name: 'Geografia', short: 'GEO', tag: 'BRASIL E MUNDO', ranked: true, rich: true, maxPortals: 3,
+      intro: 'Capitais dos estados e dos países, regiões, biomas e rios. Veja o lugar e atravesse o portal certo.',
+      speed: { start: 13, step: 0.9, max: 36 },
+      glyphs: ['N', 'S', 'L', 'O', '°', '⌖', 'BR', 'RJ', 'SP', 'MG', 'BA', 'AM', 'RS', 'PE'],
+      gen: fromBank('geo'),
+      tips: [
+        'Dica: Palmas é a capital do Tocantins, o estado mais novo do Brasil (1988).',
+        'Dica: o Brasil tem 5 regiões: Norte, Nordeste, Centro-Oeste, Sudeste e Sul.',
+        'Dica: Canberra, e não Sydney, é a capital da Austrália.',
+        'Dica: a Amazônia é o maior bioma do Brasil; o Pampa fica no Rio Grande do Sul.',
       ],
     },
   };
@@ -427,14 +470,19 @@
     recent.push(q.key);
     if (recent.length > RECENT) recent.splice(0, recent.length - RECENT);
     // posição da resposta certa também é sorteada com o mesmo gerador (igual para todos na sala)
-    const r = c.rng || Math.random;
+    return shuffled(q, c.rng || Math.random);
+  }
+  // embaralha as opções (a pergunta de treino volta com as mesmas opções, em outra ordem)
+  function shuffled(q, r) {
+    const rr = r || Math.random;
     const answers = [q.ans, ...q.wrong];
-    for (let i = answers.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [answers[i], answers[j]] = [answers[j], answers[i]]; }
+    for (let i = answers.length - 1; i > 0; i--) { const j = Math.floor(rr() * (i + 1)); [answers[i], answers[j]] = [answers[j], answers[i]]; }
     return Object.assign({}, q, { answers, correct: answers.indexOf(q.ans) });
   }
 
   QC.Modes = {
-    list: ['mat', 'quim', 'fis'],
+    list: ['mat', 'quim', 'fis', 'bio', 'geo'],
+    shuffled,
     get: (id) => MODES[id] || MODES.mat,
     all: MODES,
     make,
