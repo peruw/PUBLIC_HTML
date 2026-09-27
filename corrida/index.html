@@ -157,6 +157,44 @@
   .mode { font-family: var(--pixel-text); font-weight: 700; font-size: 14px; letter-spacing: 1px; padding: 9px 12px 8px;
     color: var(--ink-dim); background: var(--panel-2); border: 2px solid var(--brand-dark); box-shadow: 0 3px 0 #000; cursor: pointer; }
   .mode.on { color: #03140c; background: var(--brand); border-color: var(--brand-hi); }
+  .mode:disabled { cursor: default; opacity: .55; }
+  .modes.small .mode { font-size: 12px; padding: 7px 9px 6px; }
+  /* erros da corrida, com a explicação de cada um */
+  .misses { margin: 0 0 14px; padding: 10px 12px; text-align: left; background: var(--panel-2); border: 2px solid var(--brand-dark); }
+  .misses h3 { margin: 0 0 8px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; letter-spacing: 1px; color: var(--danger); }
+  .misses ol { margin: 0; padding: 0 0 0 18px; display: grid; gap: 8px; font-size: 13px; line-height: 1.4; color: var(--ink); }
+  .misses li b { color: var(--brand-hi); font-weight: 700; }
+  .misses li .you { color: var(--ink-dim); white-space: nowrap; }
+  .misses li s { color: var(--danger); }
+  .misses li .mt { color: var(--gold); }
+  .misses li small { display: block; color: var(--ink-dim); font-size: 12px; }
+  .room-line { margin: 0 0 12px; font-size: 14px; color: var(--ink-dim); line-height: 1.4; }
+  .room-line b { color: var(--gold); }
+  .room-line[hidden] { display: none; }
+  /* sala de turma */
+  .room-code { font-family: var(--pixel); font-size: clamp(22px, 7vw, 34px); letter-spacing: 6px; color: var(--gold); text-shadow: 3px 3px 0 #000; margin: 8px 0 6px; text-align: center; }
+  .room-box { margin: 0 0 14px; padding: 12px; text-align: left; background: var(--panel-2); border: 2px solid var(--brand-dark); }
+  .room-box h3 { margin: 0 0 8px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; letter-spacing: 1px; color: var(--brand); }
+  .room-box p { margin: 0 0 8px; font-size: 13px; color: var(--ink-dim); line-height: 1.4; }
+  .room-box p b { color: var(--ink); }
+  .room-box .field { margin-bottom: 8px; }
+  .room-box .modes { margin: 4px 0 8px; }
+  .room-box .link { margin-top: 10px; font-size: 13px; }
+  .mono { font-family: ui-monospace, monospace; font-size: 12px; color: var(--ink); word-break: break-all; }
+  .room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .room-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 8px 10px; background: #0a1f16; border: 2px solid var(--brand-dark); font-size: 13px; }
+  .room-list li b { font-family: var(--pixel); font-size: 11px; color: var(--gold); }
+  .room-list li small { display: block; color: var(--ink-dim); font-size: 12px; }
+  .room-list li.board-msg { display: block; text-align: center; color: var(--ink-dim); background: none; border: 0; }
+  .btn.mini { width: auto; padding: 8px 9px 7px; font-size: 9px; }
+  .rep-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; margin-bottom: 12px; }
+  .rep-table th, .rep-table td { padding: 6px 5px; border-bottom: 1px solid var(--brand-dark); vertical-align: top; }
+  .rep-table th { font-family: var(--pixel-text); font-weight: 700; font-size: 12px; letter-spacing: 1px; color: var(--ink-dim); }
+  .rep-table td.n, .rep-table th.n { font-family: var(--pixel); font-size: 10px; color: var(--brand); text-align: right; white-space: nowrap; }
+  .rep-badge { display: inline-block; padding: 1px 5px; font-size: 10px; background: var(--brand-dark); color: var(--ink-dim); margin-left: 4px; vertical-align: middle; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .btn.share { margin-top: 10px; color: #03140c; background: #25d366; box-shadow: inset -4px -4px 0 #128c4a, inset 4px 4px 0 #7cf0a8, 0 6px 0 #000; }
+  .tabs.modes-tabs { grid-template-columns: 1fr 1fr 1fr; margin-bottom: 8px; }
   .mode:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
   .q-opts { display: flex; gap: 6px; justify-content: center; }
   .q-opts > span {
@@ -564,6 +602,7 @@
     <div class="tag" id="modeTag">QUANTA AULAS · CÁLCULO MENTAL</div>
     <h1 class="title">CORRIDA<br><span>QUANTA</span></h1>
     <div class="modes" role="group" aria-label="Modo de jogo"></div>
+    <div class="room-line" hidden></div>
     <p id="modeIntro">Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
     <div class="keys">
       <div><span class="kc">◄ ►</span> Setas ou A/D. No celular, toque no lado ou deslize.</div>
@@ -573,13 +612,14 @@
     </div>
     <div class="account-slot"></div>
     <button class="btn" id="btnStart" type="button" disabled><span id="loading">CARREGANDO...</span></button>
-    <div class="row2">
+    <div class="row3">
       <button class="btn alt" type="button" data-open="locker">SKINS</button>
       <button class="btn alt" type="button" data-open="rank">RANKING</button>
+      <button class="btn alt" type="button" data-open="room">SALA</button>
     </div>
     <div class="rec">RECORDE <b id="bestStart">0</b> · XP <b id="xpStart">0</b> · SKINS <b id="skinCount">1/10</b></div>
     <!-- Versão do jogo: troque a cada publicação (o mesmo número vai no ?v= dos scripts abaixo) -->
-    <div class="ver">VERSÃO <span id="gameVersion">2026.09.26-1</span></div>
+    <div class="ver">VERSÃO <span id="gameVersion">2026.09.27-1</span></div>
   </div>
 </div>
 
@@ -606,6 +646,7 @@
       <div><b id="rLevel">1</b><small>NÍVEL</small></div>
     </div>
     <div class="unlocked" id="unlocked"></div>
+    <div class="misses" id="misses" hidden></div>
     <div class="xp">
       <div class="xp-line"><span>+<b id="xpGain">0</b> XP</span><span>TOTAL <b id="xpTotal">0</b></span></div>
       <div class="xp-bar"><i id="xpBar"></i></div>
@@ -613,10 +654,13 @@
     </div>
     <div class="online-line" id="onlineLine"></div>
     <button class="btn" id="btnRetry" type="button">► JOGAR DE NOVO</button>
+    <button class="btn share" id="btnShare" type="button">COMPARTILHAR RESULTADO</button>
     <div class="modes" role="group" aria-label="Modo de jogo"></div>
-    <div class="row2">
+    <div class="room-line" hidden></div>
+    <div class="row3">
       <button class="btn alt" type="button" data-open="locker">SKINS</button>
       <button class="btn alt" type="button" data-open="rank">RANKING</button>
+      <button class="btn alt" type="button" data-open="room">SALA</button>
     </div>
     <p class="tip" id="overTip" style="margin:16px 0 0"></p>
     <a class="link" href="/">Voltar ao site</a>
@@ -642,12 +686,49 @@
       <div class="tag">RANKING</div>
       <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
     </div>
+    <div class="tabs modes-tabs" role="tablist" id="rankModes"></div>
     <div class="tabs" role="tablist">
       <button class="tab on" type="button" role="tab" data-period="week" aria-selected="true">SEMANA</button>
       <button class="tab" type="button" role="tab" data-period="all" aria-selected="false">GERAL</button>
     </div>
     <ol class="board" id="board"></ol>
     <div class="account-slot"></div>
+  </div>
+</div>
+
+<!-- Sala de turma -->
+<div class="overlay" id="roomScreen">
+  <div class="card">
+    <div class="sheet-head">
+      <div class="tag">SALA DE TURMA</div>
+      <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
+    </div>
+    <div id="roomBody"></div>
+  </div>
+</div>
+
+<!-- Resultados da sala (professor) -->
+<div class="overlay" id="reportScreen">
+  <div class="card">
+    <div class="sheet-head">
+      <div class="tag" id="reportTag">RESULTADOS</div>
+      <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
+    </div>
+    <div id="reportBody"></div>
+  </div>
+</div>
+
+<!-- Nome do convidado na sala -->
+<div class="overlay" id="guestScreen">
+  <div class="card">
+    <div class="tag">SEU NOME NA SALA</div>
+    <p>Você entrou na sala <b id="guestRoom"></b> sem conta. Escreva seu nome para o professor ver seu resultado.</p>
+    <form id="guestForm" autocomplete="off">
+      <input class="field" id="guestInput" name="nome" maxlength="24" minlength="2" required spellcheck="false" placeholder="Nome e sobrenome">
+      <div class="err" id="guestErr"></div>
+      <button class="btn" type="submit">ENTRAR NA SALA</button>
+    </form>
+    <a class="link" id="guestLogin" href="/conta/?return=%2Fcorrida%2F">Ou entre com sua conta Quanta</a>
   </div>
 </div>
 
@@ -668,20 +749,21 @@
 
 <noscript><p style="position:fixed;inset:auto 16px 16px;z-index:9">Ative o JavaScript para jogar.</p></noscript>
 
-<script src="js/themes.js?v=2026.09.26-1"></script>
-<script src="js/skins.js?v=2026.09.26-1"></script>
-<script src="js/creatures.js?v=2026.09.26-1"></script>
-<script src="js/music.js?v=2026.09.26-1"></script>
-<script src="js/fx2d.js?v=2026.09.26-1"></script>
-<script src="js/progress.js?v=2026.09.26-1"></script>
-<script src="js/online.js?v=2026.09.26-1"></script>
-<script src="js/modes.js?v=2026.09.26-1"></script>
+<script src="js/themes.js?v=2026.09.27-1"></script>
+<script src="js/skins.js?v=2026.09.27-1"></script>
+<script src="js/creatures.js?v=2026.09.27-1"></script>
+<script src="js/music.js?v=2026.09.27-1"></script>
+<script src="js/fx2d.js?v=2026.09.27-1"></script>
+<script src="js/progress.js?v=2026.09.27-1"></script>
+<script src="js/online.js?v=2026.09.27-1"></script>
+<script src="js/banks.js?v=2026.09.27-1"></script>
+<script src="js/modes.js?v=2026.09.27-1"></script>
 <script>
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
   const $$ = (sel) => [...document.querySelectorAll(sel)];
-  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES || !QC.Modes) {
+  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES || !QC.Modes || !QC.Banks) {
     $('loading').textContent = 'ERRO AO CARREGAR. RECARREGUE A PÁGINA.';
     return;
   }
@@ -715,56 +797,27 @@
   };
   // modo de jogo (Matemática, Química, Física): perguntas, velocidade e dicas vêm de js/modes.js
   let GM = QC.Modes.get(store.get('quanta-corrida-mode', 'mat'));
+  let room = null;   // sala de turma em que o jogador está: { code, name, mode, seed, owner, participants, open }
   const applyModeSpeed = () => { CFG.startSpeed = GM.speed.start; CFG.speedStep = GM.speed.step; CFG.maxSpeed = GM.speed.max; };
   applyModeSpeed();
   document.body.classList.toggle('rich', !!GM.rich);
 
   // 2 portais nos níveis 1-2, 3 nos níveis 3-4, 4 do nível 5 em diante
-  const portalsFor = (level) => (level >= 5 ? 4 : level >= 3 ? 3 : 2);
+  // nos modos de ciência as opções são maiores: no máximo 3 portais
+  const portalsFor = (level) => Math.min(GM.maxPortals || 4, level >= 5 ? 4 : level >= 3 ? 3 : 2);
   const ROAD = 8.4;
   const laneXs = (n) => Array.from({ length: n }, (_, i) => -ROAD / 2 + (ROAD / n) * (i + 0.5));
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const embedded = (() => { try { return window.top !== window.self; } catch (e) { return true; } })();
 
-  // ================= Contas =================
+  // ================= Perguntas =================
+  // O sorteio fica em js/modes.js. qctx guarda as últimas perguntas (sem repetir) e o nº da pergunta.
+  // Numa sala todo mundo vê a mesma sequência: a pergunta nº i só depende da semente da sala e de i.
+  const qctx = { recent: [], index: 0 };
   function makeQuestion(level, n) {
-    if (GM.make) return GM.make(level, n);
-    let a, b, c, text, ans;
-    const big = Math.max(0, level - 5);
-    const types = ['add'];
-    if (level >= 2) types.push('sub');
-    if (level >= 3) types.push('mul');
-    if (level >= 4) types.push('div');
-    if (level >= 6) types.push('mix');
-    const type = level <= 4 && Math.random() < 0.6 ? types[types.length - 1] : pick(types);
-    switch (type) {
-      case 'add': a = rand(2, 12 + big * 15); b = rand(2, 12 + big * 15); text = `${a} + ${b}`; ans = a + b; break;
-      case 'sub': a = rand(6, 20 + big * 15); b = rand(1, a - 1); text = `${a} - ${b}`; ans = a - b; break;
-      case 'mul': a = rand(2, 9 + Math.min(big, 3)); b = rand(2, 9); text = `${a} × ${b}`; ans = a * b; break;
-      case 'div': b = rand(2, 9); ans = rand(2, 9 + Math.min(big, 3)); a = b * ans; text = `${a} ÷ ${b}`; break;
-      case 'mix':
-        a = rand(2, 9); b = rand(2, 9);
-        if (Math.random() < 0.5) { c = rand(1, 15); text = `${a} × ${b} + ${c}`; ans = a * b + c; }
-        else { c = rand(1, a * b - 1); text = `${a} × ${b} - ${c}`; ans = a * b - c; }
-        break;
-    }
-    return { text, ans, wrong: makeDistractors(ans, type, a, b, n - 1) };
-  }
-  // respostas erradas plausíveis: vizinhas da certa ou erros típicos de conta
-  function makeDistractors(ans, type, a, b, count) {
-    const opts = [ans + 1, ans - 1, ans + 2, ans - 2, ans + 10, ans - 10, ans + 3, ans - 3];
-    if (type === 'mul') opts.push(a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b, a + b);
-    if (type === 'div') opts.push(b, ans * 2);
-    if (type === 'sub') opts.push(a + b);
-    if (type === 'add') opts.push(Math.abs(a - b));
-    const pool = shuffle([...new Set(opts)].filter((v) => v !== ans && v >= 0));
-    const out = pool.slice(0, count);
-    for (let k = 4; out.length < count; k++) if (!out.includes(ans + k)) out.push(ans + k);
-    return out;
-  }
-  function shuffle(arr) {
-    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
-    return arr;
+    const ctx = room ? { rng: QC.Modes.rngFor(room.seed, qctx.index), recent: qctx.recent } : { recent: qctx.recent };
+    qctx.index++;
+    return QC.Modes.make(GM.id, level, n, ctx);
   }
 
   // ================= Texturas em pixel =================
@@ -997,11 +1050,14 @@
     });
   }
 
+  const glyphMeasure = document.createElement('canvas').getContext('2d');
   function glyphTex(ch) {
-    return canvasTex(24, 24, (g, w, h) => {
+    glyphMeasure.font = `800 20px 'Plus Jakarta Sans', sans-serif`;
+    const w = Math.max(24, Math.ceil(glyphMeasure.measureText(ch).width) + 6);
+    return canvasTex(w, 24, (g, W, H) => {
       g.font = `800 20px 'Plus Jakarta Sans', sans-serif`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = '#ffffff'; g.fillText(ch, w / 2, h / 2 + 1);
+      g.fillStyle = '#ffffff'; g.fillText(ch, W / 2, H / 2 + 1);
     });
   }
 
@@ -1109,19 +1165,30 @@
     scene.add(m); moving.push({ obj: m, span: cityZone, limit: 16 });
   }
 
-  // símbolos matemáticos flutuando
+  // símbolos flutuando (os do modo: matemática, química ou física)
   const floaty = [];
-  ['π', 'Σ', '√', '∞', '÷', '×', '+', '=', '%', 'Δ', '∫', '7', '3', '9'].forEach((ch) => {
-    for (let k = 0; k < 2; k++) {
-      const mat = new T.SpriteMaterial({ map: glyphTex(ch), transparent: true, depthWrite: false }); tint(mat.color, 'glyph');
-      const sp = new T.Sprite(mat);
-      const s = rnd(1.4, 3);
-      sp.scale.set(s, s, 1);
-      sp.position.set((Math.random() < 0.5 ? -1 : 1) * rnd(6.5, 16), rnd(3, 12), 14 - Math.random() * 150);
-      sp.userData.base = sp.position.y; sp.userData.ph = Math.random() * 6;
-      scene.add(sp); moving.push({ obj: sp, span: 150, limit: 14 }); floaty.push(sp);
-    }
-  });
+  for (let i = 0; i < 28; i++) {
+    const mat = new T.SpriteMaterial({ map: glyphTex('?'), transparent: true, depthWrite: false }); tint(mat.color, 'glyph');
+    const sp = new T.Sprite(mat);
+    const s = rnd(1.4, 3);
+    sp.userData.s = s; sp.scale.set(s, s, 1);
+    sp.position.set((Math.random() < 0.5 ? -1 : 1) * rnd(6.5, 16), rnd(3, 12), 14 - Math.random() * 150);
+    sp.userData.base = sp.position.y; sp.userData.ph = Math.random() * 6;
+    scene.add(sp); moving.push({ obj: sp, span: 150, limit: 14 }); floaty.push(sp);
+  }
+  function paintGlyphs() {
+    const list = GM.glyphs || ['?'];
+    floaty.forEach((sp, i) => {
+      const ch = list[i % list.length];
+      if (sp.userData.ch === ch) return;
+      sp.userData.ch = ch;
+      if (sp.material.map) sp.material.map.dispose();
+      const tex = glyphTex(ch);
+      sp.material.map = tex; sp.material.needsUpdate = true;
+      sp.scale.set(sp.userData.s * tex.image.width / 24, sp.userData.s, 1);
+    });
+  }
+  paintGlyphs();
 
   // linhas de velocidade
   const streakGeo = new T.BoxGeometry(0.05, 0.05, 4);
@@ -1515,12 +1582,14 @@
     fxCall('clear');
     clearTimeout(recordTimer);
     runUnlocks = [];
+    qctx.recent = []; qctx.index = 0; S.misses = [];
     useSkin(P.data.skin);
     setTrackLanes(2);
     // bilhete do ranking: pedido só depois de a corrida anterior terminar de ser enviada
     applyModeSpeed();
     S.speed = S.maxSpeedSeen = CFG.startSpeed;
-    runTicket = GM.ranked && onlineReady && !embedded && QC.Online.user ? submitting.then(() => QC.Online.startRun()) : null;
+    // numa sala o resultado vai para a sala (perguntas iguais para todos), não para o ranking geral
+    runTicket = !room && GM.ranked && onlineReady && !embedded && QC.Online.user ? submitting.then(() => QC.Online.startRun()) : null;
     applyTheme(1, themeIdx === 0);
     if (creatures) creatures.clear();
     if (music) { try { music.resume(); music.play(0); } catch (e) {} }
@@ -1536,7 +1605,9 @@
   }
 
   function spawnGate() {
-    const n = portalsFor(S.level);
+    // na sala, nível e nº de portais seguem o nº da pergunta (iguais para todos); fora dela, o nível do jogador
+    const lvQ = room ? 1 + Math.floor(qctx.index / CFG.hitsPerLevel) : S.level;
+    const n = portalsFor(lvQ);
     if (n !== S.lanes.length) {
       S.lanes = laneXs(n);
       setTrackLanes(n);
@@ -1545,9 +1616,8 @@
       S.lane = bestI;
       setTimeout(() => popText(`AGORA SÃO ${n} PORTAIS!`, '#ffd23f', '64%', false, true), 400);
     }
-    const q = makeQuestion(S.level, n);
-    const answers = shuffle([q.ans, ...q.wrong]);
-    const correct = answers.indexOf(q.ans);
+    const q = makeQuestion(lvQ, n);
+    const answers = q.answers, correct = q.correct;
     S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: 1, obj: makeGate(q, answers, S.lanes) };
     $('qText').innerHTML = (q.title ? `<small class="q-title">${richHtml(q.title)}</small>` : '') + `${richHtml(q.text)} = <span class="qm">?</span>`;
     $('qOpts').innerHTML = answers.map((a) => `<span>${richHtml(a)}</span>`).join('');
@@ -1559,7 +1629,7 @@
   }
 
   function liveStats() {
-    return { score: S.score, hits: S.hits, maxCombo: S.maxCombo, maxLevel: S.level, maxSpeed: S.maxSpeedSeen / CFG.startSpeed };
+    return { mode: GM.id, score: S.score, hits: S.hits, maxCombo: S.maxCombo, maxLevel: S.level, maxSpeed: S.maxSpeedSeen / CFG.startSpeed };
   }
   let runUnlocks = [];
   function announceUnlocks(ids) {
@@ -1654,6 +1724,7 @@
       paintCombo(false);
       flash('rgba(255,77,94,0.9)', 0.35);
       popText(`ERA ${richHtml(g.q.ans)}`, '#ff4d5e', '52%');
+      S.misses.push({ k: g.q.key, t: g.q.title || '', x: g.q.text, a: String(g.q.ans), c: String(g.answers[S.lane]), why: g.q.why || '' });
       sfx.bad();
       if (navigator.vibrate) { try { navigator.vibrate(140); } catch (e) {} }
     }
@@ -1663,14 +1734,6 @@
     updateHud();
   }
 
-  const TIPS = [
-    'Dica: na tabuada, confira o último algarismo. 7 × 8 termina em 6, então é 56.',
-    'Dica: para somar 9, some 10 e tire 1.',
-    'Dica: dividir é perguntar quantas vezes cabe. 42 ÷ 6? 6 × 7 = 42.',
-    'Dica: número par vezes qualquer número dá sempre par.',
-    'Dica: 25 - 8 é o mesmo que 25 - 10 + 2.',
-    'Dica: na tabuada do 9, os algarismos do resultado somam 9.',
-  ];
   function gameOver() {
     S.mode = 'over';
     document.body.classList.remove('playing');
@@ -1679,8 +1742,10 @@
     const run = {
       score: S.score, hits: S.hits, maxLevel: S.level, maxCombo: S.maxCombo,
       maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, ticket: runTicket,
-      mode: GM.id, ranked: !!GM.ranked,
+      mode: GM.id, ranked: !!GM.ranked, room,
+      misses: S.misses.map((m) => ({ k: m.k.slice(0, 80), t: m.t.slice(0, 80), x: m.x.slice(0, 80), a: m.a.slice(0, 40) })),
     };
+    lastRun = run;
     runTicket = null;
     const res = P.applyRun(run);
     stinger(res.record ? 'record' : 'gameover');
@@ -1692,7 +1757,8 @@
     if (res.record) recordTimer = setTimeout(() => { if (S.mode === 'over') { fxCall('fireworks', 8); fxCall('confetti', 90); } }, 400);
     $('newRecord').classList.toggle('show', res.record);
     $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
-    $('overTip').textContent = pick(GM.tips || TIPS);
+    $('overTip').textContent = pick(GM.tips);
+    paintMisses(S.misses);
     countUp($('xpGain'), res.xpGained, 900);
     countUp($('xpTotal'), P.data.xp, 1100, P.data.xp - res.xpGained);
     const un = $('unlocked');
@@ -1709,6 +1775,24 @@
     if (S.gate) { removeGate(S.gate); S.gate = null; }
   }
   let recordTimer = 0;
+  let lastRun = null;
+  // erros da corrida com a explicação de cada um (3 vidas = no máximo 3)
+  function paintMisses(list) {
+    const box = $('misses');
+    if (!list.length) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    box.innerHTML = '<h3>O QUE VOCÊ ERROU</h3><ol>' + list.map((m) =>
+      `<li>${m.t ? `<span class="mt">${richHtml(m.t)}</span> · ` : ''}${richHtml(m.x)} = <b>${richHtml(m.a)}</b> <span class="you">· você: <s>${richHtml(m.c)}</s></span>${m.why ? `<small>${richHtml(m.why)}</small>` : ''}</li>`).join('') + '</ol>';
+  }
+  // compartilhar o resultado (WhatsApp ou a folha de compartilhar do aparelho)
+  function shareResult() {
+    if (!lastRun) return;
+    const url = 'https://quantaaulas.com/corrida/' + (room ? '?sala=' + room.code : '');
+    const text = `Fiz ${fmt(lastRun.score)} pontos no modo ${GM.name} da Corrida Quanta${room ? ` (sala ${room.name})` : ''}! Consegue me vencer? ${url}`;
+    if (navigator.share) { navigator.share({ title: 'Corrida Quanta', text }).catch(() => {}); return; }
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  }
+  $('btnShare').addEventListener('click', shareResult);
   // números que sobem rolando
   function countUp(el, to, ms, from) {
     const a = from || 0, t0 = performance.now();
@@ -1755,7 +1839,14 @@
     if (baseScreen) $(baseScreen).classList.remove('show');
     $(id).classList.add('show');
     if (id === 'lockerScreen') { S.lockerOn = true; S.preview = null; document.body.classList.add('dressing'); renderLocker(); }
-    if (id === 'rankScreen') loadBoard(boardPeriod);
+    if (id === 'rankScreen') { boardMode = GM.id; paintRankModes(); loadBoard(boardPeriod); }
+    if (id === 'roomScreen') paintRoom();
+    if (id === 'guestScreen') {
+      $('guestRoom').textContent = room ? room.name : '';
+      $('guestInput').value = guestName(); $('guestErr').textContent = '';
+      $('guestLogin').href = '/conta/?return=' + encodeURIComponent('/corrida/' + (room ? '?sala=' + room.code : ''));
+      setTimeout(() => $('guestInput').focus(), 50);
+    }
     if (id === 'nickScreen') {
       const inp = $('nickInput');
       inp.value = cloud.nickname || (QC.Online && QC.Online.user ? QC.Online.user.firstName : '') || '';
@@ -1771,9 +1862,9 @@
     if (baseScreen && (S.mode === 'menu' || S.mode === 'over')) $(baseScreen).classList.add('show');
     baseScreen = null;
   }
-  $$('[data-open]').forEach((b) => b.addEventListener('click', () => openScreen(b.dataset.open === 'locker' ? 'lockerScreen' : 'rankScreen')));
+  $$('[data-open]').forEach((b) => b.addEventListener('click', () => openScreen({ locker: 'lockerScreen', rank: 'rankScreen', room: 'roomScreen' }[b.dataset.open])));
   $$('[data-close]').forEach((b) => b.addEventListener('click', closePanel));
-  ['lockerScreen', 'rankScreen', 'nickScreen'].forEach((id) => $(id).addEventListener('click', (e) => { if (e.target.id === id) closePanel(); }));
+  ['lockerScreen', 'rankScreen', 'nickScreen', 'roomScreen', 'reportScreen', 'guestScreen'].forEach((id) => $(id).addEventListener('click', (e) => { if (e.target.id === id) closePanel(); }));
 
   const RARITY = { 'comum': 'comum', 'rara': 'rara', 'épica': 'epica', 'lendária': 'lendaria' };
   const LOCK_SVG = '<svg class="lock" viewBox="0 0 6 7" shape-rendering="crispEdges" aria-hidden="true"><path fill="#ffd23f" d="M1 0h4v1H1zM0 1h1v2H0zM5 1h1v2H5zM0 3h6v4H0z"/><path fill="#000" d="M2 4h2v2H2z"/></svg>';
@@ -1868,12 +1959,20 @@
     renderLocker();
   });
 
-  let boardPeriod = 'week';
-  $$('.tab').forEach((t) => t.addEventListener('click', () => {
+  let boardPeriod = 'week', boardMode = GM.id;
+  $$('[data-period]').forEach((t) => t.addEventListener('click', () => {
     boardPeriod = t.dataset.period;
-    $$('.tab').forEach((x) => { x.classList.toggle('on', x === t); x.setAttribute('aria-selected', String(x === t)); });
+    $$('[data-period]').forEach((x) => { x.classList.toggle('on', x === t); x.setAttribute('aria-selected', String(x === t)); });
     loadBoard(boardPeriod);
   }));
+  function paintRankModes() {
+    $('rankModes').innerHTML = QC.Modes.list.map((id) => `<button class="tab${id === boardMode ? ' on' : ''}" type="button" role="tab" data-rank-mode="${id}" aria-selected="${id === boardMode}">${esc(QC.Modes.get(id).name.toUpperCase())}</button>`).join('');
+  }
+  $('rankModes').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rank-mode]');
+    if (!b) return;
+    boardMode = b.dataset.rankMode; paintRankModes(); loadBoard(boardPeriod);
+  });
   let boardReq = 0;
   const BOARD_SIZE = 20;
   async function loadBoard(period) {
@@ -1884,7 +1983,7 @@
       return;
     }
     el.innerHTML = '<li class="board-msg">Carregando...</li>';
-    const rows = await QC.Online.leaderboard(period, BOARD_SIZE);
+    const rows = await QC.Online.leaderboard(period, BOARD_SIZE, boardMode);
     if (req !== boardReq) return;
     if (!rows) { el.innerHTML = `<li class="board-msg">${embedded ? 'O ranking funciona no site: quantaaulas.com/corrida' : 'Não foi possível carregar o ranking. Tente de novo.'}</li>`; return; }
     if (!rows.length) { el.innerHTML = `<li class="board-msg">Ninguém pontuou ${period === 'week' ? 'nesta semana' : 'ainda'}. O primeiro lugar pode ser seu!</li>`; return; }
@@ -1947,27 +2046,164 @@
   }
   // seletor de modo (no início e no fim de corrida)
   function paintModes() {
-    $$('.modes').forEach((box) => {
+    $$('.modes:not(.create-modes)').forEach((box) => {
       box.innerHTML = QC.Modes.list.map((id) => {
         const m = QC.Modes.get(id), on = id === GM.id;
-        return `<button class="mode${on ? ' on' : ''}" type="button" data-mode="${id}" aria-pressed="${on}">${esc(m.name.toUpperCase())}</button>`;
+        return `<button class="mode${on ? ' on' : ''}" type="button" data-mode="${id}" aria-pressed="${on}"${room ? ' disabled' : ''}>${esc(m.name.toUpperCase())}</button>`;
       }).join('');
     });
     $('modeTag').textContent = `QUANTA AULAS · ${GM.tag}`;
     $('modeIntro').textContent = GM.intro;
+    // na sala o modo é o da sala
+    const gn = !QC.Online.user && guestName();
+    const rl = room ? `Sala <b>${esc(room.name)}</b> (${room.code}) · ${esc(QC.Modes.get(room.mode).name)}${gn ? ` · você: ${esc(gn)}` : ''} · <button class="link" type="button" data-act="leave-room">sair</button>` : '';
+    $$('.room-line').forEach((el) => { el.innerHTML = rl; el.hidden = !rl; });
+  }
+  function setMode(id) {
+    GM = QC.Modes.get(id);
+    document.body.classList.toggle('rich', !!GM.rich);
+    store.set('quanta-corrida-mode', GM.id);
+    applyModeSpeed();
+    paintGlyphs();
+    refreshMenus();
   }
   document.addEventListener('click', (e) => {
     const m = e.target.closest('[data-mode]');
-    if (m && (S.mode === 'menu' || S.mode === 'over') && m.dataset.mode !== GM.id) {
-      GM = QC.Modes.get(m.dataset.mode);
-      document.body.classList.toggle('rich', !!GM.rich);
-      store.set('quanta-corrida-mode', GM.id);
-      applyModeSpeed();
-      refreshMenus();
-      return;
-    }
+    if (m && !room && (S.mode === 'menu' || S.mode === 'over') && m.dataset.mode !== GM.id) { setMode(m.dataset.mode); return; }
+    const cm = e.target.closest('[data-cmode]');
+    if (cm) { createMode = cm.dataset.cmode; paintCreateModes(); return; }
     const b = e.target.closest('[data-act]');
-    if (b && b.dataset.act === 'nick') openScreen('nickScreen');
+    if (!b) return;
+    const act = b.dataset.act;
+    if (act === 'nick') openScreen('nickScreen');
+    else if (act === 'guest-name') openScreen('guestScreen');
+    else if (act === 'leave-room') { leaveRoom(); if (openPanel === 'roomScreen') paintRoom(); toast('Você saiu da sala.'); }
+    else if (act === 'join') joinRoom(b.dataset.code).then((r) => { if (r.ok) { toast(`Você entrou na sala ${esc(r.room.name)}`); if (openPanel === 'roomScreen') paintRoom(); } });
+    else if (act === 'report') openReport(b.dataset.code);
+    else if (act === 'refresh-report') openReport(b.dataset.code);
+    else if (act === 'toggle-room') QC.Online.roomOpen(b.dataset.code, b.dataset.open === '1').then((r) => { if (r && r.ok) { if (room && room.code === b.dataset.code) room.open = r.open; openReport(b.dataset.code); } else toast('Não deu para alterar a sala agora.'); });
+    else if (act === 'copy-link' || act === 'share-room') {
+      const link = 'https://quantaaulas.com/corrida/?sala=' + (room ? room.code : b.dataset.code);
+      const text = `Entre na sala ${room ? room.name : ''} da Corrida Quanta e jogue ${QC.Modes.get(room ? room.mode : GM.id).name}: ${link}`;
+      if (act === 'share-room' && navigator.share) { navigator.share({ title: 'Corrida Quanta', text }).catch(() => {}); return; }
+      if (act === 'share-room') { window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener'); return; }
+      (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link copiado!'), () => prompt('Copie o link da sala:', link));
+    }
+  });
+
+  // ================= Sala de turma =================
+  // O professor cria a sala (código de 5 letras) e manda o link; os alunos jogam as mesmas perguntas
+  // e o resultado vai para a sala. Sem conta, o aluno entra como convidado (nome guardado neste aparelho).
+  const ROOM_KEY = 'quanta-corrida-room', GUEST_KEY = 'quanta-corrida-guest-name';
+  const guestName = () => String(store.get(GUEST_KEY, '') || '');
+  let createMode = GM.id;
+  function setRoom(r) {
+    room = r;
+    store.set(ROOM_KEY, r ? r.code : '');
+    if (r && GM.id !== r.mode) setMode(r.mode); else refreshMenus();
+  }
+  async function joinRoom(code) {
+    const c = String(code || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{5}$/.test(c)) return { error: 'invalid' };
+    if (!onlineReady) return { error: 'offline' };
+    const r = await QC.Online.roomGet(c);
+    if (r === undefined) return { error: 'offline' };
+    if (!r) return { error: 'not_found' };
+    setRoom(r);
+    if (!QC.Online.user && !guestName()) openScreen('guestScreen');
+    return { ok: true, room: r };
+  }
+  function leaveRoom() { setRoom(null); }
+  const ROOM_ERR = { invalid: 'O código tem 5 letras ou números.', offline: 'Sem conexão agora. Tente de novo daqui a pouco.', not_found: 'Sala não encontrada. Confira o código.', too_fast: 'Espere alguns segundos e tente de novo.', limit: 'Você já tem muitas salas abertas.', anonymous: 'Entre com sua conta Quanta para criar salas.' };
+  function paintCreateModes() {
+    const el = $('createModes');
+    if (!el) return;
+    el.innerHTML = QC.Modes.list.map((id) => `<button class="mode${id === createMode ? ' on' : ''}" type="button" data-cmode="${id}" aria-pressed="${id === createMode}">${esc(QC.Modes.get(id).name.toUpperCase())}</button>`).join('');
+  }
+  function paintRoom() {
+    const b = $('roomBody');
+    if (!onlineReady) { b.innerHTML = `<p class="tip">${embedded ? 'As salas funcionam no site: quantaaulas.com/corrida' : 'Sem conexão agora. Tente de novo daqui a pouco.'}</p>`; return; }
+    const u = QC.Online.user;
+    let html = '';
+    if (room) {
+      const link = `https://quantaaulas.com/corrida/?sala=${room.code}`;
+      html += `<div class="room-box"><h3>VOCÊ ESTÁ NA SALA</h3><p><b>${esc(room.name)}</b> · ${esc(QC.Modes.get(room.mode).name)}${room.owner ? ' · criada por você' : ''}${!room.open ? ' · <b>fechada</b>' : ''}</p>
+        <div class="room-code">${room.code}</div><p class="mono">${link}</p>
+        <div class="row2" style="margin-top:6px"><button class="btn alt" type="button" data-act="copy-link">COPIAR LINK</button><button class="btn alt" type="button" data-act="share-room">ENVIAR LINK</button></div>
+        ${room.owner ? `<button class="btn" type="button" data-act="report" data-code="${room.code}" style="margin-top:10px">VER RESULTADOS DA TURMA</button>` : ''}
+        ${!u ? `<button class="link" type="button" data-act="guest-name">Seu nome na sala: ${esc(guestName() || 'escolher')}</button><br>` : ''}
+        <button class="link" type="button" data-act="leave-room">Sair da sala</button></div>`;
+    } else {
+      html += `<div class="room-box"><h3>ENTRAR NUMA SALA</h3><p>Peça o código de 5 letras ao professor ou abra o link que ele mandou.</p>
+        <form id="joinForm" autocomplete="off"><input class="field" id="joinInput" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters" spellcheck="false"><div class="err" id="joinErr"></div><button class="btn" type="submit">ENTRAR</button></form></div>`;
+    }
+    html += '<div class="room-box"><h3>CRIAR SALA (PROFESSOR)</h3>';
+    if (!u) html += `<p>Entre com sua conta Quanta para criar salas para a sua turma.</p><a class="btn alt google" href="${accountUrl}">${GOOGLE_SVG} Entrar com Google</a>`;
+    else html += `<p>Os alunos entram pelo link e jogam as mesmas perguntas. Você vê o ranking da turma e o que mais erraram.</p>
+      <form id="createForm" autocomplete="off"><input class="field" id="createName" maxlength="40" placeholder="Nome da turma (ex.: 9º A)" required><div class="modes create-modes small" id="createModes"></div><div class="err" id="createErr"></div><button class="btn" type="submit">CRIAR SALA</button></form>`;
+    html += '</div>';
+    if (u) html += '<div class="room-box"><h3>MINHAS SALAS</h3><ul class="room-list" id="roomList"><li class="board-msg">Carregando...</li></ul></div>';
+    b.innerHTML = html;
+    if (u) { paintCreateModes(); loadRoomList(); }
+    const jf = $('joinForm');
+    if (jf) jf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = jf.querySelector('button'); btn.disabled = true; $('joinErr').textContent = '';
+      const r = await joinRoom($('joinInput').value);
+      btn.disabled = false;
+      if (r.ok) { toast(`Você entrou na sala ${esc(r.room.name)}`); if (openPanel === 'roomScreen') paintRoom(); }
+      else $('joinErr').textContent = ROOM_ERR[r.error] || 'Não deu para entrar agora.';
+    });
+    const cf = $('createForm');
+    if (cf) cf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = cf.querySelector('button[type=submit]'); btn.disabled = true; $('createErr').textContent = '';
+      const r = await QC.Online.roomCreate($('createName').value, createMode);
+      btn.disabled = false;
+      if (r && r.ok) { const rr = await QC.Online.roomGet(r.code); if (rr) setRoom(rr); toast(`Sala ${esc(r.name)} criada: ${r.code}`); if (openPanel === 'roomScreen') paintRoom(); }
+      else $('createErr').textContent = r && r.error === 'invalid' ? 'Use de 2 a 40 letras ou números no nome da turma.' : ROOM_ERR[r && r.error] || 'Não deu para criar a sala agora.';
+    });
+  }
+  async function loadRoomList() {
+    const list = await QC.Online.roomList();
+    const el = $('roomList');
+    if (!el) return;
+    if (!list) { el.innerHTML = '<li class="board-msg">Não deu para carregar suas salas.</li>'; return; }
+    if (!list.length) { el.innerHTML = '<li class="board-msg">Você ainda não criou nenhuma sala.</li>'; return; }
+    el.innerHTML = list.map((r) => `<li><span><b>${r.code}</b> ${esc(r.name)}<small>${esc(QC.Modes.get(r.mode).name)} · ${r.participants} aluno${r.participants === 1 ? '' : 's'} · ${r.runs} corrida${r.runs === 1 ? '' : 's'}${r.open ? '' : ' · fechada'}</small></span>
+      <button class="btn alt mini" type="button" data-act="join" data-code="${r.code}">ENTRAR</button><button class="btn alt mini" type="button" data-act="report" data-code="${r.code}">RESULTADOS</button></li>`).join('');
+  }
+  async function openReport(code) {
+    if (openPanel !== 'reportScreen') openScreen('reportScreen');
+    const body = $('reportBody');
+    body.innerHTML = '<p class="tip">Carregando...</p>';
+    const r = await QC.Online.roomReport(code);
+    if (openPanel !== 'reportScreen') return;
+    if (!r || !r.ok) { body.innerHTML = `<p class="tip">${r && r.error === 'forbidden' ? 'Só quem criou a sala vê os resultados.' : 'Não deu para carregar os resultados agora.'}</p>`; return; }
+    const rm = r.room, players = r.players || [], misses = r.misses || [];
+    $('reportTag').textContent = `RESULTADOS · ${rm.code}`;
+    let html = `<div class="room-box"><h3>${esc(rm.name)}</h3><p>${esc(QC.Modes.get(rm.mode).name)} · ${players.length} aluno${players.length === 1 ? '' : 's'} · ${rm.runs} corrida${rm.runs === 1 ? '' : 's'} · ${rm.open ? 'aberta' : 'fechada'}</p>
+      <div class="row2"><button class="btn alt" type="button" data-act="refresh-report" data-code="${rm.code}">ATUALIZAR</button><button class="btn alt" type="button" data-act="toggle-room" data-code="${rm.code}" data-open="${rm.open ? '0' : '1'}">${rm.open ? 'FECHAR SALA' : 'REABRIR SALA'}</button></div></div>`;
+    if (!players.length) html += '<p class="tip">Ninguém jogou ainda. Mande o link da sala para a turma.</p>';
+    else {
+      html += '<table class="rep-table"><thead><tr><th>#</th><th>Aluno</th><th class="n">Pontos</th><th class="n">Acertos</th><th class="n">Corridas</th></tr></thead><tbody>';
+      players.forEach((p, i) => { html += `<tr><td class="n">${i + 1}</td><td>${esc(p.name)}${p.guest ? '<span class="rep-badge">sem conta</span>' : ''}</td><td class="n">${fmt(p.score)}</td><td class="n">${p.hits}</td><td class="n">${p.runs}</td></tr>`; });
+      html += '</tbody></table>';
+      if (misses.length) {
+        html += '<div class="misses"><h3>PERGUNTAS MAIS ERRADAS</h3><ol>' + misses.map((m) =>
+          `<li>${m.t ? `<span class="mt">${richHtml(m.t)}</span> · ` : ''}${richHtml(m.x)} = <b>${richHtml(m.a)}</b><small>${m.students} aluno${m.students === 1 ? '' : 's'} errou${m.students === 1 ? '' : 'am'} (${m.total} vez${m.total === 1 ? '' : 'es'})</small></li>`).join('') + '</ol></div>';
+      } else html += '<p class="tip">Nenhum erro registrado até agora.</p>';
+    }
+    body.innerHTML = html;
+  }
+  $('guestForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = $('guestInput').value.trim().replace(/\s+/g, ' ');
+    if (v.length < 2) { $('guestErr').textContent = 'Escreva pelo menos 2 letras.'; return; }
+    store.set(GUEST_KEY, v.slice(0, 24));
+    closePanel(); refreshMenus();
+    toast(`Bem-vindo à sala, ${esc(v)}!`);
+    if (S.mode === 'over' && lastRun && lastRun.room && $('onlineLine').dataset.needsName) { delete $('onlineLine').dataset.needsName; submitOnline(lastRun); }
   });
 
   $('nickForm').addEventListener('submit', async (e) => {
@@ -2026,7 +2262,28 @@
     const line = $('onlineLine');
     delete line.dataset.needsNick;
     if (embedded) { line.textContent = ''; return; }
-    if (!run.ranked) { line.textContent = run.score > 0 ? 'Por enquanto o ranking online é só do modo Matemática. Seu recorde deste modo fica salvo.' : ''; return; }
+    delete line.dataset.needsName;
+    if (run.room) {
+      if (run.score <= 0) { line.textContent = 'Corrida sem pontos: nada foi para a sala.'; return; }
+      if (!onlineReady) { line.textContent = 'Sem conexão: o resultado não foi para a sala.'; return; }
+      if (!QC.Online.user && !guestName()) {
+        line.innerHTML = '<button class="link" type="button" data-act="guest-name">Escreva seu nome</button> para o resultado entrar na sala.';
+        line.dataset.needsName = '1';
+        return;
+      }
+      line.textContent = 'Enviando para a sala...';
+      const r = await QC.Online.roomSubmit(run.room.code, run, run.misses, guestName());
+      if (r && r.ok) line.innerHTML = `Sala <b>${esc(run.room.name)}</b>: você está em <b>#${r.rank}</b> de ${r.participants}${r.best > run.score ? ` (seu melhor: ${fmt(r.best)})` : ''}.`;
+      else line.textContent = {
+        closed: 'A sala foi fechada pelo professor: o resultado não entrou.',
+        invalid_name: 'Esse nome não é permitido na sala. Escolha outro.',
+        too_fast: 'Espere alguns segundos entre uma corrida e outra para contar na sala.',
+        limit: 'A sala chegou ao limite de corridas.',
+        not_found: 'Sala não encontrada.',
+        anonymous: 'Escreva seu nome para o resultado entrar na sala.',
+      }[r && r.error] || 'Não deu para enviar o resultado para a sala agora.';
+      return;
+    }
     if (!onlineReady || !QC.Online.user) {
       if (!run.ticket) line.innerHTML = `<a class="link" href="${accountUrl}">Entre com sua conta Quanta</a> para aparecer no ranking.`;
       return;
@@ -2267,6 +2524,14 @@
       onlineReady = ok;
       refreshMenus();
       if (ok && QC.Online.user) loadMe();
+      // sala pelo link (?sala=CODIGO) ou a última em que entrou neste aparelho
+      const fromUrl = new URLSearchParams(location.search).get('sala');
+      const code = fromUrl || store.get(ROOM_KEY, '');
+      if (ok && code) joinRoom(code).then((r) => {
+        if (r.ok) { if (fromUrl) toast(`Você entrou na sala ${esc(r.room.name)}<small>${esc(QC.Modes.get(r.room.mode).name)} · todo mundo joga as mesmas perguntas</small>`); }
+        else if (fromUrl) toast('Sala não encontrada. Confira o link com o professor.');
+        else if (r.error === 'not_found') store.set(ROOM_KEY, '');
+      });
     });
   }
 

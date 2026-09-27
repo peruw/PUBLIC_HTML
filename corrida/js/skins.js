@@ -39,6 +39,12 @@
     { id: 'arcoiris', name: 'Arco-íris', desc: 'Capa de arco-íris que tremula e cintila com a velocidade.', rarity: 'lendária', color: '#b58cff',
       swatch: ['#ff4f6a', '#ffe14a', '#4fe08a', '#4fb4ff'],
       unlock: { type: 'xp', value: 10000, label: 'Acumule 10.000 pontos' } },
+    { id: 'alquimista', name: 'Alquimista', desc: 'Avental de laboratório, luvas roxas e óculos de proteção. Cuidado com o frasco borbulhando nas costas.', rarity: 'épica', color: '#b06cff',
+      swatch: ['#b06cff', '#1fd685', '#f2f6f4', '#2a1a3a'],
+      unlock: { type: 'hits_quim', value: 60, label: 'Acerte 60 portais em Química' } },
+    { id: 'genio', name: 'Gênio da Física', desc: 'Cabelo elétrico, suéter de lã e E = mc² nas costas. As ideias faíscam na cabeça.', rarity: 'épica', color: '#ffd23f',
+      swatch: ['#f4f1ea', '#8a5a3a', '#ffd23f', '#3a6ad8'],
+      unlock: { type: 'hits_fis', value: 60, label: 'Acerte 60 portais em Física' } },
   ];
   const RARITY_COLORS = { comum: '#9fc2b0', rara: '#46b8ff', 'épica': '#c77dff', 'lendária': '#ffd23f' };
   const DEFAULT = 'quanta';
@@ -752,6 +758,79 @@
         segs[i].mat.color.setRGB(b, b, b);
       }
       capeTex.offset.y = hemTex.offset.y = 1 - ((Math.floor(t * (3 + sf * 6)) % N + N) % N + 1) / N;  // desliza de pixel em pixel
+    };
+  };
+
+  // Alquimista (Química): avental verde sobre camisa escura, luvas roxas, óculos de proteção e frasco nas costas
+  BUILD.alquimista = (k, r) => {
+    const shirt = k.lam(0x2a1a3a), apron = k.lam(0x1fd685), pants = k.lam(0x1c1230), skin = k.lam(SKIN), glove = k.lam(0xb06cff), hair = k.lam(0x3be8c8);
+    stdLegs(k, r, { shorts: pants, shin: pants, shoe: k.lam(0x0f0a18), sole: k.lam(0x1fd685) });
+    stdArms(k, r, { sleeve: shirt, fore: shirt, hand: glove }, (sh) => k.box(0.27, 0.05, 0.29, glove, 0, -0.63, 0, sh));   // punho da luva
+    const back = k.painted(16, 16, (g, em) => {
+      if (!em) P(g, '#2a1a3a', 0, 0, 16, 16);
+      // frasco: gargalo, bojo e líquido brilhante com bolhas
+      const pal = em ? { l: '#1fd685', b: '#7dffc0' } : { g: '#cfe6ff', v: '#9fc2ff', l: '#1fd685', b: '#7dffc0', r: '#e8c14a' };
+      bmp(g, 4, 1, ['...gg...', '...gg...', '...gg...', '..gvvg..', '.gvvvvg.', 'gvllllvg', 'gllbllbg', 'glllblll', 'gllllllg', '.gggggg.'], pal);
+      if (!em) P(g, '#e8c14a', 6, 0, 4, 1);  // rolha
+    }, true);
+    const front = k.painted(16, 16, (g) => {
+      P(g, '#2a1a3a', 0, 0, 16, 16);
+      P(g, '#1fd685', 3, 3, 10, 13); P(g, '#0f7a4c', 3, 3, 10, 1);          // avental com barra
+      P(g, '#0f7a4c', 5, 0, 1, 3); P(g, '#0f7a4c', 10, 0, 1, 3);           // alças
+      P(g, '#0f7a4c', 5, 9, 6, 4); P(g, '#7dffc0', 6, 10, 1, 1); P(g, '#b06cff', 8, 10, 1, 2);   // bolso com tubos
+      bmp(g, 6, 4, ['.ww.', 'w..w', '.ww.'], { w: '#eafff3' });                // logo redondo
+    });
+    torso(k, r, F(shirt, back, front));
+    // cabeça: cabelo bagunçado verde-água, óculos de proteção na testa
+    const faceM = face(k, hx(SKIN), ['hhhhhhhh', 'hh.hhh.h', 'h......h', '..e..e..', '........', '.c....c.', '..mmmm..', '........'],
+      { h: '#3be8c8', e: '#1a1410', m: '#a8584a', c: '#f0a58a' });
+    skull(k, r, F(skin, null, faceM));
+    k.box(0.7, 0.4, 0.66, hair, 0, 0.12, 0.04, r.head);
+    for (const [x, y, z, w] of [[-0.22, 0.4, -0.12, 0.16], [0.08, 0.44, 0.02, 0.18], [0.28, 0.38, 0.18, 0.14], [-0.05, 0.4, 0.24, 0.16]]) k.box(w, 0.14, 0.16, hair, x, y, z, r.head);
+    const strap = k.lam(0x15181b), lens = k.glow(0xb06cff);
+    k.box(0.7, 0.07, 0.02, strap, 0, 0.2, -0.33, r.head);                  // faixa dos óculos
+    for (const s of [-1, 1]) { k.box(0.22, 0.16, 0.05, strap, s * 0.16, 0.2, -0.345, r.head); k.box(0.14, 0.1, 0.02, lens, s * 0.16, 0.2, -0.37, r.head); }
+    // bolhas do frasco (brilhos verdes subindo nas costas)
+    return sparkles(k, r, 4, 0x7dffc0, [[0, 1.7, 0.3, 0.3, 0.5]]);
+  };
+
+  // Gênio da Física: cabelo branco elétrico, bigode, suéter de lã com E = mc² nas costas e ideias faiscando
+  BUILD.genio = (k, r) => {
+    const wool = k.lam(0x8a5a3a), woolD = k.lam(0x6b4429), pants = k.lam(0x3a4050), skin = k.lam(SKIN), hair = k.lam(0xf4f1ea);
+    stdLegs(k, r, { shorts: pants, shin: pants, shoe: k.lam(0x2a1a10), sole: k.lam(0x17110d) });
+    stdArms(k, r, { sleeve: wool, fore: wool, hand: skin }, (sh) => k.box(0.27, 0.05, 0.29, woolD, 0, -0.42, 0, sh));   // punho da manga
+    const back = k.painted(16, 16, (g, em) => {
+      if (!em) { P(g, '#8a5a3a', 0, 0, 16, 16); for (let y = 0; y < 16; y += 2) P(g, '#7a4e30', 0, y, 16, 1); }   // trama da lã
+      const pal = { w: em ? '#ffd23f' : '#ffe98a' };
+      bmp(g, 1, 3, ['www..........', 'w......www...', 'www....w..w..', 'w......www...', 'www..........'], pal);        // E =
+      bmp(g, 2, 9, ['w.w.w..www..www', 'ww.ww.w....w...', 'w.w.w.w....www.', 'w...w.w......w.', 'w...w..www.www.'], pal);   // mc²
+    }, true);
+    const front = k.painted(16, 16, (g) => {
+      P(g, '#8a5a3a', 0, 0, 16, 16); for (let y = 0; y < 16; y += 2) P(g, '#7a4e30', 0, y, 16, 1);
+      P(g, '#f4f1ea', 5, 0, 6, 3); P(g, '#3a6ad8', 7, 1, 2, 6);                // gola da camisa e gravata
+      P(g, '#6b4429', 2, 12, 5, 3); P(g, '#6b4429', 9, 12, 5, 3);            // bolsos
+    });
+    torso(k, r, F(wool, back, front));
+    // cabeça: cabelo branco pra todo lado, bigode, óculos redondos
+    const faceM = face(k, hx(SKIN), ['hhhhhhhh', 'h.hhhh.h', '........', '..e..e..', '........', '.bbbbbb.', '..mmmm..', '........'],
+      { h: '#f4f1ea', e: '#1a1410', b: '#e8e2d6', m: '#a8584a' });
+    skull(k, r, F(skin, null, faceM));
+    k.box(0.72, 0.42, 0.68, hair, 0, 0.14, 0.04, r.head);
+    const tufts = [];
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2, rr = 0.34 + (i % 2) * 0.06;
+      const p = k.pivot(Math.cos(a) * rr, 0.3 + (i % 3) * 0.04, Math.sin(a) * rr * 0.9, r.head);
+      p.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9);
+      k.box(0.14, 0.34, 0.14, hair, 0, 0.14, 0, p);
+      tufts.push({ p, a });
+    }
+    const frame = k.lam(0x2b2b2b), lens = k.glow(0xd8f0ff);
+    for (const s of [-1, 1]) { k.box(0.2, 0.2, 0.03, frame, s * 0.16, 0.03, -0.325, r.head); k.box(0.14, 0.14, 0.02, lens, s * 0.16, 0.03, -0.345, r.head); }
+    k.box(0.06, 0.03, 0.03, frame, 0, 0.03, -0.33, r.head);
+    const spark = sparkles(k, r, 5, 0xffd23f, [[0, 2.85, 0, 0.9, 0.3]]);
+    return (dt, t, sf) => {
+      spark(dt);
+      tufts.forEach((tf, i) => { const w = Math.sin(t * (6 + sf * 8) + i) * (0.08 + sf * 0.12); tf.p.rotation.x = Math.sin(tf.a) * 0.9 + w; tf.p.rotation.z = -Math.cos(tf.a) * 0.9 + w * 0.6; });
     };
   };
 

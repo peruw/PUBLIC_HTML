@@ -8,7 +8,7 @@
   const LEGACY_BEST = 'quanta-corrida-best';
 
   function blank() {
-    return { v: 1, xp: 0, bestScore: 0, maxLevel: 1, maxCombo: 0, maxSpeed: 1, totalHits: 0, runs: 0, skins: ['quanta'], skin: 'quanta', bests: { mat: 0, quim: 0, fis: 0 }, updatedAt: 0 };
+    return { v: 1, xp: 0, bestScore: 0, maxLevel: 1, maxCombo: 0, maxSpeed: 1, totalHits: 0, runs: 0, skins: ['quanta'], skin: 'quanta', bests: { mat: 0, quim: 0, fis: 0 }, hitsBy: { mat: 0, quim: 0, fis: 0 }, updatedAt: 0 };
   }
 
   function sanitize(p) {
@@ -32,6 +32,8 @@
         o[m] = Math.floor(m === 'mat' && !(p.bests && typeof p.bests === 'object') ? num(p.bestScore, 0) : v);
         return o;
       }, {}),
+      // acertos por modo (desbloqueiam as skins de cada matéria)
+      hitsBy: ['mat', 'quim', 'fis'].reduce((o, m) => { o[m] = Math.floor(p.hitsBy && typeof p.hitsBy === 'object' ? num(p.hitsBy[m], 0) : 0); return o; }, {}),
       updatedAt: num(p.updatedAt, 0),
     };
   }
@@ -66,6 +68,7 @@
         case 'best': return s.bestScore;
         case 'speed': return s.maxSpeed;
         case 'hits': return s.totalHits;
+        case 'hits_mat': case 'hits_quim': case 'hits_fis': return (s.hitsBy || {})[type.slice(5)] || 0;
         default: return Infinity;
       }
     },
@@ -78,7 +81,10 @@
     checkUnlocks(live) {
       const list = (QC.Skins && QC.Skins.list) || [];
       const fresh = [];
+      const hitsBy = Object.assign({}, this.data.hitsBy);
+      if (live && live.mode) hitsBy[live.mode] = (hitsBy[live.mode] || 0) + live.hits;
       const stats = live ? {
+        hitsBy,
         xp: this.data.xp + live.score,
         maxCombo: Math.max(this.data.maxCombo, live.maxCombo),
         maxLevel: Math.max(this.data.maxLevel, live.maxLevel),
@@ -109,6 +115,7 @@
       d.maxCombo = Math.max(d.maxCombo, run.maxCombo);
       d.maxSpeed = Math.max(d.maxSpeed, Math.round(run.maxSpeed * 100) / 100);
       d.totalHits += run.hits;
+      d.hitsBy[mode] = (d.hitsBy[mode] || 0) + run.hits;
       d.runs += 1;
       const fresh = this.checkUnlocks();
       this.save();

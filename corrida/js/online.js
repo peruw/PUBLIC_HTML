@@ -1,7 +1,8 @@
-// Corrida Quanta — apelido e ranking (Supabase do projeto fisora).
+// Corrida Quanta — apelido, ranking por modo e salas de turma (Supabase do projeto fisora).
 // O login é o único do site (/conta/): o jogo só lê essa sessão. Skins, XP e recordes
 // ficam em localStorage ('quanta-corrida-profile') e a conta do site sincroniza sozinha.
 // Tudo aqui é opcional: sem internet ou sem conta, o jogo segue no modo local.
+// Salas: quem entra sem conta participa como convidado (nome + id gerado neste aparelho).
 (() => {
   'use strict';
   window.QC = window.QC || {};
@@ -51,11 +52,27 @@
     }
   }
 
+  // identidade de convidado nas salas (só neste aparelho)
+  function guestId() {
+    const K = 'quanta-corrida-guest';
+    try {
+      let id = localStorage.getItem(K);
+      if (!id || !/^[0-9a-f-]{36}$/.test(id)) {
+        id = (crypto.randomUUID && crypto.randomUUID()) || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+        });
+        localStorage.setItem(K, id);
+      }
+      return id;
+    } catch (e) { return null; }
+  }
+
   const Online = {
     get available() { return !!sb; },
     get user() { return user; },
     // login e "Minha conta" são a página de conta do site, que volta para o jogo
     accountUrl: '/conta/?return=' + encodeURIComponent(RETURN),
+    guestId,
 
     async init() {
       if (sb) return true;
@@ -99,20 +116,57 @@
       return r.error ? null : r.data;
     },
 
-    // run: { runId, score, hits, maxLevel, maxCombo, maxSpeed, durationMs, skin }
+    // run: { runId, mode, score, hits, maxLevel, maxCombo, maxSpeed, durationMs, skin }
     async submitRun(run) {
       if (!run.runId) return { ok: false, error: 'no_run' };
       const r = await rpc('corrida_submit_run', {
-        p_run_id: run.runId, p_score: run.score, p_hits: run.hits, p_max_level: run.maxLevel, p_max_combo: run.maxCombo,
+        p_run_id: run.runId, p_mode: run.mode || 'mat', p_score: run.score, p_hits: run.hits, p_max_level: run.maxLevel, p_max_combo: run.maxCombo,
         p_max_speed: Math.round(run.maxSpeed * 100) / 100, p_duration_ms: Math.round(run.durationMs), p_skin: run.skin,
       });
       return r.error ? { ok: false, error: r.error } : r.data;
     },
 
-    // [{ rank, nickname, score, skin, is_me }]
-    async leaderboard(period, limit) {
-      const r = await rpc('corrida_leaderboard', { p_period: period === 'all' ? 'all' : 'week', p_limit: limit || 20 });
+    // [{ rank, nickname, score, skin, is_me }] do modo pedido
+    async leaderboard(period, limit, mode) {
+      const r = await rpc('corrida_leaderboard', { p_period: period === 'all' ? 'all' : 'week', p_limit: limit || 20, p_mode: mode || 'mat' });
       return r.error ? null : (r.data || []);
+    },
+
+    // ---------- salas de turma ----------
+    // { ok, code, name, mode } ou { ok:false, error }
+    async roomCreate(name, mode) {
+      const r = await rpc('corrida_room_create', { p_name: name, p_mode: mode });
+      return r.error ? { ok: false, error: 'offline' } : r.data;
+    },
+    // { code, name, mode, seed, owner, participants, open } | null (não existe) | undefined (falhou)
+    async roomGet(code) {
+      const r = await rpc('corrida_room_get', { p_code: code });
+      if (r.error) return undefined;
+      return r.data || null;
+    },
+    // run como em submitRun + misses [{k,t,x,a}]; guestName só sem conta
+    async roomSubmit(code, run, misses, guestName) {
+      const r = await rpc('corrida_room_submit', {
+        p_code: code, p_name: guestName || '', p_guest_id: user ? null : guestId(),
+        p_score: run.score, p_hits: run.hits, p_max_level: run.maxLevel, p_max_combo: run.maxCombo,
+        p_max_speed: Math.round(run.maxSpeed * 100) / 100, p_duration_ms: Math.round(run.durationMs), p_skin: run.skin,
+        p_misses: misses || [],
+      }, 12000);
+      return r.error ? { ok: false, error: r.error } : r.data;
+    },
+    // só quem criou a sala: { ok, room, players:[...], misses:[...] }
+    async roomReport(code) {
+      const r = await rpc('corrida_room_report', { p_code: code }, 12000);
+      return r.error ? { ok: false, error: r.error } : r.data;
+    },
+    // salas de quem está logado
+    async roomList() {
+      const r = await rpc('corrida_room_list');
+      return r.error ? null : (r.data || []);
+    },
+    async roomOpen(code, open) {
+      const r = await rpc('corrida_room_close', { p_code: code, p_open: !!open });
+      return r.error ? { ok: false, error: r.error } : r.data;
     },
   };
 
