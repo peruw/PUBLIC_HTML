@@ -83,7 +83,7 @@ const SONGS = {
     vol: { lead: 0.16, counter: 0.06, arp: 0.1, pad: 0.014, bass: 0.11 },
     sections: [
       {
-        drums: 'intro', bass: 'R..R..O.R..R.O5.', arp: 'stab',
+        id: 'intro', drums: 'intro', bass: 'R..R..O.R..R.O5.', arp: 'stab',
         bars: [
           ['Cmaj7', REST],
           ['Am7', REST],
@@ -92,7 +92,7 @@ const SONGS = {
         ],
       },
       {
-        drums: 'funk', bass: 'R.O.RO.5R.O.RO7.', arp: 'stab', crash: true,
+        id: 'estrofe', drums: 'funk', bass: 'R.O.RO.5R.O.RO7.', arp: 'stab', crash: true,
         bars: [
           ['Cmaj7', 'E6 - - C6 - - G5 - A5 - C6 - . . D6 -'],
           ['Am7', '- - E6 - . . C6 - - - . . A5 - C6 -'],
@@ -105,7 +105,7 @@ const SONGS = {
         ],
       },
       {
-        drums: 'funk2', bass: 'R-.R.O.5R-.R.O5A', arp: 'up16', pad: true,
+        id: 'ponte', drums: 'funk2', bass: 'R-.R.O.5R-.R.O5A', arp: 'up16', pad: true,
         bars: [
           ['Fmaj7', 'C6 - - A5 - - F5 - E6 - - - C6 - . .'],
           ['Em7', 'B5 - - G5 - - E5 - D6 - - - B5 - . .'],
@@ -118,7 +118,7 @@ const SONGS = {
         ],
       },
       {
-        drums: 'chorus', bass: 'R.OR.OR.R.OR.O5.', arp: 'stab', pad: true, crash: true,
+        id: 'refrao', drums: 'chorus', bass: 'R.OR.OR.R.OR.O5.', arp: 'stab', pad: true, crash: true,
         bars: [
           ['F', 'A5 - C6 - F6 - - - E6 - - F6 - - G6 -', 'F5 - - - - - - - A5 - - - - - - -'],
           ['G', '- - - - D6 - - - B5 - - C6 - - D6 -', 'G5 - - - - - - - B5 - - - - - - -'],
@@ -131,7 +131,7 @@ const SONGS = {
         ],
       },
       {
-        drums: 'chorus', bass: 'R.O.R.O.R.O.R.O.', arp: 'up16', pad: true, crash: true,
+        id: 'subida', drums: 'chorus', bass: 'R.O.R.O.R.O.R.O.', arp: 'up16', pad: true, crash: true,
         bars: [
           ['Abmaj7', 'C6 - - Eb6 - - G6 - - - Eb6 - C6 - - -'],
           ['Bb7', 'D6 - - F6 - - Ab6 - - - F6 - D6 - - -'],
@@ -196,6 +196,13 @@ const DRUMS = {
 
 const STAB = '..x..x....x..x..';
 
+// Variações da música da corrida por volta do jogador: a composição é a mesma,
+// só o arranjo muda (sem transpor: a melodia de metais fica estridente mais aguda).
+// Por seção: drums troca padrões de bateria pelo nome; arp troca o modo do arpejo.
+const LAP2 = { estrofe: { drums: { funk: 'drive', funkFill: 'driveFill' }, arp: { stab: 'updown' } } };
+const LAP3 = { ...LAP2, ponte: { drums: { funk2: 'half' } } };
+const raceVariant = (lap) => (lap >= 3 ? LAP3 : lap === 2 ? LAP2 : null);
+
 function parseLine(toks, steps, where) {
   const out = new Array(steps).fill(null);
   for (let i = 0; i < steps; i++) {
@@ -218,7 +225,7 @@ function compile(song) {
   const steps = bars.length * 16;
   const chords = new Array(steps), names = new Array(steps), arp = new Array(steps);
   const bass = new Array(steps).fill(null), pad = new Array(steps).fill(null), crash = new Array(steps).fill(false);
-  const drums = new Array(bars.length);
+  const drums = new Array(bars.length), drumName = new Array(bars.length), secId = new Array(bars.length);
   const leadT = [], ctrT = [];
   const cache = {};
   const ch = (n) => (cache[n] ||= chord(n));
@@ -235,8 +242,10 @@ function compile(song) {
     if (t.length !== 16 || c.length !== 16) throw new Error(`compasso ${b + 1}: ${t.length}/${c.length} passos`);
     leadT.push(...t);
     ctrT.push(...c);
-    drums[b] = DRUMS[dr || sec.drums];
-    if (!drums[b]) throw new Error(`compasso ${b + 1}: bateria "${dr || sec.drums}"`);
+    drumName[b] = dr || sec.drums;
+    drums[b] = DRUMS[drumName[b]];
+    secId[b] = sec.id || null;
+    if (!drums[b]) throw new Error(`compasso ${b + 1}: bateria "${drumName[b]}"`);
     if (sec.crash && first) crash[b * 16] = true;
   });
   bars.forEach(({ sec }, b) => {
@@ -268,7 +277,7 @@ function compile(song) {
   return {
     bpm: song.bpm, swing: song.swing, loopFrom: song.loopFrom, vol: song.vol, steps, leadInst: song.leadInst,
     lead: parseLine(leadT, steps, 'melodia'), counter: parseLine(ctrT, steps, 'contracanto'),
-    chords, arp, bass, pad, crash, drums,
+    chords, arp, bass, pad, crash, drums, drumName, secId,
   };
 }
 const COMPILED = {};
@@ -310,6 +319,11 @@ export class AudioSystem {
     this.finalLap = false;
     this.tempoMul = 1;
     this.volume = { master: 0.85, music: 0.5, sfx: 0.9 };
+    this._user = { music: 1, sfx: 1 }; // volume escolhido pelo jogador (0 a 1), multiplica o da mixagem
+    this._musicLap = 1; // volta do jogador (variações do arranjo da corrida)
+    this._profiles = new Map(); // kart → timbre do motor (cache por corrida)
+    this._rel = new Map(); // kart → lado em relação ao jogador (ultrapassagem)
+    this._wwT = 0; // próxima buzina de contramão
     this._world = null;
     this._lastUpdate = 0;
     this._last = Object.create(null);
@@ -363,19 +377,38 @@ export class AudioSystem {
     if (this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : this.volume.master, this.ctx.currentTime, 0.03);
   }
 
+  // Volume do jogador por tipo ('music' | 'sfx'), de 0 a 1 (padrão 1), com rampa suave
+  setVolume(kind, v) {
+    if (kind !== 'music' && kind !== 'sfx') return;
+    v = Math.max(0, Math.min(1, +v));
+    if (!Number.isFinite(v)) return;
+    this._user[kind] = v;
+    if (!this.ctx) return;
+    const g = kind === 'music' ? this.musicGain : this.sfxGain;
+    g.gain.setTargetAtTime(this.volume[kind] * v, this.ctx.currentTime, 0.05);
+  }
+
+  getVolume(kind) {
+    return this._user[kind] ?? 1;
+  }
+
   // Pausa (menu de pausa): silencia motor/derrapagem e congela a música
   pauseAll(b) {
     this.paused = !!b;
     if (!this.ctx) return;
     if (this.paused) this._silenceLoops(0.05);
-    else if (this._seq) this._seq.next = this.ctx.currentTime + 0.06;
+    else {
+      // o contexto pode ter sido suspenso (troca de aba, iOS 'interrupted')
+      if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+      if (this._seq) this._seq.next = this.ctx.currentTime + 0.06;
+    }
   }
 
   playMusic(name) {
     if (name && !COMPILED[name]) name = null;
     if (name === this.musicName && (this._seq || !this.ctx)) return;
     this.musicName = name;
-    if (name !== 'race') { this.finalLap = false; this.tempoMul = 1; }
+    if (name !== 'race') { this.finalLap = false; this.tempoMul = 1; this._musicLap = 1; }
     if (!this.ctx) return;
     this._stopSong(0.25);
     if (name) this._startSong(name);
@@ -416,11 +449,13 @@ export class AudioSystem {
     this.master = ctx.createGain();
     this.master.gain.value = this.muted ? 0 : this.volume.master;
     this.master.connect(this.comp).connect(ctx.destination);
+    // música → volume → "ducking" (abaixa nos momentos-chave) → master
     this.musicGain = ctx.createGain();
-    this.musicGain.gain.value = this.volume.music;
-    this.musicGain.connect(this.master);
+    this.musicGain.gain.value = this.volume.music * this._user.music;
+    this.duckGain = ctx.createGain();
+    this.musicGain.connect(this.duckGain).connect(this.master);
     this.sfxGain = ctx.createGain();
-    this.sfxGain.gain.value = this.volume.sfx;
+    this.sfxGain.gain.value = this.volume.sfx * this._user.sfx;
     this.sfxGain.connect(this.master);
     // ruído branco compartilhado (2 s)
     const len = ctx.sampleRate * 2;
@@ -444,12 +479,13 @@ export class AudioSystem {
     e.b.detune.value = 9;
     e.sub = ctx.createOscillator();
     e.sub.type = 'triangle';
-    const ga = ctx.createGain(); ga.gain.value = 0.5;
-    const gb = ctx.createGain(); gb.gain.value = 0.28;
-    const gs = ctx.createGain(); gs.gain.value = 0.6;
-    e.a.connect(ga).connect(e.filter);
-    e.b.connect(gb).connect(e.filter);
-    e.sub.connect(gs).connect(e.filter);
+    // ganhos guardados: o timbre de cada cientista muda a mistura (ver _profile)
+    e.ga = ctx.createGain(); e.ga.gain.value = 0.5;
+    e.gb = ctx.createGain(); e.gb.gain.value = 0.28;
+    e.gs = ctx.createGain(); e.gs.gain.value = 0.6;
+    e.a.connect(e.ga).connect(e.filter);
+    e.b.connect(e.gb).connect(e.filter);
+    e.sub.connect(e.gs).connect(e.filter);
     e.am = ctx.createGain();
     e.am.gain.value = 1;
     e.filter.connect(e.am).connect(e.out).connect(this.sfxGain);
@@ -501,6 +537,125 @@ export class AudioSystem {
     rb.lfoD.gain.value = 0.4;
     rb.lfo.connect(rb.lfoD).connect(rb.am.gain);
     rb.lfo.start();
+    // motor do adversário mais próximo: uma serra filtrada, com volume/pan pela posição
+    const rv = (this.rival = {});
+    rv.osc = ctx.createOscillator();
+    rv.osc.type = 'sawtooth';
+    rv.osc.frequency.value = 90;
+    rv.lp = ctx.createBiquadFilter();
+    rv.lp.type = 'lowpass';
+    rv.lp.frequency.value = 900;
+    rv.lp.Q.value = 1.5;
+    rv.out = ctx.createGain();
+    rv.out.gain.value = 0;
+    const rvPan = this._pan(0.001);
+    rv.pan = rvPan.out.pan || null;
+    rv.osc.connect(rv.lp).connect(rv.out).connect(rvPan.in);
+    rvPan.out.connect(this.sfxGain);
+    rv.osc.start();
+    // torcida perto da linha de chegada: ruído rosa em passa-faixa (300 a 1200 Hz)
+    const cr = (this.crowd = {});
+    cr.src = ctx.createBufferSource();
+    cr.src.buffer = this.pink = this._pinkNoise();
+    cr.src.loop = true;
+    cr.hp = ctx.createBiquadFilter();
+    cr.hp.type = 'highpass';
+    cr.hp.frequency.value = 300;
+    cr.lp = ctx.createBiquadFilter();
+    cr.lp.type = 'lowpass';
+    cr.lp.frequency.value = 1200;
+    cr.out = ctx.createGain();
+    cr.out.gain.value = 0;
+    cr.src.connect(cr.hp).connect(cr.lp).connect(cr.out).connect(this.sfxGain);
+    cr.src.start(0, Math.random() * 1.5);
+  }
+
+  // Ruído rosa (filtro de Paul Kellet), 2 s em laço: mais "cheio" que o branco, soa como multidão
+  _pinkNoise() {
+    const ctx = this.ctx, len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856;
+      b4 = 0.55 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+      b6 = w * 0.115926;
+    }
+    return buf;
+  }
+
+  // Ruído de hélice (só o Santos Dumont): criado na primeira vez que precisa
+  _propeller() {
+    if (this.prop) return this.prop;
+    const ctx = this.ctx;
+    const pr = (this.prop = {});
+    pr.src = this._noiseLoop();
+    pr.bp = ctx.createBiquadFilter();
+    pr.bp.type = 'bandpass';
+    pr.bp.frequency.value = 700;
+    pr.bp.Q.value = 0.9;
+    // as pás "cortam" o ar: ganho pulsando na frequência de passagem das pás
+    pr.am = ctx.createGain();
+    pr.am.gain.value = 0.5;
+    pr.lfo = ctx.createOscillator();
+    pr.lfo.frequency.value = 20;
+    pr.lfoD = ctx.createGain();
+    pr.lfoD.gain.value = 0.45;
+    pr.lfo.connect(pr.lfoD).connect(pr.am.gain);
+    pr.out = ctx.createGain();
+    pr.out.gain.value = 0;
+    pr.src.connect(pr.bp).connect(pr.am).connect(pr.out).connect(this.sfxGain);
+    pr.lfo.start();
+    return pr;
+  }
+
+  // Timbre do motor pelo cientista (peso) e pela classe (velocidade): cache por corrida
+  _profile(k, cc) {
+    let pf = this._profiles.get(k);
+    if (pf) return pf;
+    const st = (k.character && k.character.stats) || {};
+    const w = Math.max(-1, Math.min(1, ((st.weight ?? 3) - 3) / 2)); // -1 leve … +1 pesado
+    pf = {
+      // pesado = mais grave; a classe sobe o giro junto com a velocidade máxima
+      pitch: (1 - 0.13 * w) * ((cc && cc.speedMult) || 1),
+      beat: 0.35 + 0.2 * w, // profundidade da "batida de cilindro"
+      beatRate: 0.5 - 0.12 * w, // pulsos por ciclo: leves zunem mais rápido
+      saw: 0.5 - 0.06 * w,
+      buzz: 0.28 - 0.12 * w, // quadrada: o zunido do motor leve
+      sub: 0.6 + 0.25 * w,
+      bright: 1 - 0.18 * w, // abertura do filtro
+      prop: !!(k.character && k.character.id === 'dumont'),
+    };
+    this._profiles.set(k, pf);
+    return pf;
+  }
+
+  // Aplica o timbre ao motor do jogador (só quando muda o kart ou a classe)
+  _applyProfile(pf) {
+    if (this._engPf === pf) return;
+    this._engPf = pf;
+    const t = this.ctx.currentTime, e = this.eng;
+    e.ga.gain.setTargetAtTime(pf.saw, t, 0.1);
+    e.gb.gain.setTargetAtTime(pf.buzz, t, 0.1);
+    e.gs.gain.setTargetAtTime(pf.sub, t, 0.1);
+    e.lfoDepth.gain.setTargetAtTime(pf.beat, t, 0.1);
+    if (!pf.prop && this.prop) this.prop.out.gain.setTargetAtTime(0, t, 0.1);
+  }
+
+  // Abaixa a música por um instante (raio, explosão perto, batida, chegada)
+  duck(depth = 0.45, hold = 0.12) {
+    if (!this.ctx) return;
+    const g = this.duckGain.gain, t = this.ctx.currentTime;
+    if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t);
+    else g.cancelScheduledValues(t);
+    g.setTargetAtTime(depth, t, 0.02);
+    g.setTargetAtTime(1, t + hold, 0.13); // ~95% de volta em 0,5 s
   }
 
   _noiseLoop() {
@@ -511,12 +666,12 @@ export class AudioSystem {
     return s;
   }
 
-  _setEngine(f, cutoff, tc = 0.05) {
+  _setEngine(f, cutoff, tc = 0.05, beatRate = 0.5) {
     const t = this.ctx.currentTime, e = this.eng;
     e.a.frequency.setTargetAtTime(f, t, tc);
     e.b.frequency.setTargetAtTime(f * 1.004, t, tc);
     e.sub.frequency.setTargetAtTime(f * 0.5, t, tc);
-    e.lfo.frequency.setTargetAtTime(Math.max(8, f * 0.5), t, tc);
+    e.lfo.frequency.setTargetAtTime(Math.max(8, f * beatRate), t, tc);
     if (cutoff) e.filter.frequency.setTargetAtTime(cutoff, t, 0.08);
   }
 
@@ -526,11 +681,15 @@ export class AudioSystem {
     this.drift.out.gain.setTargetAtTime(0, t, tc);
     this.drift.sqOut.gain.setTargetAtTime(0, t, tc);
     this.rumble.out.gain.setTargetAtTime(0, t, tc);
+    this.rival.out.gain.setTargetAtTime(0, t, tc);
+    this.crowd.out.gain.setTargetAtTime(0, t, tc * 2);
+    if (this.prop) this.prop.out.gain.setTargetAtTime(0, t, tc);
     this._loopsOn = false;
   }
 
   // ---------------------------------------------------------------------
-  // Atualização por quadro: motor do jogador, derrapagem, acostamento, roleta
+  // Atualização por quadro: motor do jogador, derrapagem, acostamento, torcida,
+  // contramão, motor do adversário mais próximo e roleta
   // ---------------------------------------------------------------------
   update(dt, world) {
     this._world = world;
@@ -541,8 +700,16 @@ export class AudioSystem {
       if (this._loopsOn) this._silenceLoops();
       return;
     }
+    // Já cruzou a chegada: na tela de resultado a IA dirige o kart do jogador e
+    // o motor embolaria a fanfarra. Tudo do jogador some devagar.
+    if (p.finished) {
+      if (this._loopsOn) this._silenceLoops(0.25);
+      return;
+    }
     this._loopsOn = true;
     const t = this.ctx.currentTime;
+    const pf = this._profile(p, world.cc);
+    this._applyProfile(pf);
     const c = p.controls || {};
     const boosting = (p.boostTime || 0) > 0 || (p.starTime || 0) > 0;
     const ms = p.maxSpeed || 20;
@@ -555,9 +722,17 @@ export class AudioSystem {
     if (boosting) f *= 1.12;
     if (p.onGround === false) f *= 1.06;
     const shrink = (p.shrinkTime || 0) > 0 ? 1.35 : 1;
-    this._setEngine(f * shrink, 380 + 2300 * Math.min(1, ratio) + thr * 450 + (boosting ? 900 : 0));
-    const vol = (0.05 + thr * 0.045 + Math.min(1, ratio) * 0.05) * ((p.spinTime || 0) > 0 || (p.tumbleTime || 0) > 0 ? 0.6 : 1);
+    this._setEngine(f * shrink * pf.pitch, (380 + 2300 * Math.min(1, ratio) + thr * 450 + (boosting ? 900 : 0)) * pf.bright, 0.05, pf.beatRate);
+    // parado e sem acelerar (grid): marcha lenta baixinha, para não cobrir a contagem
+    const drive = Math.min(1, Math.min(1, ratio) * 5 + thr * 2);
+    const vol = (0.022 + 0.028 * drive + thr * 0.045 + Math.min(1, ratio) * 0.05) * ((p.spinTime || 0) > 0 || (p.tumbleTime || 0) > 0 ? 0.6 : 1);
     this.eng.out.gain.setTargetAtTime(vol, t, 0.06);
+    if (pf.prop) {
+      // hélice do 14-bis: chiado de ar pulsando mais rápido com a velocidade
+      const pr = this._propeller();
+      pr.out.gain.setTargetAtTime(0.012 + 0.03 * Math.min(1, ratio), t, 0.1);
+      pr.lfo.frequency.setTargetAtTime(14 + 38 * Math.min(1, ratio), t, 0.1);
+    }
     // derrapagem
     const drifting = p.drifting && p.onGround !== false && Math.abs(p.speed || 0) > 4;
     const lvl = p.driftLevel || 0;
@@ -568,6 +743,23 @@ export class AudioSystem {
     // acostamento
     const off = p.offroad && p.onGround !== false && Math.abs(p.speed || 0) > 3 && !boosting;
     this.rumble.out.gain.setTargetAtTime(off ? 0.16 * Math.min(1, Math.abs(p.speed) / 14) : 0, t, 0.08);
+    // torcida: sobe perto da linha de chegada (s perto de 0 ou do fim da pista)
+    const L = world.track && world.track.length;
+    let crowd = 0;
+    if (L && Number.isFinite(p.s)) {
+      const s = ((p.s % L) + L) % L;
+      const near = Math.max(0, 1 - Math.min(s, L - s) / 70);
+      crowd = 0.07 * near * near;
+    }
+    this.crowd.out.gain.setTargetAtTime(crowd, t, 0.3);
+    // contramão: buzina grave a cada 1 s
+    if ((p.wrongWay || 0) > 45 && world.phase === 'racing') {
+      if (t >= this._wwT) {
+        this.sfx('wrongWay');
+        this._wwT = t + 1;
+      }
+    } else this._wwT = 0;
+    this._updateRivals(p, world, t);
     // roleta de itens: tique quando o item mostrado muda (limite de ritmo)
     const r = p.roulette;
     const now = t;
@@ -580,6 +772,54 @@ export class AudioSystem {
     } else this._rShow = undefined;
   }
 
+  // Pan (-0,8 a 0,8) de um vetor jogador → fonte pela direita da câmera
+  _panOf(dx, dy, dz, d) {
+    const cam = this._world && this._world.camera;
+    if (!cam || d < 0.5) return 0;
+    const e = cam.matrixWorld.elements; // coluna 0 = direita da câmera
+    return Math.max(-0.8, Math.min(0.8, (dx * e[0] + dy * e[1] + dz * e[2]) / d));
+  }
+
+  // Motor do adversário mais próximo e "whoosh" quando alguém cruza o jogador
+  _updateRivals(p, world, t) {
+    const ks = world.karts || [];
+    const pp = p.position;
+    let best = null, bd = 45 * 45, bx = 0, by = 0, bz = 0;
+    const racing = world.phase === 'racing';
+    const L = world.track && world.track.length;
+    for (const k of ks) {
+      if (k === p || !k.position) continue;
+      const dx = k.position.x - pp.x, dy = k.position.y - pp.y, dz = k.position.z - pp.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < bd) { bd = d2; best = k; bx = dx; by = dy; bz = dz; }
+      // ultrapassagem: o lado (à frente/atrás ao longo da pista) trocou bem perto do
+      // jogador; por s (e não progress) para valer também para quem leva volta
+      let ds = (k.s || 0) - (p.s || 0);
+      if (L) { if (ds > L / 2) ds -= L; else if (ds < -L / 2) ds += L; }
+      const side = ds > 0 ? 1 : -1;
+      const prev = this._rel.get(k);
+      this._rel.set(k, side);
+      if (racing && prev !== undefined && prev !== side && d2 < 64 && Math.abs((k.speed || 0) - (p.speed || 0)) > 1.5) {
+        const d = Math.sqrt(d2);
+        this.sfx('whoosh', { vol: 0.9 - d * 0.06, pan: this._panOf(dx, dy, dz, d) });
+      }
+    }
+    const rv = this.rival;
+    if (!best) {
+      rv.out.gain.setTargetAtTime(0, t, 0.15);
+      return;
+    }
+    const d = Math.sqrt(bd);
+    const pf = this._profile(best, world.cc);
+    const r = Math.min(1.2, Math.abs(best.speed || 0) / Math.max(8, best.maxSpeed || 20));
+    const f = (55 + 155 * Math.pow(Math.min(r, 1), 0.85)) * pf.pitch * ((best.boostTime || 0) > 0 ? 1.1 : 1);
+    const near = 1 / (1 + (d / 10) * (d / 10));
+    rv.osc.frequency.setTargetAtTime(f, t, 0.08);
+    rv.lp.frequency.setTargetAtTime((450 + 1400 * Math.min(1, r)) * pf.bright, t, 0.1);
+    rv.out.gain.setTargetAtTime((0.012 + 0.03 * Math.min(1, r)) * near, t, 0.08);
+    if (rv.pan) rv.pan.setTargetAtTime(this._panOf(bx, by, bz, d), t, 0.08);
+  }
+
   // ---------------------------------------------------------------------
   // Sequenciador de música (setInterval de 25 ms + agenda 120 ms à frente)
   // Cada música tem sua própria mesa: canais com pan, eco, reverb e
@@ -589,33 +829,37 @@ export class AudioSystem {
     const song = COMPILED[name];
     if (!song || !this.ctx) return;
     const ctx = this.ctx;
-    const gain = ctx.createGain();
+    // todos os nós da mesa ficam listados para serem desligados em _stopSong
+    // (o laço de eco se mantém vivo sozinho e vazaria em sessões longas)
+    const nodes = [];
+    const add = (n) => (nodes.push(n), n);
+    const pan = (p) => { const c = this._pan(p); add(c.in); if (c.out !== c.in) add(c.out); return c; };
+    const gain = add(ctx.createGain());
     gain.gain.value = 1;
     gain.connect(this.musicGain);
     const fx = { out: gain };
-    fx.verb = ctx.createConvolver();
-    this._ir ||= makeImpulse(ctx, 1.8, 3);
-    fx.verb.buffer = this._ir;
-    const vr = ctx.createGain();
+    fx.verb = add(ctx.createConvolver());
+    fx.verb.buffer = this._impulse();
+    const vr = add(ctx.createGain());
     vr.gain.value = 0.8;
     fx.verb.connect(vr).connect(gain);
-    fx.delay = ctx.createDelay(1.5);
-    const fb = ctx.createGain();
+    fx.delay = add(ctx.createDelay(1.5));
+    const fb = add(ctx.createGain());
     fb.gain.value = 0.3;
-    const dl = ctx.createBiquadFilter();
+    const dl = add(ctx.createBiquadFilter());
     dl.type = 'lowpass';
     dl.frequency.value = 2600;
     fx.delay.connect(dl).connect(fb).connect(fx.delay);
-    const dOut = this._pan(0.25);
+    const dOut = pan(0.25);
     dl.connect(dOut.in);
     dOut.out.connect(gain);
-    fx.duck = ctx.createGain();
+    fx.duck = add(ctx.createGain());
     fx.duck.connect(gain);
-    const chan = (pan, verb, delay, duck) => {
-      const c = this._pan(pan);
+    const chan = (p, verb, delay, duck) => {
+      const c = pan(p);
       c.out.connect(duck ? fx.duck : gain);
-      if (verb) { const g = ctx.createGain(); g.gain.value = verb; c.out.connect(g).connect(fx.verb); }
-      if (delay) { const g = ctx.createGain(); g.gain.value = delay; c.out.connect(g).connect(fx.delay); }
+      if (verb) { const g = add(ctx.createGain()); g.gain.value = verb; c.out.connect(g).connect(fx.verb); }
+      if (delay) { const g = add(ctx.createGain()); g.gain.value = delay; c.out.connect(g).connect(fx.delay); }
       return c.in;
     };
     fx.lead = chan(0, 0.2, 0.2, false);
@@ -625,10 +869,19 @@ export class AudioSystem {
     fx.bass = chan(0, 0, 0, true);
     fx.drums = chan(0, 0.07, 0, false);
     fx.hats = chan(0.2, 0.04, 0, false);
-    const s = { name, song, step: 0, next: ctx.currentTime + 0.08, gain, fx, hold: 0, tr: 0, last: 0 };
+    const s = { name, song, step: 0, next: ctx.currentTime + 0.08, gain, fx, nodes, hold: 0, tr: 0, last: 0 };
     this._seq = s;
     if (name === 'race' && this.finalLap) this._applyFinal(s);
     else this._setDelay(s, 1);
+  }
+
+  // Resposta do reverb (uma por qualidade). Na qualidade baixa (celular) a IR é
+  // mais curta: o custo do ConvolverNode cresce com o comprimento dela.
+  _impulse() {
+    const q = this._world && this._world.quality && this._world.quality.id;
+    const low = q === 'baixa';
+    const key = low ? '_irLow' : '_ir';
+    return (this[key] ||= low ? makeImpulse(this.ctx, 0.9, 2.4) : makeImpulse(this.ctx, 1.8, 3));
   }
 
   _pan(p) {
@@ -657,7 +910,8 @@ export class AudioSystem {
     this._seq = null;
     const t = this.ctx.currentTime;
     s.gain.gain.setTargetAtTime(0, t, fade / 3);
-    setTimeout(() => s.gain.disconnect(), (fade + 2) * 1000);
+    // depois do fade (e da cauda do reverb/eco), desliga a mesa inteira
+    setTimeout(() => { for (const n of s.nodes) n.disconnect(); }, (fade + 2) * 1000);
   }
 
   _tick() {
@@ -686,6 +940,9 @@ export class AudioSystem {
     const song = s.song, fx = s.fx, tr = s.tr, v = song.vol;
     const inBar = i % 16, bar = i >> 4;
     const ch = song.chords[i];
+    // variação de arranjo pela volta do jogador (só na música da corrida)
+    const vs = s.name === 'race' ? raceVariant(this._musicLap) : null;
+    const vr = vs && song.secId[bar] ? vs[song.secId[bar]] : null;
     // melodia
     const n = song.lead[i];
     if (n) {
@@ -697,7 +954,8 @@ export class AudioSystem {
     const c = song.counter[i];
     if (c) this._soft(fx.counter, c.m + tr, t, c.len * sd * 0.95, v.counter);
     // arpejo
-    const mode = song.arp[i];
+    let mode = song.arp[i];
+    if (vr && vr.arp && vr.arp[mode]) mode = vr.arp[mode];
     if (mode === 'up16') {
       const tones = [ch.root, ch.third, ch.fifth, ch.root + 12];
       this._pluck(fx.arp, tones[inBar % 4] + 12 + tr, t, sd * 2.5, v.arp * (inBar % 4 === 0 ? 1 : 0.75));
@@ -725,7 +983,8 @@ export class AudioSystem {
     const b = song.bass[i];
     if (b) this._bass(fx.bass, b.m + tr, t, b.len * sd * 0.9, v.bass);
     // bateria
-    const dr = song.drums[bar];
+    const alt = vr && vr.drums && vr.drums[song.drumName[bar]];
+    const dr = alt ? DRUMS[alt] : song.drums[bar];
     if (song.crash[i]) this._crash(t, fx.hats, 0.16);
     if (dr.k && dr.k[inBar] === 'x') {
       this._kick(t, fx.drums, 0.62);
@@ -1041,7 +1300,8 @@ export class AudioSystem {
     const w = this._world;
     if (!w) return { vol: 0.6, pan: 0 };
     if (w.phase === 'title') return { vol: 0, pan: 0 };
-    if (kart && kart === w.player) return { vol: 1, pan: 0 };
+    // o kart do jogador, depois da chegada, é dirigido pela IA: bem mais baixo
+    if (kart && kart === w.player) return { vol: kart.finished ? 0.4 : 1, pan: 0 };
     const src = pos || (kart && kart.position);
     const lis = (w.player && w.player.position) || (w.camera && w.camera.position);
     if (!src || !lis) return { vol: 0.5, pan: 0 };
@@ -1067,24 +1327,43 @@ export class AudioSystem {
   // Eventos do jogo → sons
   // ---------------------------------------------------------------------
   _bind(bus) {
-    const isP = (k) => !!(k && (k.isPlayer || (this._world && k === this._world.player)));
+    const isMe = (k) => !!(k && (k.isPlayer || (this._world && k === this._world.player)));
+    // depois da chegada a IA dirige o kart do jogador: batidas, derrapagem etc. não tocam mais
+    const isP = (k) => isMe(k) && !k.finished;
+    // nova corrida ou volta ao menu: arranjo original e timbres recalculados
+    bus.on('race:reset', () => {
+      this._musicLap = 1;
+      this._profiles.clear();
+      this._rel.clear();
+      this._engPf = null;
+      this._wwT = 0;
+    });
     bus.on('race:countdown', () => this.sfx('countdown'));
     bus.on('race:go', () => this.sfx('go'));
     bus.on('race:lap', (d) => {
       if (!isP(d && d.kart)) return;
+      this._musicLap = d.lap || 1; // o arranjo da música muda nas próximas seções
+      this.sfx('cheer', { vol: 0.7 });
       const total = this._world && this._world.totalLaps;
       if (total && d.lap >= total) return; // a volta final tem vinheta própria
       this.sfx('lap');
+    });
+    bus.on('race:place', (d) => {
+      if (!isP(d && d.kart) || this._world?.phase !== 'racing') return;
+      if (d.to < d.from) this.sfx('placeUp');
+      else if (d.to > d.from) this.sfx('placeDown', { vol: 0.7 });
     });
     bus.on('race:finalLap', (d) => {
       if (d && d.kart && !isP(d.kart)) return;
       this.setFinalLap(true);
     });
     bus.on('race:finish', (d) => {
-      if (!isP(d && d.kart)) return;
+      if (!isMe(d && d.kart)) return; // o kart já vem com finished = true
+      this.duck();
       this._stopSong(0.4);
       this.musicName = null;
       this.sfx('finish');
+      this.sfx('cheer');
     });
     bus.on('item:pickup', (d) => { if (isP(d && d.kart)) this.sfx('pickup'); });
     bus.on('item:got', (d) => { if (isP(d && d.kart)) this.sfx('itemGet'); });
@@ -1094,11 +1373,24 @@ export class AudioSystem {
       if (name === 'boost' && isP(d.kart)) return; // kart:boost cuida do turbo do jogador
       this._at(name, null, d.kart, name === 'blackhole' ? 1 : 0.9);
     });
-    bus.on('item:explode', (d) => this._at('explosion', d && d.pos, null, 1));
+    bus.on('item:explode', (d) => {
+      this._at('explosion', d && d.pos, null, 1);
+      if (d && d.pos && this._spatial(d.pos, null).vol > 0.3) this.duck(); // só perto do jogador
+    });
     bus.on('item:incoming', (d) => { if (isP(d && d.kart)) this.sfx('warn', { vol: d.dist < 30 ? 1 : 0.7 }); });
-    bus.on('item:lightning', () => { if (this._world?.phase !== 'title') this.sfx('lightning'); });
-    bus.on('item:blackhole', (d) => this._at('blackhole', d && d.pos, d && d.target, 1.2));
-    bus.on('kart:hit', (d) => this._at('hit', null, d && d.kart, 1));
+    bus.on('item:lightning', () => {
+      if (this._world?.phase === 'title') return;
+      this.sfx('lightning');
+      this.duck();
+    });
+    bus.on('item:blackhole', (d) => {
+      this._at('blackhole', d && d.pos, d && d.target, 1.2);
+      if (d && (d.pos || d.target) && this._spatial(d.pos, d.target).vol > 0.3) this.duck();
+    });
+    bus.on('kart:hit', (d) => {
+      this._at('hit', null, d && d.kart, 1);
+      if (isP(d && d.kart)) this.duck();
+    });
     bus.on('kart:boost', (d) => { if (isP(d && d.kart)) this.sfx('boost'); });
     bus.on('kart:bump', (d) => {
       if (!d || (!isP(d.a) && !isP(d.b))) return;
@@ -1116,11 +1408,85 @@ export class AudioSystem {
 }
 
 // Intervalo mínimo entre repetições do mesmo efeito (s)
-const GAPS = { warn: 0.4, boost: 0.15, lightning: 0.4, finish: 1, finalLap: 1, go: 0.5, countdown: 0.3, roulette: 0.045, blackhole: 0.3, lap: 0.5 };
+const GAPS = {
+  warn: 0.4, boost: 0.15, lightning: 0.4, finish: 1, finalLap: 1, go: 0.5, countdown: 0.3, roulette: 0.045, blackhole: 0.3, lap: 0.5,
+  placeUp: 0.3, placeDown: 0.5, wrongWay: 0.8, cheer: 1, whoosh: 0.25,
+};
 const PRIORITY = { go: 1, countdown: 1, finish: 1, finalLap: 1, lap: 1, lightning: 1, itemGet: 1 };
 
 // Geradores de efeitos: this = AudioSystem; recebem (saída, instante) e devolvem a duração
 const SFX = {
+  // ganhou posição: duas notas subindo
+  placeUp(o, t) {
+    this._notes(o, 'triangle', [['A5', 0, 0.09], ['E6', 0.08, 0.18]], t, 0.24);
+    this._notes(o, this.pw25, [['E5', 0, 0.08], ['A5', 0.08, 0.15]], t, 0.05);
+    return 0.3;
+  },
+  // perdeu posição: duas notas descendo, mais discretas
+  placeDown(o, t) {
+    this._notes(o, 'triangle', [['E5', 0, 0.1], ['A4', 0.09, 0.2]], t, 0.18);
+    return 0.32;
+  },
+  // contramão: buzina grave (duas serras desafinadas, som "fonfom" de carro velho)
+  wrongWay(o, t) {
+    const ctx = this.ctx;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1100;
+    lp.Q.value = 1.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.16, t + 0.015);
+    g.gain.setValueAtTime(0.16, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+    lp.connect(g).connect(o);
+    for (const f of [196, 247]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = f;
+      osc.connect(lp);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    }
+    return 0.45;
+  },
+  // torcida: onda de ruído rosa que cresce e some, com palmas espalhadas
+  cheer(o, t) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.pink;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(600, t);
+    bp.frequency.linearRampToValueAtTime(950, t + 0.4);
+    bp.Q.value = 0.7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.35, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);
+    src.connect(bp).connect(g).connect(o);
+    src.start(t, Math.random() * 0.1, 2);
+    for (let i = 0; i < 14; i++) this._noise(o, t + 0.08 + Math.random() * 1.3, 0.03, 0.05 + Math.random() * 0.06, 'bandpass', 1600, 1600, 1.2);
+    return 2;
+  },
+  // alguém cruzou o jogador: sopro de ruído descendo
+  whoosh(o, t) {
+    const ctx = this.ctx;
+    const s = ctx.createBufferSource();
+    s.buffer = this.noise;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 1.4;
+    f.frequency.setValueAtTime(2600, t);
+    f.frequency.exponentialRampToValueAtTime(450, t + 0.4);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.3, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+    s.connect(f).connect(g).connect(o);
+    s.start(t, Math.random() * 1.4, 0.45);
+    return 0.45;
+  },
   // aviso de item vindo (elétron / buraco negro): dois bipes curtos descendo
   warn(o, t) {
     this._tone(o, 'square', 1567.98, 1567.98, t, 0.07, 0.11);
