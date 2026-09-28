@@ -1,13 +1,16 @@
 :root {
-  --bg: #1c1a17;
-  --panel: rgba(24, 22, 20, 0.82);
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --text: #f2ede3;
-  --muted: #a8a094;
-  --accent: #ffd54a;
+  /* cores da marca Quanta (design-system.css do site) */
+  --bg: #101a16;
+  --panel: rgba(16, 28, 22, 0.86);
+  --panel-border: rgba(118, 214, 172, 0.16);
+  --text: #f2f5f1;
+  --muted: #aebdb5;
+  --accent: #76d6ac;
+  --accent-ink: #09241a;
+  --brand-deep: #176448;
   --accent-2: #64c8ff;
   --danger: #ff6b5a;
-  --font-title: 'Fredoka', system-ui, sans-serif;
+  --font-title: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font: 'Inter', system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -115,15 +118,15 @@ button { font: inherit; cursor: pointer; }
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .stack.row { flex-direction: row; justify-content: center; margin-top: 16px; }
 .btn {
-  background: #2c2925; color: var(--text); border: 1px solid var(--panel-border); border-radius: 14px; padding: 14px 18px;
+  background: #16261e; color: var(--text); border: 1px solid var(--panel-border); border-radius: 14px; padding: 14px 18px;
   font-size: 17px; font-weight: 600;
 }
-.btn.primary { background: var(--accent); color: #1c1a17; border-color: transparent; }
+.btn.primary { background: linear-gradient(180deg, #8ae6bd, var(--accent)); color: var(--accent-ink); border-color: transparent; font-weight: 800; box-shadow: 0 6px 24px rgba(118, 214, 172, 0.35); }
 .btn.ghost { background: transparent; }
 .btn:active { transform: scale(0.98); }
 .label { text-align: left; margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { background: #2c2925; color: var(--text); border: 1px solid var(--panel-border); border-radius: 999px; padding: 9px 14px; font-size: 14px; }
+.chip { background: #16261e; color: var(--text); border: 1px solid var(--panel-border); border-radius: 999px; padding: 9px 14px; font-size: 14px; }
 .chip.active { background: var(--accent-2); color: #0f1a22; border-color: transparent; font-weight: 600; }
 .check { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 10px; }
 .howto { text-align: left; color: #e1dbd0; line-height: 1.5; padding-left: 20px; margin: 0 0 18px; }
@@ -161,3 +164,38 @@ button { font: inherit; cursor: pointer; }
   .hud-turn-wrap { min-width: 0; }
   .hud-eval-num { font-size: 16px; min-width: 44px; }
 }
+
+/* ---------- Tela de abertura com a marca Quanta ---------- */
+#screens { background: radial-gradient(ellipse at 50% 35%, rgba(23, 100, 72, 0.35), rgba(8, 16, 12, 0.82) 70%); }
+.card { background: rgba(14, 26, 20, 0.94); border-color: var(--panel-border); }
+.card-hero {
+  position: relative; overflow: hidden; border: 1px solid rgba(118, 214, 172, 0.45);
+  box-shadow: 0 0 0 1px rgba(118, 214, 172, 0.08), 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 60px rgba(118, 214, 172, 0.18);
+}
+.card-hero::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 5px;
+  background: linear-gradient(90deg, var(--brand-deep), var(--accent), #c8f5df, var(--accent), var(--brand-deep));
+}
+.card-hero::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.07;
+  background: repeating-linear-gradient(135deg, var(--accent) 0 2px, transparent 2px 22px);
+}
+.card-hero > * { position: relative; }
+.brand-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 6px; }
+.brand-logo { width: 64px; height: auto; filter: drop-shadow(0 0 14px rgba(118, 214, 172, 0.55)); }
+.brand-name { font: 800 22px var(--font-title); letter-spacing: 0.12em; color: var(--text); }
+.brand-name b { color: var(--accent); margin-left: 0.35em; }
+.hero-title { margin: 8px 0 10px !important; line-height: 0.9 !important; }
+.hero-title span {
+  display: block; font: 800 clamp(54px, 13vw, 84px) var(--font-title); letter-spacing: -0.02em; font-style: italic;
+  background: linear-gradient(180deg, #d9fbe9 0%, var(--accent) 55%, var(--brand-deep) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 18px rgba(118, 214, 172, 0.35));
+}
+.hero-title small {
+  display: block; margin-top: 6px; font: 800 clamp(15px, 3.6vw, 19px) var(--font-title);
+  letter-spacing: 0.32em; text-transform: uppercase; color: var(--text);
+}
+.card-hero .lead { color: var(--muted); }
+.card-hero .btn:not(.primary):hover { border-color: rgba(118, 214, 172, 0.5); }
+.card-hero .small a { color: var(--accent); }
