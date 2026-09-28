@@ -46,8 +46,9 @@ function dailyChallenge() {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
   const ch = CHARACTERS[Math.floor(rnd() * CHARACTERS.length)];
-  const ccs = is150Unlocked() ? ['50cc', '100cc', '150cc'] : ['50cc', '100cc'];
-  const cc = ccs[Math.floor(rnd() * ccs.length)];
+  const ccs = ['50cc', '100cc', '150cc'];
+  let cc = ccs[Math.floor(rnd() * ccs.length)];
+  if (cc === '150cc' && !is150Unlocked()) cc = '100cc'; // o sorteio é igual para todos; só a classe cai
   const podium = rnd() < 0.5;
   return { key, character: ch.id, cc, laps: 2, maxPlace: podium ? 3 : 1, label: `${ch.name} · ${cc} · ${podium ? 'chegar no pódio' : 'vencer'}` };
 }
@@ -90,8 +91,9 @@ async function init() {
     },
     // 'Trocar cientista' no resultado: volta ao estado de título de verdade
     onPlay: () => { if (game.state !== 'title') enterTitle(); },
-    // corrida online: "de novo" é voltar para a sala de espera (o anfitrião começa a próxima)
-    onRestart: () => (game.opts?.net ? netBackToLobby() : startRace(game.opts)),
+    // corrida online: "de novo" é voltar para a sala de espera (o anfitrião começa a próxima);
+    // a sala de turma vem do menu: se o aluno saiu dela (fechada, nome recusado), a nova corrida não vai para ela
+    onRestart: () => (game.opts?.net ? netBackToLobby() : startRace({ ...game.opts, room: game.opts?.room ? menu.room : null })),
     onQuit: () => enterTitle(),
     onNet: (a, btn) => netUI?.action(a, btn),
     onNetLobby: () => netBackToLobby(),
@@ -115,7 +117,11 @@ async function init() {
     dailyInfo: () => {
       const d = dailyChallenge();
       const st = store.get('daily', {});
-      return { label: d.label, done: !!st[d.key], streak: store.get('dailyStreak', { n: 0 }).n };
+      const sk = store.get('dailyStreak', { last: '', n: 0 });
+      const y = new Date(Date.now() - 864e5);
+      const yKey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+      const alive = sk.last === d.key || sk.last === yKey;
+      return { label: d.label, done: !!st[d.key], streak: alive ? sk.n : 0 };
     },
     qualityId: () => qualityId,
     onSetQuality: (id) => {
@@ -223,7 +229,8 @@ async function init() {
   input.setAutoAccelerate(store.get('auto', input.touchEnabled));
   menu.setAutoLabel(input.autoAccelerate);
   const race = new RaceManager({ bus });
-  // ranking online (conta do site): carrega em segundo plano; sem ela o jogo segue normal
+  // ranking online (conta do site): carrega em segundo plano (mesmo passando dos 8 s de espera);
+  // sem ela o jogo segue normal
   Online.init();
   let runTicket = null; // promessa do bilhete da corrida atual (kart_start_run)
   const hud = new Hud({ bus });
@@ -279,6 +286,7 @@ async function init() {
       c.updateProjectionMatrix();
     }
   }
+  let holdLatch = false; // item seguro mantido depois da pausa até um novo aperto
 
   // Pré-compila os shaders para evitar travadas na primeira corrida.
   try {
@@ -324,6 +332,7 @@ async function init() {
     }
     setGhost(null);
     env.setMood?.(0);
+    moodT = -1; // não deixa a hora dourada continuar animando no título
     items.setMode?.('race');
     world.rival = null;
     setupGrid(order);
@@ -585,6 +594,7 @@ async function init() {
     const me = results.find((r) => r.kart === p);
     hud.show(false);
     input.showTouch(false);
+    const prevGhostTime = ghostPrevTime; // setGhost(null) zera o tempo do fantasma
     setGhost(null);
     const rec = saveRecords(results);
     const info = { rec, cc: opts.cc, laps: opts.laps, mode: opts.mode, facts: hud.raceFacts.slice() };
@@ -607,7 +617,7 @@ async function init() {
     }
     // fantasma
     if (tt && valid) {
-      const prev = ghostPrevTime;
+      const prev = prevGhostTime;
       if (prev) info.ghost = me.time - prev;
       if (!prev || me.time < prev) saveGhost(me.time);
     }
@@ -699,8 +709,11 @@ async function init() {
     const room = opts.room && opts.room.board === board ? opts.room : null;
     const ticket = runTicket;
     runTicket = null;
+    // conta conectada só depois da largada (ex.: internet lenta): sem bilhete, não vale para o ranking
+    const noTicket = !ticket && !!Online.user;
     if (!ticket && !room) {
-      if (Online.available) menu.renderOnlineResult({ loginHint: true });
+      if (noTicket) menu.renderOnlineResult({ board, global: { ok: false, error: 'no_ticket' } });
+      else if (Online.available) menu.renderOnlineResult({ loginHint: true });
       return;
     }
     const run = {
@@ -711,7 +724,8 @@ async function init() {
       place: me.place,
     };
     menu.renderOnlineResult({ pending: true });
-    const res = { roomCode: room?.code, loginHint: !Online.user };
+    const res = { board, roomCode: room?.code, loginHint: !Online.user };
+    if (noTicket) res.global = { ok: false, error: 'no_ticket' };
     try {
       if (ticket) {
         const runId = await ticket;
@@ -720,7 +734,7 @@ async function init() {
       }
       if (room) {
         res.room = await Online.roomSubmit(room.code, run, room.guestName);
-        if (res.room?.ok) res.roomBoard = await Online.roomBoard(room.code, 8);
+        if (res.room?.ok) res.roomBoard = await Online.roomBoard(room.code, 8, room.guestName);
       }
     } catch {
       /* sem conexão: o resultado local já foi salvo */
@@ -848,7 +862,9 @@ async function init() {
     const gT = ghost.laps.slice(0, n).reduce((a, b) => a + b, 0);
     const dT = race.time - gT;
     const txt = `${dT < 0 ? '−' : '+'}${Math.abs(dT).toFixed(2).replace('.', ',')} s`;
-    hud.center(`Volta ${lap}<small class="${dT < 0 ? 'ahead' : 'behind'}">👻 ${txt}</small>`, 'msg pop', 1800);
+    const title = lap >= world.totalLaps ? 'ÚLTIMA VOLTA!' : `Volta ${lap}`;
+    // depois do passo atual: o HUD escreve 'ÚLTIMA VOLTA!' no mesmo passo e sobrescreveria
+    setTimeout(() => hud.center(`${title}<small class="${dT < 0 ? 'ahead' : 'behind'}">👻 ${txt}</small>`, 'msg pop', 1800), 0);
   });
 
   // ---------- rival e hora dourada ----------
@@ -881,7 +897,12 @@ async function init() {
       resumeFlush = true;
     }
     // (na tela dividida, o Enter que fecha a pausa também é a tecla de item do J2)
-    if (!on && game.paused) resumeFlush = true;
+    // voltando da pausa com um item seguro atrás do kart: ele continua seguro até um novo
+    // aperto (a pausa solta todas as teclas, e isso dispararia o item sozinho)
+    if (!on && game.paused) {
+      resumeFlush = true;
+      holdLatch = !!world.player?.itemHeld;
+    }
     game.paused = on;
     audio.pauseAll?.(on);
     needsRender = true;
@@ -1053,22 +1074,12 @@ async function init() {
         if (move1) menu.moveSelection(per[0][0], per[0][1], 0);
         if (move2) menu.moveSelection(per[1][0], per[1][1], 1);
       } else if (move) menu.moveSelection(dx, dy);
-      if (edgeLB || edgeRB) {
-        const o = menu.opts;
-        if (edgeLB) {
-          const ids = Object.keys(CLASSES);
-          o.cc = ids[(ids.indexOf(o.cc) + 1) % ids.length];
-        }
-        if (edgeRB) {
-          const L = RACE.lapOptions;
-          o.laps = L[(L.indexOf(o.laps) + 1) % L.length];
-        }
-        audio.sfx('menuMove');
-        menu.refreshSelect();
-      }
+      // mesmo caminho do teclado: respeita o cadeado do 150cc
+      if (edgeLB) menu.cycleOpt('cc', 1);
+      if (edgeRB) menu.cycleOpt('laps', 1);
     }
     if (edgeB) {
-      if (cur === 'select' || cur === 'howto') menu.action('back');
+      if (cur === 'select' || cur === 'howto' || cur === 'online' || cur === 'turma') menu.action('back');
       else if (cur === 'pause') menu.action('resume');
       else if (cur === 'results') menu.action('quit');
     }
@@ -1110,7 +1121,8 @@ async function init() {
         c.drift = ctrl.drift;
         c.lookBack = ctrl.lookBack;
         // segurar o item atrás (escudo) e o gesto de tiro para trás no toque
-        c.holdItem = !!ctrl.holdItem;
+        if (holdLatch && (ctrl.holdItem || ctrl.useItem || !player.itemHeld)) holdLatch = false;
+        c.holdItem = !!ctrl.holdItem || holdLatch;
         c.itemBack = !!ctrl.itemBack;
         if (pendingUse) {
           c.useItem = true;
@@ -1469,9 +1481,13 @@ async function init() {
     const md = q.get('modo');
     let any = false;
     if (ch && CHARACTERS.some((c) => c.id === ch)) { menu.opts.character = ch; any = true; }
-    if (mo && CLASSES[mo]) { menu.opts.cc = mo; any = true; }
+    if (mo && CLASSES[mo]) { menu.opts.cc = mo === '150cc' && !is150Unlocked() ? '100cc' : mo; any = true; }
     if (RACE.lapOptions.includes(vo)) { menu.opts.laps = vo; any = true; }
-    if (md) { menu.opts.mode = /relogio|timetrial/i.test(md) ? 'timetrial' : 'race'; any = true; }
+    if (md) {
+      const plain = md.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      menu.opts.mode = /relogio|timetrial/i.test(plain) ? 'timetrial' : 'race';
+      any = true;
+    }
     // link da sala online (?sala=CÓDIGO): abre direto a entrada, com o código preenchido
     const sala = q.get('sala');
     if (sala) netUI.open(sala);

@@ -32,13 +32,26 @@ const shade = (c, k) => mix(c, k < 1 ? 0x000000 : 0xffffff, k < 1 ? 1 - k : k - 
 
 // ---------------------------------------------------------------------------
 // Atlas de decalques (números, emblemas, E=mc², tabela periódica)
+// Grade de 8 x 8 células de 128 px:
+//   linha 0: branco, faixa E=mc² (1..4), placa 14-BIS (5..6), faces do cubo mágico (7)
+//   linha 1: números 1..8          linha 2: emblemas 0..7
+//   linhas 3 e 4: tabela periódica linha 5: números 9..16
+//   linha 6: emblemas 8..15        linha 7: chapa fotográfica (0..1), quadro-negro (2..3),
+//                                  planta azul (4), placa QUANTA (5..6)
 // ---------------------------------------------------------------------------
-const AW = 1024, AH = 640, CELL = 128;
+const AW = 1024, AH = 1024, CELL = 128;
 const WHITE_UV = [32 / AW, 1 - 32 / AH];
 function cellUV(cx, cy, cw = 1, ch = 1) {
   const x = cx * CELL + 2, y = cy * CELL + 2, w = cw * CELL - 4, h = ch * CELL - 4;
   return [x / AW, 1 - (y + h) / AH, (x + w) / AW, 1 - y / AH];
 }
+// Retângulo em pixels do atlas (para pedaços menores que uma célula)
+function pxUV(x, y, w, h, inset = 2) {
+  return [(x + inset) / AW, 1 - (y + h - inset) / AH, (x + w - inset) / AW, 1 - (y + inset) / AH];
+}
+// Números 1..8 na linha 1 e 9..16 na linha 5
+const numCell = (n) => (n >= 1 && n <= 8 ? [n - 1, 1] : n >= 9 && n <= 16 ? [n - 9, 5] : [(Math.max(1, n) - 1) % 8, 1]);
+const numUV = (n) => cellUV(...numCell(n));
 const ELEMENTS = [
   ['H', 1, '#7fd4ff'], ['He', 2, '#c9a7ff'], ['Li', 3, '#ff8f85'], ['C', 6, '#8fe39c'],
   ['N', 7, '#8fe39c'], ['O', 8, '#8fe39c'], ['Ne', 10, '#c9a7ff'], ['Na', 11, '#ff8f85'],
@@ -46,7 +59,17 @@ const ELEMENTS = [
   ['Ge', 32, '#7fd6c8'], ['Au', 79, '#f5d36b'], ['Ra', 88, '#ffd27f'], ['Md', 101, '#f59ac0'],
 ];
 const tileUV = (sym) => { const i = ELEMENTS.findIndex((e) => e[0] === sym); return cellUV(i % 8, 3 + Math.floor(i / 8)); };
-const EMBLEM = { newton: 0, curie: 1, mendeleev: 2, einstein: 3, galileu: 4, darwin: 5, dumont: 6, oswaldo: 7 };
+// Emblema de cada cientista: 0..7 na linha 2 do atlas, 8..15 na linha 6
+const EMBLEM = {
+  newton: 0, curie: 1, mendeleev: 2, einstein: 3, galileu: 4, darwin: 5, dumont: 6, oswaldo: 7,
+  samuel: 8, lattes: 9, franklin: 10, johnson: 11, enedina: 12,
+};
+const emblemUV = (id) => {
+  const i = EMBLEM[id] ?? 0;
+  return cellUV(i % 8, i < 8 ? 2 : 6);
+};
+// Faces do cubo mágico: quadrantes de 64 px da célula (7, 0)
+const cubeUV = (q) => pxUV(7 * CELL + (q % 2) * 64, Math.floor(q / 2) * 64, 64, 64, 1.5);
 
 function roundRectPath(g, x, y, w, h, r) {
   g.beginPath();
@@ -81,13 +104,14 @@ function drawAtlas() {
   g.lineWidth = 8; g.strokeStyle = '#ffdf00'; g.stroke();
   g.fillStyle = '#ffdf00'; g.font = `bold 62px ${FONT}`;
   g.fillText('14-BIS', 6 * CELL, 66);
-  // Números 1..8 (linha 1)
-  for (let i = 0; i < 8; i++) {
-    const cx = i * CELL + 64, cy = CELL + 64;
+  // Números 1..8 (linha 1) e 9..16 (linha 5)
+  for (let n = 1; n <= 16; n++) {
+    const [col, row] = numCell(n);
+    const cx = col * CELL + 64, cy = row * CELL + 64;
     disc(g, cx, cy, 63, '#161616');
     disc(g, cx, cy, 52, '#ffffff');
-    g.fillStyle = '#161616'; g.font = `bold 78px ${FONT}`;
-    g.fillText(String(i + 1), cx, cy + 5);
+    g.fillStyle = '#161616'; g.font = `bold ${n < 10 ? 78 : 62}px ${FONT}`;
+    g.fillText(String(n), cx, cy + 5);
   }
   // Emblemas (linha 2)
   const ey = 2 * CELL + 64;
@@ -189,7 +213,212 @@ function drawAtlas() {
     g.textAlign = 'left'; g.font = `bold 24px ${FONT}`; g.fillText(String(num), x + 16, y + 26);
     g.textAlign = 'center'; g.font = `bold ${sym.length > 1 ? 58 : 66}px ${FONT}`; g.fillText(sym, x + 64, y + 74);
   });
+  drawAtlasExtra(g);
   return cv;
+}
+
+// Alvo da Quanta Aulas (mesmo desenho do logo SVG de 64 x 64 do index.html), centrado em (cx, cy)
+function quantaTarget(g, cx, cy, k, col = '#1fd685') {
+  g.save();
+  g.translate(cx - 32 * k, cy - 32 * k);
+  g.scale(k, k);
+  g.strokeStyle = col; g.fillStyle = col; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.lineWidth = 5;
+  for (const r of [26, 17, 8]) { g.beginPath(); g.arc(30, 30, r, 0, TAU); g.stroke(); }
+  g.beginPath(); g.arc(30, 30, 3.5, 0, TAU); g.fill();
+  g.lineWidth = 4.5; g.beginPath(); g.moveTo(30, 30); g.lineTo(52, 52); g.stroke();
+  g.lineWidth = 3;
+  g.beginPath(); g.moveTo(47, 55); g.lineTo(58, 58); g.lineTo(55, 47); g.closePath(); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(52, 52); g.lineTo(60, 49); g.moveTo(52, 52); g.lineTo(49, 60); g.stroke();
+  g.restore();
+}
+
+// Emblemas 8..12 (linha 6) e texturas dos acessórios (célula 7 da linha 0 e linha 7)
+function drawAtlasExtra(g) {
+  const ey = 6 * CELL + 64;
+  const rr = rng(1947);
+  // 8: alvo da Quanta (Prof. Samuel)
+  {
+    const cx = 64;
+    disc(g, cx, ey, 63, '#1fd685'); disc(g, cx, ey, 55, '#0b1511');
+    quantaTarget(g, cx + 3, ey + 3, 1.42);
+  }
+  // 9: raios cósmicos chegando ao monte Chacaltaya, com o píon (Lattes)
+  {
+    const cx = CELL + 64;
+    disc(g, cx, ey, 63, '#f4d35e'); disc(g, cx, ey, 55, '#16324f');
+    g.save(); g.beginPath(); g.arc(cx, ey, 55, 0, TAU); g.clip();
+    g.strokeStyle = '#f4d35e'; g.lineWidth = 3.5; g.lineCap = 'round'; g.setLineDash([7, 5]);
+    for (const [x1, x2] of [[-2, 4], [26, 16], [48, 30]]) { g.beginPath(); g.moveTo(cx + x1, ey - 58); g.lineTo(cx + x2, ey - 4); g.stroke(); }
+    g.setLineDash([]);
+    g.fillStyle = '#6d8196';
+    g.beginPath(); g.moveTo(cx - 62, ey + 60); g.lineTo(cx - 26, ey + 8); g.lineTo(cx - 10, ey + 22); g.lineTo(cx + 14, ey - 8);
+    g.lineTo(cx + 62, ey + 60); g.closePath(); g.fill();
+    g.fillStyle = '#ffffff';
+    g.beginPath(); g.moveTo(cx + 14, ey - 8); g.lineTo(cx + 27, ey + 8); g.lineTo(cx + 19, ey + 5); g.lineTo(cx + 12, ey + 12);
+    g.lineTo(cx + 6, ey + 4); g.lineTo(cx + 2, ey + 7); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(cx - 26, ey + 8); g.lineTo(cx - 17, ey + 17); g.lineTo(cx - 24, ey + 15); g.lineTo(cx - 32, ey + 17); g.closePath(); g.fill();
+    g.restore();
+    g.fillStyle = '#ffffff'; g.font = `bold 44px Georgia, 'Times New Roman', serif`;
+    g.fillText('π', cx - 24, ey - 22);
+  }
+  // 10: a "Foto 51", o X da difração de raios X do DNA (Rosalind Franklin)
+  {
+    const cx = 2 * CELL + 64;
+    disc(g, cx, ey, 63, '#f1faee');
+    const rg = g.createRadialGradient(cx, ey, 2, cx, ey, 56);
+    rg.addColorStop(0, '#8a8a8a'); rg.addColorStop(0.45, '#3a3a3a'); rg.addColorStop(1, '#141414');
+    g.fillStyle = rg; g.beginPath(); g.arc(cx, ey, 55, 0, TAU); g.fill();
+    g.fillStyle = '#f2f2f2';
+    for (let k = 1; k <= 5; k++) {
+      for (const sy of [1, -1]) for (const sx of [1, -1]) {
+        g.beginPath(); g.ellipse(cx + sx * k * 7.2, ey + sy * k * 8.2, 5.4 - k * 0.45, 2.6, 0, 0, TAU); g.fill();
+      }
+    }
+    g.strokeStyle = '#e6e6e6'; g.lineWidth = 7; g.lineCap = 'butt';
+    g.beginPath(); g.arc(cx, ey + 8, 50, -Math.PI / 2 - 0.3, -Math.PI / 2 + 0.3); g.stroke();
+    g.beginPath(); g.arc(cx, ey - 8, 50, Math.PI / 2 - 0.3, Math.PI / 2 + 0.3); g.stroke();
+  }
+  // 11: órbita em volta da Terra, com a cápsula (Katherine Johnson)
+  {
+    const cx = 3 * CELL + 64;
+    disc(g, cx, ey, 63, '#ffbe0b'); disc(g, cx, ey, 55, '#0d1b3e');
+    for (let k = 0; k < 9; k++) disc(g, cx - 44 + rr() * 88, ey - 44 + rr() * 30, 1.2 + rr() * 1.2, '#ffffff');
+    g.strokeStyle = '#ffffff'; g.lineWidth = 4;
+    g.beginPath(); g.ellipse(cx, ey + 4, 47, 19, -0.32, Math.PI, TAU); g.stroke();
+    disc(g, cx, ey + 6, 21, '#3a86ff');
+    g.fillStyle = '#52b788';
+    g.beginPath(); g.ellipse(cx - 7, ey, 8, 6, 0.5, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(cx + 8, ey + 14, 6, 4, -0.3, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(cx, ey + 4, 47, 19, -0.32, 0, Math.PI); g.stroke();
+    // cápsula (cone) sobre a órbita, apontando no sentido do movimento
+    const t = -0.55, ox = 47 * Math.cos(t), oy = 19 * Math.sin(t);
+    const px = cx + ox * Math.cos(-0.32) - oy * Math.sin(-0.32), py = ey + 4 + ox * Math.sin(-0.32) + oy * Math.cos(-0.32);
+    g.save(); g.translate(px, py); g.rotate(-1.35);
+    g.fillStyle = '#eef2f6'; g.beginPath(); g.moveTo(-8, 7); g.lineTo(8, 7); g.lineTo(3, -9); g.lineTo(-3, -9); g.closePath(); g.fill();
+    g.fillStyle = '#d7263d'; g.fillRect(-8, 5, 16, 4);
+    g.restore();
+  }
+  // 12: usina hidrelétrica, com a barragem e o raio (Enedina Marques)
+  {
+    const cx = 4 * CELL + 64;
+    disc(g, cx, ey, 63, '#264653'); disc(g, cx, ey, 55, '#d4ecff');
+    g.save(); g.beginPath(); g.arc(cx, ey, 55, 0, TAU); g.clip();
+    g.fillStyle = '#2f80d1'; g.fillRect(cx - 60, ey - 6, 50, 70);
+    g.fillStyle = '#6fb3f2'; g.fillRect(cx - 60, ey - 6, 50, 5);
+    g.fillStyle = '#8f9aa6';
+    g.beginPath(); g.moveTo(cx - 14, ey - 20); g.lineTo(cx - 2, ey - 20); g.lineTo(cx + 22, ey + 62); g.lineTo(cx - 14, ey + 62); g.closePath(); g.fill();
+    g.fillStyle = '#b8c2cc'; g.fillRect(cx - 14, ey - 20, 12, 8);
+    g.fillStyle = '#5aa9f0'; g.fillRect(cx + 14, ey + 38, 50, 30);
+    g.restore();
+    g.fillStyle = '#ffbe0b'; g.strokeStyle = '#264653'; g.lineWidth = 3; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(cx + 26, ey - 44); g.lineTo(cx + 8, ey - 6); g.lineTo(cx + 22, ey - 6); g.lineTo(cx + 10, ey + 26);
+    g.lineTo(cx + 42, ey - 16); g.lineTo(cx + 28, ey - 16); g.lineTo(cx + 40, ey - 44); g.closePath(); g.fill(); g.stroke();
+  }
+  // Faces do cubo mágico (célula 7 da linha 0): 4 quadrantes com 3 x 3 adesivos
+  {
+    const K = { w: '#f5f5f5', y: '#ffd500', r: '#e3232c', o: '#ff7b10', b: '#1463d8', g: '#14a54f' };
+    ['wwwwwwoww', 'rrrrrrgrr', 'gggyggggg', 'bbobbbbbb'].forEach((f, q) => {
+      const fx = 7 * CELL + (q % 2) * 64, fy = Math.floor(q / 2) * 64;
+      g.fillStyle = '#111114'; g.fillRect(fx, fy, 64, 64);
+      for (let k = 0; k < 9; k++) {
+        roundRectPath(g, fx + 3.5 + (k % 3) * 19.5, fy + 3.5 + Math.floor(k / 3) * 19.5, 18, 18, 4);
+        g.fillStyle = K[f[k]]; g.fill();
+      }
+    });
+  }
+  // Chapa fotográfica de emulsão (células 0..1 da linha 7): vidro escuro com rastros claros
+  {
+    const x0 = 0, y0 = 7 * CELL, w = 2 * CELL, h = CELL;
+    g.fillStyle = '#b9c7cf'; g.fillRect(x0, y0, w, h);
+    const gr = g.createLinearGradient(x0, y0, x0 + w, y0 + h);
+    gr.addColorStop(0, '#2a3439'); gr.addColorStop(1, '#161d21');
+    g.fillStyle = gr; g.fillRect(x0 + 7, y0 + 7, w - 14, h - 14);
+    g.fillStyle = 'rgba(210,220,200,0.22)';
+    for (let i = 0; i < 320; i++) g.fillRect(x0 + 9 + rr() * (w - 18), y0 + 9 + rr() * (h - 18), 1.6, 1.6);
+    // rastro = grãos de prata ao longo de uma linha
+    const track = (pts, rad, col, step = 2.4) => {
+      g.fillStyle = col;
+      for (let j = 1; j < pts.length; j++) {
+        const [xa, ya] = pts[j - 1], [xb, yb] = pts[j];
+        const n = Math.max(2, Math.round(Math.hypot(xb - xa, yb - ya) / step));
+        for (let i = 0; i <= n; i++) {
+          const t = i / n;
+          g.beginPath();
+          g.arc(x0 + xa + (xb - xa) * t + (rr() - 0.5) * 1.5, y0 + ya + (yb - ya) * t + (rr() - 0.5) * 1.5, rad * (0.7 + rr() * 0.5), 0, TAU);
+          g.fill();
+        }
+      }
+    };
+    track([[14, 112], [242, 22]], 1.2, 'rgba(190,205,195,0.8)', 4); // raio cósmico atravessando
+    track([[16, 26], [58, 40], [98, 60], [118, 70]], 2.5, '#fff6d0'); // píon que para...
+    track([[118, 70], [150, 90], [184, 104]], 2.1, '#fff6d0'); // ...e vira múon
+    track([[184, 104], [214, 84], [244, 70]], 1.1, 'rgba(255,246,208,0.75)', 3.2); // elétron
+    for (let k = 0; k < 6; k++) { // estrela: núcleo que se desintegra
+      const a = k * 1.05 + 0.3, L2 = 12 + rr() * 16;
+      track([[204, 36], [204 + Math.cos(a) * L2, 36 + Math.sin(a) * L2]], 1.7, '#ffe9a8');
+    }
+    g.fillStyle = '#ffd166'; g.font = `italic bold 22px Georgia, serif`;
+    g.fillText('π', x0 + 70, y0 + 30); g.fillText('μ', x0 + 162, y0 + 80);
+  }
+  // Quadro-negro (células 2..3 da linha 7): Terra, órbita tracejada e contas de giz
+  {
+    const x0 = 2 * CELL, y0 = 7 * CELL, w = 2 * CELL, h = CELL;
+    g.fillStyle = '#243a2e'; g.fillRect(x0, y0, w, h);
+    g.fillStyle = 'rgba(255,255,255,0.05)';
+    for (let i = 0; i < 7; i++) { g.beginPath(); g.ellipse(x0 + rr() * w, y0 + rr() * h, 20 + rr() * 30, 8 + rr() * 10, rr(), 0, TAU); g.fill(); }
+    const chalk = 'rgba(248,248,236,0.95)';
+    g.strokeStyle = chalk; g.lineWidth = 3; g.lineCap = 'round';
+    g.beginPath(); g.ellipse(x0 + 70, y0 + 66, 56, 30, -0.3, Math.PI, TAU); g.stroke();
+    disc(g, x0 + 66, y0 + 68, 19, '#5c8fd6');
+    g.fillStyle = '#7cc47f';
+    g.beginPath(); g.ellipse(x0 + 60, y0 + 63, 7, 5, 0.5, 0, TAU); g.fill();
+    g.beginPath(); g.ellipse(x0 + 73, y0 + 76, 5, 3.5, -0.3, 0, TAU); g.fill();
+    g.beginPath(); g.arc(x0 + 66, y0 + 68, 19, 0, TAU); g.stroke();
+    g.setLineDash([8, 6]);
+    g.beginPath(); g.ellipse(x0 + 70, y0 + 66, 56, 30, -0.3, 0, Math.PI); g.stroke();
+    g.setLineDash([]);
+    // cápsula e seta do movimento
+    g.fillStyle = chalk;
+    g.beginPath(); g.moveTo(x0 + 118, y0 + 30); g.lineTo(x0 + 128, y0 + 40); g.lineTo(x0 + 115, y0 + 42); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(x0 + 20, y0 + 96); g.quadraticCurveTo(x0 + 8, y0 + 80, x0 + 14, y0 + 62); g.stroke();
+    g.beginPath(); g.moveTo(x0 + 8, y0 + 70); g.lineTo(x0 + 14, y0 + 62); g.lineTo(x0 + 20, y0 + 70); g.stroke();
+    g.textAlign = 'left'; g.font = `italic 19px Georgia, 'Times New Roman', serif`;
+    g.fillText('x = r cos θ', x0 + 140, y0 + 28);
+    g.fillText('y = r sen θ', x0 + 140, y0 + 54);
+    g.fillText('v = √GM/r', x0 + 140, y0 + 80);
+    g.fillText('T = 88 min', x0 + 140, y0 + 106);
+    g.textAlign = 'center';
+    // traço do radical cobre GM/r inteiro: v = √(GM/r)
+    g.strokeStyle = chalk; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x0 + 174, y0 + 70); g.lineTo(x0 + 226, y0 + 70); g.stroke();
+  }
+  // Planta azul (célula 4 da linha 7): quadriculado e desenho técnico de uma barragem com turbina
+  {
+    const x0 = 4 * CELL, y0 = 7 * CELL;
+    g.fillStyle = '#1f5fae'; g.fillRect(x0, y0, CELL, CELL);
+    g.strokeStyle = 'rgba(220,235,255,0.28)'; g.lineWidth = 1;
+    for (let i = 8; i < CELL; i += 16) {
+      g.beginPath(); g.moveTo(x0 + i, y0); g.lineTo(x0 + i, y0 + CELL); g.stroke();
+      g.beginPath(); g.moveTo(x0, y0 + i); g.lineTo(x0 + CELL, y0 + i); g.stroke();
+    }
+    g.strokeStyle = '#eef6ff'; g.lineWidth = 3; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(x0 + 20, y0 + 104); g.lineTo(x0 + 44, y0 + 24); g.lineTo(x0 + 58, y0 + 24); g.lineTo(x0 + 80, y0 + 104); g.closePath(); g.stroke();
+    g.beginPath(); g.arc(x0 + 96, y0 + 88, 14, 0, TAU); g.stroke();
+    g.beginPath(); g.moveTo(x0 + 60, y0 + 70); g.lineTo(x0 + 86, y0 + 80); g.stroke();
+    g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(x0 + 10, y0 + 14); g.lineTo(x0 + 118, y0 + 14); g.stroke();
+    g.beginPath(); g.moveTo(x0 + 100, y0 + 30); g.lineTo(x0 + 120, y0 + 30); g.lineTo(x0 + 120, y0 + 60); g.stroke();
+  }
+  // Placa QUANTA (células 5..6 da linha 7): faixa 4:1 no meio da célula
+  {
+    const x0 = 5 * CELL, y0 = 7 * CELL + 32;
+    roundRectPath(g, x0 + 4, y0 + 3, 248, 58, 14);
+    g.fillStyle = '#0b1511'; g.fill();
+    g.lineWidth = 5; g.strokeStyle = '#1fd685'; g.stroke();
+    quantaTarget(g, x0 + 38, y0 + 32, 0.72);
+    g.fillStyle = '#1fd685'; g.font = `bold 40px ${FONT}`;
+    g.fillText('QUANTA', x0 + 150, y0 + 34);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -253,13 +482,16 @@ const circleG = (seg) => G(`o${seg}`, () => new THREE.CircleGeometry(0.5, seg));
 const rboxG = (w, h, d, r, k) => G(`r${w}.${h}.${d}.${r}.${k}`, () => (k > 0 ? roundedBox(w, h, d, r, k) : new THREE.BoxGeometry(w, h, d)));
 // Casca de barba na mandíbula: faixa esférica cuja borda de cima é baixa na frente
 // (abaixo da boca) e alta nas laterais (costeletas). Ângulos em "pitch" (rad).
-const jawShellG = (pf, ps, pb, w, h) => G(`j${pf}.${ps}.${pb}.${w}.${h}`, () => {
-  const g = new THREE.SphereGeometry(1, w, h, Math.PI / 2 - 1.75, 3.5, 0.5, 1);
+// ym: ângulo (yaw) máximo das costeletas; 1.75 passa por trás da orelha.
+// pbs: borda de baixo nas laterais (a linha da mandíbula sobe até a orelha); padrão = pb.
+const jawShellG = (pf, ps, pb, w, h, ym = 1.75, pbs = pb) => G(`j${pf}.${ps}.${pb}.${w}.${h}${ym === 1.75 && pbs === pb ? '' : `.${ym}.${pbs}`}`, () => {
+  const g = new THREE.SphereGeometry(1, w, h, Math.PI / 2 - ym, 2 * ym, 0.5, 1);
   const pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
-    const yaw = -1.75 + 3.5 * uv.getX(i);
-    const top = ps + (pf - ps) * Math.pow(Math.max(0, Math.cos(yaw)), 1.5);
-    const pitch = pb + (top - pb) * uv.getY(i);
+    const yaw = -ym + 2 * ym * uv.getX(i);
+    const k = Math.pow(Math.max(0, Math.cos(yaw)), 1.5);
+    const top = ps + (pf - ps) * k, bot = pbs + (pb - pbs) * k;
+    const pitch = bot + (top - bot) * uv.getY(i);
     const x = Math.sin(yaw) * Math.cos(pitch), y = Math.sin(pitch), z = Math.cos(yaw) * Math.cos(pitch);
     pos.setXYZ(i, x, y, z);
     nor.setXYZ(i, x, y, z);
@@ -400,6 +632,21 @@ class Builder {
     }
     return this;
   }
+  // Contorno avulso: casco escuro e invertido de uma geometria já "engordada" pelo chamador
+  // (tubos finos e curvos, em que a escala do contorno automático não acompanha a forma).
+  hull(geo, color, pos, rot = null, scl = 1) {
+    if (!this.outline) return this;
+    if (typeof scl === 'number') _sc.set(scl, scl, scl);
+    else _sc.set(scl[0], scl[1], scl[2]);
+    if (rot) _q.setFromEuler(_eu.set(rot[0], rot[1], rot[2], rot[3] || 'XYZ'));
+    else _q.identity();
+    _mA.compose(_p.set(pos[0], pos[1], pos[2]), _q, _sc);
+    _mB.multiplyMatrices(this.base, _mA);
+    _oc.set(color).multiplyScalar(OUTLINE_K);
+    _oc.r += 0.004; _oc.g += 0.003; _oc.b += 0.006;
+    this._append(geo, _mB, _oc, true, null);
+    return this;
+  }
   _append(geo, m, color, outline, uvRect) {
     const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv, idx = geo.index;
     _nm.getNormalMatrix(m);
@@ -527,13 +774,13 @@ function face(b, L, o = {}) {
       b.box(0x1a1010, hp(s * (eyeYaw + 0.075), eyeP + 0.07, 0.0), [0.05, 0.016, 0.02], 0.007, hr(s * (eyeYaw + 0.08), eyeP + 0.07, s * 0.5), { ol: 0 });
     }
     // bochechas rosadas
-    if (o.cheeks !== false) b.ell(mix(skin, 0xff6f6f, 0.4), hp(s * 0.56, -0.15, -0.018), [0.058, 0.036, 0.025], hr(s * 0.56, -0.15), { ol: 0, seg: [8, 5] });
+    if (o.cheeks !== false) b.ell(o.cheek ?? mix(skin, 0xff6f6f, 0.4), hp(s * 0.56, -0.15, -0.018), [0.058, 0.036, 0.025], hr(s * 0.56, -0.15), { ol: 0, seg: [8, 5] });
     // orelhas
     if (o.ears !== false) b.ell(shade(skin, 0.96), hp(s * 1.5, 0.0, -0.01), [0.04, 0.07, 0.055], hr(s * 1.5, 0), { ol: 0.009, seg: [8, 6] });
   }
   // nariz
   const nr = o.nose ?? 0.052;
-  b.ell(mix(skin, 0xd9826b, 0.18), hp(0, o.noseP ?? -0.1, -0.012), [nr, nr * (o.noseSY ?? 0.9), nr * 0.95], hr(0, -0.1), { ol: 0.008, seg: [10, 7] });
+  b.ell(o.noseCol ?? mix(skin, 0xd9826b, 0.18), hp(0, o.noseP ?? -0.1, -0.012), [nr, nr * (o.noseSY ?? 0.9), nr * 0.95], hr(0, -0.1), { ol: 0.008, seg: [10, 7] });
   // boca
   const mp = o.mouthP ?? -0.32;
   if (o.mouth === 'smile') {
@@ -582,6 +829,52 @@ function mustache(b, color, o = {}) {
   for (const s of [1, -1]) {
     b.ell(color, hp(s * yaw, p, o.lift ?? 0.018), [w, h, h * 0.95], hr(s * yaw, p, -s * tilt), { ol: 0.008 });
   }
+}
+
+// Aro de óculos: moldura retangular de cantos arredondados no plano XY, com largura 1
+// (altura ar, raio do canto rr, espessura do aro th, profundidade dp; tudo relativo à largura).
+const rimG = (ar, rr, th, dp, cs = 3) => G(`g${ar}.${rr}.${th}.${dp}.${cs}`, () => {
+  const rect = (p, w, h, r) => {
+    const x = -w / 2, y = -h / 2;
+    p.moveTo(x + r, y); p.lineTo(x + w - r, y); p.quadraticCurveTo(x + w, y, x + w, y + r);
+    p.lineTo(x + w, y + h - r); p.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    p.lineTo(x + r, y + h); p.quadraticCurveTo(x, y + h, x, y + h - r);
+    p.lineTo(x, y + r); p.quadraticCurveTo(x, y, x + r, y);
+  };
+  const s = new THREE.Shape();
+  rect(s, 1, ar, rr);
+  const hole = new THREE.Path();
+  rect(hole, 1 - 2 * th, ar - 2 * th, Math.max(0.02, rr - th));
+  s.holes.push(hole);
+  const g = new THREE.ExtrudeGeometry(s, { depth: dp, bevelEnabled: false, curveSegments: cs });
+  g.translate(0, 0, -dp / 2);
+  return g;
+});
+
+// Óculos de aros retangulares: lentes sobre os olhos, ponte e hastes que seguem a cabeça até a orelha.
+function glasses(b, color, o = {}) {
+  const yaw = o.yaw ?? 0.33, p = o.p ?? 0.02, lift = o.lift ?? 0.036, W = o.w ?? 0.17;
+  const geo = rimG(o.ar ?? 0.78, o.r ?? 0.14, o.th ?? 0.08, o.dp ?? 0.07, b.lv(3, 2, 1, 1));
+  const tr = o.temple ?? 0.009;
+  const inner = [];
+  for (const s of [1, -1]) {
+    const c = hp(s * yaw, p, lift);
+    const ly = s * yaw * (o.flat ?? 0.75); // lentes mais de frente que a curva da cabeça
+    const ax = Math.cos(ly), az = -Math.sin(ly);
+    b.add(geo, color, c, hr(ly, p, s * (o.roll ?? 0)), W, { ol: o.ol ?? 0 });
+    const hw = W / 2 - W * (o.th ?? 0.08) * 0.5;
+    const edge = [c[0] + s * hw * ax, c[1] + (o.templeY ?? 0.012), c[2] + s * hw * az];
+    inner.push([c[0] - s * hw * ax, c[1] + 0.012, c[2] - s * hw * az]);
+    const pts = [edge, ...[0.95, 1.22, 1.46].map((y) => hp(s * y, p + 0.06, o.templeLift ?? 0.018))];
+    for (let i = 0; i < 3; i++) b.cyl(color, pts[i], pts[i + 1], tr, tr, 5, { ol: 0 });
+  }
+  b.cyl(color, inner[0], inner[1], tr * 1.1, tr * 1.1, 5, { ol: 0 });
+}
+
+// Cabeça genérica (cientista sem entrada em HEADS)
+function genericHead(b, L) {
+  face(b, L, { mouth: 'smile' });
+  hairCap(b, L.hair, 1.5, 0.5, 1.06);
 }
 
 // ---- Cabeças de cada cientista ----
@@ -754,6 +1047,114 @@ const HEADS = {
     }
     b.cyl(GL, hp(0.1, 0.03, 0.035), hp(-0.1, 0.03, 0.035), 0.009, 0.009, 5, { ol: 0 });
   },
+
+  samuel(b, L, r) {
+    const H = L.hair, H2 = mix(H, 0x6a5a50, 0.3), FADE = mix(H, L.skin, 0.4), BEARD = 0x30251e;
+    face(b, L, { brow: H, browW: 0.105, browH: 0.032, browTilt: 0.03, browLift: 0.008, eyeYaw: 0.34, eyeScale: 0.86, nose: 0.057, noseSY: 0.95, mouth: 'grin', mouthP: -0.37, mouthW: 0.1 });
+    // cabelo bem curto: degradê nas laterais e na nuca, mais comprido em cima e levantado na frente
+    hairCap(b, FADE, 1.67, 0.78, 1.03);
+    hairCap(b, H, 1.47, 0.52, 1.045);
+    b.ell(H, [0, 0.17, 0.0], [0.24, 0.13, 0.23], [0.25, 0, 0]);
+    // frente levantada: tufos curtos em pé ao longo da linha do cabelo, com pontinhas
+    const n = Math.max(5, Math.round(8 * b.dens));
+    for (let i = 0; i < n; i++) {
+      const u = -1 + (2 * i) / (n - 1);
+      const yaw = u * 0.62 + (r() - 0.5) * 0.06;
+      const p = 0.76 - Math.abs(u) * 0.06 + (r() - 0.5) * 0.04;
+      const tip = hp(yaw * 1.08, p + 0.12, 0.075 - Math.abs(u) * 0.02 + r() * 0.012);
+      b.cone(i % 3 ? H : H2, hp(yaw, p - 0.02, -0.01), tip, 0.06, 6, { ol: 0.008 });
+    }
+    // barba curta e aparada: casca na mandíbula (das costeletas, na frente da orelha, até o queixo)
+    const [cw, ch] = b.lv([24, 8], [16, 5], [10, 4], [8, 3]);
+    b.add(jawShellG(-0.62, -0.05, -1.28, cw, ch, 1.42, -0.6), BEARD, [0, 0, 0], null, [HR * 1.035, HR * 1.03, HR * 1.05], { ol: 0.008 });
+    b.blob(BEARD, hp(0, -0.8, -0.01), [0.1, 0.065, 0.07], hr(0, -0.8), { ol: 0.008 });
+    // bigode ligado à barba pelos cantos da boca
+    mustache(b, BEARD, { w: 0.076, h: 0.024, tilt: 0.18, p: -0.255, yaw: 0.105, lift: 0.012 });
+    for (const s of [1, -1]) b.ell(BEARD, hp(s * 0.33, -0.44, 0.0), [0.026, 0.07, 0.024], hr(s * 0.33, -0.44, s * 0.3), { ol: 0.006 });
+    // óculos retangulares de armação preta fina
+    glasses(b, 0x141418, { yaw: 0.34, w: 0.18, ar: 0.72, r: 0.13, th: 0.065, templeLift: 0.024 });
+  },
+
+  lattes(b, L, r) {
+    const H = L.hair, H2 = mix(H, 0x8a7a70, 0.4);
+    face(b, L, { brow: H, browW: 0.105, browH: 0.032, browTilt: 0.02, browLift: 0.006, nose: 0.055, noseSY: 1.05, mouth: 'smile', lip: 0x8a3a3a, mouthP: -0.35 });
+    hairCap(b, H, 1.44, 0.5, 1.055);
+    // penteado para trás, com o topete (onda) na frente, puxado para a esquerda da risca
+    b.ell(H, [0, 0.19, -0.04], [0.25, 0.12, 0.25], [0.15, 0, 0]);
+    b.ell(H, [0.025, 0.25, 0.1], [0.19, 0.1, 0.16], [0.5, 0.1, -0.1]);
+    b.ell(H, [0.05, 0.29, 0.17], [0.13, 0.065, 0.08], [0.9, 0.15, -0.12], { ol: 0.009 });
+    for (const [x, ry] of [[-0.06, -0.2], [0.03, 0.05], [0.12, 0.3]]) {
+      b.ell(H2, [x, 0.31 - Math.abs(x - 0.03) * 0.3, 0.02], [0.018, 0.01, 0.13], [0.2, ry, 0], { ol: 0, seg: [8, 5] });
+    }
+  },
+
+  franklin(b, L, r) {
+    const H = L.hair, H2 = shade(H, 0.8), H3 = mix(H, 0x8a5a3a, 0.3);
+    face(b, L, { lashes: true, ears: false, brow: shade(H, 0.9), browW: 0.095, browH: 0.024, browTilt: -0.04, nose: 0.045, mouth: 'smile', lip: 0xb0485a, eyeScale: 1.03 });
+    hairCap(b, H, 1.56, 0.5, 1.07);
+    // risca do lado direito do rosto (-X): o volume de cima vai para a esquerda (+X)
+    const nt = Math.max(4, Math.round(6 * b.dens));
+    for (let i = 0; i < nt; i++) {
+      const u = i / (nt - 1);
+      const yaw = -0.35 + u * 1.25, p = 0.66 + Math.sin(u * Math.PI) * 0.1;
+      b.blob(i % 2 ? H : H3, hp(yaw, p, 0.015), [0.12, 0.07, 0.11], hr(yaw, p, -0.45), { ol: 0.01 });
+    }
+    // ondas curtas nas laterais e na nuca, terminando na altura do queixo
+    const nw = Math.max(3, Math.round(4 * b.dens));
+    for (const s of [1, -1]) {
+      for (let k = 0; k < 3; k++) {
+        const p = 0.24 - k * 0.24;
+        for (let i = 0; i < nw; i++) {
+          const yaw = s * (1.05 + (k % 2) * 0.18 + i * (1.9 / nw));
+          b.blob([H, H2, H3][(i + k) % 3], hp(yaw, p, 0.005 - k * 0.004), [0.11, 0.065, 0.08], hr(yaw, p, s * 0.3), { ol: 0.01 });
+        }
+      }
+    }
+  },
+
+  johnson(b, L, r) {
+    const H = L.hair, cols = [H, shade(H, 0.86), mix(H, 0xffffff, 0.35), shade(H, 0.94)];
+    const warm = mix(L.skin, 0xd0605a, 0.32);
+    face(b, L, { lashes: true, brow: 0x4a3a34, browW: 0.095, browH: 0.026, browTilt: -0.06, browLift: 0.008, eyeScale: 0.92, nose: 0.058, noseSY: 0.86, noseCol: mix(L.skin, 0x5a2e1e, 0.12), mouth: 'smile', lip: 0x9a4652, cheek: warm, pupil: 0x1e120c });
+    hairCap(b, shade(H, 0.9), 1.42, 0.55, 1.05);
+    // cachos curtos e arrumados cobrindo a calota (testa e rosto livres)
+    const rows = [[1.35, 3], [1.08, 7], [0.8, 11], [0.52, 12], [0.24, 12], [-0.04, 10], [-0.3, 6]];
+    let c = 0;
+    rows.forEach(([p, n0], k) => {
+      const n = Math.max(3, Math.round(n0 * b.dens));
+      for (let i = 0; i < n; i++) {
+        const yaw = ((i + (k % 2) * 0.5) / n) * TAU + (r() - 0.5) * 0.12;
+        const f = Math.cos(yaw);
+        const line = f > 0 ? 0.62 * Math.pow(f, 0.6) : 0.1 + 0.4 * f; // linha do cabelo
+        if (p < line - 0.05) continue;
+        const rad = (0.066 + r() * 0.014) / Math.sqrt(b.dens);
+        b.blob(cols[c++ % 4], hp(yaw, p + (r() - 0.5) * 0.05, 0.03), rad, null, { ol: 0.01 });
+      }
+    });
+    // óculos grandes de armação clara e brincos de pérola
+    glasses(b, 0xeadcbc, { yaw: 0.34, w: 0.2, ar: 0.8, r: 0.3, th: 0.1, roll: 0.06, ol: 0.004, templeLift: 0.05, temple: 0.011 });
+    for (const s of [1, -1]) b.ell(0xfaf5ea, hp(s * 1.47, -0.24, 0.035), 0.019, null, { ol: 0.004 });
+  },
+
+  enedina(b, L, r) {
+    const H = L.hair, H2 = mix(H, 0x6a5a55, 0.4), HELM = 0xf7f7f3, HELM2 = 0xdedfd8;
+    const warm = mix(L.skin, 0xd0605a, 0.3);
+    face(b, L, { lashes: true, brow: H, browW: 0.095, browH: 0.026, browTilt: -0.05, browLift: 0.008, nose: 0.054, noseSY: 0.86, noseCol: mix(L.skin, 0x3a1e14, 0.1), mouth: 'smile', lip: 0x9a4450, cheek: warm, pupil: 0x1a100c });
+    // cabelo liso puxado para trás, preso num coque baixo na nuca
+    hairCap(b, H, 1.55, 0.35, 1.05);
+    for (const s of [1, -1]) b.ell(H2, hp(s * 0.75, 0.42, 0.012), [0.012, 0.012, 0.09], hr(s * 0.75, 0.42, 0), { ol: 0, seg: [6, 4] });
+    b.ell(H, [0, -0.1, -0.285], [0.13, 0.11, 0.1]);
+    b.ell(H2, [0.04, -0.07, -0.37], [0.04, 0.025, 0.02], null, { ol: 0, seg: [6, 4] });
+    // capacete de obra branco: casco, friso central e aba com pala na frente
+    b.setBase(0, 0.39, 0.03, -0.16, 0, 0);
+    const [w, h] = b.lv([22, 10], [16, 7], [10, 5], [8, 4]);
+    b.add(capG(w, h, Math.PI / 2), HELM, [0, 0, 0], null, [0.335, 0.31, 0.335]);
+    b.torus(HELM2, [0, 0, 0], [0, Math.PI / 2, 0], 0.31, 0.032, Math.PI, { ol: 0.008 });
+    b.cyl(HELM, [0, -0.02, 0], [0, 0.01, 0], 0.365, 0.36);
+    b.ell(HELM, [0, -0.01, 0.24], [0.25, 0.022, 0.17], null, { seg: b.lv([14, 6], [10, 5]) });
+    b.cyl(HELM2, [0, 0.005, 0], [0, 0.04, 0], 0.34, 0.336, 0, { ol: 0 });
+    b.setBase(0, 0.3, 0.03); // volta ao centro da cabeça
+  },
 };
 
 // ---- Troncos (roupa); coordenadas relativas ao quadril (pivô de inclinação) ----
@@ -766,6 +1167,26 @@ function torsoBase(b, L, C, o = {}) {
   // pescoço
   b.cyl(L.skin, [0, 0.48, 0.0], [0, 0.66, 0.02], 0.075, 0.07, 0, { ol: 0 });
   return w;
+}
+// Raio do perfil do tronco na altura y
+function torsoR(y) {
+  const P = TORSO_PROFILE;
+  for (let i = 1; i < P.length; i++) {
+    if (y <= P[i][1]) return P[i - 1][0] + ((P[i][0] - P[i - 1][0]) * (y - P[i - 1][1])) / (P[i][1] - P[i - 1][1]);
+  }
+  return 0;
+}
+// Ponto na frente do tronco (altura y, lado x; w = largura de torsoBase), afastado `lift` da
+// superfície, e a rotação que deixa +Z local na normal (para golas, botões e decalques).
+function chestAt(y, x, w, lift = 0) {
+  const zAt = (yy) => {
+    const a = torsoR(yy) * w, k = Math.min(0.97, Math.abs(x) / a);
+    return 0.82 * a * Math.sqrt(1 - k * k);
+  };
+  const z = zAt(y), a = torsoR(y) * w, c = 0.82 * a;
+  const pitch = Math.atan2(zAt(y + 0.01) - zAt(y - 0.01), 0.02);
+  const yaw = Math.atan2(x / (a * a), z / (c * c));
+  return { p: [x + Math.sin(yaw) * lift, y, z + Math.cos(yaw) * lift], r: [pitch, yaw, 0] };
 }
 const TORSOS = {
   newton(b, L, C) {
@@ -820,16 +1241,111 @@ const TORSOS = {
     b.box(0xdfe4ea, [0.12, 0.25, 0.19], [0.08, 0.06, 0.02], 0.01, [0.1, 0.2, 0], { ol: 0.005 });
     b.box(0x2e86de, [0.12, 0.29, 0.2], [0.012, 0.05, 0.012], 0.004, [0.1, 0.2, 0], { ol: 0 });
   },
+  samuel(b, L, C) {
+    const w = torsoBase(b, L, C);
+    // camiseta henley: gola redonda canelada, carcela com 3 botões e o alvo da Quanta no peito
+    const RIB = shade(L.outfit, 0.9);
+    b.torus(RIB, [0, 0.515, 0.008], [Math.PI / 2 + 0.12, 0, 0], 0.09, 0.021);
+    const pk = chestAt(0.43, 0, w, 0.006);
+    b.box(RIB, pk.p, [0.056, 0.15, 0.016], 0.008, pk.r, { ol: 0.005 });
+    for (let i = 0; i < 3; i++) {
+      const bt = chestAt(0.475 - i * 0.043, 0, w, 0.016);
+      b.ell(0x8b6a48, bt.p, [0.012, 0.012, 0.007], bt.r, { ol: 0.004, seg: [8, 6] });
+    }
+    const lg = chestAt(0.37, 0.105, w, 0.004);
+    b.decal(emblemUV('samuel'), lg.p, lg.r, 0.062, 0.062, true);
+  },
+  lattes(b, L, C) {
+    const w = torsoBase(b, L, C);
+    // paletó com lapelas; no decote em V, camisa branca e gravata; lenço no bolso
+    const SH = 0xffffff, TIE = 0x8e2430, LAP = shade(L.outfit, 0.8);
+    b.cyl(SH, [0, 0.475, 0], [0, 0.555, 0.012], 0.09, 0.085);
+    const v = chestAt(0.43, 0, w, 0.003);
+    b.box(SH, v.p, [0.12, 0.15, 0.02], 0.02, v.r, { ol: 0.005 });
+    for (const s of [1, -1]) b.box(SH, [s * 0.04, 0.515, 0.085], [0.06, 0.028, 0.05], 0.01, [0.7, s * 0.45, s * 0.55], { ol: 0.005 });
+    const kn = chestAt(0.49, 0, w, 0.018);
+    b.ell(TIE, kn.p, [0.03, 0.028, 0.02], kn.r, { ol: 0.005 });
+    const ti = chestAt(0.4, 0, w, 0.014);
+    b.box(TIE, ti.p, [0.042, 0.15, 0.014], 0.012, ti.r, { ol: 0.005 });
+    for (const s of [1, -1]) {
+      const lp = chestAt(0.4, s * 0.085, w, 0.01);
+      b.box(LAP, lp.p, [0.06, 0.24, 0.026], 0.012, [lp.r[0], lp.r[1], s * 0.38]);
+    }
+    const pq = chestAt(0.33, 0.14, w, 0.012);
+    b.box(SH, pq.p, [0.05, 0.03, 0.014], 0.006, [pq.r[0], pq.r[1], 0.3], { ol: 0.004 });
+  },
+  franklin(b, L, C) {
+    const w = torsoBase(b, L, C);
+    // jaleco branco aberto sobre a blusa azul-escura; bolso com caneta
+    const BL = L.outfitAccent, LAP = 0xe4e9ef;
+    b.cyl(BL, [0, 0.47, 0], [0, 0.55, 0.012], 0.088, 0.083);
+    const v = chestAt(0.43, 0, w, 0.003);
+    b.box(BL, v.p, [0.13, 0.16, 0.02], 0.02, v.r, { ol: 0.005 });
+    for (const s of [1, -1]) b.box(BL, [s * 0.042, 0.508, 0.09], [0.065, 0.03, 0.05], 0.012, [0.7, s * 0.45, s * 0.5], { ol: 0.005 });
+    for (const s of [1, -1]) {
+      const lp = chestAt(0.4, s * 0.088, w, 0.01);
+      b.box(LAP, lp.p, [0.06, 0.24, 0.026], 0.012, [lp.r[0], lp.r[1], s * 0.36]);
+    }
+    const pk = chestAt(0.28, -0.12, w, 0.008);
+    b.box(LAP, pk.p, [0.08, 0.06, 0.02], 0.01, pk.r, { ol: 0.005 });
+    b.box(0x9b5de5, [pk.p[0], pk.p[1] + 0.045, pk.p[2] + 0.004], [0.012, 0.05, 0.012], 0.004, pk.r, { ol: 0 });
+  },
+  johnson(b, L, C) {
+    const w = torsoBase(b, L, C);
+    // gola redonda e colar de pérolas, mais baixo na frente
+    b.torus(shade(L.outfit, 0.85), [0, 0.515, 0.008], [Math.PI / 2 + 0.1, 0, 0], 0.092, 0.02);
+    const n = b.lv(13, 11, 9, 7);
+    for (let i = 0; i < n; i++) {
+      const a = -1.3 + (2.6 * i) / (n - 1);
+      const pe = chestAt(0.49 - 0.06 * Math.cos(a), Math.sin(a) * 0.115, w, 0.014);
+      b.ell(0xfaf5ea, pe.p, 0.017, null, { ol: 0.004, seg: b.lv([7, 5], [6, 4]) });
+    }
+    for (let i = 0; i < 3; i++) {
+      const bt = chestAt(0.33 - i * 0.07, 0, w, 0.01);
+      b.ell(shade(L.outfit, 0.7), bt.p, [0.014, 0.014, 0.008], bt.r, { ol: 0, seg: [8, 6] });
+    }
+  },
+  enedina(b, L, C) {
+    const w = torsoBase(b, L, C);
+    // gola branca deitada nos ombros, com as duas pontas na frente; botões e um lápis no bolso
+    const WH = L.outfitAccent;
+    const cr = torsoR(0.47) * w + 0.012;
+    b.add(cylG(0.6, b.lv(18, 12, 8, 6)), WH, [0, 0.488, 0.004], null, [cr, 0.036, cr * 0.84], { ol: 0.008 });
+    b.cyl(WH, [0, 0.49, 0], [0, 0.55, 0.012], 0.088, 0.084);
+    for (const s of [1, -1]) {
+      const cp = chestAt(0.455, s * 0.05, w, 0.006);
+      b.ell(WH, cp.p, [0.05, 0.036, 0.012], [cp.r[0], cp.r[1], s * 0.7], { ol: 0.006 });
+    }
+    for (let i = 0; i < 3; i++) {
+      const bt = chestAt(0.42 - i * 0.075, 0, w, 0.01);
+      b.ell(WH, bt.p, [0.014, 0.014, 0.008], bt.r, { ol: 0.003, seg: [8, 6] });
+    }
+    const pk = chestAt(0.33, 0.12, w, 0.008);
+    b.box(shade(L.outfit, 0.85), pk.p, [0.08, 0.06, 0.018], 0.01, pk.r, { ol: 0.005 });
+    b.cyl(0xffc300, [pk.p[0] + 0.015, pk.p[1] + 0.01, pk.p[2] + 0.006], [pk.p[0] + 0.02, pk.p[1] + 0.09, pk.p[2] - 0.004], 0.009, 0.009, 6, { ol: 0.004 });
+    b.cyl(0xf28aa0, [pk.p[0] + 0.02, pk.p[1] + 0.09, pk.p[2] - 0.004], [pk.p[0] + 0.021, pk.p[1] + 0.105, pk.p[2] - 0.006], 0.009, 0.009, 6, { ol: 0 });
+  },
 };
 // Cor da calça de cada um
 const PANTS = {
   newton: 0x3b2618, curie: 0x1c1c22, mendeleev: 0x23253a, einstein: 0x4a4a52,
   galileu: 0x1f1f1f, darwin: 0x2b2222, dumont: 0x2e3a4f, oswaldo: 0x2d3142,
+  samuel: 0x2f3c56, lattes: 0x324152, franklin: 0x2b3148, johnson: 0x3a2e3a, enedina: 0x3c464d,
 };
 // Cor do punho da manga
 const CUFFS = {
   newton: 0xf5f0e1, curie: 0x2a2a33, mendeleev: 0x8d99ae, einstein: 0x3d3d3d,
   galileu: 0xf1ede4, darwin: 0xd9cbb0, dumont: 0xffffff, oswaldo: 0xdfe4ea,
+  samuel: 0xe6e6e2, lattes: 0xffffff, franklin: 0x33415c, johnson: 0x5e2046, enedina: 0xffffff,
+};
+// Braços especiais (o padrão é manga comprida com punho)
+const ARMS = {
+  // camiseta de manga curta: manga branca com barra e antebraço de pele
+  samuel(b, L) {
+    b.limb(L.outfit, [0, 0, 0], [0, 0, 0.15], 0.075);
+    b.cyl(shade(L.outfit, 0.92), [0, 0, 0.13], [0, 0, 0.175], 0.08, 0.08);
+    b.limb(L.skin, [0, 0, 0.16], [0, 0, ARM_LEN - 0.04], 0.058);
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -872,7 +1388,7 @@ function kartDims(C) {
 
 function kartBody(b, C, num, D) {
   const K = C.colors.kart, A = C.colors.kartAccent;
-  const numUV = cellUV(num - 1, 1);
+  const nUV = numUV(num);
   // assoalho
   b.box(DARK, [0, 0.19, -0.05], [0.84, 0.12, 1.5], 0.05, null, { ol: 0 });
   // bico arredondado (topo inclinado: altura do topo em cada z)
@@ -897,7 +1413,7 @@ function kartBody(b, C, num, D) {
   for (const s of [1, -1]) {
     b.box(K, [s * D.podX, 0.33, -0.06], [D.podW, 0.3, 0.86], 0.06);
     b.box(A, [s * D.podX, 0.49, -0.06], [D.podW - 0.02, 0.04, 0.8], 0.02, null, { ol: 0.008 });
-    b.decal(numUV, [s * D.podOut, 0.33, numZ], [0, s * Math.PI / 2, 0], 0.2, 0.2, true);
+    b.decal(nUV, [s * D.podOut, 0.33, numZ], [0, s * Math.PI / 2, 0], 0.2, 0.2, true);
   }
   // traseira + banco
   b.box(K, [0, 0.35, -0.62], [D.rearW, 0.28, 0.46], 0.1);
@@ -908,8 +1424,8 @@ function kartBody(b, C, num, D) {
   const back = [0, 0.747, -0.607], backR = [-0.2, Math.PI, 0];
   if (C.id === 'einstein') b.decal(cellUV(1, 0, 4, 1), back, backR, 0.46, 0.115);
   else if (C.id === 'dumont') b.decal(cellUV(5, 0, 2, 1), back, backR, 0.34, 0.17);
-  else b.decal(cellUV(EMBLEM[C.id] ?? 0, 2), back, backR, 0.23, 0.23, true);
-  b.decal(numUV, [0, nTop(D.noseZ + 0.04) + 0.018, D.noseZ + 0.04], [-Math.PI / 2 + D.noseTilt, 0, 0], 0.2, 0.2, true);
+  else b.decal(emblemUV(C.id), back, backR, 0.23, 0.23, true);
+  b.decal(nUV, [0, nTop(D.noseZ + 0.04) + 0.018, D.noseZ + 0.04], [-Math.PI / 2 + D.noseTilt, 0, 0], 0.2, 0.2, true);
   // motor e escapamentos (pontas em (±0.3, 0.45, D.exhaustTip)); pesados têm motor maior
   const e = D.eng, eTop = 0.45 + 0.2 * e;
   b.box(METAL, [0, 0.45 + 0.1 * e, -0.76], [0.44 * e, 0.2 * e, 0.28 * e], 0.05);
@@ -928,7 +1444,7 @@ function kartBody(b, C, num, D) {
 
 // Pernas do piloto (fixas no kart)
 function legs(b, id) {
-  const pants = PANTS[id];
+  const pants = PANTS[id] ?? 0x2d3142;
   for (const s of [1, -1]) {
     // só a coxa aparece; canela e pé ficam sob o painel
     b.limb(pants, [s * 0.11, 0.38, -0.24], [s * 0.13, 0.52, 0.1], 0.075);
@@ -973,7 +1489,11 @@ function steeringGeo(C, L, detail) {
 // Braço: cápsula ao longo de +Z (ombro na origem), punho perto da ponta
 function armGeo(L, id, detail) {
   const b = new Builder({ detail, ol: 0.01 });
-  const cuff = CUFFS[id];
+  if (ARMS[id]) {
+    ARMS[id](b, L);
+    return b.build();
+  }
+  const cuff = CUFFS[id] ?? L.outfitAccent;
   b.limb(L.outfit, [0, 0, 0], [0, 0, ARM_LEN - 0.04], 0.066);
   b.cyl(cuff, [0, 0, ARM_LEN - 0.1], [0, 0, ARM_LEN - 0.04], 0.074, 0.074);
   return b.build();
@@ -988,7 +1508,7 @@ const KART_EXTRAS = {
     b.ell(0xff6b6b, [p[0] + 0.03, p[1] + 0.03, p[2] + 0.05], 0.022, null, { ol: 0 });
     b.cyl(0x5b3a29, [p[0], p[1] + 0.06, p[2]], [p[0] + 0.01, p[1] + 0.11, p[2]], 0.01, 0.008, 5);
     b.ell(0x3a9d4e, [p[0] + 0.04, p[1] + 0.1, p[2]], [0.04, 0.012, 0.02], [0, 0, 0.5]);
-    emblemSides(b, D, cellUV(EMBLEM.newton, 2));
+    emblemSides(b, D, emblemUV('newton'));
   },
   curie(b, C, ext, D) {
     // suporte do frasco (o líquido brilhante é uma malha separada)
@@ -997,7 +1517,7 @@ const KART_EXTRAS = {
     b.cyl(0x8a5a3a, [x, y + 0.36, z], [x, y + 0.42, z], 0.045, 0.05);
     b.torus(0xd0e8ff, [x, y + 0.33, z], [Math.PI / 2, 0, 0], 0.05, 0.012, TAU, { ol: 0 });
     ext.vial = { pos: [x, y + 0.02, z] };
-    emblemSides(b, D, cellUV(EMBLEM.curie, 2));
+    emblemSides(b, D, emblemUV('curie'));
   },
   mendeleev(b, C, ext, D) {
     // quadradinhos da tabela periódica
@@ -1017,12 +1537,12 @@ const KART_EXTRAS = {
     const back = [['Au', 0.34, 0.34], ['Ra', 0.11, 0.3], ['O', -0.11, 0.3], ['C', -0.34, 0.34]];
     for (const [sym, x, y] of back) b.decal(tileUV(sym), [x, y, -0.853], [0, Math.PI, 0], 0.11, 0.11);
     // placa "Md" no painel
-    b.decal(cellUV(EMBLEM.mendeleev, 2), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
+    b.decal(emblemUV('mendeleev'), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
   },
   einstein(b, C, ext, D) {
     for (const s of [1, -1]) b.decal(cellUV(1, 0, 4, 1), [s * D.podOut, 0.33, -0.15], [0, s * Math.PI / 2, 0], 0.54, 0.135);
     // átomo no painel
-    b.decal(cellUV(EMBLEM.einstein, 2), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
+    b.decal(emblemUV('einstein'), [-0.2, 0.62, 0.5], [-Math.PI / 2 + 0.6, 0, 0], 0.14, 0.14, true);
   },
   galileu(b, C, ext, D) {
     // luneta dourada inclinada para o céu
@@ -1037,7 +1557,7 @@ const KART_EXTRAS = {
     // suporte (forquilha)
     b.cyl(DARK, [-0.44, 0.47, -0.3], [-0.44, 0.86, -0.3], 0.03, 0.025);
     b.ell(GOLD2, [-0.44, 0.88, -0.3], 0.05);
-    emblemSides(b, D, cellUV(EMBLEM.galileu, 2));
+    emblemSides(b, D, emblemUV('galileu'));
   },
   darwin(b, C, ext, D) {
     // galhinho-poleiro e corpo do tentilhão (a cabeça é separada)
@@ -1053,7 +1573,7 @@ const KART_EXTRAS = {
     for (const s of [1, -1]) b.cyl(0x8a6a4a, [s * 0.02, -0.06, 0.0], [s * 0.02, -0.075, 0.01], 0.008, 0.008, 4, { ol: 0 });
     b.setBase();
     ext.finch = { pos: [0.34 + 0.065 * Math.sin(0.9), 0.858, -0.66 + 0.065 * Math.cos(0.9)], yaw: 0.9, s: 1.3 };
-    emblemSides(b, D, cellUV(EMBLEM.darwin, 2));
+    emblemSides(b, D, emblemUV('darwin'));
   },
   dumont(b, C, ext, D) {
     // asinhas em caixa (pipa de Hargrave, como no 14-bis): duas células abertas por lado,
@@ -1074,7 +1594,7 @@ const KART_EXTRAS = {
     }
     // mastro da hélice, na frente do kart (hélice puxando, lida como "para a frente")
     b.cyl(WOOD, [0, 0.5, 0.86], [0, 0.66, 1.02], 0.03, 0.025);
-    emblemSides(b, D, cellUV(EMBLEM.dumont, 2));
+    emblemSides(b, D, emblemUV('dumont'));
     ext.propeller = { pos: [0, 0.66, 1.06] };
   },
   oswaldo(b, C, ext, D) {
@@ -1091,7 +1611,72 @@ const KART_EXTRAS = {
     b.cyl(BR, [0, 0.2, 0.05], [0, 0.17, 0.055], 0.02, 0.014, 0, { ol: 0 });
     b.ell(BR, [0.05, 0.25, -0.05], 0.022, null, { ol: 0.005 });
     b.setBase();
-    emblemSides(b, D, cellUV(EMBLEM.oswaldo, 2));
+    emblemSides(b, D, emblemUV('oswaldo'));
+  },
+  samuel(b, C, ext, D) {
+    // cubo mágico no painel: corpo preto e adesivos 3 x 3 (atlas) nas 5 faces visíveis
+    const c = 0.13, h = c / 2 + 0.0015, sz = c * 0.95;
+    b.setBase(0.2, 0.668, 0.44, 0.25, 0.42, 0);
+    b.box(0x121214, [0, 0, 0], [c, c, c], 0.014);
+    b.decal(cubeUV(0), [0, h, 0], [-Math.PI / 2, 0, 0], sz);
+    b.decal(cubeUV(1), [0, 0, h], null, sz);
+    b.decal(cubeUV(2), [h, 0, 0], [0, Math.PI / 2, 0], sz);
+    b.decal(cubeUV(3), [-h, 0, 0], [0, -Math.PI / 2, 0], sz);
+    b.decal(cubeUV(2), [0, 0, -h], [0, Math.PI, 0], sz);
+    b.setBase();
+    // placa QUANTA na traseira e o alvo da Quanta nas laterais
+    b.decal(pxUV(5 * CELL, 7 * CELL + 32, 2 * CELL, 64), [0, 0.35, -0.853], [0, Math.PI, 0], 0.3, 0.075);
+    emblemSides(b, D, emblemUV('samuel'));
+  },
+  lattes(b, C, ext, D) {
+    // chapa fotográfica de emulsão numa haste, inclinada para o céu (como no monte Chacaltaya)
+    const x = -Math.min(0.32, D.rearW / 2 - 0.08), z = -0.76;
+    b.cyl(METAL, [x, 0.48, z + 0.02], [x, 0.66, z - 0.04], 0.02, 0.017);
+    b.setBase(x, 0.74, z - 0.03, 0.85, Math.PI, 0);
+    b.box(0xaebcc4, [0, 0, 0], [0.3, 0.2, 0.018], 0.008);
+    b.decal(cellUV(0, 7, 2, 1), [0, 0, 0.0095], null, 0.28, 0.14);
+    b.box(METAL, [0, -0.1, 0], [0.1, 0.035, 0.04], 0.01);
+    b.setBase();
+    emblemSides(b, D, emblemUV('lattes'));
+  },
+  franklin(b, C, ext, D) {
+    // base do modelo de dupla hélice (a hélice gira: malha separada)
+    const x = Math.min(0.3, D.rearW / 2 - 0.08), z = -0.68;
+    b.cyl(0x2f2a3a, [x, 0.48, z], [x, 0.53, z], 0.085, 0.075);
+    ext.dna = { pos: [x, 0.53, z] };
+    emblemSides(b, D, emblemUV('franklin'));
+  },
+  johnson(b, C, ext, D) {
+    // quadro-negro num cavalete, virado para trás (a câmera de perseguição vê a órbita)
+    const x = Math.min(0.3, D.rearW / 2 - 0.1), z = -0.74, WOOD = 0x8a5a2b;
+    for (const s of [1, -1]) b.cyl(WOOD, [x + s * 0.15, 0.48, z + 0.03], [x + s * 0.14, 0.72, z - 0.01], 0.016, 0.014);
+    b.setBase(x, 0.8, z - 0.02, -0.15, Math.PI, 0);
+    b.box(WOOD, [0, 0, 0], [0.4, 0.22, 0.026], 0.012);
+    b.decal(cellUV(2, 7, 2, 1), [0, 0, 0.0135], null, 0.36, 0.18);
+    b.decal(cellUV(2, 7, 2, 1), [0, 0, -0.0135], [0, Math.PI, 0], 0.36, 0.18);
+    b.box(WOOD, [0, -0.12, 0.022], [0.3, 0.018, 0.04], 0.006);
+    b.box(0xf4f1e8, [0.06, -0.105, 0.03], [0.05, 0.012, 0.012], 0.005, null, { ol: 0.003 });
+    b.setBase();
+    emblemSides(b, D, emblemUV('johnson'));
+  },
+  enedina(b, C, ext, D) {
+    // rolo de planta azul amarrado no pontão esquerdo
+    const x = D.podX, y = 0.555, z0 = -0.34, z1 = 0.14;
+    b.cyl(0xffffff, [x, y, z0], [x, y, z1], 0.045, 0.045, 0, { uv: cellUV(4, 7), open: true });
+    for (const [zz, dz] of [[z0, -1], [z1, 1]]) {
+      b.cyl(0xdbe8f7, [x, y, zz - 0.002 * dz], [x, y, zz + 0.002 * dz], 0.044, 0.044, 0, { ol: 0 });
+      b.cyl(0x1f5fae, [x, y, zz], [x, y, zz + 0.004 * dz], 0.024, 0.024, 8, { ol: 0 });
+      b.cyl(0xdbe8f7, [x, y, zz], [x, y, zz + 0.006 * dz], 0.012, 0.012, 6, { ol: 0 });
+    }
+    for (const zz of [z0 + 0.1, z1 - 0.1]) b.cyl(0x3a2a22, [x, y, zz - 0.012], [x, y, zz + 0.012], 0.051, 0.051, 10, { ol: 0.004, open: true });
+    // turbina Pelton na traseira: suporte, cano com o bocal do jato; a roda gira (malha separada)
+    const tx = -Math.min(0.3, D.rearW / 2 - 0.12), ty = 0.86, tz = -0.74;
+    b.cyl(METAL, [tx, 0.48, tz + 0.06], [tx, ty, tz + 0.06], 0.022, 0.02);
+    b.ell(METAL, [tx, ty, tz + 0.06], [0.03, 0.03, 0.02]);
+    b.cyl(0x2f80d1, [tx + 0.19, 0.48, tz], [tx + 0.19, 0.68, tz], 0.024, 0.022);
+    b.cyl(0x2f80d1, [tx + 0.19, 0.68, tz], [tx + 0.07, 0.71, tz], 0.022, 0.014);
+    ext.turbine = { pos: [tx, ty, tz] };
+    emblemSides(b, D, emblemUV('enedina'));
   },
 };
 function emblemSides(b, D, uv) {
@@ -1118,6 +1703,67 @@ function finchHeadGeo(detail) {
   }
   return b.build();
 }
+// Hélice (curva) em volta de Y, de y = 0 a H, com `turns` voltas a partir da fase ph
+class HelixCurve extends THREE.Curve {
+  constructor(R, H, turns, ph) { super(); this.R = R; this.H = H; this.turns = turns; this.ph = ph; }
+  getPoint(t, out = new THREE.Vector3()) {
+    const a = this.ph - t * this.turns * TAU; // sinal negativo: hélice destra, como o DNA-B real
+    return out.set(Math.cos(a) * this.R, t * this.H, Math.sin(a) * this.R);
+  }
+}
+const helixG = (R, H, turns, ph, tube, seg, rs) => G(`h${R}.${H}.${turns}.${ph}.${tube}.${seg}.${rs}`, () => new THREE.TubeGeometry(new HelixCurve(R, H, turns, ph), seg, tube, rs, false));
+// Modelo de dupla hélice do DNA (gira em torno de Y; origem na base)
+function dnaGeo(detail) {
+  const b = new Builder({ detail, ol: 0.008, olMin: detail === 0 ? 0.05 : 0 });
+  const R = 0.085, H = 0.46, turns = 1.25, y0 = 0.04;
+  const seg = b.lv(40, 24, 16, 12), rs = b.lv(6, 4, 4, 3);
+  [0x4cc9f0, 0xffd166].forEach((col, k) => {
+    b.add(helixG(R, H, turns, k * Math.PI, 0.017, seg, rs), col, [0, y0, 0], null, 1, { ol: 0 });
+    b.hull(helixG(R, H, turns, k * Math.PI, 0.025, seg, rs), col, [0, y0, 0]);
+  });
+  // pares de bases: degraus em duas cores (A-T e C-G)
+  const PAIRS = [[0xef476f, 0x06d6a0], [0x118ab2, 0xff9f1c], [0x06d6a0, 0xef476f], [0xff9f1c, 0x118ab2]];
+  const n = b.lv(10, 8, 6, 5);
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n, a = -t * turns * TAU, y = y0 + t * H; // mesmo sentido das fitas (destra)
+    const p = [Math.cos(a) * R, y, Math.sin(a) * R], q = [-p[0], y, -p[2]], m = [0, y, 0];
+    const [c1, c2] = PAIRS[i % 4];
+    b.cyl(c1, p, m, 0.012, 0.012, 6, { ol: 0.004, open: true });
+    b.cyl(c2, m, q, 0.012, 0.012, 6, { ol: 0.004, open: true });
+  }
+  b.cyl(0xb8bec6, [0, 0, 0], [0, y0 + H + 0.03, 0], 0.008, 0.008, 6, { ol: 0 });
+  b.ell(0xb8bec6, [0, y0 + H + 0.035, 0], 0.016, null, { ol: 0.004 });
+  return b.build();
+}
+// Roda Pelton (turbina de usina): gira em torno de Z; conchas duplas no aro
+function turbineGeo(detail, C) {
+  const b = new Builder({ detail, ol: 0.008, olMin: detail === 0 ? 0.05 : 0 });
+  const ST = 0xc3ccd4, ST2 = 0x6f7a86;
+  b.cyl(ST2, [0, 0, -0.016], [0, 0, 0.016], 0.1, 0.1);
+  b.cyl(0xd4a24c, [0, 0, -0.04], [0, 0, 0.04], 0.033, 0.033);
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * TAU;
+    b.box(C.colors.kartAccent, [Math.cos(a) * 0.06, Math.sin(a) * 0.06, 0.018], [0.07, 0.022, 0.006], 0.004, [0, 0, a], { ol: 0 });
+  }
+  const n = b.lv(12, 10, 8, 6);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU, c = Math.cos(a), s = Math.sin(a);
+    b.ell(ST, [c * 0.122, s * 0.122, 0], [0.024, 0.034, 0.036], [0, 0, a], { ol: 0.006 });
+    if (detail > 0) b.ell(0x39414a, [c * 0.128 - s * 0.012, s * 0.128 + c * 0.012, 0], [0.01, 0.02, 0.026], [0, 0, a], { ol: 0 });
+  }
+  return b.build();
+}
+// Acessórios que giram (malhas separadas): geometria, eixo local e velocidade (rad/s pela velocidade do kart)
+const SPINNERS = {
+  dna: { geo: (detail) => dnaGeo(detail), axis: 'y', rate: (v) => 1.4 + v * 0.1 },
+  turbine: { geo: (detail, C) => turbineGeo(detail, C), axis: 'z', rate: (v) => 3 + v * 1.1 },
+};
+
+// Valores padrão de aparência (cientista novo sem tudo preenchido em config.js)
+const DEFAULT_LOOK = { skin: 0xe8b98f, hair: 0x3a2a20, outfit: 0x2d3142, outfitAccent: 0xffffff };
+const DEFAULT_COLORS = { kart: 0x8d99ae, kartAccent: 0xffffff };
+const DEFAULT_STATS = { speed: 3, accel: 3, handling: 3, weight: 3 };
+
 function vialGeo(detail) {
   // Erlenmeyer: brilho verde (material básico, sem sombreamento)
   const pts = [[0, 0], [0.11, 0], [0.12, 0.02], [0.115, 0.05], [0.05, 0.22], [0.038, 0.25], [0.038, 0.36], [0, 0.36]];
@@ -1131,9 +1777,13 @@ function buildParts(id, detail) {
   const key = `${id}:${detail}`;
   const sh = shared();
   if (sh.models.has(key)) return sh.models.get(key);
-  const C = CHARACTER_BY_ID[id] || CHARACTERS[0];
+  // cópia com valores padrão: um cientista sem `look`/`colors` completos não quebra o modelo
+  const C0 = CHARACTER_BY_ID[id] || CHARACTERS[0];
+  const C = {
+    ...C0, stats: { ...DEFAULT_STATS, ...C0.stats }, colors: { ...DEFAULT_COLORS, ...C0.colors }, look: { ...DEFAULT_LOOK, ...C0.look },
+  };
   const L = C.look;
-  const num = CHARACTERS.indexOf(C) + 1;
+  const num = CHARACTERS.indexOf(C0) + 1;
   const outline = true;
   const ext = {};
   const D = kartDims(C);
@@ -1146,12 +1796,12 @@ function buildParts(id, detail) {
   // tronco
   // baixa: só as peças grandes ganham contorno (menos triângulos)
   const torso = new Builder({ detail, outline, ol: 0.012, olMin: lo ? 0.08 : 0 });
-  TORSOS[C.id](torso, L, C);
+  (TORSOS[C.id] || torsoBase)(torso, L, C);
   // cabeça (origem no pescoço; centro da cabeça em (0, 0.3, 0.03))
   const head = new Builder({ detail, outline, ol: 0.012, olMin: lo ? 0.08 : 0 });
   head.setBase(0, 0.3, 0.03);
   head.ell(L.skin, [0, 0, 0], [HR, HR * 0.97, HR * 0.98], null, { seg: byDetail(detail, [22, 16], [14, 10]) });
-  HEADS[C.id](head, L, rng(num * 7919));
+  (HEADS[C.id] || genericHead)(head, L, rng(num * 7919));
   const parts = {
     body: body.build(),
     torso: torso.build(),
@@ -1165,6 +1815,8 @@ function buildParts(id, detail) {
       propeller: ext.propeller ? propellerGeo(detail) : null,
       finch: ext.finch ? finchHeadGeo(detail) : null,
       vial: ext.vial ? vialGeo(detail) : null,
+      // acessórios giratórios presentes neste kart: { chave: geometria }
+      spin: Object.fromEntries(Object.keys(SPINNERS).filter((k) => ext[k]).map((k) => [k, SPINNERS[k].geo(detail, C)])),
     },
   };
   sh.models.set(key, parts);
@@ -1305,6 +1957,12 @@ export function createKartModel(characterId, { quality } = {}) {
     finch.rotation.y = parts.ext.finch.yaw;
     finch.scale.setScalar(parts.ext.finch.s || 1);
   }
+  // modelo de DNA, turbina...: giram em torno de um eixo local
+  const spinners = Object.entries(parts.extGeo.spin || {}).map(([k, geo]) => {
+    const m = mk(geo, chassis, true);
+    m.position.fromArray(parts.ext[k].pos);
+    return { k, m, a: 0, axis: SPINNERS[k].axis, rate: SPINNERS[k].rate };
+  });
   if (parts.extGeo.vial) {
     vialMat = new THREE.MeshBasicMaterial({ color: 0x7dff5a });
     vial = new THREE.Mesh(parts.extGeo.vial, vialMat);
@@ -1377,6 +2035,7 @@ export function createKartModel(characterId, { quality } = {}) {
     }
     if (propeller && lp.extGeo.propeller) items.push({ geo: lp.extGeo.propeller, m: at(propeller) });
     if (finch && lp.extGeo.finch) items.push({ geo: lp.extGeo.finch, m: at(finch) });
+    for (const sp of spinners) if (lp.extGeo.spin?.[sp.k]) items.push({ geo: lp.extGeo.spin[sp.k], m: at(sp.m) });
     geo = mergeSolid(items);
     sh.models.set(key, geo);
     return geo;
@@ -1430,6 +2089,10 @@ export function createKartModel(characterId, { quality } = {}) {
       propA += (5 + aspd * 1.6) * dt;
       propeller.rotation.z = propA % TAU;
     }
+    for (const sp of spinners) {
+      sp.a = (sp.a + sp.rate(aspd) * dt) % TAU;
+      sp.m.rotation[sp.axis] = sp.a;
+    }
     if (finch) {
       peck = (peck + dt) % 2.4;
       const p = peck < 0.5 ? Math.sin((peck / 0.5) * Math.PI * 2) * 0.35 : 0;
@@ -1448,7 +2111,8 @@ export function createKartModel(characterId, { quality } = {}) {
   const stats = {
     body: tri(parts.body), torso: tri(parts.torso), head: tri(parts.head), arms: 2 * tri(parts.arm),
     wheels: 4 * tri(parts.wheel), steer: tri(parts.steer),
-    extras: tri(parts.extGeo.propeller) + tri(parts.extGeo.finch) + tri(parts.extGeo.vial) + (glow ? 2 : 0),
+    extras: tri(parts.extGeo.propeller) + tri(parts.extGeo.finch) + tri(parts.extGeo.vial) + (glow ? 2 : 0) +
+      Object.values(parts.extGeo.spin || {}).reduce((a, g) => a + tri(g), 0),
   };
   stats.total = Object.values(stats).reduce((a, b) => a + b, 0);
   // Pontos úteis para efeitos: pontas dos escapamentos (local) e o grupo da cabeça

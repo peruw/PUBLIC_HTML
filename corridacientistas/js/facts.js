@@ -74,8 +74,8 @@ export const ITEM_FACTS = {
   ],
   eletron: [
     {
-      short: 'Cargas opostas se atraem: é a Lei de Coulomb.',
-      text: 'Cargas opostas se atraem (Lei de Coulomb). No jogo, o kart da frente faz o papel da carga positiva que puxa o elétron.',
+      short: 'Cargas opostas se atraem, e mais forte quando estão perto.',
+      text: 'Cargas de sinais opostos se atraem. A Lei de Coulomb diz que essa força fica mais forte quanto mais perto as cargas estão. No jogo, o kart da frente faz o papel da carga positiva que puxa o elétron.',
       quiz: { q: 'Duas cargas elétricas de sinais opostos:', options: ['Se atraem', 'Se repelem', 'Não interagem', 'Viram nêutrons'], answer: 0 },
     },
     {
@@ -175,7 +175,7 @@ export const SCIENTIST_FACTS = {
   ],
   darwin: [
     { text: 'O Beagle passou pelo Brasil: Darwin visitou Salvador e o Rio de Janeiro em 1832.' },
-    { text: 'Nas Galápagos, Darwin viu tentilhões com bicos diferentes em cada ilha, adaptados ao alimento de cada lugar.', quiz: { q: 'O que Darwin notou nos tentilhões das ilhas Galápagos?', options: ['Bicos diferentes, adaptados ao alimento', 'Todos eram iguais', 'Não sabiam voar', 'Eram todos da mesma cor'], answer: 0 } },
+    { text: 'Nas Galápagos, Darwin coletou tentilhões com bicos de formatos muito variados. Mais tarde se viu que cada espécie tem o bico adaptado ao alimento que come.', quiz: { q: 'O que chama a atenção nos "tentilhões de Darwin"?', options: ['Bicos de formatos diferentes, adaptados ao alimento', 'Todos têm o bico igual', 'Nenhum sabe voar', 'Todos são da mesma cor'], answer: 0 } },
     { text: 'Seleção natural: os indivíduos com características mais vantajosas para o ambiente deixam mais descendentes.', quiz: { q: 'Na seleção natural, quem tende a deixar mais descendentes?', options: ['Quem tem características vantajosas para o ambiente', 'Sempre o maior indivíduo', 'Quem nasceu primeiro', 'Todos deixam o mesmo número'], answer: 0 } },
     { text: 'A viagem do Beagle ao redor do mundo durou quase cinco anos, de 1831 a 1836.' },
   ],
@@ -204,7 +204,7 @@ export const SCIENTIST_FACTS = {
     { text: 'César Lattes nasceu em Curitiba e foi um dos fundadores do Centro Brasileiro de Pesquisas Físicas (CBPF), no Rio de Janeiro, em 1949.' },
   ],
   franklin: [
-    { text: 'A "Foto 51", feita pela equipe de Rosalind Franklin em 1952 com raios X, mostrou o padrão em forma de X que revelou a dupla hélice do DNA.', quiz: { q: 'Que técnica Rosalind Franklin usou para fotografar o DNA?', options: ['Difração de raios X', 'Microscópio comum', 'Ultrassom', 'Telescópio'], answer: 0 } },
+    { text: 'A "Foto 51", feita pela equipe de Rosalind Franklin em 1952 com raios X, mostrou o padrão em forma de X de uma hélice, pista decisiva para descobrir a dupla hélice do DNA.', quiz: { q: 'Que técnica Rosalind Franklin usou para fotografar o DNA?', options: ['Difração de raios X', 'Microscópio comum', 'Ultrassom', 'Telescópio'], answer: 0 } },
     { text: 'Rosalind Franklin morreu em 1958, aos 37 anos. O Nobel de 1962 pela estrutura do DNA foi para Watson, Crick e Wilkins: o prêmio não é dado a quem já morreu.' },
     { text: 'Além do DNA, Rosalind Franklin estudou a estrutura de vírus, como o do mosaico do tabaco, e a do carvão.' },
     { text: 'O DNA guarda as instruções genéticas dos seres vivos em uma sequência de quatro bases: A, T, C e G.', quiz: { q: 'Quantos tipos de base formam o "alfabeto" do DNA?', options: ['Quatro (A, T, C e G)', 'Duas', 'Vinte e seis', 'Cem'], answer: 0 } },
@@ -245,8 +245,8 @@ export const ZONE_FACTS = {
   },
   lagoa: {
     name: 'Lagoa de Galápagos',
-    short: 'Galápagos: tartarugas e tentilhões diferentes em cada ilha.',
-    text: 'Nas ilhas Galápagos, Darwin notou tartarugas e tentilhões diferentes em cada ilha. Essas diferenças foram pistas importantes para a teoria da evolução.',
+    short: 'Galápagos: sabiás e tartarugas mudam de ilha para ilha.',
+    text: 'Nas ilhas Galápagos, Darwin notou que os sabiás e as tartarugas mudavam de uma ilha para outra. Essas diferenças foram pistas importantes para a teoria da evolução.',
     quiz: { q: 'As observações de Darwin nas Galápagos ajudaram a criar qual teoria?', options: ['Evolução por seleção natural', 'Gravitação universal', 'Relatividade', 'Tabela periódica'], answer: 0 },
   },
   tunel: {
@@ -259,7 +259,7 @@ export const ZONE_FACTS = {
     name: 'Reta de Tesla',
     short: 'Bobinas de Tesla geram centenas de milhares de volts.',
     text: 'As torres da Reta de Tesla são bobinas de Tesla: elas elevam a tensão elétrica a centenas de milhares de volts e soltam faíscas no ar.',
-    quiz: { q: 'O que uma bobina de Tesla produz?', options: ['Tensões elétricas altíssimas e faíscas', 'Ímãs permanentes', 'Luz ultravioleta apenas', 'Som'], answer: 0 },
+    quiz: { q: 'O que uma bobina de Tesla produz?', options: ['Tensões elétricas altíssimas e faíscas', 'Ímãs permanentes', 'Corrente contínua de baixa tensão', 'Gelo'], answer: 0 },
   },
   final: {
     name: 'Reta final',

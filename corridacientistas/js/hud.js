@@ -129,11 +129,20 @@ export class Hud {
   }
 
   // ---------- quem acertou quem ----------
-  onHit({ kart, by, item }) {
+  onHit({ kart, by, item, type }) {
     const p = this.player;
     if (!p || !this.active || !item || !ITEMS[item]) return;
     const it = ITEMS[item];
     const ico = itemIconHTML(item);
+    const squash = item === 'tesla' && type !== 'shock'; // passou por cima de um kart encolhido
+    if (kart === p && squash) {
+      this.toast(`<div class="item-ico">${ico}</div><div><b>${by ? by.character.name + ' passou por cima de você!' : 'Amassado!'}</b></div>`, 1700, 'hit');
+      return;
+    }
+    if (by === p && squash && !kart.finished) {
+      this.toast(`<div class="item-ico">${ico}</div><div><b>Você amassou ${kart.character.name}!</b></div>`, 1500, 'good');
+      return;
+    }
     if (kart === p) {
       const from = by && by !== p ? ` <span class="who">de ${who(by)}</span>` : by === p ? ' <span class="who">(foi você mesmo!)</span>' : '';
       this.toast(`<div class="item-ico">${ico}</div><div><b>${it.name}${from}</b></div>`, 1900, 'hit', this.tag);
@@ -176,9 +185,10 @@ export class Hud {
   // Dica da primeira corrida (cada uma aparece uma vez).
   tip(key, text, ms = 3000) {
     if (!this.tips || this.tips.has(key) || !this.active) return;
-    this.tips.add(key);
     const el = this.el.drift;
+    // durante o drift os pontos ocupam o lugar: a dica espera a próxima oportunidade
     if (!el || (el.classList.contains('dots') && key !== 'release')) return;
+    this.tips.add(key);
     el.className = 'hud-drift tip';
     el.textContent = text;
     this.driftTip = ms;
@@ -227,6 +237,7 @@ export class Hud {
     this.tips = tutorial ? new Set() : null;
     this.driftTip = 0;
     this.setDriftDots(-1);
+    this._feel = 0;
     if (this.el.vignette) this.el.vignette.style.opacity = 0;
     this.el.total.textContent = `/${karts.length}`;
     this._total = karts.length;

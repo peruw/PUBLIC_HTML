@@ -773,6 +773,7 @@ export class ItemSystem {
       held.t += dt;
       // o gesto de "para trás" vale enquanto o dedo está no botão (ao soltar, fica o último valor)
       if (c.holdItem) held.back = !!c.itemBack;
+      else if (c.itemBack) held.back = true; // gesto concluído no mesmo quadro em que o dedo saiu
       if (k.stunned) this._loseHeld(k); // batida: o item cai da mão
       else if (!c.holdItem || use || k.finished) this._releaseHeld(k);
       else this._heldPos(k, held.pos);
@@ -1520,6 +1521,7 @@ export class ItemSystem {
     h.phase = 'fly';
     h.t = 0;
     h.age = 0;
+    h.riseT = 0;
     h.scale = 0.2;
     h.heading = k.heading || 0;
     h.fade = 1;
@@ -1546,6 +1548,12 @@ export class ItemSystem {
           if (nt) {
             h.target = nt;
             if (h.phase !== 'fly') {
+              // recomeça o voo de onde o buraco está (sem saltar para o ponto antigo da pista)
+              const pr = track.project(h.pos, h.s);
+              h.s = pr.s;
+              h.lateral = pr.lateral;
+              h.start.copy(h.pos);
+              h.riseT = 0;
               h.phase = 'fly';
               h.t = 0;
             }
@@ -1584,7 +1592,8 @@ export class ItemSystem {
         const near = clamp(1 - (Math.abs(d) - 5) / 40, 0, 1);
         h.lateral += ((tg.lateral || 0) * near - h.lateral) * Math.min(1, dt * 3);
         _v.copy(smp.pos).addScaledVector(smp.right, h.lateral).addScaledVector(UP, 4);
-        const rise = Math.min(1, h.age / 0.45);
+        h.riseT = (h.riseT || 0) + dt; // cronômetro próprio da subida (zera ao trocar de alvo)
+        const rise = Math.min(1, h.riseT / 0.45);
         const e = 1 - Math.pow(1 - rise, 3);
         h.pos.lerpVectors(h.start, _v, e);
         h.heading = Math.atan2(smp.tangent.x, smp.tangent.z);

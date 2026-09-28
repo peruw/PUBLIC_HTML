@@ -3,7 +3,7 @@ import { CHARACTERS, CLASSES, ITEMS, RACE } from './config.js';
 import { itemIconHTML, PLAYER_COLORS } from './hud.js';
 import { formatTime } from './race.js';
 import { SCIENTIST_FACTS, pickFact, shuffledQuiz } from './facts.js';
-import { Online, ERR_TEXT, boardOf, parseBoard } from './online.js';
+import { Online, ERR_TEXT, boardOf, parseBoard, ROOM_NAME_RE, cleanRoomName, runErrText } from './online.js';
 
 const $ = (id) => document.getElementById(id);
 const SCREENS = ['loading', 'title', 'select', 'howto', 'online', 'turma', 'net', 'lobby', 'pause', 'results', 'error'];
@@ -90,8 +90,17 @@ export class Menu {
     if (!CLASSES[this.opts.cc] || (this.opts.cc === '150cc' && !is150Unlocked())) this.opts.cc = CLASSES[this.opts.cc] ? '100cc' : '50cc';
     if (!RACE.lapOptions.includes(this.opts.laps)) this.opts.laps = RACE.defaultLaps;
 
+    // quem já jogava em 150cc (antes do cadeado) fica com ele liberado de vez
+    if (store.get('cc', '') === '150cc') store.set('unlock150', true);
     this.room = store.get('room', null); // sala de turma em que o aluno entrou
     this.tabNav = false; // foco veio do Tab (não do mouse/toque)
+    // contadores de pedidos: resposta de um pedido antigo (ou de outra tela) é ignorada
+    this._onSeq = this._turmaSeq = this._joinSeq = this._repSeq = 0;
+    // online ligado depois de uma demora, ou conta trocada: redesenha a tela aberta
+    Online.onChange(() => {
+      if (this.current === 'online') this.refreshOnline();
+      else if (this.current === 'turma') this.refreshTurma(false);
+    });
     this.buildSelect();
     this.buildHowto();
 
@@ -161,9 +170,13 @@ export class Menu {
       case 'start': {
         h.sfx('menuSelect');
         store.set('character', this.opts.character);
-        store.set('cc', this.opts.cc);
-        store.set('laps', this.opts.laps);
-        store.set('mode', this.opts.mode);
+        // numa sala, motor/voltas/modo são os da sala: não viram preferência do jogador
+        // (e uma sala de 150cc não libera o 150cc de vez)
+        if (!this.room) {
+          store.set('cc', this.opts.cc);
+          store.set('laps', this.opts.laps);
+          store.set('mode', this.opts.mode);
+        }
         const duo = this.duo();
         if (this.opts.players === 2 && duo) {
           store.set('players', 2);
@@ -214,10 +227,20 @@ export class Menu {
         this.showReport(btn?.dataset.code);
         break;
       case 'room-toggle':
-        this.toggleRoom(btn?.dataset.code, btn?.dataset.open === '1');
+        this.toggleRoom(btn?.dataset.code, btn?.dataset.open === '1', btn);
+        break;
+      case 'room-copy':
+        this.copyReport(btn);
+        break;
+      case 'room-remove':
+        this.removeFromRoom(btn);
+        break;
+      case 'online-retry':
+        if (this.current === 'online') this.refreshOnline();
+        else if (this.current === 'turma') this.refreshTurma(false);
         break;
       case 'nick-save':
-        this.saveNick();
+        this.saveNick(btn);
         break;
       case 'share':
         this.share(btn);
@@ -276,6 +299,11 @@ export class Menu {
     // teclado: foco no botão principal da tela (pausa e resultado)
     // (o primeiro botão principal visível: na corrida online o "Correr de novo" dá lugar a "Voltar à sala")
     if (name === 'results') requestAnimationFrame(() => [...($('screen-results')?.querySelectorAll('.btn-primary') || [])].find((b) => b.offsetParent)?.focus({ preventScroll: true }));
+    // ranking online e turma abertos pelo Tab: foco no Voltar, para seguir navegando pela tela
+    // (sem Tab não: no celular o foco num campo abriria o teclado virtual)
+    if ((name === 'online' || name === 'turma') && this.tabNav) {
+      requestAnimationFrame(() => $('screen-' + name)?.querySelector('[data-action=back]')?.focus({ preventScroll: true }));
+    }
   }
 
   // Tela inicial: acertos no quiz, desafio do dia e sugestão de qualidade.
@@ -541,18 +569,25 @@ export class Menu {
     for (const b of $('opt-laps').children) b.classList.toggle('on', Number(b.dataset.laps) === this.opts.laps);
     for (const b of $('opt-mode')?.children || []) b.classList.toggle('on', b.dataset.mode === this.opts.mode);
     // sala de turma: mostra o aviso e trava motor/voltas/modo nos da sala
+    // (o rodapé esconde as opções travadas: a faixa já diz quais são)
+    $('screen-select')?.classList.toggle('in-room', !!this.room);
     const rb = $('room-banner');
     if (rb) {
       rb.classList.toggle('hidden', !this.room);
-      if (this.room && board) {
-        const b = board;
-        rb.innerHTML = `🏫 Sala <b>${esc(this.room.code)}</b> · ${esc(this.room.name)} · ${b.cc}, ${b.laps === 1 ? '1 volta' : b.laps + ' voltas'}${b.mode === 'timetrial' ? ', contra o relógio' : ''} <button class="btn btn-small" data-action="room-leave">Sair da sala</button>`;
+      if (this.room) {
+        const b = parseBoard(this.room.board);
+        const what = `${b.cc}, ${b.laps === 1 ? '1 volta' : b.laps + ' voltas'}${b.mode === 'timetrial' ? ', contra o relógio' : ''}`;
+        // "como Ana": quem senta depois no mesmo computador percebe que está com o nome de outro
+        const who = this.room.guestName ? ` · como <b>${esc(this.room.guestName)}</b>` : '';
+        const plain = `Sala ${this.room.code} · ${this.room.name} · ${what}${this.room.guestName ? ' · como ' + this.room.guestName : ''}`;
+        rb.innerHTML = `<span class="rb-text" title="${esc(plain)}">🏫 Sala <b>${esc(this.room.code)}</b> · ${esc(this.room.name)} · ${what}${who}</span><button class="btn btn-small" data-action="room-leave">Sair da sala</button>`;
       }
     }
     for (const g of ['opt-cc', 'opt-laps', 'opt-mode']) $(g)?.classList.toggle('room-locked', !!this.room);
     const unlocked = is150Unlocked();
     for (const b of $('opt-cc').children) {
-      const locked = b.dataset.cc === '150cc' && !unlocked;
+      // numa sala de 150cc o motor vale mesmo sem estar liberado: sem cadeado no rótulo
+      const locked = b.dataset.cc === '150cc' && !unlocked && !this.room;
       b.classList.toggle('locked', locked);
       b.querySelector('small').textContent = locked ? '🔒 vença no 100cc' : CLASSES[b.dataset.cc].hint;
     }
@@ -628,6 +663,8 @@ export class Menu {
     if (this.tabNav && document.activeElement?.classList.contains('char-card')) {
       this.grid.querySelector(`[data-id="${this.pick(who)}"]`)?.focus();
     }
+    // setas/controle: a grade rola até o cartão escolhido (3ª fileira fora da tela em telas baixas)
+    this.grid.querySelector('.char-card.selected')?.scrollIntoView({ block: 'nearest' });
   }
 
   buildHowto() {
@@ -660,7 +697,10 @@ export class Menu {
         else if (rec.prevLap) parts.push(`melhor volta ${formatTime(rec.bestLap)} (recorde ${formatTime(rec.prevLap.time)})`);
       }
     }
-    if (info.ghost != null) parts.push(info.ghost < 0 ? `👻 ${formatTime(-info.ghost).replace(/^0:/, '')} s mais rápido que o fantasma` : `👻 ${formatTime(info.ghost).replace(/^0:/, '')} s atrás do fantasma`);
+    if (info.ghost != null) {
+      const g = Math.abs(info.ghost).toFixed(2).replace('.', ',');
+      parts.push(info.ghost < 0 ? `👻 ${g} s mais rápido que o fantasma` : `👻 ${g} s atrás do fantasma`);
+    }
     if (info.rival && !tt) {
       const d = info.rival.delta;
       const n = info.rival.name;
@@ -922,7 +962,7 @@ export class Menu {
       return;
     }
     const rows = list
-      .map((e, i) => `<li class="${i === idx ? 'me' : ''}"><span>${i + 1}º</span><span>${i === idx && !e.name ? `<input id="rank-name" maxlength="14" placeholder="Seu nome" value="${esc(store.get('nick', ''))}" aria-label="Seu nome no ranking" /><button class="btn btn-small" id="rank-save">Salvar</button>` : esc(e.name || 'Jogador')}</span><span class="t">${formatTime(e.time)}</span></li>`)
+      .map((e, i) => `<li class="${i === idx ? 'me' : ''}"><span>${i + 1}º</span><span>${i === idx && !e.name ? `<input id="rank-name" maxlength="14" placeholder="Seu nome" value="${esc(store.get('nick', '') || this.me?.nickname || '')}" aria-label="Seu nome no ranking" /><button class="btn btn-small" id="rank-save">Salvar</button>` : esc(e.name || 'Jogador')}</span><span class="t">${formatTime(e.time)}</span></li>`)
       .join('');
     box.innerHTML = `<details ${idx >= 0 ? 'open' : ''}><summary>🏆 Ranking deste aparelho</summary><ol class="rank-list">${rows}</ol></details>`;
     const save = $('rank-save');
@@ -944,31 +984,64 @@ export class Menu {
   }
 
   // ---------- ranking online ----------
+  // me: { nickname, suggest }, null (sem conta) ou undefined (não carregou)
   accountHTML(me) {
     const u = Online.user;
-    if (!Online.available) return '<p class="muted">O ranking online funciona no site quantaaulas.com. Aqui vale o ranking deste aparelho.</p>';
+    if (!Online.available) return this.offlineHTML('O ranking online funciona no site quantaaulas.com. Aqui vale o ranking deste aparelho.');
     if (!u) return `<p>Entre com sua conta Google para aparecer no ranking.</p><a class="btn btn-primary btn-small" href="${Online.loginUrl}">Entrar com Google</a>`;
-    if (me && me.nickname) return `<p>Você aparece como <b>${esc(me.nickname)}</b>.</p>` + this.nickForm(me.nickname, 'Trocar apelido');
-    return '<p>Escolha um apelido para aparecer no ranking (os colegas veem esse nome, não o seu e-mail).</p>' + this.nickForm(me?.suggest || u.firstName || '', 'Salvar apelido');
+    if (me === undefined) return '<p class="muted">Não deu para carregar o seu apelido agora.</p><button class="btn btn-small" data-action="online-retry">Tentar de novo</button>';
+    if (me && me.nickname) return `<p>Você aparece como <b>${esc(me.nickname)}</b>.</p>` + this.nickForm(me.nickname, 'Trocar apelido', 'nick');
+    return '<p>Escolha um apelido para aparecer no ranking (os colegas veem esse nome, não o seu e-mail).</p>' + this.nickForm(me?.suggest || u.firstName || '', 'Salvar apelido', 'nick');
   }
 
-  nickForm(value, label) {
-    return `<div class="turma-row"><input id="nick-input" maxlength="16" value="${esc(value)}" aria-label="Apelido" /><button class="btn btn-small" data-action="nick-save">${label}</button></div><p class="turma-msg" id="nick-msg"></p>`;
+  // Online indisponível: ainda carregando (rede lenta), sem conexão no site ou fora do site.
+  offlineHTML(offSite) {
+    if (Online.status === 'loading') return '<p class="muted">Conectando à sua conta… A internet está lenta: esta tela se atualiza sozinha.</p>';
+    if (Online.onSite) return `<p class="muted">${ERR_TEXT.room_offline}</p><button class="btn btn-small" data-action="online-retry">Tentar de novo</button>`;
+    return `<p class="muted">${offSite}</p>`;
   }
 
-  async saveNick() {
-    const v = ($('nick-input')?.value || '').trim();
-    const r = await Online.setNickname(v);
-    const msg = $('nick-msg');
+  // Formulário de apelido. idp: prefixo dos ids ('nick' na tela Ranking online, 'res-nick' no resultado);
+  // saveNick procura o campo dentro do próprio formulário.
+  nickForm(value, label, idp) {
+    return `<div class="nick-form"><div class="turma-row"><input class="nick-input" id="${idp}-input" maxlength="16" value="${esc(value)}" aria-label="Apelido" enterkeyhint="done" /><button class="btn btn-small" data-action="nick-save">${label}</button></div><p class="turma-msg nick-msg" id="${idp}-msg" aria-live="polite"></p></div>`;
+  }
+
+  async saveNick(el) {
+    const box = el?.closest('.nick-form');
+    const inp = box?.querySelector('.nick-input');
+    const btn = box?.querySelector('[data-action=nick-save]');
+    const msg = box?.querySelector('.nick-msg');
+    if (!inp || btn?.disabled) return;
+    if (btn) btn.disabled = true; // clique duplo não manda duas vezes
+    if (msg) msg.textContent = '';
+    const r = await Online.setNickname(inp.value.trim());
+    if (btn) btn.disabled = false;
     if (r?.ok) {
       this.me = { nickname: r.nickname };
       this.h.sfx('menuSelect');
-      if (this.current === 'online') this.refreshOnline();
-      else if (this.current === 'results') this.renderOnlineResult(this._onlineRes);
-    } else if (msg) msg.textContent = ERR_TEXT[r?.error] || ERR_TEXT.offline;
+      if (this.current === 'online' && box.closest('#screen-online')) this.refreshOnline();
+      else if (this.current === 'results' && box.closest('#results-online')) this.nickSavedOnResult(r.nickname);
+    } else if (msg?.isConnected) msg.textContent = ERR_TEXT[r?.error] || ERR_TEXT.offline;
+  }
+
+  // Apelido salvo no resultado: o tempo já enviado passa a aparecer no ranking; mostra a colocação.
+  async nickSavedOnResult(nick) {
+    const res = this._onlineRes;
+    if (!res?.global?.ok) return;
+    res.global.nick = nick;
+    this.renderOnlineResult(res);
+    if (!res.board) return;
+    const [w, a] = await Promise.all([Online.leaderboard(res.board, 'week', 1), Online.leaderboard(res.board, 'all', 1)]);
+    if (this._onlineRes !== res || this.current !== 'results') return;
+    res.global.rank_week = w?.find((x) => x.is_me)?.rank;
+    res.global.rank_all = a?.find((x) => x.is_me)?.rank;
+    this.renderOnlineResult(res);
   }
 
   async refreshOnline() {
+    const seq = ++this._onSeq;
+    const stale = () => seq !== this._onSeq || this.current !== 'online';
     if (!this.onFilter) this.onFilter = { mode: this.opts.mode, cc: this.opts.cc, laps: this.opts.laps, period: 'week' };
     const f = this.onFilter;
     // seletores (liga os cliques só uma vez)
@@ -986,19 +1059,31 @@ export class Menu {
           this.refreshOnline();
         });
       }
-      for (const b of el.children) b.classList.toggle('on', String(f[key]) === b.dataset.v);
+      for (const b of el.children) {
+        const on = String(f[key]) === b.dataset.v;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', String(on)); // leitor de tela: qual filtro está ativo
+      }
     }
     const list = $('online-list');
     list.innerHTML = '<li class="muted">Carregando…</li>';
     await Online.init();
-    this.me = Online.user ? await Online.getMe() : null;
-    $('online-account').innerHTML = this.accountHTML(this.me);
+    const me = Online.user ? await Online.getMe() : null;
+    if (stale()) return;
+    if (me !== undefined) this.me = me;
+    // a conta só é redesenhada se mudou (trocar de filtro não apaga o apelido que está sendo digitado)
+    const acc = $('online-account');
+    const key = JSON.stringify([Online.status, Online.user?.id, me === undefined ? 'x' : me?.nickname, me?.suggest]);
+    if (acc._key !== key || !acc.innerHTML) {
+      acc._key = key;
+      acc.innerHTML = this.accountHTML(me);
+    }
     if (!Online.available) {
       list.innerHTML = '';
       return;
     }
     const rows = await Online.leaderboard(boardOf(f), f.period, 20);
-    if (this.current !== 'online') return;
+    if (stale()) return;
     list.innerHTML = this.boardRows(rows, 'Ninguém correu nesta combinação ainda. Seja o primeiro!');
   }
 
@@ -1031,17 +1116,33 @@ export class Menu {
         const rk = [];
         if (g.rank_week) rk.push(`${g.rank_week}º da semana`);
         if (g.rank_all) rk.push(`${g.rank_all}º no geral`);
-        parts.push(`<p>🌐 Ranking online: ${rk.length ? '<b>' + rk.join(' · ') + '</b>' : 'tempo salvo'}</p>`);
-        if (!g.rank_all && !g.rank_week) parts.push(this.nickForm(this.me?.suggest || Online.user?.firstName || '', 'Salvar apelido'));
-      } else parts.push(`<p class="muted">🌐 ${ERR_TEXT[g.error] || ERR_TEXT.offline}</p>`);
+        const as = g.nick ? ` como <b>${esc(g.nick)}</b>` : '';
+        if (rk.length) parts.push(`<p>🌐 Ranking online${as}: <b>${rk.join(' · ')}</b></p>`);
+        else if (g.nick) parts.push(`<p>🌐 Apelido salvo: <b>${esc(g.nick)}</b>. Seu tempo já aparece no ranking online.</p>`);
+        else {
+          // tempo gravado, mas sem apelido ele não aparece na lista
+          parts.push('<p>🌐 Tempo salvo no ranking online. Escolha um apelido para ele aparecer na lista (os colegas veem o apelido, não o seu e-mail):</p>');
+          parts.push(this.nickForm(this.me?.suggest || Online.user?.firstName || '', 'Salvar apelido', 'res-nick'));
+        }
+      } else parts.push(`<p class="muted">🌐 ${runErrText(g.error)}</p>`);
     } else if (res.loginHint && Online.available) {
       parts.push(`<p class="muted">🌐 Entre com sua conta para este tempo valer no ranking online. <a href="${Online.loginUrl}">Entrar com Google</a></p>`);
     }
     if (res.room) {
       const r = res.room;
       if (r.ok) parts.push(`<p>🏫 Sala ${esc(res.roomCode)}: <b>${r.rank}º de ${r.participants}</b> (seu melhor: ${formatTime(r.best / 1000)})</p>`);
-      else parts.push(`<p class="muted">🏫 ${ERR_TEXT[r.error] || ERR_TEXT.offline}</p>`);
-      if (res.roomBoard?.players) parts.push(`<ol class="online-list compact">${this.boardRows(res.roomBoard.players.slice(0, 8), '')}</ol>`);
+      else {
+        // sala fechada/apagada ou nome recusado: o aluno sai da sala (senão a escolha fica travada
+        // no motor/voltas dela e toda corrida falha igual)
+        if (['closed', 'not_found', 'invalid_name'].includes(r.error) && this.room?.code === res.roomCode) {
+          this.setRoom(null);
+          res.leftRoom = true;
+        }
+        const t = r.error === 'limit' ? ERR_TEXT.room_limit : runErrText(r.error, 'Sem conexão com a sala agora: este tempo não foi enviado.');
+        parts.push(`<p class="muted">🏫 ${t}${res.leftRoom ? ` Você saiu da sala ${esc(res.roomCode)}.` : ''}</p>`);
+      }
+      // o servidor já limita (os 8 primeiros e a linha do próprio aluno, se ele ficou de fora)
+      if (res.roomBoard?.players) parts.push(`<ol class="online-list compact">${this.boardRows(res.roomBoard.players, '')}</ol>`);
     }
     box.innerHTML = parts.join('');
   }
@@ -1050,109 +1151,243 @@ export class Menu {
   setRoom(room) {
     this.room = room;
     if (room) store.set('room', room);
-    else store.set('room', null);
+    else {
+      store.set('room', null);
+      // ao sair da sala, volta às escolhas do próprio jogador
+      const cc = store.get('cc', '50cc');
+      this.opts.cc = CLASSES[cc] && (cc !== '150cc' || is150Unlocked()) ? cc : '100cc';
+      const laps = store.get('laps', RACE.defaultLaps);
+      this.opts.laps = RACE.lapOptions.includes(laps) ? laps : RACE.defaultLaps;
+      this.opts.mode = store.get('mode', 'race') === 'timetrial' ? 'timetrial' : 'race';
+    }
     if (this.current === 'select') this.refreshSelect();
   }
 
   async joinRoom() {
     const code = ($('room-code').value || '').trim().toUpperCase();
-    const name = ($('room-name').value || '').trim();
+    const name = cleanRoomName($('room-name').value);
     const msg = $('room-msg');
     if (!/^[A-Z0-9]{5}$/.test(code)) {
       msg.textContent = 'O código tem 5 letras ou números.';
       return;
     }
-    await Online.init();
-    if (!Online.available) {
-      msg.textContent = 'As salas funcionam no site quantaaulas.com, com internet.';
-      return;
-    }
-    if (!Online.user && name.length < 2) {
+    // com conta e apelido, o nome na sala é o apelido do ranking (já validado)
+    const nick = Online.user && this.me && this.me.nickname;
+    if (!nick && name.length < 2) {
       msg.textContent = 'Escreva seu nome para a turma ver no placar.';
       return;
     }
+    // mesma regra do banco: um nome recusado lá só apareceria no fim da corrida
+    if (!nick && !ROOM_NAME_RE.test(name)) {
+      msg.textContent = ERR_TEXT.room_name;
+      return;
+    }
+    // resposta de um pedido antigo, ou que chega depois de o jogador sair da tela, é ignorada
+    const seq = ++this._joinSeq;
+    const stale = () => seq !== this._joinSeq || this.current !== 'turma';
     msg.textContent = 'Procurando a sala…';
+    await Online.init();
+    if (stale()) return;
+    if (!Online.available) {
+      msg.textContent = Online.onSite || Online.status === 'loading' ? ERR_TEXT.room_offline : 'As salas funcionam no site quantaaulas.com, com internet.';
+      return;
+    }
     const r = await Online.roomGet(code);
-    if (r === undefined) msg.textContent = ERR_TEXT.offline;
+    if (stale()) return;
+    if (r === undefined) msg.textContent = ERR_TEXT.room_offline;
     else if (!r) msg.textContent = ERR_TEXT.not_found;
     else if (!r.open) msg.textContent = ERR_TEXT.closed;
     else {
       store.set('room-name', name);
-      this.setRoom({ code: r.code, name: r.name, board: r.board, guestName: name });
+      store.set('room-code', r.code);
+      this.setRoom({ code: r.code, name: r.name, board: r.board, guestName: nick || name });
       this.h.sfx('menuSelect');
       this.show('select');
     }
   }
 
-  async refreshTurma() {
-    const saved = store.get('room', null);
-    if (saved && !this.room) this.room = saved;
-    $('room-name').value = store.get('room-name', store.get('nick', ''));
-    if (this.room) $('room-code').value = this.room.code;
-    $('room-msg').textContent = this.room ? `Você está na sala ${this.room.code} (${this.room.name}).` : '';
+  // prefill: preenche os campos do aluno (só ao abrir a tela; não apaga o que está sendo digitado)
+  async refreshTurma(prefill = true) {
+    const seq = ++this._turmaSeq;
+    const stale = () => seq !== this._turmaSeq || this.current !== 'turma';
+    if (prefill) {
+      const saved = store.get('room', null);
+      if (saved && !this.room) this.room = saved;
+      $('room-name').value = store.get('room-name', store.get('nick', ''));
+      $('room-code').value = this.room ? this.room.code : store.get('room-code', '');
+      $('room-msg').textContent = this.room ? `Você está na sala ${this.room.code} (${this.room.name}).` : '';
+    }
     const create = $('turma-create');
     const list = $('turma-list');
     create.innerHTML = '<p class="muted">Carregando…</p>';
     list.innerHTML = '';
+    const report = $('room-report');
+    report.innerHTML = '';
+    report.classList.add('hidden');
     await Online.init();
+    if (stale()) return;
     if (!Online.available) {
-      create.innerHTML = '<p class="muted">As salas funcionam no site quantaaulas.com, com internet.</p>';
+      create.innerHTML = this.offlineHTML('As salas funcionam no site quantaaulas.com, com internet.');
       return;
     }
+    // sala guardada: confere se ainda existe e está aberta (senão o aluno sai dela)
+    if (this.room && prefill) {
+      const code = this.room.code;
+      Online.roomGet(code).then((r) => {
+        if (r === undefined || (r && r.open) || this.room?.code !== code) return;
+        this.setRoom(null);
+        if (this.current === 'turma') $('room-msg').textContent = `Você saiu da sala ${code}: ${r ? 'ela foi fechada' : 'ela não existe mais'}.`;
+      });
+    }
+    // com conta e apelido, o nome na sala é o apelido do ranking
+    const me = Online.user ? await Online.getMe() : null;
+    if (stale()) return;
+    if (me !== undefined) this.me = me;
+    const nameIn = $('room-name');
+    const nick = this.me && this.me.nickname;
+    nameIn.disabled = !!nick;
+    if (nick) nameIn.value = nick;
+    nameIn.title = nick ? 'Na sala aparece o seu apelido do ranking online' : '';
     if (!Online.user) {
       create.innerHTML = `<p>Para criar uma sala, entre com a sua conta.</p><a class="btn btn-small" href="${Online.loginUrl}">Entrar com Google</a>`;
       return;
     }
     const o = this.opts;
     create.innerHTML = `<p>A sala usa o motor, as voltas e o modo escolhidos agora: <b>${o.cc}, ${o.laps === 1 ? '1 volta' : o.laps + ' voltas'}${o.mode === 'timetrial' ? ', contra o relógio' : ''}</b> (troque na tela de escolha antes de criar).</p>
-      <div class="turma-row"><input id="room-new-name" maxlength="40" placeholder="Nome da turma (ex.: 1º ano B)" aria-label="Nome da turma" /><button class="btn btn-primary btn-small" data-action="room-create">Criar sala</button></div><p class="turma-msg" id="room-new-msg"></p>`;
+      <div class="turma-row"><input id="room-new-name" maxlength="40" placeholder="Nome da turma (ex.: 1º ano B)" aria-label="Nome da turma" enterkeyhint="go" /><button class="btn btn-primary btn-small" data-action="room-create">Criar sala</button></div><p class="turma-msg" id="room-new-msg" aria-live="polite"></p>`;
     const rooms = await Online.roomList();
-    if (!rooms || !rooms.length) return;
+    if (stale() || !rooms || !rooms.length) return;
     list.innerHTML = '<h3>Minhas salas</h3><ul class="room-list">' + rooms
       .map((r) => {
         const b = parseBoard(r.board) || {};
-        return `<li><b class="code">${esc(r.code)}</b> ${esc(r.name)} <small>${b.cc || ''}, ${b.laps || '?'} v${b.mode === 'timetrial' ? ', relógio' : ''} · ${r.participants} aluno(s) · ${r.open ? 'aberta' : 'fechada'}</small>
-          <button class="btn btn-small" data-action="room-report" data-code="${esc(r.code)}">Resultados</button>
-          <button class="btn btn-small" data-action="room-toggle" data-code="${esc(r.code)}" data-open="${r.open ? '0' : '1'}">${r.open ? 'Fechar' : 'Reabrir'}</button></li>`;
+        return `<li><span class="room-info"><b class="code">${esc(r.code)}</b> ${esc(r.name)} <small>${b.cc || ''}, ${b.laps || '?'} v${b.mode === 'timetrial' ? ', relógio' : ''} · ${r.participants} aluno(s) · ${r.open ? 'aberta' : 'fechada'}</small></span>
+          <span class="room-actions"><button class="btn btn-small" data-action="room-report" data-code="${esc(r.code)}">Resultados</button>
+          <button class="btn btn-small" data-action="room-toggle" data-code="${esc(r.code)}" data-open="${r.open ? '0' : '1'}">${r.open ? 'Fechar' : 'Reabrir'}</button></span></li>`;
       })
-      .join('') + '</ul><div id="room-report"></div>';
+      .join('') + '</ul>';
   }
 
   async createRoom() {
-    const name = ($('room-new-name').value || '').trim();
+    const inp = $('room-new-name');
     const msg = $('room-new-msg');
+    const btn = $('turma-create')?.querySelector('[data-action=room-create]');
+    if (!inp || btn?.disabled) return;
+    const name = cleanRoomName(inp.value);
+    if (name.length < 2) {
+      msg.textContent = 'Dê um nome de 2 a 40 letras para a turma.';
+      return;
+    }
+    if (!ROOM_NAME_RE.test(name)) {
+      msg.textContent = ERR_TEXT.room_name;
+      return;
+    }
+    if (btn) btn.disabled = true; // clique duplo não cria duas salas
     const r = await Online.roomCreate(name, boardOf(this.opts));
+    if (btn) btn.disabled = false;
+    if (this.current !== 'turma') return;
     if (r?.ok) {
       this.h.sfx('menuSelect');
-      await this.refreshTurma();
+      await this.refreshTurma(false);
       const m = $('room-new-msg');
       if (m) m.innerHTML = `Sala criada! Passe o código <b class="code">${esc(r.code)}</b> para a turma.`;
-    } else if (msg) msg.textContent = r?.error === 'invalid' ? 'Dê um nome de 2 a 40 letras para a turma.' : ERR_TEXT[r?.error] || ERR_TEXT.offline;
+    } else if (msg?.isConnected) {
+      msg.textContent = r?.error === 'invalid' ? 'Esse nome não é aceito para a turma. Escolha outro.'
+        : r?.error === 'limit' ? 'Você já tem 30 salas ativas (cada uma vale 30 dias). Espere uma vencer para criar outra.'
+        : r?.error === 'offline' ? ERR_TEXT.room_offline : ERR_TEXT[r?.error] || ERR_TEXT.room_offline;
+    }
   }
 
-  async toggleRoom(code, open) {
-    await Online.roomOpen(code, open);
-    this.refreshTurma();
+  async toggleRoom(code, open, btn) {
+    if (!code || btn?.disabled) return;
+    if (btn) btn.disabled = true;
+    const r = await Online.roomOpen(code, open);
+    if (this.current !== 'turma') return;
+    await this.refreshTurma(false);
+    // teclado: o foco volta ao botão da mesma sala (a lista foi redesenhada)
+    if (this.tabNav) $('turma-list')?.querySelector(`[data-action=room-toggle][data-code="${code}"]`)?.focus({ preventScroll: true });
+    const m = $('room-new-msg');
+    if (!r?.ok && m) {
+      m.textContent = r?.error === 'limit' ? 'Você já tem 30 salas ativas: espere uma vencer para reabrir esta.'
+        : r?.error === 'not_found' ? ERR_TEXT.not_found : ERR_TEXT.room_offline;
+    }
   }
 
   async showReport(code) {
     const box = $('room-report');
     if (!box || !code) return;
+    const seq = ++this._repSeq;
+    box.classList.remove('hidden');
     box.innerHTML = '<p class="muted">Carregando…</p>';
     const r = await Online.roomReport(code);
+    // clique em 'Resultados' de outra sala antes da resposta: vale só o último
+    if (seq !== this._repSeq || this.current !== 'turma') return;
+    this._report = r?.ok ? r : null;
     if (!r?.ok) {
-      box.innerHTML = `<p class="muted">${ERR_TEXT[r?.error] || ERR_TEXT.offline}</p>`;
+      box.innerHTML = `<p class="muted">${ERR_TEXT[r?.error] || ERR_TEXT.room_offline}</p>`;
       return;
     }
+    // 'Remover' só com o banco atualizado (o relatório traz o id da corrida)
+    const canRemove = (r.players || []).some((p) => p.id != null);
     const rows = (r.players || [])
       .map((p, i) => {
         const c = CHARACTERS.find((x) => x.id === p.character);
-        return `<tr><td>${i + 1}º</td><td>${esc(p.name)}${p.guest ? ' <small>(sem conta)</small>' : ''}</td><td>${formatTime(p.time_ms / 1000)}</td><td>${formatTime(p.best_lap_ms / 1000)}</td><td>${c ? esc(c.name) : ''}</td><td>${p.runs}</td></tr>`;
+        const rm = canRemove ? `<td>${p.id != null ? `<button class="btn btn-small btn-quiet" data-action="room-remove" data-id="${esc(p.id)}" aria-label="Remover ${esc(p.name)} do placar">Remover</button>` : ''}</td>` : '';
+        return `<tr><td>${i + 1}º</td><td>${esc(p.name)}${p.guest ? ' <small>(sem conta)</small>' : ''}</td><td>${formatTime(p.time_ms / 1000)}</td><td>${formatTime(p.best_lap_ms / 1000)}</td><td>${c ? esc(c.name) : ''}</td><td>${p.runs}</td>${rm}</tr>`;
       })
       .join('');
-    box.innerHTML = `<h3>Sala ${esc(code)} · ${esc(r.room.name)}</h3>` + (rows
-      ? `<table class="report"><thead><tr><th></th><th>Aluno</th><th>Melhor tempo</th><th>Melhor volta</th><th>Cientista</th><th>Corridas</th></tr></thead><tbody>${rows}</tbody></table>`
+    box.innerHTML = `<div class="report-head"><h3>Sala ${esc(code)} · ${esc(r.room.name)}</h3>${rows ? '<button class="btn btn-small" data-action="room-copy">📋 Copiar para planilha</button>' : ''}</div><p class="turma-msg" id="report-msg" aria-live="polite"></p>` + (rows
+      ? `<div class="report-scroll"><table class="report"><thead><tr><th></th><th>Aluno</th><th>Melhor tempo</th><th>Melhor volta</th><th>Cientista</th><th>Corridas</th>${canRemove ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`
       : '<p class="muted">Ninguém correu ainda.</p>');
+    box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  // Professor tira um aluno do placar da sala (nome indevido, tempo impossível): pede um segundo toque.
+  async removeFromRoom(btn) {
+    const code = this._report?.room?.code;
+    if (!btn || !code || btn.disabled || !this._confirm(btn, 'Remover mesmo?')) return;
+    btn.disabled = true;
+    const r = await Online.roomRemove(code, Number(btn.dataset.id));
+    if (this.current !== 'turma') return;
+    if (r?.ok) {
+      await this.showReport(code);
+      const m = $('report-msg');
+      if (m) m.textContent = 'Aluno removido do placar da sala.';
+    } else {
+      btn.disabled = false;
+      const m = $('report-msg');
+      if (m) m.textContent = r?.error === 'not_found' ? 'Esse aluno já não está no placar.' : ERR_TEXT.room_offline;
+    }
+  }
+
+  // Relatório como tabela separada por tabulação: cola direto no Excel/Planilhas Google.
+  async copyReport(btn) {
+    const r = this._report;
+    if (!r) return;
+    const lines = [['Posição', 'Aluno', 'Sem conta', 'Melhor tempo', 'Melhor volta', 'Cientista', 'Corridas'].join('\t')];
+    (r.players || []).forEach((p, i) => {
+      const c = CHARACTERS.find((x) => x.id === p.character);
+      lines.push([i + 1, p.name, p.guest ? 'sim' : '', formatTime(p.time_ms / 1000), formatTime(p.best_lap_ms / 1000), c ? c.name : '', p.runs].join('\t'));
+    });
+    const text = lines.join('\n');
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch {
+      // sem permissão da área de transferência: seleciona um campo de texto e copia
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;left:0;top:0';
+      document.body.append(ta);
+      ta.select();
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+      ta.remove();
+    }
+    if (btn) {
+      const old = btn.textContent;
+      btn.textContent = ok ? '✔ Copiado! Cole na planilha' : 'Não deu para copiar';
+      setTimeout(() => { btn.textContent = old; }, 2500);
+    }
   }
 
   // ---------- teclado nos menus ----------
@@ -1160,6 +1395,22 @@ export class Menu {
     if (e.key === 'Tab') this.tabNav = true;
     if (e.repeat) return;
     const k = e.key;
+    // campo de texto: Enter envia o que o campo pede; Esc só tira o foco do campo (não troca de
+    // tela nem apaga o que foi digitado); as outras teclas são do campo
+    const inp = e.target.closest?.('input:not([type=range]), textarea');
+    if (inp) {
+      if (k === 'Escape') {
+        e.preventDefault();
+        inp.blur();
+      } else if (k === 'Enter') {
+        if (inp.id === 'room-code' || inp.id === 'room-name') this.joinRoom();
+        else if (inp.id === 'room-new-name') this.createRoom();
+        else if (inp.classList.contains('nick-input')) this.saveNick(inp);
+        else return;
+        e.preventDefault();
+      }
+      return;
+    }
     // botão focado pelo Tab: Enter/Espaço acionam o próprio botão
     // (no cartão do cientista, Enter continua sendo "correr")
     const f = document.activeElement;
@@ -1190,7 +1441,7 @@ export class Menu {
       e.preventDefault();
     } else if (this.current === 'howto' && (k === 'Escape' || k === 'Enter')) {
       this.action('back');
-    } else if (this.current === 'net' && k === 'Escape') {
+    } else if ((this.current === 'net' || this.current === 'online' || this.current === 'turma') && k === 'Escape') {
       this.action('back');
     } else if (this.current === 'results' && k === 'Enter' && !e.target.closest?.('input')) {
       this.action('restart');
