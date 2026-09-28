@@ -157,9 +157,13 @@ export class Menu {
       case 'start':
         h.sfx('menuSelect');
         store.set('character', this.opts.character);
-        store.set('cc', this.opts.cc);
-        store.set('laps', this.opts.laps);
-        store.set('mode', this.opts.mode);
+        // numa sala, motor/voltas/modo são os da sala: não viram preferência do jogador
+        // (e uma sala de 150cc não libera o 150cc de vez)
+        if (!this.room) {
+          store.set('cc', this.opts.cc);
+          store.set('laps', this.opts.laps);
+          store.set('mode', this.opts.mode);
+        }
         h.onStart({ ...this.opts, room: this.room || null });
         break;
       case 'daily':
@@ -189,6 +193,9 @@ export class Menu {
         break;
       case 'room-toggle':
         this.toggleRoom(btn?.dataset.code, btn?.dataset.open === '1');
+        break;
+      case 'room-copy':
+        this.copyReport(btn);
         break;
       case 'nick-save':
         this.saveNick();
@@ -400,6 +407,8 @@ export class Menu {
   }
 
   refreshSelect() {
+    // sala de turma: motor, voltas e modo são os da sala (antes de marcar os botões)
+    if (this.room) Object.assign(this.opts, parseBoard(this.room.board) || {});
     const c = CHARACTERS.find((x) => x.id === this.opts.character);
     for (const card of this.grid.children) card.classList.toggle('selected', card.dataset.id === c.id);
     for (const b of $('opt-cc').children) b.classList.toggle('on', b.dataset.cc === this.opts.cc);
@@ -411,7 +420,6 @@ export class Menu {
       rb.classList.toggle('hidden', !this.room);
       if (this.room) {
         const b = parseBoard(this.room.board);
-        Object.assign(this.opts, b);
         rb.innerHTML = `🏫 Sala <b>${esc(this.room.code)}</b> · ${esc(this.room.name)} · ${b.cc}, ${b.laps === 1 ? '1 volta' : b.laps + ' voltas'}${b.mode === 'timetrial' ? ', contra o relógio' : ''} <button class="btn btn-small" data-action="room-leave">Sair da sala</button>`;
       }
     }
@@ -639,7 +647,7 @@ export class Menu {
       return;
     }
     const rows = list
-      .map((e, i) => `<li class="${i === idx ? 'me' : ''}"><span>${i + 1}º</span><span>${i === idx && !e.name ? `<input id="rank-name" maxlength="14" placeholder="Seu nome" value="${esc(store.get('nick', ''))}" aria-label="Seu nome no ranking" /><button class="btn btn-small" id="rank-save">Salvar</button>` : esc(e.name || 'Jogador')}</span><span class="t">${formatTime(e.time)}</span></li>`)
+      .map((e, i) => `<li class="${i === idx ? 'me' : ''}"><span>${i + 1}º</span><span>${i === idx && !e.name ? `<input id="rank-name" maxlength="14" placeholder="Seu nome" value="${esc(store.get('nick', '') || this.me?.nickname || '')}" aria-label="Seu nome no ranking" /><button class="btn btn-small" id="rank-save">Salvar</button>` : esc(e.name || 'Jogador')}</span><span class="t">${formatTime(e.time)}</span></li>`)
       .join('');
     box.innerHTML = `<details ${idx >= 0 ? 'open' : ''}><summary>🏆 Ranking deste aparelho</summary><ol class="rank-list">${rows}</ol></details>`;
     const save = $('rank-save');
@@ -767,7 +775,15 @@ export class Menu {
   setRoom(room) {
     this.room = room;
     if (room) store.set('room', room);
-    else store.set('room', null);
+    else {
+      store.set('room', null);
+      // ao sair da sala, volta às escolhas do próprio jogador
+      const cc = store.get('cc', '50cc');
+      this.opts.cc = CLASSES[cc] && (cc !== '150cc' || is150Unlocked()) ? cc : '100cc';
+      const laps = store.get('laps', RACE.defaultLaps);
+      this.opts.laps = RACE.lapOptions.includes(laps) ? laps : RACE.defaultLaps;
+      this.opts.mode = store.get('mode', 'race') === 'timetrial' ? 'timetrial' : 'race';
+    }
     if (this.current === 'select') this.refreshSelect();
   }
 
@@ -784,7 +800,8 @@ export class Menu {
       msg.textContent = 'As salas funcionam no site quantaaulas.com, com internet.';
       return;
     }
-    if (!Online.user && name.length < 2) {
+    const nick = Online.user && this.me && this.me.nickname;
+    if (!nick && name.length < 2) {
       msg.textContent = 'Escreva seu nome para a turma ver no placar.';
       return;
     }
@@ -811,11 +828,21 @@ export class Menu {
     const list = $('turma-list');
     create.innerHTML = '<p class="muted">Carregando…</p>';
     list.innerHTML = '';
+    const report = $('room-report');
+    report.innerHTML = '';
+    report.classList.add('hidden');
     await Online.init();
     if (!Online.available) {
       create.innerHTML = '<p class="muted">As salas funcionam no site quantaaulas.com, com internet.</p>';
       return;
     }
+    // com conta e apelido, o nome na sala é o apelido do ranking
+    this.me = Online.user ? await Online.getMe() : null;
+    const nameIn = $('room-name');
+    const nick = this.me && this.me.nickname;
+    nameIn.disabled = !!nick;
+    if (nick) nameIn.value = nick;
+    nameIn.title = nick ? 'Na sala aparece o seu apelido do ranking online' : '';
     if (!Online.user) {
       create.innerHTML = `<p>Para criar uma sala, entre com a sua conta.</p><a class="btn btn-small" href="${Online.loginUrl}">Entrar com Google</a>`;
       return;
@@ -832,7 +859,7 @@ export class Menu {
           <button class="btn btn-small" data-action="room-report" data-code="${esc(r.code)}">Resultados</button>
           <button class="btn btn-small" data-action="room-toggle" data-code="${esc(r.code)}" data-open="${r.open ? '0' : '1'}">${r.open ? 'Fechar' : 'Reabrir'}</button></li>`;
       })
-      .join('') + '</ul><div id="room-report"></div>';
+      .join('') + '</ul>';
   }
 
   async createRoom() {
@@ -855,8 +882,10 @@ export class Menu {
   async showReport(code) {
     const box = $('room-report');
     if (!box || !code) return;
+    box.classList.remove('hidden');
     box.innerHTML = '<p class="muted">Carregando…</p>';
     const r = await Online.roomReport(code);
+    this._report = r?.ok ? r : null;
     if (!r?.ok) {
       box.innerHTML = `<p class="muted">${ERR_TEXT[r?.error] || ERR_TEXT.offline}</p>`;
       return;
@@ -867,9 +896,41 @@ export class Menu {
         return `<tr><td>${i + 1}º</td><td>${esc(p.name)}${p.guest ? ' <small>(sem conta)</small>' : ''}</td><td>${formatTime(p.time_ms / 1000)}</td><td>${formatTime(p.best_lap_ms / 1000)}</td><td>${c ? esc(c.name) : ''}</td><td>${p.runs}</td></tr>`;
       })
       .join('');
-    box.innerHTML = `<h3>Sala ${esc(code)} · ${esc(r.room.name)}</h3>` + (rows
-      ? `<table class="report"><thead><tr><th></th><th>Aluno</th><th>Melhor tempo</th><th>Melhor volta</th><th>Cientista</th><th>Corridas</th></tr></thead><tbody>${rows}</tbody></table>`
+    box.innerHTML = `<div class="report-head"><h3>Sala ${esc(code)} · ${esc(r.room.name)}</h3>${rows ? '<button class="btn btn-small" data-action="room-copy">📋 Copiar para planilha</button>' : ''}</div>` + (rows
+      ? `<div class="report-scroll"><table class="report"><thead><tr><th></th><th>Aluno</th><th>Melhor tempo</th><th>Melhor volta</th><th>Cientista</th><th>Corridas</th></tr></thead><tbody>${rows}</tbody></table></div>`
       : '<p class="muted">Ninguém correu ainda.</p>');
+    box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  // Relatório como tabela separada por tabulação: cola direto no Excel/Planilhas Google.
+  async copyReport(btn) {
+    const r = this._report;
+    if (!r) return;
+    const lines = [['Posição', 'Aluno', 'Sem conta', 'Melhor tempo', 'Melhor volta', 'Cientista', 'Corridas'].join('\t')];
+    (r.players || []).forEach((p, i) => {
+      const c = CHARACTERS.find((x) => x.id === p.character);
+      lines.push([i + 1, p.name, p.guest ? 'sim' : '', formatTime(p.time_ms / 1000), formatTime(p.best_lap_ms / 1000), c ? c.name : '', p.runs].join('\t'));
+    });
+    const text = lines.join('\n');
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch {
+      // sem permissão da área de transferência: seleciona um campo de texto e copia
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;left:0;top:0';
+      document.body.append(ta);
+      ta.select();
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+      ta.remove();
+    }
+    if (btn) {
+      const old = btn.textContent;
+      btn.textContent = ok ? '✔ Copiado! Cole na planilha' : 'Não deu para copiar';
+      setTimeout(() => { btn.textContent = old; }, 2500);
+    }
   }
 
   // ---------- teclado nos menus ----------

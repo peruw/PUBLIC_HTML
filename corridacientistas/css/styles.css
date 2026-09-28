@@ -1811,6 +1811,13 @@ body.touch {
 .room-list li { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .room-list small { color: var(--ink-dim); }
 table.report { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+.turma-report { grid-column: 1 / -1; }
+.turma-report.hidden { display: none; }
+.report-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.report-head h3 { margin: 0; }
+.report-scroll { overflow-x: auto; }
+.report-scroll table.report { min-width: 460px; }
+.turma-row input:disabled { opacity: 0.75; }
 table.report th, table.report td { text-align: left; padding: 3px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
 
 .room-banner {
