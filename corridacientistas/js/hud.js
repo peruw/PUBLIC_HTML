@@ -227,6 +227,8 @@ export class Hud {
       this.toastList = [];
       this.el.toasts.innerHTML = '';
       this.el.toasts.classList.remove('dim');
+      // mensagens do centro das duas metades (o painel do J2 já existe: é criado no construtor dele)
+      this.centers = [...this.root.querySelectorAll('.hud-center')];
     }
     if (this.el.map && track !== this.track) this.prepareMinimap(track);
   }
@@ -469,12 +471,15 @@ export class Hud {
       this.centerTimer -= dt * 1000;
       if (this.centerTimer <= 0 && !this.centerSticky) this.el.center.textContent = '';
     }
-    // mensagem grande no centro: as curiosidades recuam para não brigar com ela
-    // (na tela dividida as curiosidades ficam no alto, longe das mensagens de cada metade)
-    const busy = !!this.el.center.textContent && !this.split;
-    if (this.index === 0 && busy !== this.last.busy) {
-      this.last.busy = busy;
-      this.el.toasts.classList.toggle('dim', busy);
+    // mensagem grande no centro: as curiosidades recuam para não brigar com ela. Na tela dividida
+    // elas ficam no alto, entre as metades, mas em telas baixas (notebook 1366×768 com as barras
+    // do navegador) cobrem o começo/fim das mensagens: aí vale a mensagem de qualquer metade.
+    if (this.index === 0) {
+      const busy = this.split ? this.centers.some((e) => e.textContent) : !!this.el.center.textContent;
+      if (busy !== this.last.busy) {
+        this.last.busy = busy;
+        this.el.toasts.classList.toggle('dim', busy);
+      }
     }
 
     if (half && this.ctx) this.drawMinimap();

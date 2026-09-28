@@ -17,12 +17,15 @@ const KEYMAP = {
 };
 // Dois jogadores no mesmo teclado: cada tecla é de um jogador ([jogador, ação]).
 // J1 = WASD, Espaço (drift), E (item), Q (olhar para trás).
-// J2 = setas, Ctrl direito ou ponto (drift), Enter ou Shift direito (item), vírgula ou End (olhar para trás).
+// J2 = setas, ponto ou barra (drift), Enter ou Shift direito (item), vírgula ou End (olhar para trás).
+// Nada de Ctrl: com o Ctrl do J2 apertado, o W do J1 vira Ctrl+W e o navegador FECHA a aba
+// (atalho reservado, a página não consegue impedir); o S viraria "Salvar página".
 const KEYMAP_SPLIT = {
   KeyW: [0, 'up'], KeyS: [0, 'down'], KeyA: [0, 'left'], KeyD: [0, 'right'],
   Space: [0, 'drift'], KeyE: [0, 'item'], KeyQ: [0, 'look'],
   ArrowUp: [1, 'up'], ArrowDown: [1, 'down'], ArrowLeft: [1, 'left'], ArrowRight: [1, 'right'],
-  ControlRight: [1, 'drift'], Period: [1, 'drift'], NumpadDecimal: [1, 'drift'],
+  // Slash = "/" no teclado americano; IntlRo = "/" do ABNT2 (ao lado do Shift direito)
+  Period: [1, 'drift'], Slash: [1, 'drift'], IntlRo: [1, 'drift'], NumpadDecimal: [1, 'drift'],
   Enter: [1, 'item'], NumpadEnter: [1, 'item'], ShiftRight: [1, 'item'],
   Comma: [1, 'look'], End: [1, 'look'],
   Escape: [0, 'pause'], KeyP: [0, 'pause'],
@@ -30,8 +33,9 @@ const KEYMAP_SPLIT = {
 };
 // teclas que rolariam a página
 const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
-// no modo de 2 jogadores, também End (rola a página) e Enter (clicaria num botão focado)
-const PREVENT_SPLIT = new Set([...PREVENT, 'End', 'Enter', 'NumpadEnter']);
+// no modo de 2 jogadores, também End (rola a página), Enter (clicaria num botão focado)
+// e a barra (no Firefox abre a busca rápida, que rouba as teclas)
+const PREVENT_SPLIT = new Set([...PREVENT, 'End', 'Enter', 'NumpadEnter', 'Slash', 'IntlRo']);
 const DEADZONE = 0.2;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -219,6 +223,7 @@ export class Input {
     if (on === this._split) return;
     this._split = on;
     this._releaseAll();
+    this._applyTouchVisibility(); // os botões de toque não valem na tela dividida
   }
 
   // Vibra o gamepad (se estiver em uso e tiver motor de vibração). ms = duração; strength 0..1.
@@ -404,7 +409,9 @@ export class Input {
     const m = KEYMAP_SPLIT[e.code];
     if (!m) return;
     if (isEditable(e.target)) return;
-    if (PREVENT_SPLIT.has(e.code)) e.preventDefault();
+    // com a pausa aberta, Enter aciona o botão escolhido com Tab (só na corrida ele é bloqueado)
+    const menuEnter = (e.code === 'Enter' || e.code === 'NumpadEnter') && this._overlayOpen();
+    if (PREVENT_SPLIT.has(e.code) && !menuEnter) e.preventDefault();
     this.lastDevice = 'keyboard';
     if (down) {
       if (e.repeat || this._downCodes.has(e.code)) return;
@@ -661,7 +668,9 @@ export class Input {
 
   _applyTouchVisibility() {
     if (!this._root) return;
-    const show = this._touchWanted && this._touchEnabled;
+    // tela dividida (só PC): o toque não dirige nenhum dos dois (_pollSplit o ignora), então um
+    // toque num notebook com tela sensível não pode cobrir o HUD com botões que não funcionam
+    const show = this._touchWanted && this._touchEnabled && !this._split;
     this._root.classList.toggle('tc-hidden', !show);
     if (show) {
       this._readSafeArea();

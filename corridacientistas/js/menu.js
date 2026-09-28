@@ -415,10 +415,7 @@ export class Menu {
     if (n === this.opts.players) return;
     this.opts.players = n;
     this.editing = 0;
-    // o J2 não pode começar com o mesmo cientista do J1
-    if (n === 2 && this.opts.character2 === this.opts.character) {
-      this.opts.character2 = CHARACTERS.find((c) => c.id !== this.opts.character).id;
-    }
+    // (o J2 não começa com o cientista do J1: refreshSelect cuida disso)
     this.h.sfx('menuMove');
     this.refreshSelect();
   }
@@ -484,8 +481,18 @@ export class Menu {
   }
 
   refreshSelect() {
+    // sala de turma: motor, voltas e modo são os da sala. Vale ANTES de desenhar os botões
+    // (depois, a 1ª tela ao entrar na sala destacava o motor antigo, e não o da corrida)
+    const board = this.room ? parseBoard(this.room.board) : null;
+    if (board) Object.assign(this.opts, board);
     const duo = this.duo();
     if (!duo) this.editing = 0;
+    // os dois não podem ter o mesmo cientista. Com 1 jogador, no contrarrelógio, na sala ou pelo
+    // link do professor o J1 pode ter ficado com o do J2: ao valer o duelo de novo, o J2 troca
+    // (antes as duas abas mostravam o mesmo e a corrida dava outro cientista ao J2 sem avisar)
+    if (duo && this.opts.character2 === this.opts.character) {
+      this.opts.character2 = CHARACTERS.find((x) => x.id !== this.opts.character).id;
+    }
     const c = CHARACTERS.find((x) => x.id === this.pick(this.editing));
     for (const card of this.grid.children) {
       card.classList.toggle('selected', card.dataset.id === c.id);
@@ -520,9 +527,8 @@ export class Menu {
     const rb = $('room-banner');
     if (rb) {
       rb.classList.toggle('hidden', !this.room);
-      if (this.room) {
-        const b = parseBoard(this.room.board);
-        Object.assign(this.opts, b);
+      if (this.room && board) {
+        const b = board;
         rb.innerHTML = `🏫 Sala <b>${esc(this.room.code)}</b> · ${esc(this.room.name)} · ${b.cc}, ${b.laps === 1 ? '1 volta' : b.laps + ' voltas'}${b.mode === 'timetrial' ? ', contra o relógio' : ''} <button class="btn btn-small" data-action="room-leave">Sair da sala</button>`;
       }
     }

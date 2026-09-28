@@ -1908,9 +1908,11 @@ table.report th, table.report td { text-align: left; padding: 3px 6px; border-bo
   bottom: calc(max(8px, env(safe-area-inset-bottom)) + 158px);
 }
 
-/* minimapa único no centro de baixo, com os dois jogadores */
+/* minimapa único no centro de baixo, com os dois jogadores
+   (top: auto vence o body.touch, que num notebook com tela de toque o levaria para cima) */
 #hud.split #hud-minimap {
   left: 50%;
+  top: auto;
   bottom: max(8px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: 150px;

@@ -705,7 +705,8 @@ async function init() {
     game.paused = on;
     audio.pauseAll?.(on);
     needsRender = true;
-    if (on) pendingUse = false;
+    // aperto de item guardado antes da pausa não sai sozinho ao continuar (nem o do J2)
+    if (on) pendingUse = pendingUse2 = false;
     if (on) {
       input.showTouch(false);
       menu.show('pause');
@@ -1078,7 +1079,7 @@ async function init() {
     // celular no título/resultado: 30 quadros por segundo bastam (menos bateria e calor)
     const halfRate = isTouch && (game.state === 'title' || game.state === 'results') && (++frameNo & 1);
     if ((!idle && !halfRate) || needsRender) {
-      if (world.split) renderSplit(t);
+      if (world.split) renderSplit(dt, t);
       else renderer.render(scene, camera);
       needsRender = false;
     }
@@ -1090,7 +1091,7 @@ async function init() {
 
   // Tela dividida: um renderer, duas metades (scissor) e duas câmeras. O ambiente (céu, sombra,
   // túnel) é reposicionado para a câmera do J2 antes da segunda metade, sem animar de novo.
-  function renderSplit(t) {
+  function renderSplit(dt, t) {
     const W = innerWidth;
     const H = innerHeight;
     const hw = Math.floor(W / 2);
@@ -1098,7 +1099,8 @@ async function init() {
     renderer.setViewport(0, 0, hw, H);
     renderer.setScissor(0, 0, hw, H);
     renderer.render(scene, camera);
-    env.update(0, t, camera2, true);
+    // dt de verdade: a penumbra do túnel do J2 é suavizada com ele (com 0 ela nunca mudava)
+    env.update(dt, t, camera2, true);
     renderer.setViewport(hw, 0, W - hw, H);
     renderer.setScissor(hw, 0, W - hw, H);
     renderer.render(scene, camera2);

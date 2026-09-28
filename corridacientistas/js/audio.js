@@ -708,14 +708,18 @@ export class AudioSystem {
     }
     // tela dividida: motor do J2 à direita, com o timbre do cientista dele
     const two = world.split && world.players && world.players[1];
-    this._engine2(two && !two.finished ? two : null, world);
+    const two2 = two && !two.finished ? two : null;
     // Já cruzou a chegada: na tela de resultado a IA dirige o kart do jogador e
     // o motor embolaria a fanfarra. Tudo do jogador some devagar.
     if (p.finished) {
       if (this._loopsOn) this._silenceLoops(0.25);
-      if (two && !two.finished) this._loopsOn = true; // o motor do J2 continua
+      // o motor do J2, que ainda corre, vem DEPOIS do silêncio: no mesmo instante vale o
+      // último alvo, e antes ele era zerado a cada quadro (o J2 corria mudo)
+      this._engine2(two2, world);
+      if (two2) this._loopsOn = true; // pausa/menu ainda precisam silenciá-lo
       return;
     }
+    this._engine2(two2, world);
     this._loopsOn = true;
     const t = this.ctx.currentTime;
     if (this.eng.pan) this.eng.pan.setTargetAtTime(two ? -0.55 : 0, t, 0.1);
