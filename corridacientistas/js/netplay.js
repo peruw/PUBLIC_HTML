@@ -168,6 +168,17 @@ class Emitter {
 // ---------------------------------------------------------------------------
 // Supabase Realtime (supabase-js v2): canal público com broadcast e presence.
 // ---------------------------------------------------------------------------
+// Saídas de canal ainda em andamento, por cliente e tópico. O realtime-js devolve o canal que
+// ainda está na lista para quem pede o mesmo tópico (sair e voltar na hora para a mesma sala
+// pegaria o canal antigo, saindo, e o subscribe não faria nada) e, quando a saída termina, tira
+// da lista todos os canais daquele tópico. Por isso quem conecta espera a saída acabar.
+const closingByClient = new WeakMap();
+function closingOf(client) {
+  let m = closingByClient.get(client);
+  if (!m) closingByClient.set(client, (m = new Map()));
+  return m;
+}
+
 export class SupabaseTransport extends Emitter {
   constructor(client, code, id, { timeout = 12000 } = {}) {
     super();
@@ -179,10 +190,15 @@ export class SupabaseTransport extends Emitter {
     this.meta = null;
     this.members = new Map();
     this.connected = false;
+    this.closed = false;
   }
 
-  connect(meta) {
+  async connect(meta) {
     this.meta = { ...meta };
+    // saiu desta mesma sala agorinha: espera o canal antigo terminar de sair (no máximo 3 s)
+    const pending = typeof this.client === 'object' && closingOf(this.client).get(this.topic);
+    if (pending) await Promise.race([pending, new Promise((r) => setTimeout(r, 3000))]);
+    if (this.closed) return false; // desistiu enquanto esperava
     const ch = this.client.channel(this.topic, {
       config: { broadcast: { self: false }, presence: { key: this.id } },
     });
@@ -205,6 +221,7 @@ export class SupabaseTransport extends Emitter {
       };
       const timer = setTimeout(() => finish(false), this.timeout);
       ch.subscribe(async (status) => {
+        if (this.ch !== ch) return; // (canal já fechado: saiu da sala enquanto conectava)
         if (status === 'SUBSCRIBED') {
           this.connected = true;
           // (volta a marcar presença também depois de uma reconexão automática)
@@ -216,6 +233,9 @@ export class SupabaseTransport extends Emitter {
           this._emit('status', 'connected');
           finish(true);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // canal caído (o realtime-js tenta de novo sozinho): sem enviar até voltar, senão o
+          // supabase-js manda cada estado pela API REST (15 requisições por segundo)
+          this.connected = false;
           this._emit('status', 'error');
           finish(false);
         } else if (status === 'CLOSED') {
@@ -259,6 +279,7 @@ export class SupabaseTransport extends Emitter {
   close() {
     const ch = this.ch;
     this.ch = null;
+    this.closed = true;
     this.connected = false;
     this.members = new Map();
     if (!ch) return;
@@ -268,11 +289,14 @@ export class SupabaseTransport extends Emitter {
     } catch {
       /* ignora */
     }
-    try {
-      this.client.removeChannel(ch);
-    } catch {
-      /* ignora */
-    }
+    const closing = closingOf(this.client);
+    const done = Promise.resolve()
+      .then(() => this.client.removeChannel(ch))
+      .catch(() => {})
+      .then(() => {
+        if (closing.get(this.topic) === done) closing.delete(this.topic);
+      });
+    closing.set(this.topic, done);
   }
 }
 

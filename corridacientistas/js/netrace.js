@@ -345,15 +345,19 @@ export class NetRace {
     if (m.r !== this.raceId) return;
     const k = this.byId.get(m.id);
     if (!k || !k.remote || typeof m.time !== 'number') return;
+    // IA do anfitrião depois de o resultado fechar aqui: vale o que o anfitrião viu (chegada ou
+    // estimativa), senão a lista daqui ficaria diferente da dele. (Ex.: o último humano chegou
+    // neste aparelho e uma IA cruzou a linha no anfitrião antes de a notícia chegar lá.)
+    const lateAI = this.final && m.fr === this.hostId && !this.humans.includes(k);
     if (m.est) {
       this.est.set(k, m.time);
-      // estimativa da IA vinda do anfitrião depois de fechar: refaz a lista com ela (todos
-      // os aparelhos mostram os mesmos tempos)
-      if (this.final && m.fr === this.hostId && !this.humans.includes(k)) {
-        this.final = null;
-        this._finalize();
-      }
     } else if (!this.final) this.race.finishRemote(k, m.time);
+    else if (lateAI) this.race.finishRemote(k, m.time);
+    if (lateAI) {
+      // refaz a lista com o tempo do anfitrião (todos os aparelhos mostram os mesmos tempos)
+      this.final = null;
+      this._finalize();
+    }
   }
 
   _estimate(k) {

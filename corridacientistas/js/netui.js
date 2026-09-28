@@ -232,8 +232,10 @@ export class NetUI {
   onMembers() {
     const room = this.room;
     if (!room) return;
-    // sala cheia: quem entrou depois do 8º volta para a entrada
-    if (room.order >= MAX_HUMANS) {
+    // sala cheia: quem entrou depois do 8º volta para a entrada. Só vale para quem acabou de
+    // chegar e está na sala de espera: um aparelho com o relógio atrasado entraria "antes" na
+    // fila e tiraria da sala alguém que já estava lá (até no meio de uma corrida)
+    if (room.order >= MAX_HUMANS && this.phase === 'lobby' && Date.now() - room.meta.joined < 15000) {
       this.leave();
       this.menu.show('net');
       this.setMsg('net-msg', `Sala cheia (${MAX_HUMANS} jogadores).`);

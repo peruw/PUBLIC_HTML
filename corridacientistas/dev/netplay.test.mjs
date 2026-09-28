@@ -174,6 +174,94 @@ test('SupabaseTransport: erro do canal resolve false', async () => {
   assert.deepEqual(st, ['error']);
 });
 
+// Com o canal caído (rede piscou), o supabase-js "manda assim mesmo" pela API REST, com um aviso
+// no console a cada envio: a 15 estados/s isso vira uma enxurrada de requisições. O transporte
+// fica quieto até o canal voltar sozinho (SUBSCRIBED de novo) e aí marca a presença outra vez.
+test('SupabaseTransport: canal caído não envia até voltar', async () => {
+  let status = null;
+  const sent = [];
+  const tracked = [];
+  const ch = {
+    on() { return this; },
+    subscribe(cb) { status = cb; setTimeout(() => cb('SUBSCRIBED'), 1); return this; },
+    track: async (m) => { tracked.push(m); return 'ok'; },
+    untrack: async () => 'ok',
+    presenceState: () => ({}),
+    send(m) { sent.push(m.payload); return Promise.resolve('ok'); },
+  };
+  const t = new SupabaseTransport({ channel: () => ch, removeChannel: async () => 'ok' }, 'ABCDE', 'pa');
+  const st = [];
+  t.on('status', (s) => st.push(s));
+  assert.equal(await t.connect({ id: 'pa' }), true);
+  t.send({ n: 1 });
+  status('CHANNEL_ERROR'); // o realtime-js tenta de novo sozinho
+  t.send({ n: 2 });
+  t.track({ id: 'pa', phase: 'race' });
+  assert.deepEqual(sent, [{ n: 1 }], 'nada sai com o canal caído');
+  status('SUBSCRIBED');
+  await tick(1);
+  t.send({ n: 3 });
+  assert.deepEqual(sent, [{ n: 1 }, { n: 3 }]);
+  assert.deepEqual(st, ['connected', 'error', 'connected']);
+  assert.deepEqual(tracked.at(-1), { id: 'pa', phase: 'race' }, 'presença marcada de novo com a meta mais nova');
+  t.close();
+});
+
+// Como o realtime-js de verdade (2.x): channel(tópico) devolve o canal que ainda está na lista
+// (mesmo tópico); subscribe num canal que não está fechado não faz nada; removeChannel só tira
+// o canal da lista quando o servidor confirma a saída, e tira TODOS os canais daquele tópico.
+function realisticClient(leaveMs = 30) {
+  const list = [];
+  class Ch {
+    constructor(topic) {
+      this.topic = 'realtime:' + topic;
+      this.state = 'closed';
+    }
+    on() { return this; }
+    subscribe(cb) {
+      if (this.state !== 'closed') return this;
+      this.state = 'joining';
+      setTimeout(() => { this.state = 'joined'; cb('SUBSCRIBED'); }, 2);
+      return this;
+    }
+    track() { return Promise.resolve('ok'); }
+    untrack() { return Promise.resolve('ok'); }
+    presenceState() { return {}; }
+    send() { return Promise.resolve('ok'); }
+  }
+  return {
+    list,
+    channel(topic) {
+      const ex = list.find((c) => c.topic === 'realtime:' + topic);
+      if (ex) return ex;
+      const c = new Ch(topic);
+      list.push(c);
+      return c;
+    },
+    getChannels: () => list,
+    removeChannel(ch) {
+      ch.state = 'leaving';
+      return new Promise((r) => setTimeout(() => {
+        ch.state = 'closed';
+        for (let i = list.length - 1; i >= 0; i--) if (list[i].topic === ch.topic) list.splice(i, 1);
+        r('ok');
+      }, leaveMs));
+    },
+  };
+}
+
+test('SupabaseTransport: sair e voltar na hora para a mesma sala', async () => {
+  const client = realisticClient();
+  const a = new SupabaseTransport(client, 'ABCDE', 'pa', { timeout: 300 });
+  assert.equal(await a.connect({ id: 'pa' }), true);
+  a.close(); // "Sair da sala" e logo "Entrar" com o mesmo código
+  const b = new SupabaseTransport(client, 'ABCDE', 'pa', { timeout: 300 });
+  assert.equal(await b.connect({ id: 'pa' }), true, 'conecta de novo (não pega o canal antigo, que está saindo)');
+  await tick(60);
+  assert.ok(client.list.includes(b.ch), 'o canal novo continua valendo depois de o antigo terminar de sair');
+  b.close();
+});
+
 // ---------- NetRoom (sobre o mock do Supabase) ----------
 test('NetRoom: anfitrião, conflito de cientista e troca de anfitrião', async () => {
   const srv = mockServer();

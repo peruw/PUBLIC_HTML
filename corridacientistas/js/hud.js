@@ -248,7 +248,8 @@ export class Hud {
     if (!this.tagBox) {
       this.tagBox = document.createElement('div');
       this.tagBox.className = 'hud-tags';
-      this.root.appendChild(this.tagBox);
+      // primeiro filho do #hud: os nomes ficam por baixo do painel (item, posição, minimapa)
+      this.root.prepend(this.tagBox);
     }
     this.tagBox.innerHTML = '';
     this.tags = (list || []).map(({ kart, name }) => {

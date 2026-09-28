@@ -781,7 +781,9 @@ export class Menu {
   showNetResults(results, player, info) {
     this.renderNetList(results, player, info);
     const me = results.find((r) => r.kart === player);
-    this.lastRun = { place: me?.place, time: me?.time, character: player.character, cc: info.cc, laps: info.laps, mode: 'race', estimated: me?.estimated, online: results.filter((r) => r.human).length };
+    // online: quantos amigos (os outros humanos; você não conta)
+    const friends = results.filter((r) => r.human && r.kart !== player).length;
+    this.lastRun = { place: me?.place, time: me?.time, character: player.character, cc: info.cc, laps: info.laps, mode: 'race', estimated: me?.estimated, online: Math.max(1, friends) };
     // curiosidades: vencedor (entre os que já chegaram) e o seu cientista
     const winner = results.find((r) => !r.running && !r.left)?.kart.character;
     const mine = player.character;
@@ -809,6 +811,8 @@ export class Menu {
   renderNetList(results, player, info) {
     const me = results.find((r) => r.kart === player);
     const final = !!info.final;
+    // o texto de "Compartilhar" usa a colocação de agora (a lista muda até fechar)
+    if (me && this.lastRun?.online) Object.assign(this.lastRun, { place: me.place, time: me.time, estimated: me.estimated });
     const v = info.laps === 1 ? '1 volta' : `${info.laps} voltas`;
     let title = 'Resultado';
     if (me && !me.running && !me.left) {
@@ -890,7 +894,7 @@ export class Menu {
     const text = r.duel
       ? `No Kart Científico, corremos em dupla: ${r.duel[0].name} (J1) chegou em ${r.duel[0].place}º e ${r.duel[1].name} (J2) em ${r.duel[1].place}º (${r.cc}, ${v})! Topa o desafio?`
       : r.online
-        ? `No Kart Científico online, cheguei em ${r.place}º lugar numa corrida com ${r.online} amigos, com ${r.character.name} (${r.cc}, ${v})! Bora correr junto?`
+        ? `No Kart Científico online, cheguei em ${r.place}º lugar numa corrida com ${r.online === 1 ? '1 amigo' : `${r.online} amigos`}, com ${r.character.name} (${r.cc}, ${v})! Bora correr junto?`
         : `No Kart Científico, ${what} com ${r.character.name} (${r.cc}, ${v})! Você consegue?`;
     try {
       if (navigator.share) {

@@ -394,9 +394,10 @@ export class Kart {
   // item: id do item que causou a batida ('maca', 'alfa', 'eletron', 'buraco', 'tesla', 'faraday')
   // ou null (o HUD usa para mostrar quem acertou quem).
   hit(type = 'spin', by = null, item = null) {
+    // (kart remoto: gaiola e proteção chegam pelo estado do dono; sem elas não há batida prevista)
+    if (this.invincible || this._hitCd > 0 || this.frozen) return false;
     // corrida online: só o dono aplica a batida no próprio kart; aqui ela vira mensagem
     if (this.remote) return this.netHit ? !!this.netHit(type, by, item) : false;
-    if (this.invincible || this._hitCd > 0 || this.frozen) return false;
     const T = TUNING;
     if (this.drifting) this._endDrift(false);
     this._driftArm = 0;
