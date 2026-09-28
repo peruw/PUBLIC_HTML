@@ -39,3 +39,6 @@ ganha um plano cinematográfico lateral.
 - `npm run test:xadrez`: regras (perft, roque, en passant, promoção, mate, afogamento, repetição, SAN) e IA.
 - O 3D e o Stockfish só rodam no navegador (o CDN precisa estar acessível). `window.__xadrez` expõe estado, `fen()` e `play('e2e4')` para depuração.
 - `dev/chars.html?type=p&color=both&view=three` visualiza os personagens; `anim=attack&victim=p&t=0.8` e `view=fp` testam as animações de batalha (`stub=1` usa as cópias de `dev/stubchars/`).
+
+## Partida online (`js/net.js`)
+Sala por código de 5 caracteres. Transporte: canal em tempo real do Supabase do site (`broadcast` + `presence`, sem banco de dados; cliente de `/conta/client.mjs` ou, fora do site, `@supabase/supabase-js` do CDN com a chave pública). `?net=local` troca por `BroadcastChannel` (testes e duas abas). O anfitrião escolhe a cor; cada lance leva o número da meia-jogada e é reenviado até o `ack`; lacunas pedem `sync?` e a lista completa de lances. Convite: `?sala=CODIGO`. Sem motor de análise no modo online.

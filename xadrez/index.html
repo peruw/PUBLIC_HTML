@@ -96,6 +96,7 @@
         <div class="stack">
           <button id="btn-play-cpu" class="btn primary">▶ Jogar contra o computador</button>
           <button id="btn-play-2p" class="btn">👥 Dois jogadores</button>
+          <button id="btn-play-online" class="btn">🌐 Jogar online com um amigo</button>
           <button id="btn-howto" class="btn ghost">📖 Como jogar</button>
         </div>
         <p class="small"><a href="/">← quantaaulas.com</a></p>
@@ -130,6 +131,36 @@
       </div>
     </section>
 
+    <section class="screen hidden" data-screen="online">
+      <div class="card">
+        <h2>Jogar online</h2>
+        <div id="online-choose">
+          <p class="lead">Crie uma sala e mande o código para o seu amigo, ou entre com o código que ele mandou.</p>
+          <p class="label">Criar sala · suas peças</p>
+          <div class="chips">
+            <button class="chip" data-ocolor="w">♙ Brancas</button>
+            <button class="chip" data-ocolor="b">♟ Pretas</button>
+            <button class="chip" data-ocolor="random">🎲 Aleatório</button>
+          </div>
+          <div class="stack row"><button id="btn-online-create" class="btn primary">Criar sala</button></div>
+          <p class="label">Entrar numa sala</p>
+          <div class="online-join">
+            <input id="online-code-input" class="code-input" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CÓDIGO" aria-label="Código da sala" />
+            <button id="btn-online-join" class="btn primary">Entrar</button>
+          </div>
+        </div>
+        <div id="online-wait" class="hidden">
+          <p class="label">Código da sala</p>
+          <div id="online-code" class="room-code">-----</div>
+          <div class="stack row">
+            <button id="btn-online-copy" class="btn">🔗 Copiar convite</button>
+          </div>
+        </div>
+        <p id="online-status" class="lead online-status"></p>
+        <div class="stack row"><button id="btn-online-back" class="btn ghost">Voltar</button></div>
+      </div>
+    </section>
+
     <section class="screen hidden" data-screen="howto">
       <div class="card">
         <h2>Como jogar</h2>
@@ -137,6 +168,7 @@
           <li><b>Toque numa peça sua no tabuleiro pequeno</b> (ou na cena). A câmera vai para os olhos do personagem e as casas possíveis aparecem em azul (vermelho = captura).</li>
           <li><b>Toque na casa de destino</b> para mover. O personagem anda até lá; nas capturas você assiste à luta pelos olhos dele.</li>
           <li>Sem peça escolhida, a câmera passeia atrás da sua linha de frente. <b>Arraste</b> para olhar em volta. <b>Esc</b> cancela a escolha.</li>
+          <li><b>Online:</b> em “Jogar online com um amigo”, crie uma sala e mande o código (ou o convite) para o seu amigo. Ele entra com o código e cada um joga do próprio aparelho. “Reiniciar” pede revanche, com as cores trocadas.</li>
           <li>O botão <b>“3ª pessoa”</b> (ou a tecla <b>V</b>) põe a câmera atrás do personagem, como num jogo de ação, para ver o corpo dele andando e lutando. “1ª pessoa” volta para os olhos dele.</li>
           <li>O botão “Vista de cima” alterna entre o campo de batalha e a vista aérea 3D.</li>
           <li>O painel mostra a <b>vantagem</b> ao longo da partida, os <b>melhores lances</b> e o <b>histórico</b>.</li>

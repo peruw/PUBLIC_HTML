@@ -3,7 +3,7 @@ import * as THREE from './three.js';
 import { QUALITY, CAMERA } from './config.js';
 import {
   createGame, generateLegalMoves, makeMove, undoMove, gameStatus, toSAN, toFEN, uciToMove,
-  kingSquare, inCheck, PIECE_LETTERS, cloneState,
+  kingSquare, inCheck, PIECE_LETTERS, cloneState, moveToUCI,
 } from './rules.js';
 import { Engine } from './engine.js';
 import { buildBoard } from './board3d.js';
@@ -14,6 +14,7 @@ import { Hud } from './hud.js';
 import { Menu } from './menu.js';
 import { createIdle } from './battle.js';
 import { setStyle, getStyle } from './skins.js';
+import { openRoom, newRoomCode, normalizeCode } from './net.js';
 
 const isCoarse = matchMedia('(pointer: coarse)').matches;
 const quality = isCoarse || Math.min(innerWidth, innerHeight) < 700 ? QUALITY.baixa : QUALITY.alta;
@@ -75,6 +76,9 @@ const menu = new Menu({
   onResume: () => {},
   onRestart: () => restart(),
   onQuit: () => quitToMenu(),
+  onOnlineCreate: (color) => onlineCreate(color),
+  onOnlineJoin: (code) => onlineJoin(code),
+  onOnlineCancel: () => onlineClose(),
 });
 
 const input = new Input({
@@ -112,7 +116,13 @@ async function startGame(opts) {
   G.humanColor = opts.color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : (opts.color || 'w');
   G.game = createGame();
   G.sans = [];
-  G.lastMove = null;
+  for (const uci of opts.moves || []) {           // online: retoma uma partida em andamento
+    const m = uciToMove(G.game, uci);
+    if (!m) break;
+    G.sans.push(toSAN(G.game, m));
+    makeMove(G.game, m);
+  }
+  { const h = G.game.history; G.lastMove = h.length ? { from: h[h.length - 1].move.from, to: h[h.length - 1].move.to } : null; }
   G.selected = -1;
   G.legal = [];
   animator.clear();
@@ -127,7 +137,7 @@ async function startGame(opts) {
   board.setPosition(G.game);
   refreshHighlights();
   hud.resetEval();
-  hud.setHistory([]);
+  hud.setHistory(G.sans);
   hud.setLines([]);
   hud.setEval({ cp: 0, mateIn: null });
   hud.show(true);
@@ -137,18 +147,21 @@ async function startGame(opts) {
   G.status = 'playing';
   G.dirty = true;
   updateTurnUi();
+  if (G.opts.mode === 'online') { if (await checkGameOver()) return; flushRemote(); return; }
   if (!isHumanTurn()) computerTurn();
   else startAnalysis();
 }
 
 function restart() {
   if (!G.opts) return;
+  if (G.opts.mode === 'online') { onlineRematch(); return; }
   engine.stop();
   if (G.cancelAnalysis) { G.cancelAnalysis(); G.cancelAnalysis = null; }
   startGame(G.opts);
 }
 
 function quitToMenu() {
+  if (G.opts && G.opts.mode === 'online') onlineClose();
   engine.stop();
   if (G.cancelAnalysis) { G.cancelAnalysis(); G.cancelAnalysis = null; }
   animator.clear();
@@ -160,9 +173,11 @@ function quitToMenu() {
 function updateTurnUi() {
   const check = inCheck(G.game);
   hud.setTurn(G.game.turn, check);
-  hud.setUndoEnabled(G.game.history.length > 0);
+  hud.setUndoEnabled(G.opts.mode !== 'online' && G.game.history.length > 0);
   if (G.status === 'playing') {
-    if (!isHumanTurn()) hud.showHint('Computador pensando…');
+    if (G.opts.mode === 'online' && NET.peers === 0) hud.showHint('Seu amigo desconectou… esperando ele voltar.');
+    else if (G.opts.mode === 'online' && !isHumanTurn()) hud.showHint('Vez do seu amigo…');
+    else if (!isHumanTurn()) hud.showHint('Computador pensando…');
     else if (G.view === 'firstperson') hud.showHint('Toque numa casa azul para mover · Esc cancela');
     else hud.showHint('Toque numa peça sua no tabuleiro pequeno');
   }
@@ -262,6 +277,7 @@ function toggleView() {
 async function humanMove(move) {
   const firstPerson = G.view === 'firstperson';
   const wasCpuMode = G.opts.mode === 'cpu';
+  if (G.opts.mode === 'online') sendMove(G.game.history.length, moveToUCI(move));
   applyMoveToState(move);
   G.selected = -1; G.legal = [];
   refreshHighlights();
@@ -275,6 +291,7 @@ async function humanMove(move) {
   G.status = 'playing';
   if (await checkGameOver()) return;
   updateTurnUi();
+  if (G.opts.mode === 'online') { flushRemote(); return; }
   if (!isHumanTurn()) computerTurn();
   else startAnalysis();
 }
@@ -289,7 +306,7 @@ function applyMoveToState(move) {
 }
 
 async function computerTurn() {
-  if (G.status !== 'playing' || isHumanTurn()) return;
+  if (G.opts.mode === 'online' || G.status !== 'playing' || isHumanTurn()) return;
   G.status = 'thinking';
   hud.showHint('Computador pensando…');
   hud.setLines([]);
@@ -321,6 +338,7 @@ async function computerTurn() {
 
 function startAnalysis() {
   if (!G.game || G.status !== 'playing') return;
+  if (G.opts.mode === 'online') { hud.setLines([]); return; } // sem ajuda do motor em partida contra pessoa
   const fen = toFEN(G.game);
   const ply = G.game.history.length;
   const snapshot = cloneState(G.game);
@@ -350,6 +368,7 @@ async function checkGameOver() {
     const loserColor = st.result === '1-0' ? 'b' : 'w';
     title = `Xeque-mate! ${winner} vencem`;
     if (G.opts.mode === 'cpu') title = (st.result === '1-0') === (G.humanColor === 'w') ? 'Xeque-mate! Você venceu' : 'Xeque-mate! O computador venceu';
+    if (G.opts.mode === 'online') title = (st.result === '1-0') === (G.humanColor === 'w') ? 'Xeque-mate! Você venceu' : 'Xeque-mate! Seu amigo venceu';
     detail = `${G.sans.length} meias-jogadas · ${st.result}`;
     hud.setEval({ cp: st.result === '1-0' ? 100000 : -100000, mateIn: null });
     hud.pushEval(G.game.history.length, st.result === '1-0' ? 10000 : -10000);
@@ -366,7 +385,7 @@ async function checkGameOver() {
 }
 
 async function undo() {
-  if (!G.game || !G.game.history.length) return;
+  if (!G.game || !G.game.history.length || G.opts.mode === 'online') return;
   if (!(G.status === 'playing' || G.status === 'thinking' || G.status === 'gameover')) return;
   engine.stop();
   G.pendingCpu = null;
@@ -389,6 +408,176 @@ async function undo() {
   G.status = 'playing';
   updateTurnUi();
   if (!isHumanTurn()) computerTurn(); else startAnalysis();
+}
+
+// ---------- Partida online (código de sala) ----------
+// O anfitrião cria a sala e escolhe a cor; o convidado entra com o código. Cada lance vai com o número
+// da meia-jogada (ply) e é reenviado até o outro confirmar (ack). Se algo se perder, 'sync?' pede a lista
+// completa de lances ao outro lado. Na dúvida, vale a partida do anfitrião.
+const NET = { room: null, role: null, code: null, hostColor: 'w', peers: 0, started: false, pending: null, timers: [], queue: [] };
+
+function netClearTimers() { for (const t of NET.timers) { clearTimeout(t); clearInterval(t); } NET.timers = []; }
+function onNetStatus(st) { if (st === 'desconectado' && G.opts && G.opts.mode === 'online') hud.showHint('Conexão perdida… tentando voltar.'); }
+
+function onlineClose() {
+  netClearTimers();
+  if (NET.pending && NET.pending.timer) clearInterval(NET.pending.timer);
+  if (NET.room) { try { NET.room.send({ t: 'bye' }); } catch { /* ok */ } NET.room.close(); }
+  Object.assign(NET, { room: null, role: null, code: null, peers: 0, started: false, pending: null, queue: [] });
+}
+
+async function onlineCreate(colorPref) {
+  onlineClose();
+  const code = newRoomCode();
+  NET.role = 'host'; NET.code = code;
+  NET.hostColor = colorPref === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : (colorPref === 'b' ? 'b' : 'w');
+  menu.setOnlineStatus('Criando a sala…');
+  try {
+    NET.room = await openRoom(code, { role: 'host', onMessage: onNetMessage, onPeers: onNetPeers, onStatus: onNetStatus });
+  } catch (e) {
+    console.warn('[online]', e);
+    menu.setOnlineStatus('Não foi possível criar a sala. Verifique a internet e tente de novo.', true);
+    onlineClose();
+    return;
+  }
+  menu.showOnlineCode(code);
+}
+
+async function onlineJoin(rawCode) {
+  onlineClose();
+  const code = normalizeCode(rawCode);
+  NET.role = 'guest'; NET.code = code;
+  menu.setOnlineStatus('Conectando à sala ' + code + '…');
+  try {
+    NET.room = await openRoom(code, { role: 'guest', onMessage: onNetMessage, onPeers: onNetPeers, onStatus: onNetStatus });
+  } catch (e) {
+    console.warn('[online]', e);
+    menu.setOnlineStatus('Não foi possível conectar. Verifique a internet e tente de novo.', true);
+    onlineClose();
+    return;
+  }
+  const ask = () => { if (!NET.started && NET.room) NET.room.send({ t: 'join' }); };
+  ask();
+  NET.timers.push(setInterval(ask, 1500));
+  NET.timers.push(setTimeout(() => {
+    if (!NET.started) menu.setOnlineStatus('Sala não encontrada. Confira o código ou peça para o seu amigo criar outra.', true);
+  }, 12000));
+}
+
+function onNetPeers(n) {
+  const had = NET.peers;
+  NET.peers = n;
+  if (!G.opts || G.opts.mode !== 'online' || G.status === 'menu') return;
+  if (n > 0 && had === 0 && NET.started) NET.room.send({ t: 'sync?' });
+  if (G.status === 'playing') updateTurnUi();
+}
+
+const movesUci = () => G.game.history.map((h) => moveToUCI(h.move));
+
+async function beginOnline(myColor, moves) {
+  netClearTimers();
+  NET.started = true;
+  NET.queue = [];
+  if (NET.pending && NET.pending.timer) clearInterval(NET.pending.timer);
+  NET.pending = null;
+  NET.peers = Math.max(NET.peers, 1);
+  menu.hide();
+  await startGame({ ...menu.opts, mode: 'online', color: myColor, moves });
+}
+
+function onNetMessage(m) {
+  switch (m.t) {
+    case 'join':
+      if (NET.role !== 'host') return;
+      {
+        const moves = NET.started && G.game ? movesUci() : [];
+        if (!NET.started) beginOnline(NET.hostColor, []);
+        NET.room.send({ t: 'start', hostColor: NET.hostColor, moves });
+      }
+      break;
+    case 'start':
+      if (NET.role !== 'guest') return;
+      if (!NET.started || m.restart) beginOnline(m.hostColor === 'w' ? 'b' : 'w', m.moves || []);
+      else syncTo(m.moves || [], true);
+      break;
+    case 'move': onRemoteMove(m.ply, m.uci); break;
+    case 'ack':
+      if (NET.pending && m.ply === NET.pending.ply) { clearInterval(NET.pending.timer); NET.pending = null; }
+      break;
+    case 'sync?': if (G.game && NET.started) NET.room.send({ t: 'state', moves: movesUci() }); break;
+    case 'state': syncTo(m.moves || [], NET.role === 'guest'); break;
+    case 'rematch':
+      if (NET.role === 'host') hostRematch();
+      break;
+    case 'bye':
+      NET.peers = 0;
+      if (G.opts && G.opts.mode === 'online' && G.status !== 'menu') hud.showHint('Seu amigo saiu da partida.');
+      break;
+    default: break;
+  }
+}
+
+function sendMove(ply, uci) {
+  if (!NET.room) return;
+  if (NET.pending && NET.pending.timer) clearInterval(NET.pending.timer);
+  const msg = { t: 'move', ply, uci };
+  NET.room.send(msg);
+  NET.pending = { ply, timer: setInterval(() => NET.room && NET.room.send(msg), 2500) };
+}
+
+function onRemoteMove(ply, uci) {
+  if (NET.room) NET.room.send({ t: 'ack', ply });
+  if (!G.game || !NET.started) return;
+  const n = G.game.history.length;
+  if (ply < n) return;                                   // repetido
+  if (ply > n) { NET.room.send({ t: 'sync?' }); return; } // perdemos algum lance
+  if (NET.queue.some((q) => q.ply === ply)) return;
+  NET.queue.push({ ply, uci });
+  flushRemote();
+}
+
+async function flushRemote() {
+  if (G.status !== 'playing' || !NET.queue.length || animator.busy) return;
+  const { ply, uci } = NET.queue.shift();
+  if (!G.game || ply !== G.game.history.length || isHumanTurn()) { flushRemote(); return; }
+  const move = uciToMove(G.game, uci);
+  if (!move) { NET.room.send({ t: 'sync?' }); return; }
+  if (G.selected >= 0) { G.selected = -1; G.legal = []; }
+  applyMoveToState(move);
+  refreshHighlights();
+  G.status = 'animating';
+  await animator.playMove(move, { firstPerson: false });
+  refreshHighlights();
+  await idleView();
+  G.status = 'playing';
+  if (await checkGameOver()) return;
+  updateTurnUi();
+  flushRemote();
+}
+
+// Alinha a partida local com a lista de lances do outro lado.
+async function syncTo(moves, authoritative) {
+  if (!G.game || !NET.started) return;
+  const local = movesUci();
+  const prefix = local.every((u, i) => moves[i] === u);
+  if (prefix && moves.length === local.length) return;
+  if (prefix && moves.length === local.length + 1) { onRemoteMove(local.length, moves[local.length]); return; }
+  if (prefix && moves.length > local.length || authoritative) {
+    await beginOnline(G.humanColor, moves);             // refaz a posição do outro lado (sem animação)
+    return;
+  }
+  if (moves.every((u, i) => local[i] === u)) NET.room.send({ t: 'state', moves: local }); // o outro está atrasado
+}
+
+function hostRematch() {
+  NET.hostColor = NET.hostColor === 'w' ? 'b' : 'w'; // revanche: trocam de cor
+  beginOnline(NET.hostColor, []);
+  NET.room.send({ t: 'start', hostColor: NET.hostColor, moves: [], restart: true });
+}
+function onlineRematch() {
+  if (!NET.room) return;
+  if (NET.role === 'host') hostRematch();
+  else { NET.room.send({ t: 'rematch' }); hud.showHint('Pedindo revanche…'); }
 }
 
 // Em 3ª pessoa, esconde as peças entre a câmera e o personagem seguido (ou coladas na câmera),
@@ -467,6 +656,11 @@ async function boot() {
   }
   G.status = 'menu';
   menu.show('title');
+  // Convite por link: ?sala=CODIGO entra direto na sala
+  try {
+    const sala = normalizeCode(new URLSearchParams(location.search).get('sala'));
+    if (sala.length === 5) { menu.resetOnline(sala); menu.show('online'); onlineJoin(sala); }
+  } catch { /* sem convite */ }
   // Cenário realista em segundo plano (céu, grama e árvores); o jogo já pode ser usado enquanto carrega.
   import('./scenery.js')
     .then(({ upgradeScenery }) => upgradeScenery({ scene, renderer, board, quality, onChange: () => { G.dirty = true; } }))

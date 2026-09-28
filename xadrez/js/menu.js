@@ -8,7 +8,7 @@ const store = {
 };
 
 export class Menu {
-  constructor({ onStart, onResume, onRestart, onQuit }) {
+  constructor({ onStart, onResume, onRestart, onQuit, onOnlineCreate, onOnlineJoin, onOnlineCancel }) {
     this.screens = {};
     for (const el of document.querySelectorAll('.screen')) this.screens[el.dataset.screen] = el;
     this.opts = {
@@ -17,12 +17,35 @@ export class Menu {
       color: store.get('color', 'w'),
       rotate: store.get('rotate', true),
       style: store.get('style', 'classic'),
+      onlineColor: store.get('onlineColor', 'w'),
     };
     this.onStart = onStart;
 
     $('btn-play-cpu').addEventListener('click', () => { this.opts.mode = 'cpu'; this.show('setup'); this._syncSetup(); });
     $('btn-play-2p').addEventListener('click', () => { this.opts.mode = '2p'; this.show('setup'); this._syncSetup(); });
     $('btn-howto').addEventListener('click', () => this.show('howto'));
+    // ---- online ----
+    $('btn-play-online').addEventListener('click', () => { this.resetOnline(); this.show('online'); });
+    for (const b of document.querySelectorAll('.chip[data-ocolor]')) {
+      b.addEventListener('click', () => { this.opts.onlineColor = b.dataset.ocolor; store.set('onlineColor', b.dataset.ocolor); this._syncOnline(); });
+    }
+    $('btn-online-create').addEventListener('click', () => { this._busy(true); onOnlineCreate(this.opts.onlineColor); });
+    const codeIn = $('online-code-input');
+    codeIn.addEventListener('input', () => { codeIn.value = codeIn.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); });
+    const join = () => {
+      const code = codeIn.value.trim();
+      if (code.length !== 5) { this.setOnlineStatus('O código tem 5 letras/números.', true); return; }
+      this._busy(true); onOnlineJoin(code);
+    };
+    $('btn-online-join').addEventListener('click', join);
+    codeIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') join(); });
+    $('btn-online-copy').addEventListener('click', async () => {
+      const url = location.origin + location.pathname + '?sala=' + this.onlineCode;
+      const text = `Bora jogar xadrez? Entre em ${url} ou use o código ${this.onlineCode}.`;
+      try { await navigator.clipboard.writeText(text); this.setOnlineStatus('Convite copiado! Mande para o seu amigo.'); }
+      catch { this.setOnlineStatus('Mande este código para o seu amigo: ' + this.onlineCode); }
+    });
+    $('btn-online-back').addEventListener('click', () => { onOnlineCancel(); this.show('title'); });
     $('btn-howto-back').addEventListener('click', () => this.show('title'));
     $('btn-setup-back').addEventListener('click', () => this.show('title'));
     $('btn-setup-start').addEventListener('click', () => {
@@ -52,6 +75,32 @@ export class Menu {
     $('btn-pause-quit').addEventListener('click', () => { this.show('title'); onQuit(); });
     $('btn-over-again').addEventListener('click', () => { this.hide(); onRestart(); });
     $('btn-over-menu').addEventListener('click', () => { this.show('title'); onQuit(); });
+  }
+
+  _syncOnline() {
+    for (const b of document.querySelectorAll('.chip[data-ocolor]')) b.classList.toggle('active', b.dataset.ocolor === this.opts.onlineColor);
+  }
+  _busy(v) { $('btn-online-create').disabled = v; $('btn-online-join').disabled = v; }
+  resetOnline(code = '') {
+    $('online-choose').classList.remove('hidden');
+    $('online-wait').classList.add('hidden');
+    $('online-code-input').value = code;
+    this.setOnlineStatus('');
+    this._busy(false);
+    this._syncOnline();
+  }
+  showOnlineCode(code) {
+    this.onlineCode = code;
+    $('online-code').textContent = code;
+    $('online-choose').classList.add('hidden');
+    $('online-wait').classList.remove('hidden');
+    this.setOnlineStatus('Esperando o seu amigo entrar…');
+  }
+  setOnlineStatus(text, error = false) {
+    const el = $('online-status');
+    el.textContent = text || '';
+    el.classList.toggle('error', !!error);
+    if (error) this._busy(false);
   }
 
   _syncSetup() {

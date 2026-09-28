@@ -128,6 +128,15 @@ button { font: inherit; cursor: pointer; }
 .check { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 10px; }
 .howto { text-align: left; color: #e1dbd0; line-height: 1.5; padding-left: 20px; margin: 0 0 18px; }
 .howto li { margin-bottom: 8px; }
+.online-join { display: flex; gap: 10px; justify-content: center; }
+.code-input {
+  width: 9.5ch; font: 700 26px var(--font-title); letter-spacing: 0.25em; text-transform: uppercase; text-align: center;
+  background: #1a1815; color: var(--text); border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px 12px;
+}
+.code-input:focus { outline: 2px solid var(--accent-2); }
+.room-code { font: 700 46px var(--font-title); letter-spacing: 0.3em; color: var(--accent); margin: 4px 0 8px; user-select: all; }
+.online-status { min-height: 1.4em; margin: 14px 0 0; }
+.online-status.error { color: var(--danger); }
 .spinner { width: 34px; height: 34px; margin: 14px auto 0; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.15); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
