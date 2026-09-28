@@ -102,6 +102,8 @@ export class RaceManager {
   updateProgress(world) {
     const L = this.track.length;
     for (const k of this.karts) {
+      // kart remoto (corrida online): progresso, volta e chegada vêm do aparelho do dono
+      if (k.remote) continue;
       let d = k.s - k._prevS;
       if (d > L / 2) d -= L;
       else if (d < -L / 2) d += L;
@@ -147,9 +149,22 @@ export class RaceManager {
     k.finishTime = this.time;
     this.finishOrder.push(k);
     k.place = this.finishOrder.length;
+    // online: quem chegou antes em outro aparelho conta pelo tempo, não pela ordem das mensagens
+    if (this.karts.some((o) => o.remote)) k.place = 1 + this.karts.filter((o) => o !== k && o.finished && o.finishTime <= k.finishTime).length;
     this.bus.emit('race:finish', { kart: k, place: k.place, time: k.finishTime });
     // a corrida acaba quando todos os humanos cruzam a chegada
     if (this.players.includes(k) && this.players.every((p) => p.finished)) this.phase = 'finished';
+  }
+
+  // Corrida online: chegada de um kart remoto (tempo medido no aparelho do dono).
+  finishRemote(k, time) {
+    if (k.finished || !this.karts.includes(k)) return;
+    k.finished = true;
+    k.finishTime = time;
+    this.finishOrder.push(k);
+    // a colocação final segue o tempo (a mensagem de quem chegou antes pode chegar depois)
+    k.place = 1 + this.karts.filter((o) => o !== k && o.finished && o.finishTime < time).length;
+    this.bus.emit('race:finish', { kart: k, place: k.place, time });
   }
 
   updatePlaces() {

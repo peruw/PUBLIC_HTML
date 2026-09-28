@@ -345,6 +345,9 @@ export class ItemSystem {
     this._viewH = 720;
     this._lastUse = {}; // id -> this.time do último uso (itens com intervalo)
     this.mode = 'race'; // 'race' | 'timetrial' (contrarrelógio: as caixas só dão foguete)
+    // corrida online (netrace.js): { onUse(k, id, info), onApple(a), onAppleGone(a) } ou null.
+    // Quem usa o item simula o efeito; acerto em kart remoto vira mensagem (kart.netHit).
+    this.net = null;
 
     // brilhos aditivos (núcleos, elétrons, projéteis) num único draw call
     this.glows = new SpriteBatch(360, { additive: true, renderOrder: 13 });
@@ -613,6 +616,15 @@ export class ItemSystem {
     this._updateBoxes(dt, karts, world?.split ? null : world?.camera);
     for (let i = 0; i < karts.length; i++) {
       const k = karts[i];
+      // kart remoto (online): roleta e uso acontecem no aparelho do dono; aqui o item seguro
+      // (escudo) só acompanha o kart
+      if (k.remote) {
+        if (k.itemHeld) {
+          k.itemHeld.t += dt;
+          this._heldPos(k, k.itemHeld.pos);
+        }
+        continue;
+      }
       if (k.roulette) this._updateRoulette(k, dt);
       this._checkUse(k, dt);
     }
@@ -718,7 +730,8 @@ export class ItemSystem {
     b.alive = false;
     b.timer = RACE.boxRespawn;
     this.bus?.emit('item:pickup', { kart: k, pos: b.pos });
-    this.rollItem(k);
+    // kart remoto: a caixa quebra aqui também, mas o sorteio é no aparelho do dono
+    if (!k.remote) this.rollItem(k);
   }
 
   // ------------------------------------------------------------ roleta e uso
@@ -777,6 +790,7 @@ export class ItemSystem {
     // sem adversário ainda correndo, buraco negro e elétron não têm alvo: nada acontece
     if (NEEDS_RIVAL[id] && !this._hasRival(k)) return false;
     if (id in ITEM_COOLDOWN) this._lastUse[id] = this.time;
+    let obj = null; // projétil/buraco criado (online: os outros aparelhos desenham uma cópia)
     switch (id) {
       case 'foguete':
         k.applyBoost(1.3, 1, 'item');
@@ -793,10 +807,10 @@ export class ItemSystem {
         this._dropApple(k, from);
         break;
       case 'alfa':
-        this._fire(k, 'alfa', back, from);
+        obj = this._fire(k, 'alfa', back, from);
         break;
       case 'eletron':
-        this._fire(k, 'eletron');
+        obj = this._fire(k, 'eletron');
         break;
       case 'faraday':
         k.starTime = 7;
@@ -805,14 +819,111 @@ export class ItemSystem {
         this._tesla(k);
         break;
       case 'buraco':
-        this._launchHole(k);
+        obj = this._launchHole(k);
         break;
       default:
         break;
     }
     this._consume(k);
     this.bus?.emit('item:use', { kart: k, item: id });
+    if (this.net && !k.remote) this.net.onUse?.(k, id, { back, from, obj });
     return true;
+  }
+
+  // ------------------------------------------------------------ corrida online
+  // Item usado em outro aparelho: só o visual aqui (os acertos chegam por mensagem 'hit').
+  // d = { back, from: [x, y, z] }; target = kart alvo (elétron/buraco negro).
+  ghostUse(k, id, d = {}, target = null) {
+    if (!k || !ITEMS[id]) return;
+    if (id in ITEM_COOLDOWN) this._lastUse[id] = this.time;
+    switch (id) {
+      case 'foguete':
+        this._attachRocket(k, 1.3);
+        break;
+      case 'pilha3':
+        this._batteryPos(k, 0, _v3);
+        this.effects?.burst('electric', _v3, { kart: k, scale: 0.55, bolts: 3 });
+        break;
+      case 'alfa': {
+        const from = Array.isArray(d.from) ? _v3.set(d.from[0], d.from[1], d.from[2]) : null;
+        const p = this._fire(k, 'alfa', !!d.back, from);
+        if (p) p.ghost = true;
+        break;
+      }
+      case 'eletron': {
+        if (!target) break;
+        const p = this._fire(k, 'eletron', !!d.back, null, target);
+        if (p) p.ghost = true;
+        break;
+      }
+      case 'buraco': {
+        if (!target) break;
+        const h = this._launchHole(k, target);
+        if (h) h.ghost = true;
+        break;
+      }
+      default:
+        break;
+    }
+    this.bus?.emit('item:use', { kart: k, item: id });
+  }
+
+  // Bobina de Tesla usada em outro aparelho: o choque vale para os karts deste aparelho.
+  teslaFrom(k) {
+    this._lastUse.tesla = this.time;
+    this._tesla(k);
+  }
+
+  // Maçã solta em outro aparelho (d: posições de onde cai e onde pousa, id da rede).
+  spawnApple(owner, d) {
+    const a = this._freeApple();
+    a.from.set(d.from[0], d.from[1], d.from[2]);
+    a.to.set(d.to[0], d.to[1], d.to[2]);
+    a.ground = d.g;
+    a.s = d.s || 0;
+    a.hazard.s = a.s;
+    a.hazard.lateral = d.lat || 0;
+    a.pos.copy(a.from);
+    a.active = true;
+    a.owner = owner;
+    a.age = 0;
+    a.immune = 0.6;
+    a.t = 0;
+    a.landed = false;
+    a.phase = Math.random() * TAU;
+    a.squash = 0;
+    a.nid = d.id;
+  }
+
+  // Maçã que alguém atropelou em outro aparelho.
+  removeApple(nid) {
+    const a = this.apples.find((x) => x.active && x.nid === nid);
+    if (!a) return false;
+    a.active = false;
+    this.bus?.emit('item:explode', { pos: a.pos, item: 'maca' });
+    return true;
+  }
+
+  // Um projétil (em outro aparelho) quebrou o item que este kart segurava atrás.
+  breakHeldNet(k) {
+    if (k?.itemHeld) this._breakHeld(k);
+  }
+
+  // Kart que saiu da corrida online: projéteis e buracos param de persegui-lo.
+  forgetKart(k) {
+    for (const p of this.projs) {
+      if (p.active && p.target === k) {
+        p.target = null;
+        p.mode = 'straight';
+      }
+    }
+    for (const h of this.holes) {
+      if (h.active && h.target === k && h.phase !== 'fade') {
+        h.phase = 'fade';
+        h.t = 0;
+        h.fade = h.scale;
+      }
+    }
   }
 
   _consume(k) {
@@ -862,9 +973,11 @@ export class ItemSystem {
   }
 
   // Um projétil bateu no item segurado: os dois explodem e o kart fica sem o item.
-  _breakHeld(k) {
+  // (kart remoto, online: o dono fica sabendo por mensagem e perde o item lá)
+  _breakHeld(k, by = null, item = null) {
     const held = k.itemHeld;
     k.itemHeld = null;
+    if (k.remote) k.netHit?.('shield', by, item);
     this.bus?.emit('item:explode', { pos: held.pos, item: held.item });
     this._consume(k);
   }
@@ -1007,13 +1120,19 @@ export class ItemSystem {
 
   // ------------------------------------------------------------ maçã
   // from: posição de onde a maçã cai (item segurado); sem ela, sai de trás do piloto.
-  _dropApple(k, from = null) {
+  _freeApple() {
     let a = this.apples.find((x) => !x.active);
     if (!a) {
       a = this.apples[0];
       for (const x of this.apples) if (x.age > a.age) a = x; // remove a mais antiga
       this.effects?.burst('smoke', a.pos, { scale: 0.5 });
     }
+    a.nid = null; // id na corrida online (maçã criada aqui ou vinda de outro aparelho)
+    return a;
+  }
+
+  _dropApple(k, from = null) {
+    const a = this._freeApple();
     const h = k.heading || 0;
     const fx = Math.sin(h);
     const fz = Math.cos(h);
@@ -1042,6 +1161,8 @@ export class ItemSystem {
     a.phase = Math.random() * TAU;
     a.squash = 0;
     a.hazard.s = a.s;
+    // online: os outros aparelhos criam a mesma maçã ('hazard')
+    if (this.net && !k.remote) this.net.onApple?.(a);
   }
 
   _updateApples(dt, karts) {
@@ -1070,6 +1191,8 @@ export class ItemSystem {
         for (let i = 0; i < karts.length; i++) {
           const k = karts[i];
           if (k === a.owner && a.age < a.immune) continue;
+          // online: quem decide se um kart bateu na maçã é o aparelho do dono do kart
+          if (k.remote) continue;
           const dx = k.position.x - a.pos.x;
           const dz = k.position.z - a.pos.z;
           const dy = k.position.y - a.ground;
@@ -1083,6 +1206,7 @@ export class ItemSystem {
       if (hit) {
         a.active = false;
         this.bus?.emit('item:explode', { pos: a.pos, item: 'maca' });
+        if (a.nid) this.net?.onAppleGone?.(a);
         continue;
       }
       // desenho: balanço suave e amassadinho ao pousar
@@ -1113,11 +1237,16 @@ export class ItemSystem {
   }
 
   // back: dispara para trás (alfa); from: sai do item segurado atrás do kart.
-  _fire(k, type, back = false, from = null) {
+  // forceTarget: alvo do elétron já escolhido (cópia de um elétron de outro aparelho, online).
+  _fire(k, type, back = false, from = null, forceTarget = null) {
     const p = this._take(type);
-    if (!p) return;
+    if (!p) return null;
+    p.ghost = false; // cópia só visual (online): não acerta nada aqui
     let target = null;
-    if (type === 'eletron') {
+    if (type === 'eletron' && forceTarget) {
+      target = forceTarget;
+      from = null;
+    } else if (type === 'eletron') {
       // persegue o kart logo à frente que ainda está correndo; sem ninguém à frente (1º lugar),
       // o que vem logo atrás, disparando para trás
       const place = k.place || 0;
@@ -1167,6 +1296,7 @@ export class ItemSystem {
       p.mode = target ? 'track' : 'straight';
     }
     p.vel.set(fx * dir * p.speed, 0, fz * dir * p.speed);
+    return p;
   }
 
   _updateProjectiles(dt, karts) {
@@ -1243,18 +1373,19 @@ export class ItemSystem {
       p.hazard.s = p.s;
       p.hazard.lateral = p.lateral;
 
-      // --- colisões
+      // --- colisões (a cópia só visual de um projétil de outro aparelho não acerta nada:
+      // o aparelho de quem atirou decide e avisa por mensagem)
       let dead = false;
       // escudo: maçã/alfa segurada atrás de um kart segura o projétil antes de ele chegar ao kart
-      for (let i = 0; i < karts.length; i++) {
+      for (let i = 0; i < karts.length && !p.ghost; i++) {
         const k = karts[i];
         if (!k.itemHeld || (k === p.owner && p.age < p.immune)) continue;
         if (k.itemHeld.pos.distanceToSquared(p.pos) > SHIELD_R * SHIELD_R) continue;
-        this._breakHeld(k);
+        this._breakHeld(k, p.owner, p.type);
         dead = true;
         break;
       }
-      for (let i = 0; i < karts.length && !dead; i++) {
+      for (let i = 0; i < karts.length && !dead && !p.ghost; i++) {
         const k = karts[i];
         if (k === p.owner && p.age < p.immune) continue;
         const dx = k.position.x - p.pos.x;
@@ -1267,12 +1398,21 @@ export class ItemSystem {
         dead = true;
         break;
       }
-      if (!dead) {
+      // cópia do elétron: some ao alcançar o alvo (se acertou, o 'hit' chega de quem atirou)
+      if (!dead && p.ghost && p.type === 'eletron' && p.target) {
+        const tg = p.target;
+        const dx = tg.position.x - p.pos.x;
+        const dy = tg.position.y + 0.6 - p.pos.y;
+        const dz = tg.position.z - p.pos.z;
+        if (dx * dx + dy * dy + dz * dz < PROJ_HIT * PROJ_HIT) dead = true;
+      }
+      if (!dead && !p.ghost) {
         for (const a of this.apples) {
           if (!a.active || !a.landed) continue;
           if (a.pos.distanceToSquared(p.pos) < 1.2 * 1.2) {
             a.active = false;
             this.bus?.emit('item:explode', { pos: a.pos, item: 'maca' });
+            if (a.nid) this.net?.onAppleGone?.(a);
             dead = true;
             break;
           }
@@ -1331,6 +1471,12 @@ export class ItemSystem {
   _tesla(k) {
     for (const o of this.karts) {
       if (o === k || o.invincible || o.finished) continue;
+      // online: kart remoto leva o choque no próprio aparelho (mensagem 'tesla'); aqui só a animação
+      if (o.remote) {
+        o.netStun?.('shock');
+        this.bus?.emit('kart:hit', { kart: o, type: 'shock', by: k, item: 'tesla' });
+        continue;
+      }
       const pl = clamp(o.place || 4, 1, 8);
       o.shrink(3.5 + (8 - pl) * 0.35);
       o.hit('shock', k, 'tesla');
@@ -1353,9 +1499,10 @@ export class ItemSystem {
     return best || (strict ? null : any);
   }
 
-  _launchHole(k) {
-    const target = this._holeTarget(k, false);
-    if (!target) return false;
+  // forceTarget: alvo já escolhido (cópia de um buraco negro de outro aparelho, online).
+  _launchHole(k, forceTarget = null) {
+    const target = forceTarget || this._holeTarget(k, false);
+    if (!target) return null;
     let h = this.holes.find((x) => !x.active);
     if (!h) {
       h = this.holes[0];
@@ -1363,6 +1510,7 @@ export class ItemSystem {
     }
     const sc = this._scaleOf(k);
     h.active = true;
+    h.ghost = false; // cópia só visual (online): a explosão não acerta ninguém aqui
     h.owner = k;
     h.target = target;
     h.s = k.s || 0;
@@ -1380,7 +1528,7 @@ export class ItemSystem {
     h.group.position.copy(h.pos);
     h.group.scale.setScalar(0.2);
     this.effects?.burst('implosion', h.start, { scale: 0.4 });
-    return true;
+    return h;
   }
 
   _updateHoles(dt, karts) {
@@ -1487,14 +1635,16 @@ export class ItemSystem {
     const c = tg.position;
     for (const o of karts) {
       // o dono nunca se machuca; quem já chegou também não
-      if (o === h.owner || o.invincible || o.finished) continue;
+      // (cópia de outro aparelho, online: só o visual; os acertos chegam por mensagem)
+      if (h.ghost || o === h.owner || o.invincible || o.finished) continue;
       const dx = o.position.x - c.x;
       const dy = o.position.y - c.y;
       const dz = o.position.z - c.z;
       const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 < HOLE_HIT * HOLE_HIT) o.hit('tumble', h.owner, 'buraco');
       // maré: um pouco mais longe, só perde velocidade (no mesmo nível; o viaduto fica a 13,5 m)
-      else if (d2 < HOLE_TIDE * HOLE_TIDE && Math.abs(dy) < 4 && !o.stunned) o.speed *= TIDE_KEEP;
+      // (kart remoto: a maré fica só no aparelho de quem usou; documentado em ARCHITECTURE.md)
+      else if (d2 < HOLE_TIDE * HOLE_TIDE && Math.abs(dy) < 4 && !o.stunned && !o.remote) o.speed *= TIDE_KEEP;
     }
     h.boom.copy(c).addScaledVector(UP, 1);
     h.active = false;

@@ -571,8 +571,9 @@ export class AIDriver {
 // na tela dividida, o humano mais próximo deste kart na corrida (cada IA disputa com quem está perto).
 // Quem já cruzou a chegada só conta se ninguém mais corre: senão a IA perto dele ficava sem
 // elástico nenhum (não tirava o pé) enquanto o outro jogador ainda disputava lá atrás.
+// Corrida online: world.humans = todos os humanos (deste e dos outros aparelhos).
 function humanRef(world, k) {
-  const ps = world.players;
+  const ps = world.humans || world.players;
   if (!ps || ps.length < 2) return world.player;
   let best = null;
   let bd = Infinity;

@@ -90,7 +90,10 @@
         <p class="tagline">Newton, Curie, Einstein e companhia disputando no Campus da Ciência!</p>
       </div>
       <div class="menu-buttons">
-        <button class="btn btn-primary btn-big" data-action="play">▶ JOGAR</button>
+        <div class="row play-row">
+          <button class="btn btn-primary btn-big" data-action="play">▶ JOGAR</button>
+          <button class="btn btn-net" data-action="net">🎮 Jogar online<small>com amigos, por código</small></button>
+        </div>
         <button class="btn btn-daily" data-action="daily" id="btn-daily">⭐ Desafio do dia</button>
         <div class="row">
           <button class="btn" data-action="online">🌐 Ranking online</button>
@@ -212,6 +215,79 @@
     </div>
   </section>
 
+  <!-- Jogar online: nome e sala (criar ou entrar com código) -->
+  <section class="screen hidden" id="screen-net" role="dialog" aria-labelledby="net-title">
+    <div class="panel online-wrap net-wrap">
+      <header class="select-head">
+        <button class="btn btn-small" data-action="back">← Voltar</button>
+        <h2 id="net-title">🎮 Jogar online</h2>
+        <span></span>
+      </header>
+      <div class="online-body net-body">
+        <p class="net-intro">Corra ao vivo com os amigos: um cria a sala e passa o código, os outros entram com ele. Até 8 jogadores; as vagas que sobram ficam com cientistas da IA.</p>
+        <div class="turma-row net-name-row">
+          <label for="net-name">Seu nome</label>
+          <input id="net-name" maxlength="16" placeholder="Nome ou apelido" autocomplete="nickname" />
+        </div>
+        <div class="net-account" id="net-account"></div>
+        <div class="net-choices">
+          <div class="turma-box">
+            <h3>Criar uma sala</h3>
+            <p>Você vira o anfitrião 👑 e escolhe o motor e as voltas.</p>
+            <button class="btn btn-primary btn-small" data-action="net-create">Criar sala</button>
+          </div>
+          <div class="turma-box">
+            <h3>Entrar com código</h3>
+            <p>Digite o código que o amigo passou.</p>
+            <div class="turma-row">
+              <input id="net-code" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="Código da sala" />
+              <button class="btn btn-primary btn-small" data-action="net-join" id="net-join-btn">Entrar</button>
+            </div>
+          </div>
+        </div>
+        <p class="turma-msg" id="net-msg" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sala de espera da corrida online -->
+  <section class="screen hidden" id="screen-lobby" role="dialog" aria-labelledby="lobby-title">
+    <div class="panel lobby-wrap">
+      <header class="select-head">
+        <button class="btn btn-small" data-action="net-leave">← Sair da sala</button>
+        <h2 id="lobby-title">Sala <span class="code" id="lobby-code"></span></h2>
+        <button class="btn btn-small" data-action="net-copy">📋 Copiar link</button>
+      </header>
+      <div class="lobby-body">
+        <div class="lobby-side">
+          <div class="lobby-share">
+            <small>Código da sala</small>
+            <b class="lobby-code-big" id="lobby-code-big"></b>
+          </div>
+          <h3>Jogadores <small id="lobby-count"></small></h3>
+          <ol class="lobby-players" id="lobby-players" aria-live="polite"></ol>
+          <p class="turma-msg" id="lobby-msg" aria-live="polite"></p>
+        </div>
+        <div class="lobby-pick">
+          <h3>Seu cientista</h3>
+          <div class="lobby-chars" id="lobby-chars"></div>
+        </div>
+      </div>
+      <footer class="select-foot lobby-foot">
+        <div class="opt">
+          <span class="opt-label">Motor</span>
+          <div class="seg" id="lobby-cc"></div>
+        </div>
+        <div class="opt">
+          <span class="opt-label">Voltas</span>
+          <div class="seg" id="lobby-laps"></div>
+        </div>
+        <button class="btn btn-primary btn-go" data-action="net-start" id="lobby-start">COMEÇAR! 🏁</button>
+        <p class="select-note" id="lobby-note" aria-live="polite"></p>
+      </footer>
+    </div>
+  </section>
+
   <!-- Como jogar -->
   <section class="screen hidden" id="screen-howto" role="dialog" aria-label="Como jogar">
     <div class="panel howto-wrap">
@@ -255,6 +331,15 @@
             </ul>
           </div>
           <div class="howto-box">
+            <h3>🎮 Jogar online</h3>
+            <ul>
+              <li>Na tela inicial, <b>Jogar online</b>: um amigo cria a sala e passa o <b>código</b> (ou o link); os outros entram com ele.</li>
+              <li>Cada um escolhe um cientista diferente. O anfitrião 👑 escolhe o motor e as voltas e aperta <b>Começar</b>.</li>
+              <li>Até 8 jogadores; as vagas que sobram ficam com a IA. Funciona no PC e no celular.</li>
+              <li>Corridas online não contam para recordes e medalhas.</li>
+            </ul>
+          </div>
+          <div class="howto-box">
             <h3>🔥 Dicas de piloto</h3>
             <ul>
               <li>Segure o <b>drift</b> numa curva: as faíscas ficam <span class="c-blue">azuis</span>, <span class="c-orange">laranja</span> e <span class="c-purple">roxas</span>. Solte para ganhar turbo!</li>
@@ -275,9 +360,11 @@
   <!-- Pausa -->
   <section class="screen hidden dim" id="screen-pause" role="dialog" aria-modal="true" aria-label="Pausado">
     <div class="panel small-panel">
-      <h2>Pausado</h2>
+      <h2 class="net-hide">Pausado</h2>
+      <h2 class="net-only">Menu</h2>
       <button class="btn btn-primary" data-action="resume">▶ Continuar</button>
-      <button class="btn" data-action="restart">↻ Reiniciar corrida</button>
+      <button class="btn net-hide" data-action="restart">↻ Reiniciar corrida</button>
+      <p class="net-only muted net-pause-note">Corrida online: o jogo continua para os outros.</p>
       <button class="btn btn-small" data-action="toggle-sound" id="btn-sound-2">🔊 Som: ligado</button>
       <button class="btn btn-small touch-only" data-action="toggle-auto" id="btn-auto">Aceleração automática: ligada</button>
       <div class="vol-row">
@@ -304,10 +391,12 @@
         <div class="results-rank" id="results-rank"></div>
       </div>
       <div class="row">
-        <button class="btn btn-primary" data-action="restart">↻ Correr de novo</button>
-        <button class="btn" data-action="play">Trocar cientista</button>
+        <button class="btn btn-primary net-hide" data-action="restart">↻ Correr de novo</button>
+        <button class="btn btn-primary net-only" data-action="net-lobby" id="btn-net-lobby">🏁 Voltar à sala</button>
+        <button class="btn net-hide" data-action="play">Trocar cientista</button>
         <button class="btn" data-action="share">📤 Compartilhar</button>
-        <button class="btn" data-action="quit">Menu</button>
+        <button class="btn net-hide" data-action="quit">Menu</button>
+        <button class="btn net-only" data-action="quit">Sair da sala</button>
       </div>
     </div>
   </section>

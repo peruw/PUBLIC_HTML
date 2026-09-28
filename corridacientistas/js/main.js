@@ -18,6 +18,8 @@ import { RaceManager } from './race.js';
 import { Hud } from './hud.js';
 import { Menu, store, is150Unlocked } from './menu.js';
 import { Online, boardOf } from './online.js';
+import { NetUI } from './netui.js';
+import { NetRace } from './netrace.js';
 
 const STEP = 1 / 60; // passo fixo da simulação
 const PLAYER_SLOT = 5; // o jogador larga em 6º
@@ -58,6 +60,7 @@ addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch') document.body.classList.add('touch');
 }, true);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+const escHTML = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 // Embaralhamento justo (Fisher–Yates): sort(() => random - 0.5) é enviesado no V8.
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
@@ -87,8 +90,11 @@ async function init() {
     },
     // 'Trocar cientista' no resultado: volta ao estado de título de verdade
     onPlay: () => { if (game.state !== 'title') enterTitle(); },
-    onRestart: () => startRace(game.opts),
+    // corrida online: "de novo" é voltar para a sala de espera (o anfitrião começa a próxima)
+    onRestart: () => (game.opts?.net ? netBackToLobby() : startRace(game.opts)),
     onQuit: () => enterTitle(),
+    onNet: (a, btn) => netUI?.action(a, btn),
+    onNetLobby: () => netBackToLobby(),
     onToggleSound: () => toggleSound(),
     onCharacter: (id) => preview?.setCharacter(id),
     onScreen: (name) => preview?.setActive(name === 'select'),
@@ -146,7 +152,7 @@ async function init() {
   let needsRender = true; // redesenha uma vez mesmo em pausa/menus
   // Perda do contexto WebGL: pausa em vez de correr às cegas.
   renderer.domElement.addEventListener('webglcontextlost', () => {
-    if (game.state === 'race' && !game.paused) setPaused(true);
+    if (game.state === 'race' && !game.paused && !game.netMenu) setPaused(true);
   });
   renderer.domElement.addEventListener('webglcontextrestored', () => { needsRender = true; });
 
@@ -246,6 +252,17 @@ async function init() {
   let pendingUse2 = false;
   // cientistas com modelo 3D próprio: só eles entram como IA e na demo do título
   const racers = () => karts.filter((k) => !noModel.has(k.character.id));
+  // corrida online ao vivo: telas (sala por código) e sincronização da corrida
+  const netUI = new NetUI({
+    menu, store, online: Online,
+    sfx: (n) => audio?.sfx(n),
+    onStart: (msg) => startNetRace(msg),
+    aiPool: () => racers().map((k) => k.character.id),
+    aiLadder: AI_LADDER,
+    onGesture: () => { if (isTouch) goFullscreen(); },
+  });
+  let netRace = null;
+  let netListT = 0; // atualização da lista viva do resultado online
 
   // Liga/desliga a tela dividida: teclado dividido, FOV mais aberto e proporção da metade.
   function setSplit(on) {
@@ -277,7 +294,12 @@ async function init() {
     order.forEach((k, i) => k.placeAt(track.gridSlots[i]));
   }
 
-  function enterTitle() {
+  // lobby: volta da corrida online para a sala de espera (sem sair da sala); senão sai dela.
+  function enterTitle({ lobby = false } = {}) {
+    netRace?.dispose(); // (antes da demo: karts remotos não teriam física)
+    netRace = null;
+    if (!lobby) netUI.leave();
+    document.body.classList.remove('net');
     game.state = 'title';
     setPaused(false, true);
     world.player = null;
@@ -313,13 +335,28 @@ async function init() {
     rig.snap();
     hud.show(false);
     input.showTouch(false);
-    menu.show('title');
+    if (lobby && netUI.room) {
+      menu.show('lobby');
+      netUI.setPhase('lobby');
+    } else menu.show('title');
     audio.playMusic('menu');
     audio.setFinalLap(false);
     resultsTimer = -1;
   }
 
+  function netBackToLobby() {
+    if (!netUI.room) return enterTitle();
+    // (antes de o resultado fechar, os outros ainda correm com o kart e a IA deste aparelho)
+    if (netRace && !netRace.final && game.state !== 'title') return;
+    enterTitle({ lobby: true });
+  }
+
   function startRace(opts) {
+    if (opts?.net) return netBackToLobby(); // (corrida online só começa pela sala)
+    netRace?.dispose();
+    netRace = null;
+    netUI.leave(); // (uma corrida normal não fica presa numa sala online)
+    document.body.classList.remove('net');
     opts = { mode: 'race', ...opts };
     const tt = opts.mode === 'timetrial';
     // dois jogadores só no PC, no modo corrida, fora do desafio do dia e de sala de turma
@@ -407,6 +444,110 @@ async function init() {
     resultsTimer = -1;
     if (isTouch) goFullscreen();
   }
+
+  // ---------- corrida online ao vivo ----------
+  // msg = 'start' do anfitrião: { race, host, seed, cc, laps, grid: [ids], humans: { id: { name,
+  // character } }, ia: [{ id, character, skill, lane }], t0 }. Cada aparelho monta a mesma corrida;
+  // este simula só o próprio kart (o anfitrião também a IA). Não conta para recordes/medalhas.
+  function startNetRace(msg) {
+    const room = netUI.room;
+    if (!room || !msg?.humans?.[room.id]) return false;
+    netRace?.dispose();
+    netRace = null;
+    const cc = CLASSES[msg.cc] || CLASSES['100cc'];
+    const laps = RACE.lapOptions.includes(msg.laps) ? msg.laps : RACE.defaultLaps;
+    // karts por id: cada cientista uma vez (sem modelo 3D aqui, o kart reserva)
+    const byId = new Map();
+    const used = new Set();
+    const take = (cid) => {
+      let k = karts.find((x) => x.character.id === cid && !used.has(x));
+      if (!k) k = racers().find((x) => !used.has(x)) || karts.find((x) => !used.has(x));
+      if (k) used.add(k);
+      return k;
+    };
+    const iaById = new Map((Array.isArray(msg.ia) ? msg.ia : []).map((a) => [a.id, a]));
+    const grid = [];
+    for (const id of msg.grid.slice(0, RACE.kartCount)) {
+      const h = msg.humans[id];
+      const a = iaById.get(id);
+      if (!h && !a) continue;
+      const k = take(h ? h.character : a.character);
+      if (!k) continue;
+      byId.set(id, k);
+      grid.push(k);
+    }
+    const me = byId.get(room.id);
+    if (!me) return false;
+    game.opts = { mode: 'race', cc: cc.id, laps, net: true, players: 1, character: me.character.id, room: null };
+    game.state = 'race';
+    setPaused(false, true);
+    game.netMenu = false;
+    pendingUse = pendingUse2 = false;
+    bus.emit('race:reset');
+    world.cc = cc;
+    world.totalLaps = laps;
+    world.mode = 'race';
+    for (const k of karts) {
+      k.object3d.visible = grid.includes(k);
+      k.frozen = false;
+      k.isPlayer = k === me;
+      k.model?.setHero?.(k === me);
+    }
+    world.karts = [me, ...grid.filter((k) => k !== me)];
+    setupGrid(grid);
+    world.player = me;
+    world.players = [me];
+    items.setMode?.('race');
+    items.reset(world.karts);
+    effects.reset();
+    env.setMood?.(0);
+    moodT = -1;
+    // a IA só roda no aparelho do anfitrião (os outros recebem o estado dela)
+    drivers = new Map();
+    if (msg.host === room.id) {
+      for (const [id, k] of byId) {
+        const a = iaById.get(id);
+        if (a) drivers.set(k, new AIDriver(k, track, { skill: THREE.MathUtils.clamp(Number(a.skill) || cc.aiSkill, 0.2, 1), lane: a.lane | 0 }));
+      }
+    }
+    world.rival = null;
+    playerAI = new AIDriver(me, track, { skill: 0.9 });
+    playerAI2 = null;
+    race.start(world.karts, { laps, player: me, players: [me], track, cc });
+    world.phase = 'countdown';
+    setSplit(false);
+    netRace = new NetRace({ room, msg, byId, world, race, items, bus, track });
+    netRace.onFinal = () => {
+      // resultado fechado: some a lista viva e entra o pódio
+      if (game.state === 'results') showResults();
+      else if (game.state === 'race' && !(resultsTimer > 0)) resultsTimer = 1.2;
+    };
+    netRace.onTimeUp = () => hud.center('TEMPO ESGOTADO!', 'msg pop', 2500);
+    netRace.onLeft = (k) => {
+      if (game.state === 'race') hud.toast(`<div class="item-ico">🔌</div><div><b>${escHTML(k.netName || k.character.name)} saiu da corrida</b></div>`, 2600);
+    };
+    const tags = netRace.humans.filter((k) => k !== me).map((k) => ({ kart: k, name: k.netName || k.character.name }));
+    hud.setRace({ player: me, karts: world.karts, totalLaps: laps, track, tutorial: false, touch: input.touchEnabled, tags });
+    hud2.player = null;
+    runTicket = null; // online não vale para o ranking
+    ghostRec = null;
+    setGhost(null);
+    hud.show(true);
+    hud2.show(false);
+    input.showTouch(input.touchEnabled);
+    rig.follow(me);
+    rig.setMode('orbit', { target: me, radius: 9, height: 3.5, speed: 0.6 });
+    rig.snap();
+    introTimer = 1.6;
+    menu.hideAll();
+    document.body.classList.add('net');
+    audio.playMusic('race');
+    audio.setFinalLap(false);
+    resultsTimer = -1;
+    netUI.setPhase('race');
+    if (isTouch) goFullscreen();
+    return true;
+  }
   let introTimer = 0;
 
   // Recordes por classe (tempo total por número de voltas e melhor volta), no localStorage.
@@ -434,6 +575,7 @@ async function init() {
   }
 
   function showResults() {
+    if (game.opts?.net) return showNetResults();
     game.state = 'results';
     const results = race.buildResults();
     const opts = game.opts;
@@ -494,6 +636,30 @@ async function init() {
     menu.renderOnlineResult(null);
     audio.playMusic('results');
     podium(results);
+  }
+
+  // Resultado online: lista viva (quem ainda corre aparece "correndo…") até fechar; aí o pódio.
+  // Sem recordes, medalhas, rankings nem desafio do dia.
+  function showNetResults() {
+    const first = game.state !== 'results';
+    game.state = 'results';
+    game.netMenu = false;
+    hud.show(false);
+    input.showTouch(false);
+    const final = !!netRace?.final;
+    const list = netRace ? netRace.results(final) : [];
+    const info = { cc: game.opts.cc, laps: game.opts.laps, final, timeLeft: netRace?.timeLeft ?? null, facts: hud.raceFacts.slice(), room: netUI.room?.code || '' };
+    if (first) {
+      menu.showNetResults(list, world.player, info);
+      menu.renderOnlineResult(null);
+      audio.playMusic('results');
+      netUI.setPhase('results');
+    } else menu.renderNetList(list, world.player, info);
+    netListT = 0.5;
+    if (final && !netRace.podiumDone) {
+      netRace.podiumDone = true;
+      podium(list.filter((r) => !r.left));
+    }
   }
 
   // Os três primeiros lado a lado depois da linha de chegada, com câmera de pódio e confete.
@@ -700,6 +866,20 @@ async function init() {
   let resumeFlush = false; // ao sair da pausa, descarta o aperto de item do mesmo quadro
   function setPaused(on, silent) {
     if (on && game.state !== 'race') return;
+    // corrida online: o jogo não para (os outros continuam correndo); só o menu fica por cima
+    // e o kart deste aparelho tira o pé até continuar
+    if (on && game.opts?.net) {
+      game.netMenu = true;
+      pendingUse = false;
+      input.showTouch(false);
+      menu.show('pause');
+      needsRender = true;
+      return;
+    }
+    if (!on && game.netMenu) {
+      game.netMenu = false;
+      resumeFlush = true;
+    }
     // (na tela dividida, o Enter que fecha a pausa também é a tecla de item do J2)
     if (!on && game.paused) resumeFlush = true;
     game.paused = on;
@@ -750,18 +930,20 @@ async function init() {
   armUnlock();
 
   // Pausa automática ao trocar de aba ou quando a janela perde o foco (outro app/janela por cima).
+  // (corrida online não pausa sozinha: os outros continuam correndo)
+  const autoPause = () => game.state === 'race' && !game.paused && !game.opts?.net;
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && game.state === 'race' && !game.paused) setPaused(true);
+    if (document.hidden && autoPause()) setPaused(true);
     // iOS pode deixar o áudio 'interrupted': volta a tentar no próximo gesto
     if (!document.hidden && audio.ctx) setTimeout(() => { if (audio.ctx.state !== 'running') armUnlock(); }, 300);
   });
   addEventListener('blur', () => {
-    if (game.state === 'race' && !game.paused && race.phase === 'racing') setPaused(true);
+    if (autoPause() && race.phase === 'racing') setPaused(true);
   });
 
   // Saiu da tela cheia no celular (gesto de voltar): pausa.
   document.addEventListener('fullscreenchange', () => {
-    if (isTouch && !document.fullscreenElement && game.state === 'race' && !game.paused) setPaused(true);
+    if (isTouch && !document.fullscreenElement && autoPause()) setPaused(true);
   });
 
   // ---------- redimensionamento e orientação ----------
@@ -774,7 +956,9 @@ async function init() {
     rotateHint.classList.toggle('hidden', !show);
     // corrida começou com o celular em pé: não deixa a contagem correr por trás do aviso
     // (no próximo tique: menu.hideAll ainda vai esconder as telas depois deste callback)
-    if (show && !game.paused) setTimeout(() => { if (portraitNow && !rotateDismissed && !game.paused) setPaused(true); }, 0);
+    // (online: o menu por cima conta como pausa, senão reabriria sem parar)
+    const held = () => game.paused || game.netMenu;
+    if (show && !held()) setTimeout(() => { if (portraitNow && !rotateDismissed && !held()) setPaused(true); }, 0);
   }
   rotateHint.querySelector('[data-action="rotate-dismiss"]')?.addEventListener('click', () => {
     rotateDismissed = true;
@@ -786,7 +970,7 @@ async function init() {
     applyAspect(); // (metade da largura na tela dividida)
     portraitNow = isTouch && innerHeight > innerWidth && Math.min(screen.width, screen.height) < 600;
     updateRotateHint();
-    if (portraitNow && !rotateDismissed && game.state === 'race' && !game.paused) setPaused(true);
+    if (portraitNow && !rotateDismissed && game.state === 'race' && !game.paused && !game.netMenu) setPaused(true);
   }
   addEventListener('resize', onResize);
   onResize();
@@ -913,6 +1097,11 @@ async function init() {
         player.controls.holdItem = player.controls.itemBack = false;
         playerAI.update(h, world);
         pendingUse = false;
+      } else if (game.netMenu) {
+        // corrida online com o menu aberto: o jogo segue, o kart tira o pé
+        const c = player.controls;
+        c.throttle = c.brake = c.steer = 0;
+        c.drift = c.lookBack = c.holdItem = c.itemBack = false;
       } else if (ctrl) {
         const c = player.controls;
         c.throttle = ctrl.throttle;
@@ -941,9 +1130,13 @@ async function init() {
         pendingUse2 = false;
       }
     }
+    // corrida online: karts dos outros aparelhos vão para a pose que chegou pela rede
+    netRace?.preStep(h);
     for (const [k, ai] of drivers) ai.update(h, world);
     // Fora da corrida (demo do título, resultado) ninguém usa itens: sem flashes/trovões nos menus.
-    if (game.state !== 'race') for (const k of world.karts) k.controls.useItem = false;
+    // (online, enquanto os outros ainda correm, a IA do anfitrião continua valendo)
+    const netLive = !!(netRace && !netRace.final);
+    if (game.state !== 'race') for (const k of world.karts) if (!netLive || k.finished) k.controls.useItem = false;
     updateKarts(world.karts, h, world);
     items.update(h, world);
     if (game.state === 'race' || game.state === 'results') {
@@ -951,6 +1144,8 @@ async function init() {
       recordGhost(h);
       world.phase = race.phase === 'countdown' ? 'countdown' : race.phase === 'finished' ? 'finished' : 'racing';
     }
+    // manda o estado dos karts deste aparelho e confere o fim da corrida online
+    netRace?.postStep(h);
   }
 
   bus.on('race:finish', ({ kart }) => {
@@ -1014,7 +1209,8 @@ async function init() {
   let noLowerT = 0; // noLower expira: a adaptação volta a tentar depois de um tempo
   let shadowsCut = false;
   function frame() {
-    const dt = Math.min(clock.getDelta(), 0.1);
+    const rawDt = clock.getDelta();
+    const dt = Math.min(rawDt, 0.1);
     const t = clock.elapsedTime;
     ctrl = input.poll();
     ctrl2 = world.split ? input.state2 : null;
@@ -1026,12 +1222,12 @@ async function init() {
 
     if (ctrl.mute) toggleSound();
     const pauseToggled = game.state === 'race' && ctrl.pause;
-    if (pauseToggled) setPaused(!game.paused);
+    if (pauseToggled) setPaused(!(game.paused || game.netMenu));
     const padConfirm = pollPadConfirm();
     const confirmed = !!menu.current && padConfirm && !pauseToggled;
     if (confirmed) menu.confirm();
     pollPadMenu(dt, !confirmed && !pauseToggled);
-    if (ctrl.useItem && game.state === 'race' && !game.paused) pendingUse = true;
+    if (ctrl.useItem && game.state === 'race' && !game.paused && !game.netMenu) pendingUse = true;
     if (ctrl2?.useItem && game.state === 'race' && !game.paused) pendingUse2 = true;
 
     if (!game.paused) {
@@ -1042,6 +1238,9 @@ async function init() {
         acc -= STEP;
         n++;
       }
+      // corrida online: o tempo que a simulação deixou para trás (aparelho lento) ainda conta no
+      // relógio da rede, para os karts dos outros andarem no ritmo de verdade
+      if (netRace) netRace.lag(rawDt - dt + (n === 5 ? acc : 0));
       if (n === 5) acc = 0;
       effects.update(dt, world);
 
@@ -1056,6 +1255,8 @@ async function init() {
         resultsTimer -= dt;
         if (resultsTimer <= 0) showResults();
       }
+      // resultado online: lista viva (e o prazo) enquanto alguém ainda corre
+      if (game.state === 'results' && netRace && !netRace.final && (netListT -= dt) <= 0) showNetResults();
       if (game.state === 'race') updateGhost(dt);
       // hora dourada na última volta (~4 s de transição)
       if (moodT >= 0 && moodT < 1) {
@@ -1220,6 +1421,40 @@ async function init() {
     hud,
     env,
     effects,
+    // corrida online ao vivo (testes com várias abas: ?net=local)
+    net: {
+      ui: netUI,
+      get room() {
+        const r = netUI.room;
+        return r && { code: r.code, id: r.id, host: r.hostId, isHost: r.isHost, settings: r.settings, phase: netUI.phase, members: r.members.map((m) => ({ id: m.id, name: m.name, character: m.character, phase: m.phase })) };
+      },
+      async create(name) {
+        document.getElementById('net-name').value = name;
+        await netUI.create();
+        return netUI.room?.code || null;
+      },
+      async join(code, name) {
+        document.getElementById('net-name').value = name;
+        document.getElementById('net-code').value = code;
+        return !!(await netUI.join());
+      },
+      pick: (id) => netUI.pick(id),
+      setOpts: (o) => netUI.setOpt(o),
+      start: () => netUI.startRace(),
+      lobby: () => netBackToLobby(),
+      quit: () => enterTitle(),
+      get race() { return netRace ? netRace.info() : null; },
+      get raw() { return netRace; },
+      // dispara um projétil do jogador direto num kart da corrida (id de rede), para testar o 'hit'
+      fireAt(target, type = 'eletron') {
+        const k = netRace?.byId.get(target);
+        if (!k || !world.player) return false;
+        const p = items._fire(world.player, type, false, null, k);
+        if (p) items.net?.onUse(world.player, type, { obj: p, back: false });
+        return !!p;
+      },
+      results: () => netRace?.results().map((r) => ({ id: r.id, name: r.name, ch: r.kart.character.id, place: r.place, time: isFinite(r.time) ? Math.round(r.time * 100) / 100 : null, est: r.estimated, running: r.running, left: r.left, human: r.human })),
+    },
   };
 
   menu.setLoading(1, 'Pronto!');
@@ -1237,7 +1472,10 @@ async function init() {
     if (mo && CLASSES[mo]) { menu.opts.cc = mo; any = true; }
     if (RACE.lapOptions.includes(vo)) { menu.opts.laps = vo; any = true; }
     if (md) { menu.opts.mode = /relogio|timetrial/i.test(md) ? 'timetrial' : 'race'; any = true; }
-    if (any) menu.show('select');
+    // link da sala online (?sala=CÓDIGO): abre direto a entrada, com o código preenchido
+    const sala = q.get('sala');
+    if (sala) netUI.open(sala);
+    else if (any) menu.show('select');
   } catch {
     /* parâmetros inválidos: segue no título */
   }

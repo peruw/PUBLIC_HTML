@@ -225,8 +225,8 @@ export class AudioSystem {
 `main.js` (loop, estados, renderer), `race.js` (contagem, voltas, posições, chegada, largada-foguete), `hud.js`, `menu.js`, `facts.js`, `index.html`, `css/styles.css`.
 - `facts.js`: curiosidades de itens (`ITEM_FACTS`), cientistas (`SCIENTIST_FACTS`) e setores da pista (`ZONE_FACTS`), cada uma com `short` (corrida), `text` (resultado) e `quiz` opcional.
 - Modos (`game.opts.mode`): `'race'` e `'timetrial'` (sozinho, só foguetes, fantasma do recorde salvo em `localStorage`).
-- `localStorage` (prefixo `kartcientifico-`): `records`, `ranking`, `medals`, `unlock150`, `quiz`, `daily`, `dailyStreak`, `played`, `nick`, `vol-music`, `vol-sfx`, `ghost-<cc>-<voltas>`, `slowHint`, além das preferências antigas.
-- Parâmetros de URL para o professor: `?cientista=curie&motor=50cc&voltas=1&modo=contrarrelogio` abre direto a escolha.
+- `localStorage` (prefixo `kartcientifico-`): `records`, `ranking`, `medals`, `unlock150`, `quiz`, `daily`, `dailyStreak`, `played`, `nick`, `vol-music`, `vol-sfx`, `ghost-<cc>-<voltas>`, `slowHint`, `net-name` e `net-character` (corrida online), além das preferências antigas.
+- Parâmetros de URL para o professor: `?cientista=curie&motor=50cc&voltas=1&modo=contrarrelogio` abre direto a escolha. `?sala=CÓDIGO` abre a entrada da corrida online com o código preenchido.
 
 ## Dois jogadores no mesmo PC (tela dividida)
 - Escolha: `menu.opts.players` (1 | 2) e `menu.opts.character2`; `menu.duo()` diz se vale (só PC, modo corrida, fora de sala de turma; o desafio do dia corre sempre sozinho). Abas "Jogador 1 / Jogador 2", marcadores J1/J2 nos cartões; WASD move o J1 e as setas o J2; `moveSelection(dx, dy, who)`.
@@ -239,6 +239,26 @@ export class AudioSystem {
 - `PLAYER_COLORS` (hud.js) e `--p1`/`--p2` (CSS): azul (J1) e rosa (J2).
 - Um cientista sem modelo 3D em `models.js` usa um kart reserva (`kartModel` em main.js) e fica fora da IA e da demo.
 
+## Corrida online ao vivo (sala por código)
+Amigos correm juntos, cada um no seu aparelho (PC ou celular). Não há tabelas novas: tudo passa por um canal público do Supabase Realtime (broadcast + presence), `kart-live:<CÓDIGO>`.
+- **`js/netplay.js`** (sem DOM, testável no Node): `SupabaseTransport` (usa `Online.client`: `client.channel(topic, { config: { broadcast: { self: false }, presence: { key: id } } })`, `on('broadcast', { event: 'k' })`, `on('presence', { event: 'sync' })`, `subscribe`, `track`, `send`, `removeChannel`) e `LocalTransport` (BroadcastChannel entre abas da mesma origem, presença simulada por batimentos de 1 s, sai quem fica 8 s sem bater ou manda `bye`). A mesma interface: `connect(meta)`, `track(meta)`, `send(msg)`, `close()`, eventos `msg`, `presence` (Map id → meta) e `status`. `transportKind()`: `?net=local` força o local; com o cliente do site, Supabase; página local (127.0.0.1) sem o `/conta/`, local.
+  - `NetRoom`: quem está (ordenado: quem criou a sala, depois por entrada), `host`/`isHost`, `settings` (motor e voltas do anfitrião; quem herda o posto fica com eles e passa a valer como "criador"), `ownerOf`/`resolveCharacter` (cientista repetido fica com quem entrou antes), `update(meta)`, `send(tipo, dados)`, eventos `members`, `join`, `leave`, `msg:<tipo>`.
+  - `Interp`: interpolação de um kart remoto (~100 ms atrás, extrapola até 0,25 s, diferença de relógio = a menor já vista). `makeRoomCode()` (5 letras de `ABCDEFGHJKMNPQRSTUVWXYZ23456789`), `cleanName()`.
+  - Testes: `node --test corridacientistas/dev/netplay.test.mjs` (mock da API do supabase-js v2, LocalTransport no Node, interpolação com atraso variável e perda de pacotes).
+- **`js/netui.js`**: telas `net` (nome, Criar sala / Entrar com código, login opcional) e `lobby` (código grande, copiar link `?sala=CÓDIGO`, jogadores com 👑, cientista sem repetir, motor/voltas só do anfitrião e sem o cadeado do 150cc, Começar com 2+ jogadores, até 8). Meta de presença: `{ id, name, character, joined, phase: 'lobby'|'race'|'results', v, cc, laps, creator }`. Quem está no resultado fica fora da próxima largada.
+- **Largada**: o anfitrião manda `start { race, host, seed, cc, laps, grid: [ids], humans: { id: { name, character } }, ia: [{ id: 'ia:N', character, skill, lane }], t0 }` (repete aos 0,4 e 1,2 s; quem já recebeu ignora). Cada aparelho monta a mesma corrida em `main.startNetRace(msg)` e começa a contagem ao receber. A IA (vagas até 8, só cientistas com modelo 3D) roda **só no anfitrião**.
+- **`js/netrace.js` (`NetRace`)**, chamada no passo fixo: `preStep` (karts remotos na pose interpolada, `kart.netPose`) e `postStep` (manda o estado, confere o fim). `lag(s)` soma ao relógio da rede o tempo que um aparelho lento não simulou.
+  - Kart remoto: `kart.remote = true` (sem física: `updateKarts` e `race.updateProgress` pulam; nas colisões é obstáculo sólido leve: só o kart local reage, com a parte dele de uma batida normal), `kart.netId`, `kart.netName`, `kart.netHit`. `hit()` num kart remoto vira mensagem; `shrink()` e `applyBoost()` não fazem nada nele.
+  - Estado `st` a 15 Hz (12 com 4–5 humanos, 10 com 6–8): `{ t, k: [{ i: id, x, y, z, h: rumo, v: velocidade, st: esterço, s, p: progresso, l: volta, ag: no ar, dr/dd/dl: drift, bo: turbo, sa: gaiola, sk: encolhido, sp/ht/tb: giro/tipo/capotagem, hc: proteção, it/ic: item, ro: roleta, hd/hb: item seguro, ft: tempo de chegada }] }` (o anfitrião manda o dele e o da IA na mesma mensagem). Posições (1º, 2º…) pelo progresso de todos.
+  - Itens: quem usa simula. Acerto em kart remoto → `hit { target, type, item, by }` e só o dono aplica (`type: 'shield'` quebra o item seguro atrás). Bobina de Tesla → `tesla { by }`: cada aparelho dá o choque nos próprios karts (o anfitrião na IA), respeitando a Gaiola de Faraday. Maçã → `hazard { id, by, from, to, g, s, lat }` cria a mesma maçã em todos; quem bate (decidido no aparelho do dono do kart) manda `hazard-gone { id }`. Foguete, pilha, alfa, elétron e buraco negro → `use { by, item, back, from, target }`: os outros desenham uma cópia **só visual** (`ghost`: não acerta nada; some quando chega o `hit` de quem atirou).
+  - **Fica só no aparelho de quem usou/viu**: a maré do buraco negro (perda de velocidade perto da explosão) e as caixas de item (cada aparelho tem as suas; um kart remoto quebra a caixa aqui, mas quem sorteia é o dono). Batidas entre karts: cada aparelho resolve a parte do próprio kart.
+  - Chegada: `fin { id, time }` (o estado também leva `ft`). O resultado fecha quando todos os humanos chegaram ou 60 s depois do primeiro (`WAIT_OTHERS`): quem falta recebe tempo estimado no próprio aparelho e manda `fin { est: 1 }`; o anfitrião manda a estimativa da IA e todos adotam. Tela: lista viva (`menu.showNetResults`/`renderNetList`: nome + cientista, "correndo…", prazo), depois o pódio. Botões "Voltar à sala" e "Sair da sala" (`.net-only`/`.net-hide` com `body.net`).
+  - Saída: `leave` da presença + 2,5 s de carência → o kart some e vira "abandonou" (quem já tinha chegado mantém o tempo); se quem começou a corrida sair, a IA dele sai junto ("desconectado") e a corrida segue. Quem volta a mandar estado (a rede piscou) volta para a corrida. Na sala, o próximo da fila vira anfitrião.
+  - Pausa online: o jogo não para (`game.netMenu`: menu por cima e o kart tira o pé); sem pausa automática ao perder o foco.
+  - Não contam para recordes, medalhas, ranking, desafio do dia nem fantasma. HUD: nomes dos outros sobre os karts (`hud.setTags`) e bolinha maior no minimapa; "Você acertou Fulano".
+- Depuração: `__game.net` → `create(nome)`, `join(código, nome)`, `pick(id)`, `setOpts({ cc, laps })`, `start()`, `lobby()`, `quit()`, `room`, `race` (resumo com `stats`), `results()`, `fireAt(id, 'eletron')`. Teste com várias abas: `index.html?net=local`.
+- Supabase: o canal é público (sem RLS de Realtime); o projeto precisa permitir canais públicos. O plano do projeto limita mensagens por segundo; com a sala cheia (8 humanos a 10 Hz) são ~80 envios/s, cada um entregue a 7. Se o painel do Supabase mostrar limite, reduza `sendRate` em `netrace.js`.
+
 ## Eventos do bus
 | Evento | Dados |
 |---|---|
@@ -249,7 +269,7 @@ export class AudioSystem {
 | `race:place` | `{ kart, from, to }` (só o jogador, durante a corrida) |
 | `race:rocketEarly` | `{ kart }` (acelerou cedo demais na contagem) |
 | `race:finalLap` | `{ kart }` (só o jogador) |
-| `race:finish` | `{ kart, place, time }` |
+| `race:finish` | `{ kart, place, time }` (online: também para karts remotos, via `race.finishRemote`) |
 | `race:end` | `{ results }` |
 | `kart:hop` | `{ kart }` |
 | `kart:land` | `{ kart, airTime }` |

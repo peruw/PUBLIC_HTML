@@ -6,7 +6,7 @@ import { SCIENTIST_FACTS, pickFact, shuffledQuiz } from './facts.js';
 import { Online, ERR_TEXT, boardOf, parseBoard } from './online.js';
 
 const $ = (id) => document.getElementById(id);
-const SCREENS = ['loading', 'title', 'select', 'howto', 'online', 'turma', 'pause', 'results', 'error'];
+const SCREENS = ['loading', 'title', 'select', 'howto', 'online', 'turma', 'net', 'lobby', 'pause', 'results', 'error'];
 // Bandeiras em SVG (emoji de bandeira vira letras no Windows).
 const svgFlag = (body, vb = '0 0 30 20') => `<svg viewBox="${vb}" preserveAspectRatio="none" aria-hidden="true">${body}</svg>`;
 const hStripes = (...cs) => cs.map((c, i) => `<rect y="${(i * 20) / cs.length}" width="30" height="${20 / cs.length}" fill="${c}"/>`).join('');
@@ -184,6 +184,22 @@ export class Menu {
         h.sfx('menuSelect');
         this.show('turma');
         break;
+      // corrida online ao vivo (telas em netui.js)
+      case 'net':
+        h.sfx('menuSelect');
+        h.onNet?.('open');
+        break;
+      case 'net-create':
+      case 'net-join':
+      case 'net-leave':
+      case 'net-copy':
+      case 'net-start':
+        h.onNet?.(a, btn);
+        break;
+      case 'net-lobby':
+        h.sfx('menuSelect');
+        h.onNetLobby?.();
+        break;
       case 'room-join':
         this.joinRoom();
         break;
@@ -258,7 +274,8 @@ export class Menu {
     if (name === 'turma') this.refreshTurma();
     this.h.onScreen?.(name);
     // teclado: foco no botão principal da tela (pausa e resultado)
-    if (name === 'results') requestAnimationFrame(() => $('screen-results')?.querySelector('.btn-primary')?.focus({ preventScroll: true }));
+    // (o primeiro botão principal visível: na corrida online o "Correr de novo" dá lugar a "Voltar à sala")
+    if (name === 'results') requestAnimationFrame(() => [...($('screen-results')?.querySelectorAll('.btn-primary') || [])].find((b) => b.offsetParent)?.focus({ preventScroll: true }));
   }
 
   // Tela inicial: acertos no quiz, desafio do dia e sugestão de qualidade.
@@ -758,6 +775,81 @@ export class Menu {
     this.show('results');
   }
 
+  // Resultado da corrida online: todos, com o nome de cada jogador e o cientista. Enquanto
+  // alguém ainda corre, o main.js chama renderNetList de novo (lista viva, prazo de 60 s).
+  // Corridas online não contam para recordes, medalhas, rankings nem desafio do dia.
+  showNetResults(results, player, info) {
+    this.renderNetList(results, player, info);
+    const me = results.find((r) => r.kart === player);
+    this.lastRun = { place: me?.place, time: me?.time, character: player.character, cc: info.cc, laps: info.laps, mode: 'race', estimated: me?.estimated, online: results.filter((r) => r.human).length };
+    // curiosidades: vencedor (entre os que já chegaram) e o seu cientista
+    const winner = results.find((r) => !r.running && !r.left)?.kart.character;
+    const mine = player.character;
+    const facts = [];
+    if (winner) {
+      const wf = pickFact('sci:' + winner.id, SCIENTIST_FACTS[winner.id]);
+      if (wf) facts.push({ title: `${winner.name}, ${winner.gender === 'f' ? 'a vencedora' : 'o vencedor'}`, icon: '🏆', ...wf });
+    }
+    if (!winner || mine.id !== winner.id) {
+      const mf = pickFact('sci:' + mine.id, SCIENTIST_FACTS[mine.id]);
+      if (mf) facts.push({ title: mine.name, icon: '🧑‍🔬', ...mf });
+    }
+    for (const f of info.facts || []) facts.push(f);
+    this.resultFacts = facts;
+    $('results-fact').innerHTML =
+      '<b class="fact-head">Você sabia?</b>' +
+      facts.map((f) => `<p><span class="fi">${f.icon || '•'}</span> <b>${esc(f.title)}:</b> ${esc(f.text)}</p>`).join('');
+    const qz = $('results-quiz');
+    this.quizPool = facts.filter((f) => f.quiz);
+    qz.innerHTML = this.quizPool.length ? '<button class="btn btn-small" data-action="quiz">🧠 Responder 1 pergunta (opcional)</button>' : '';
+    this.renderRanking(null, -1);
+    this.show('results');
+  }
+
+  renderNetList(results, player, info) {
+    const me = results.find((r) => r.kart === player);
+    const final = !!info.final;
+    const v = info.laps === 1 ? '1 volta' : `${info.laps} voltas`;
+    let title = 'Resultado';
+    if (me && !me.running && !me.left) {
+      if (me.estimated) title = `Tempo esgotado · ${me.place}º lugar`;
+      else title = me.place === 1 ? 'Você venceu! 🏆' : `Você chegou em ${me.place}º lugar`;
+    }
+    $('results-title').textContent = title;
+    const waiting = results.filter((r) => r.human && r.running);
+    const parts = [];
+    if (!final && waiting.length) {
+      const names = waiting.map((r) => esc(r.name || r.kart.character.name)).join(', ');
+      parts.push(`⏳ Esperando ${names} chegar${info.timeLeft != null ? ` · o resultado fecha em <b>${Math.ceil(info.timeLeft)} s</b>` : ''}`);
+    } else if (final) parts.push('🏁 Resultado final');
+    parts.push(`<small>🌐 Sala ${esc(info.room || '')} · ${esc(info.cc)}, ${v} · corridas online não contam para recordes e medalhas</small>`);
+    const recEl = $('results-record');
+    recEl.classList.remove('hidden');
+    recEl.classList.toggle('new', final);
+    recEl.innerHTML = parts.join(' · ');
+    // volta para a sala só com o resultado fechado: quem sai antes deixaria o kart (e, se for o
+    // anfitrião, a IA) parado na pista de quem ainda corre
+    const back = $('btn-net-lobby');
+    if (back) {
+      back.disabled = !final;
+      back.innerHTML = final ? '🏁 Voltar à sala' : '⏳ Esperando todos';
+    }
+    $('results-list').innerHTML = results
+      .map((r) => {
+        const c = r.kart.character;
+        const face = this.portraits[c.id] ? `<img class="face" src="${this.portraits[c.id]}" alt="" style="--c:${c.colors.ui}">` : `<span class="dot" style="background:${c.colors.ui}"></span>`;
+        const name = r.human ? `${esc(r.name || 'Jogador')} <small class="sci">${esc(c.name)}</small>` : `${esc(c.name)} <small class="sci">IA</small>`;
+        const t = r.left && !isFinite(r.time) ? (r.human ? 'abandonou' : 'desconectado') : r.running ? 'correndo…' : `${r.estimated ? '~' : ''}${formatTime(r.time)}${r.left ? ' <small>(saiu)</small>' : ''}`;
+        return `<li class="${r.kart === player ? 'me' : ''}${r.left ? ' left' : ''}${r.human ? ' human' : ''}">
+          <span class="p">${r.place ? r.place + 'º' : '–'}</span>
+          ${face}
+          <span>${name}${r.kart === player ? ' (você)' : ''}</span>
+          <span class="t">${t}</span>
+        </li>`;
+      })
+      .join('');
+  }
+
   // ---------- quiz ----------
   startQuiz() {
     const pool = this.quizPool || [];
@@ -797,7 +889,9 @@ export class Menu {
     const what = r.mode === 'timetrial' ? `fiz ${formatTime(r.time)} no contra o relógio` : `cheguei em ${r.place}º lugar${r.estimated ? '' : ` em ${formatTime(r.time)}`}`;
     const text = r.duel
       ? `No Kart Científico, corremos em dupla: ${r.duel[0].name} (J1) chegou em ${r.duel[0].place}º e ${r.duel[1].name} (J2) em ${r.duel[1].place}º (${r.cc}, ${v})! Topa o desafio?`
-      : `No Kart Científico, ${what} com ${r.character.name} (${r.cc}, ${v})! Você consegue?`;
+      : r.online
+        ? `No Kart Científico online, cheguei em ${r.place}º lugar numa corrida com ${r.online} amigos, com ${r.character.name} (${r.cc}, ${v})! Bora correr junto?`
+        : `No Kart Científico, ${what} com ${r.character.name} (${r.cc}, ${v})! Você consegue?`;
     try {
       if (navigator.share) {
         await navigator.share({ title: 'Kart Científico', text, url: GAME_URL });
@@ -1091,6 +1185,8 @@ export class Menu {
       else return;
       e.preventDefault();
     } else if (this.current === 'howto' && (k === 'Escape' || k === 'Enter')) {
+      this.action('back');
+    } else if (this.current === 'net' && k === 'Escape') {
       this.action('back');
     } else if (this.current === 'results' && k === 'Enter' && !e.target.closest?.('input')) {
       this.action('restart');

@@ -187,6 +187,13 @@ export class Kart {
     this.frozen = false;
     this.speedFactor = 1;
 
+    // corrida online (netrace.js): kart de outro aparelho (ou da IA do anfitrião) não roda
+    // física aqui; a pose vem da rede (netPose). Batida nele vira mensagem para o dono (netHit).
+    this.remote = false;
+    this.netId = null; // id na corrida online (id do jogador ou 'ia:N')
+    this.netName = null; // nome do jogador humano (online)
+    this.netHit = null; // (type, by, item) => bool, só em karts remotos
+
     // controlados por items.js e race.js
     this.item = null;
     this.itemCount = 0;
@@ -371,7 +378,8 @@ export class Kart {
   }
 
   applyBoost(duration, strength = 1, source = 'item') {
-    if (this.stunned) return false;
+    // kart remoto: o turbo é do dono (chega pela rede)
+    if (this.stunned || this.remote) return false;
     this._boostStrength = this.boostTime > 0 ? Math.max(this._boostStrength, strength) : strength;
     this.boostTime = Math.max(this.boostTime, duration);
     this.boostSource = source;
@@ -386,6 +394,8 @@ export class Kart {
   // item: id do item que causou a batida ('maca', 'alfa', 'eletron', 'buraco', 'tesla', 'faraday')
   // ou null (o HUD usa para mostrar quem acertou quem).
   hit(type = 'spin', by = null, item = null) {
+    // corrida online: só o dono aplica a batida no próprio kart; aqui ela vira mensagem
+    if (this.remote) return this.netHit ? !!this.netHit(type, by, item) : false;
     if (this.invincible || this._hitCd > 0 || this.frozen) return false;
     const T = TUNING;
     if (this.drifting) this._endDrift(false);
@@ -426,9 +436,95 @@ export class Kart {
   }
 
   shrink(duration) {
-    if (this.invincible) return false;
+    // remoto: a Bobina de Tesla chega ao dono por mensagem própria ('tesla')
+    if (this.invincible || this.remote) return false;
     this.shrinkTime = Math.max(this.shrinkTime, duration);
     return true;
+  }
+
+  // ---------- Corrida online: kart remoto (sem física aqui) ----------
+  // Pose interpolada pela rede (netrace.js): posição, rumo e velocidade (rodas e efeitos).
+  // A projeção na pista dá s/lateral (IA e itens miram por eles) e a inclinação do chão.
+  netPose(p, dt, track) {
+    const T = TUNING;
+    this._track = track;
+    const oldH = this.heading;
+    // salto grande (estado atrasado, aba escondida): a projeção parte do s que veio da rede
+    const jump = Math.abs(p.x - this.position.x) + Math.abs(p.z - this.position.z) > 20;
+    if (jump && typeof p.s === 'number') this.s = p.s;
+    this.position.set(p.x, p.y, p.z);
+    this.heading = p.h;
+    this.speed = p.v;
+    this.steer = p.st || 0;
+    this.slip = 0;
+    // guinada pela variação do rumo (inclinação do corpo nas curvas)
+    if (dt > 0) this.yawVel = damp(this.yawVel, clamp(-wrapAngle(p.h - oldH) / dt, -4, 4), 10, dt);
+    const sh = Math.sin(p.h);
+    const ch = Math.cos(p.h);
+    this.velocity.set(sh * p.v, 0, ch * p.v);
+    const pr = track.project(this.position, this.s);
+    this.s = pr.s;
+    this.lateral = pr.lateral;
+    this.groundY = pr.groundY;
+    if (pr.normal) this.normal.copy(pr.normal);
+    if (pr.halfWidth) this.halfWidth = pr.halfWidth;
+    if (pr.wallDist) this.wallDist = pr.wallDist;
+    this.onGround = p.g !== false;
+    // no chão: a altura vem da pista daqui (a interpolação entre dois estados cortaria lombadas)
+    if (this.onGround) this.position.y = pr.groundY;
+    this.offroad = !!pr.offroad && this.onGround;
+    this.offroadLevel = !this.offroad ? 0 : Math.abs(this.lateral) - this.halfWidth <= T.edgeBand ? 1 : 2;
+    const smp = track.sample(this.s);
+    this._rx = smp.right.x;
+    this._rz = smp.right.z;
+    this._tx = smp.tangent.x;
+    this._ty = smp.tangent.y;
+    this._tz = smp.tangent.z;
+    this._prevGy = this.groundY;
+    // temporizadores correm aqui entre um estado e outro da rede
+    this.boostTime = Math.max(0, this.boostTime - dt);
+    this.starTime = Math.max(0, this.starTime - dt);
+    this.shrinkTime = Math.max(0, this.shrinkTime - dt);
+    this.spinTime = Math.max(0, this.spinTime - dt);
+    this.tumbleTime = Math.max(0, this.tumbleTime - dt);
+    this._hitCd -= dt;
+  }
+
+  // Estado mais recente de um kart remoto (valores que não se interpolam).
+  netState(s) {
+    const was = this.drifting;
+    this.drifting = !!s.dr;
+    this.driftDir = this.drifting ? s.dd || 0 : 0;
+    this.driftLevel = this.drifting ? s.dl || 0 : 0;
+    if (was !== this.drifting) this.driftCharge = 0;
+    this.boostTime = s.bo || 0;
+    this.boostSource = s.bo ? this.boostSource || 'item' : null;
+    this.starTime = s.sa || 0;
+    this.shrinkTime = s.sk || 0;
+    this._hitCd = Math.max(this._hitCd, s.hc || 0);
+    // giro/capotagem: a animação começa quando o dono avisa e continua aqui
+    if (s.tb > 0) this.netStun('tumble', s.tb);
+    else if (s.sp > 0) this.netStun(s.ht === 'shock' ? 'shock' : 'spin', s.sp);
+    this.item = s.it || null;
+    this.itemCount = s.ic || 0;
+  }
+
+  // Animação de batida num kart remoto (prevista por quem acertou, ou vinda do estado do dono).
+  netStun(type, t = 0) {
+    const T = TUNING;
+    if (type === 'tumble') {
+      if (this.tumbleTime > 0) return;
+      this.spinTime = 0;
+      this.tumbleTime = this._tumbleTotal = t || T.tumbleTime;
+    } else {
+      if (this.spinTime > 0 || this.tumbleTime > 0) return;
+      this.spinTime = this._spinTotal = t || (type === 'shock' ? T.shockTime : T.spinTime);
+      this._spinTurns = type === 'shock' ? 1 : 2;
+    }
+    this._spinDir = Math.random() < 0.5 ? -1 : 1;
+    this.hitType = type;
+    this._hitCd = Math.max(this._hitCd, (t || T.spinTime) + T.hitGrace);
+    this._suspVel -= 0.8;
   }
 
   // ---------- Física (um subpasso) ----------
@@ -995,6 +1091,10 @@ function collideKarts(karts) {
     for (let j = i + 1; j < n; j++) {
       const b = karts[j];
       if (a.frozen && b.frozen) continue;
+      // corrida online: dois karts remotos se resolvem nos aparelhos dos donos
+      const aR = a.remote;
+      const bR = b.remote;
+      if (aR && bR) continue;
       const dy = a.position.y - b.position.y;
       if (dy > 1.5 || dy < -1.5) continue;
       let dx = b.position.x - a.position.x;
@@ -1014,16 +1114,17 @@ function collideKarts(karts) {
       const overlap = r - Math.min(d, r);
 
       // estrela capota; kart normal amassa o encolhido
+      // (um kart remoto nunca apanha aqui: o aparelho do dono vê a mesma batida e resolve)
       const aStar = a.starTime > 0;
       const bStar = b.starTime > 0;
-      if (aStar && !bStar) b.hit('tumble', a, 'faraday');
-      else if (bStar && !aStar) a.hit('tumble', b, 'faraday');
+      if (aStar && !bStar) { if (!bR) b.hit('tumble', a, 'faraday'); }
+      else if (bStar && !aStar) { if (!aR) a.hit('tumble', b, 'faraday'); }
       else if (!aStar && !bStar) {
         const aSmall = a.shrinkTime > 0;
         const bSmall = b.shrinkTime > 0;
-        if (!aSmall && bSmall && !a.stunned) {
+        if (!aSmall && bSmall && !a.stunned && !bR) {
           if (b.hit('spin', a, 'tesla')) b._flat = 0.8; // encolhido pela Bobina de Tesla
-        } else if (aSmall && !bSmall && !b.stunned) {
+        } else if (aSmall && !bSmall && !b.stunned && !aR) {
           if (a.hit('spin', b, 'tesla')) a._flat = 0.8;
         }
       }
@@ -1034,10 +1135,14 @@ function collideKarts(karts) {
       const ib = b.frozen ? 0 : 1 / mb;
       const isum = ia + ib;
       if (isum <= 0) continue;
+      // kart remoto = obstáculo sólido leve: só o kart local reage, com a parte dele de uma
+      // batida normal (o remoto faz a parte dele no próprio aparelho)
+      const ua = aR ? 0 : ia;
+      const ub = bR ? 0 : ib;
 
       // separa as posições pelo inverso do peso
-      if (ia > 0) a._nudge(-nx * overlap * (ia / isum), -nz * overlap * (ia / isum));
-      if (ib > 0) b._nudge(nx * overlap * (ib / isum), nz * overlap * (ib / isum));
+      if (ua > 0) a._nudge(-nx * overlap * (ia / isum), -nz * overlap * (ia / isum));
+      if (ub > 0) b._nudge(nx * overlap * (ib / isum), nz * overlap * (ib / isum));
 
       // troca de velocidade na direção da batida
       const sa = Math.sin(a.heading);
@@ -1056,8 +1161,8 @@ function collideKarts(karts) {
       avz -= nz * jimp * ia;
       bvx += nx * jimp * ib;
       bvz += nz * jimp * ib;
-      if (ia > 0) a._setVelXZ(avx, avz);
-      if (ib > 0) b._setVelXZ(bvx, bvz);
+      if (ua > 0) a._setVelXZ(avx, avz);
+      if (ub > 0) b._setVelXZ(bvx, bvz);
       const kick = clamp(-rel * 0.025, 0, 0.18);
       a._jolt(-nx, -nz, kick * (ia / isum) * 2);
       b._jolt(nx, nz, kick * (ib / isum) * 2);
@@ -1075,7 +1180,8 @@ export function updateKarts(karts, dt, world) {
   const n = clamp(Math.ceil(dt / TUNING.maxSubstep - 1e-6), 1, 6);
   const h = dt / n;
   for (let s = 0; s < n; s++) {
-    for (let i = 0; i < karts.length; i++) karts[i]._physics(h, world);
+    // kart remoto (corrida online): sem física aqui, a pose vem da rede (netPose)
+    for (let i = 0; i < karts.length; i++) if (!karts[i].remote) karts[i]._physics(h, world);
     collideKarts(karts);
   }
   for (let i = 0; i < karts.length; i++) karts[i]._updateVisual(dt, world);

@@ -63,6 +63,8 @@ export function parseBoard(b) {
 
 export const Online = {
   get available() { return !!sb; },
+  // cliente do Supabase (a corrida ao vivo usa os canais Realtime dele: netplay.js)
+  get client() { return sb; },
   get user() { return user && !user.anonymous ? user : null; },
   loginUrl: '/conta/?return=' + encodeURIComponent(RETURN),
   guestId,

@@ -1,10 +1,16 @@
 // HUD da corrida (DOM): item, posição, volta, tempo, minimapa, mensagens e curiosidades.
+import { Vector3 } from './three.js';
 import { ITEMS } from './config.js';
 import { formatTime } from './race.js';
 import { ITEM_FACTS, ZONE_FACTS, pickFact } from './facts.js';
 
 const $ = (id) => document.getElementById(id);
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
+const escHTML = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+// nome de quem aparece nos avisos: o apelido do jogador (corrida online) ou o cientista
+const who = (k) => escHTML(k.netName || k.character.name);
+const _tagV = new Vector3();
+const TAG_MAX_DIST = 90; // m: além disso a etiqueta com o nome some
 // Cores dos jogadores na tela dividida (marcadores da escolha, HUD, minimapa e resultado).
 export const PLAYER_COLORS = ['#3da5ff', '#ff5a8a'];
 
@@ -129,8 +135,8 @@ export class Hud {
     const it = ITEMS[item];
     const ico = itemIconHTML(item);
     if (kart === p) {
-      const who = by && by !== p ? ` <span class="who">de ${by.character.name}</span>` : by === p ? ' <span class="who">(foi você mesmo!)</span>' : '';
-      this.toast(`<div class="item-ico">${ico}</div><div><b>${it.name}${who}</b></div>`, 1900, 'hit', this.tag);
+      const from = by && by !== p ? ` <span class="who">de ${who(by)}</span>` : by === p ? ' <span class="who">(foi você mesmo!)</span>' : '';
+      this.toast(`<div class="item-ico">${ico}</div><div><b>${it.name}${from}</b></div>`, 1900, 'hit', this.tag);
       // quem lidera quase nunca pega Tesla/Buraco: aprende sobre o item ao ser atingido
       this.noteItemFact(item);
     } else if (by === p && !kart.finished) {
@@ -140,7 +146,7 @@ export class Hud {
         this._teslaToast = now;
         this.toast(`<div class="item-ico">${ico}</div><div><b>Raio em todos os adversários!</b></div>`, 1600, 'good', this.tag);
       } else {
-        this.toast(`<div class="item-ico">${ico}</div><div><b>Você acertou ${kart.character.name}!</b></div>`, 1600, 'good', this.tag);
+        this.toast(`<div class="item-ico">${ico}</div><div><b>Você acertou ${who(kart)}!</b></div>`, 1600, 'good', this.tag);
       }
     }
   }
@@ -196,7 +202,9 @@ export class Hud {
   }
 
   // split: tela dividida (2 jogadores); players: os dois humanos (minimapa e etiquetas).
-  setRace({ player, karts, totalLaps, track, tutorial = false, touch = false, split = false, players = null }) {
+  // tags: corrida online, [{ kart, name }] dos outros jogadores (nome flutuando sobre o kart).
+  setRace({ player, karts, totalLaps, track, tutorial = false, touch = false, split = false, players = null, tags = null }) {
+    this.setTags(tags);
     this.player = player;
     this.split = split;
     this.tag = split ? `J${this.index + 1}` : '';
@@ -221,6 +229,7 @@ export class Hud {
     this.setDriftDots(-1);
     if (this.el.vignette) this.el.vignette.style.opacity = 0;
     this.el.total.textContent = `/${karts.length}`;
+    this._total = karts.length;
     this.last = {};
     this.el.center.textContent = '';
     if (this.index === 0) {
@@ -231,6 +240,54 @@ export class Hud {
       this.centers = [...this.root.querySelectorAll('.hud-center')];
     }
     if (this.el.map && track !== this.track) this.prepareMinimap(track);
+  }
+
+  // Corrida online: etiqueta com o nome de cada outro jogador, acima do kart dele.
+  setTags(list) {
+    if (this.index > 0) return;
+    if (!this.tagBox) {
+      this.tagBox = document.createElement('div');
+      this.tagBox.className = 'hud-tags';
+      this.root.appendChild(this.tagBox);
+    }
+    this.tagBox.innerHTML = '';
+    this.tags = (list || []).map(({ kart, name }) => {
+      const el = document.createElement('div');
+      el.className = 'hud-name';
+      el.style.setProperty('--c', kart.character.colors.ui);
+      el.textContent = name;
+      this.tagBox.appendChild(el);
+      return { kart, el, on: true };
+    });
+  }
+
+  updateTags(world) {
+    const cam = world.camera;
+    if (!this.tags?.length || !cam) return;
+    const W = innerWidth;
+    const H = innerHeight;
+    for (const t of this.tags) {
+      const k = t.kart;
+      let show = k.object3d.visible && (world.karts || []).includes(k);
+      if (show) {
+        const d = cam.position.distanceTo(k.position);
+        _tagV.copy(k.position);
+        _tagV.y += 2.2 * (k.visual?.scale.x || 1);
+        _tagV.project(cam);
+        show = d < TAG_MAX_DIST && _tagV.z < 1 && Math.abs(_tagV.x) < 1.1 && Math.abs(_tagV.y) < 1.1;
+        if (show) {
+          const x = Math.round(((_tagV.x + 1) / 2) * W);
+          const y = Math.round(((1 - _tagV.y) / 2) * H);
+          // longe: menor e mais apagado
+          const s = Math.max(0.6, Math.min(1, 18 / Math.max(1, d)));
+          t.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%) scale(${s.toFixed(2)})`;
+        }
+      }
+      if (show !== t.on) {
+        t.on = show;
+        t.el.classList.toggle('hidden', !show);
+      }
+    }
   }
 
   // Desenha a pista do minimapa uma vez num canvas separado.
@@ -349,7 +406,10 @@ export class Hud {
       c.stroke();
     };
     const humans = this.mapPlayers || (this.player ? [this.player] : []);
-    for (const k of this.karts) if (!humans.includes(k)) drawDot(k, 4.5, 1.5);
+    // corrida online: os outros jogadores com bolinha maior (a IA fica menor)
+    const others = this.tags ? this.tags.map((t) => t.kart) : [];
+    for (const k of this.karts) if (!humans.includes(k) && !others.includes(k)) drawDot(k, 4.5, 1.5);
+    for (const k of others) if (this.karts.includes(k)) drawDot(k, 6, 2.5);
     // tela dividida: J2 primeiro, para a seta do J1 ficar por cima quando se cruzam
     for (let i = humans.length - 1; i >= 0; i--) this.drawArrow(humans[i], humans.length > 1 ? PLAYER_COLORS[i] : '#fff');
   }
@@ -400,6 +460,13 @@ export class Hud {
       const name = p.item ? ITEMS[p.item].name : '';
       this.el.name.textContent = !p.roulette && p.item ? (multi ? name.replace(/\s*×\d+$/, '') : name) : '';
     }
+
+    // corrida online: quem sai da corrida some da contagem (/8 → /7)
+    if (this.karts && this.karts.length !== this._total) {
+      this._total = this.karts.length;
+      this.el.total.textContent = `/${this._total}`;
+    }
+    if (this.index === 0) this.updateTags(world);
 
     if (p.place !== this.last.place) {
       this.last.place = p.place;

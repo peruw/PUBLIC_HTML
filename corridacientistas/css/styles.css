@@ -2012,3 +2012,204 @@ body.touch .opt-players { display: none; }
 .results-list .ptag.p2 { color: var(--p2); }
 
 body.touch .howto-duo { display: none; }
+
+/* ---------- Corrida online ao vivo (sala por código) ---------- */
+/* botões só da corrida online (body.net) e os que somem nela */
+body.net .net-hide { display: none !important; }
+body:not(.net) .net-only { display: none !important; }
+.net-pause-note { margin: -2px 0 0; font-size: 13px; }
+
+.play-row { gap: 12px; align-items: stretch; }
+.btn-net {
+  display: grid;
+  align-content: center;
+  text-align: left;
+  border-color: rgba(31, 214, 133, 0.6);
+  background: rgba(31, 214, 133, 0.12);
+}
+.btn-net small { display: block; font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+
+.net-wrap { width: min(720px, 100%); }
+.net-intro { margin: 0; color: var(--ink-dim); font-size: 15px; }
+.net-name-row label { font-weight: 700; }
+.net-name-row input { flex: 0 1 260px; }
+.net-account p { margin: 0; font-size: 14px; }
+.net-account a { color: var(--brand); }
+.net-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#net-code { flex: 0 1 130px; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; font-size: 18px; }
+.turma-msg.warn { color: #ffb4b4; }
+.turma-row button:disabled,
+.net-choices .btn:disabled,
+.lobby-foot .btn-go:disabled,
+.results-wrap .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.lobby-wrap {
+  width: min(1080px, 100%);
+  max-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+}
+.lobby-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 16px;
+  padding: 4px 18px;
+  min-height: 0;
+  overflow: auto;
+}
+.lobby-body h3 { font-size: 17px; margin: 0 0 6px; }
+.lobby-body h3 small { color: var(--ink-dim); font-weight: 600; }
+.lobby-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.lobby-share {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: rgba(245, 185, 74, 0.1);
+  border: 1px dashed rgba(245, 185, 74, 0.6);
+}
+.lobby-share small { color: var(--ink-dim); font-weight: 600; }
+.lobby-code-big {
+  font-family: var(--display);
+  font-size: clamp(30px, 5vw, 46px);
+  letter-spacing: 8px;
+  color: var(--yellow);
+  line-height: 1.1;
+  user-select: all;
+  -webkit-user-select: all;
+}
+.lobby-players { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.lobby-players li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.lobby-players li.me { outline: 2px solid var(--brand); background: rgba(31, 214, 133, 0.16); }
+.lobby-players li.slot { opacity: 0.6; background: none; border: 1px dashed rgba(255, 255, 255, 0.2); }
+.lobby-players .n { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobby-players .n small { font-weight: 500; color: var(--ink-dim); }
+.lobby-players .n .c { display: block; font-size: 12px; }
+.lobby-players .tg { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; font-size: 12px; }
+.lb-host { color: var(--yellow); white-space: nowrap; }
+.lb-state { color: var(--ink-dim); font-style: normal; white-space: nowrap; }
+.lb-state.warn { color: #ffb4b4; white-space: normal; }
+.lobby-players .face,
+.lobby-chars .lb-face {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: radial-gradient(circle at 50% 40%, var(--c, #555) 0%, rgba(0, 0, 0, 0.3) 80%);
+  border: 2px solid var(--c, #fff);
+}
+.face.ph, .lb-face.ph { display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+.lobby-chars { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.lb-char {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 2px 5px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 3px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.lb-char .lb-face { width: 44px; height: 44px; }
+.lb-char:hover { background: rgba(255, 255, 255, 0.12); }
+.lb-char.selected { border-color: var(--brand); background: rgba(31, 214, 133, 0.2); }
+.lb-char.taken { opacity: 0.5; cursor: not-allowed; }
+.lb-char em {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 96%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+}
+/* (o rodapé quebra a linha: o "nowrap" da escolha do cientista em telas baixas não vale aqui) */
+.lobby-wrap { grid-template-columns: minmax(0, 1fr); }
+.lobby-pick { min-width: 0; }
+.select-foot.lobby-foot { flex-wrap: wrap; justify-content: center; }
+.lobby-foot .btn-go { margin-left: auto; }
+.lobby-foot .select-note { flex-basis: 100%; margin: 0; text-align: center; }
+.seg.room-locked button:not(.on) { opacity: 0.35; }
+
+/* resultado online: nome do jogador e o cientista */
+.results-list small.sci { color: var(--ink-dim); font-weight: 500; font-size: 0.8em; }
+.results-list li.left { opacity: 0.55; }
+.results-list li.human:not(.me) { background: rgba(61, 165, 255, 0.12); }
+
+/* nome dos outros jogadores sobre o kart (corrida online) */
+.hud-tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.hud-name {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(8, 14, 12, 0.72);
+  border: 2px solid var(--c, #fff);
+  color: #fff;
+  font: 700 13px/1.2 var(--display);
+  white-space: nowrap;
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+
+@media (max-width: 760px), (max-height: 520px) {
+  .net-choices { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .net-intro { font-size: 13px; }
+  .turma-box h3 { font-size: 15px; }
+  .turma-box p { font-size: 13px; margin-bottom: 6px; }
+  .lobby-body { gap: 10px; padding: 2px 12px; }
+  .lobby-share { padding: 4px 10px; }
+  .lobby-code-big { font-size: 28px; letter-spacing: 5px; }
+  .lobby-players li { padding: 2px 8px; font-size: 14px; }
+  .lobby-players .face { width: 26px; height: 26px; }
+  .lb-char { padding: 3px 1px; font-size: 11px; }
+  .lb-char .lb-face { width: 34px; height: 34px; }
+  .lobby-foot { padding: 6px 12px 8px; gap: 6px 12px; }
+  .btn-net small { font-size: 10px; }
+}
+
+/* celular deitado: o código já está no título; rodapé numa linha só */
+@media (max-height: 400px) {
+  .btn-net small { display: none; } /* (a fileira do JOGAR fica da mesma altura de antes) */
+  .lobby-body h3 { font-size: 14px; margin-bottom: 3px; }
+  .lobby-share { display: none; }
+  .lb-char span { display: none; }
+  .lb-char .lb-face { width: 30px; height: 30px; }
+  .net-intro { display: none; }
+  .select-foot.lobby-foot { flex-wrap: wrap; gap: 2px 10px; padding: 4px 12px 6px; }
+  .lobby-foot .opt-label { display: none; }
+  .lobby-foot .seg button small { display: none; }
+  .lobby-foot .seg button { min-height: 32px; padding: 4px 9px; }
+  .lobby-foot .btn-go { font-size: 16px; padding: 7px 14px; }
+  .lobby-foot .select-note { font-size: 11px; }
+  .lobby-players li { padding: 1px 8px; }
+  .lobby-players .n { font-size: 13px; }
+  .lobby-players .n .c { font-size: 11px; }
+}
+
+/* celular em pé: uma coluna */
+@media (max-width: 600px) and (min-height: 521px) {
+  .lobby-body, .net-choices { grid-template-columns: 1fr; }
+  .lobby-chars { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
