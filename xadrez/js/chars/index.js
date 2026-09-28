@@ -7,13 +7,14 @@ import { buildBishop } from './bishop.js';
 import { buildQueen } from './queen.js';
 import { buildKing } from './king.js';
 import { snapshotRest } from '../rig.js';
+import { getStyle, buildToon } from '../skins.js';
 
 const BUILDERS = { p: buildPawn, r: buildRook, n: buildKnight, b: buildBishop, q: buildQueen, k: buildKing };
 
 export function buildCharacter(letter, color) {
   const build = BUILDERS[letter];
   if (!build) throw new Error('tipo de peça desconhecido: ' + letter);
-  const char = build(color);
+  const char = getStyle() === 'toon' ? buildToon(letter, color) : build(color);
   char.type = letter;
   char.color = color;
   if (!char.rest) snapshotRest(char);

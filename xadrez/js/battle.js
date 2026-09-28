@@ -17,6 +17,7 @@
 //  joelho rotation.x POSITIVO = flexão (canela para trás);  ombro rotation.z POSITIVO no lado R = abre o braço para fora.
 //  Arma (pyr = pitch, yaw, roll no espaço da raiz): pitch POSITIVO = ponta para a frente; yaw POSITIVO = ponta para +X.
 import * as THREE from './three.js';
+import { toonIdle, toonWalk, toonAttack, toonHit, toonDeath, toonVictory } from './skins.js';
 import { resetPose } from './rig.js';
 
 // ---------- Utilidades numéricas ----------
@@ -286,6 +287,7 @@ const TROT_JOINTS = ['torso', 'head', 'shoulderL', 'shoulderR', 'mBody', 'mNeck'
 
 // Ciclo de andar contínuo. speed = fator do passo (1 = normal). Chame stop() ao parar (volta ao repouso).
 export function createWalk(char) {
+  if (char.toon) return toonWalk(char);
   const J = char.joints;
   const mounted = !!(char.mounted && J.mountLegs && J.mountBody);
   const P = new Poser(char, mounted ? TROT_JOINTS : WALK_JOINTS);
@@ -353,6 +355,7 @@ export function createWalk(char) {
 // =====================================================================================
 const IDLE_JOINTS = ['torso', 'hips', 'head', 'shoulderL', 'shoulderR', 'mHead', 'mNeck', 'mTail', 'mFR'];
 export function createIdle(char) {
+  if (char.toon) return toonIdle(char);
   const P = new Poser(char, IDLE_JOINTS);
   const mounted = !!char.mounted;
   const ph = (char.group.id % 11) * 0.7; // defasagem por personagem: exército não respira em uníssono
@@ -529,6 +532,7 @@ const ATTACKS = {
 // Golpe: prepara, golpeia (chama opts.onHit no impacto), recupera. Coreografia por attacker.weaponKind.
 // O integrador já virou o atacante para a vítima e o pôs à distância de alcance.
 export function createAttack(attacker, victim, opts = {}) {
+  if (attacker.toon) return toonAttack(attacker, victim, opts);
   let def = ATTACKS[attacker.weaponKind] || ATTACKS.none;
   if (attacker.mounted && def !== ATTACKS.lance) def = ATTACKS.lance;       // montado sempre usa a lança em riste
   if (!attacker.mounted && def === ATTACKS.lance) def = ATTACKS.spear;      // lança a pé vira estocada
@@ -541,6 +545,7 @@ export function createAttack(attacker, victim, opts = {}) {
 // =====================================================================================
 const HIT_JOINTS = ['torso', 'head', 'shoulderL', 'shoulderR', 'elbowL', 'elbowR', 'mNeck', 'mHead'];
 export function createHit(victim, dir) {
+  if (victim.toon) return toonHit(victim, dir);
   const P = new Poser(victim, HIT_JOINTS);
   const dur = 0.38;
   let t = 0, started = false, side = 1;
@@ -658,6 +663,7 @@ function mountedDeathFrames(char, side) {
   ];
 }
 export function createDeath(victim, dir) {
+  if (victim.toon) return toonDeath(victim, dir);
   // componente lateral do golpe no espaço da vítima: decide o lado da torção / da rolagem
   const yaw = victim.group.rotation.y;
   const lateral = dir ? dir.x * Math.cos(yaw) - dir.z * Math.sin(yaw) : 0;
@@ -691,6 +697,7 @@ function victoryFrames(char) {
   ];
 }
 export function createVictory(char) {
+  if (char.toon) return toonVictory(char);
   const frames = victoryFrames(char);
   for (const f of frames) for (const k in f) if (f[k] === undefined) delete f[k];
   const clip = compileClip(char, frames);

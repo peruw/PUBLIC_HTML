@@ -8,6 +8,7 @@
 //  - Cada joint é um THREE.Group cujo pivô é a articulação. Animações só mexem em `rotation` dos joints
 //    (e em `root.position` para deslocar o corpo). `resetPose(char)` restaura o repouso.
 import * as THREE from './three.js';
+import { toonReset } from './skins.js';
 
 let SHADOWS = true;
 export function setShadows(v) { SHADOWS = !!v; }
@@ -224,6 +225,7 @@ export function snapshotRest(char) {
   return char;
 }
 export function resetPose(char) {
+  if (char.toon) { toonReset(char); return; }
   if (!char.rest) return;
   for (const r of char.rest) { r.o.rotation.copy(r.rot); r.o.position.copy(r.pos); }
   // (a visibilidade da cabeça é controlada pela câmera em 1ª pessoa, não pela pose)

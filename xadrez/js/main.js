@@ -13,6 +13,7 @@ import { Animator } from './animations.js';
 import { Hud } from './hud.js';
 import { Menu } from './menu.js';
 import { createIdle } from './battle.js';
+import { setStyle, getStyle } from './skins.js';
 
 const isCoarse = matchMedia('(pointer: coarse)').matches;
 const quality = isCoarse || Math.min(innerWidth, innerHeight) < 700 ? QUALITY.baixa : QUALITY.alta;
@@ -115,6 +116,14 @@ async function startGame(opts) {
   G.selected = -1;
   G.legal = [];
   animator.clear();
+  if ((opts.style || 'classic') !== getStyle()) {
+    menu.show('loading');
+    const lt = document.getElementById('loading-text');
+    if (lt) lt.textContent = 'Carregando personagens…';
+    const ok = await setStyle(opts.style);
+    if (!ok) hud.showHint('Não deu para carregar o desenho animado; usando os clássicos.');
+    menu.hide();
+  }
   board.setPosition(G.game);
   refreshHighlights();
   hud.resetEval();
@@ -467,7 +476,7 @@ async function boot() {
 boot();
 
 window.__xadrez = {
-  get state() { return G; }, engine, board, rig, animator, input, get mini() { return hud.mini; },
+  get state() { return G; }, renderer, scene, engine, board, rig, animator, input, get mini() { return hud.mini; },
   fen: () => toFEN(G.game),
   play: (uci) => { const m = uciToMove(G.game, uci); if (m && isHumanTurn()) humanMove(m); return !!m; },
 };

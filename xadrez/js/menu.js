@@ -16,6 +16,7 @@ export class Menu {
       level: store.get('level', 2),
       color: store.get('color', 'w'),
       rotate: store.get('rotate', true),
+      style: store.get('style', 'classic'),
     };
     this.onStart = onStart;
 
@@ -25,7 +26,7 @@ export class Menu {
     $('btn-howto-back').addEventListener('click', () => this.show('title'));
     $('btn-setup-back').addEventListener('click', () => this.show('title'));
     $('btn-setup-start').addEventListener('click', () => {
-      store.set('mode', this.opts.mode); store.set('level', this.opts.level); store.set('color', this.opts.color); store.set('rotate', this.opts.rotate);
+      store.set('mode', this.opts.mode); store.set('level', this.opts.level); store.set('color', this.opts.color); store.set('rotate', this.opts.rotate); store.set('style', this.opts.style);
       this.hide();
       onStart({ ...this.opts });
     });
@@ -40,6 +41,9 @@ export class Menu {
     }
     for (const b of document.querySelectorAll('.chip[data-color]')) {
       b.addEventListener('click', () => { this.opts.color = b.dataset.color; this._syncSetup(); });
+    }
+    for (const b of document.querySelectorAll('.chip[data-style]')) {
+      b.addEventListener('click', () => { this.opts.style = b.dataset.style; this._syncSetup(); });
     }
     $('setup-rotate').addEventListener('change', (e) => { this.opts.rotate = e.target.checked; });
 
@@ -56,6 +60,7 @@ export class Menu {
     $('setup-2p-only').classList.toggle('hidden', this.opts.mode !== '2p');
     for (const b of document.querySelectorAll('#setup-levels .chip')) b.classList.toggle('active', +b.dataset.level === this.opts.level);
     for (const b of document.querySelectorAll('.chip[data-color]')) b.classList.toggle('active', b.dataset.color === this.opts.color);
+    for (const b of document.querySelectorAll('.chip[data-style]')) b.classList.toggle('active', b.dataset.style === this.opts.style);
     $('setup-rotate').checked = !!this.opts.rotate;
   }
 
