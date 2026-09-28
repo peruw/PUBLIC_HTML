@@ -389,7 +389,8 @@ function drawAtlasExtra(g) {
     g.fillText('v = √GM/r', x0 + 140, y0 + 80);
     g.fillText('T = 88 min', x0 + 140, y0 + 106);
     g.textAlign = 'center';
-    g.strokeStyle = chalk; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x0 + 174, y0 + 70); g.lineTo(x0 + 212, y0 + 70); g.stroke();
+    // traço do radical cobre GM/r inteiro: v = √(GM/r)
+    g.strokeStyle = chalk; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x0 + 174, y0 + 70); g.lineTo(x0 + 226, y0 + 70); g.stroke();
   }
   // Planta azul (célula 4 da linha 7): quadriculado e desenho técnico de uma barragem com turbina
   {
@@ -1706,7 +1707,7 @@ function finchHeadGeo(detail) {
 class HelixCurve extends THREE.Curve {
   constructor(R, H, turns, ph) { super(); this.R = R; this.H = H; this.turns = turns; this.ph = ph; }
   getPoint(t, out = new THREE.Vector3()) {
-    const a = this.ph + t * this.turns * TAU;
+    const a = this.ph - t * this.turns * TAU; // sinal negativo: hélice destra, como o DNA-B real
     return out.set(Math.cos(a) * this.R, t * this.H, Math.sin(a) * this.R);
   }
 }
@@ -1724,7 +1725,7 @@ function dnaGeo(detail) {
   const PAIRS = [[0xef476f, 0x06d6a0], [0x118ab2, 0xff9f1c], [0x06d6a0, 0xef476f], [0xff9f1c, 0x118ab2]];
   const n = b.lv(10, 8, 6, 5);
   for (let i = 0; i < n; i++) {
-    const t = (i + 0.5) / n, a = t * turns * TAU, y = y0 + t * H;
+    const t = (i + 0.5) / n, a = -t * turns * TAU, y = y0 + t * H; // mesmo sentido das fitas (destra)
     const p = [Math.cos(a) * R, y, Math.sin(a) * R], q = [-p[0], y, -p[2]], m = [0, y, 0];
     const [c1, c2] = PAIRS[i % 4];
     b.cyl(c1, p, m, 0.012, 0.012, 6, { ol: 0.004, open: true });

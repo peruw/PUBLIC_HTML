@@ -204,7 +204,7 @@ export const SCIENTIST_FACTS = {
     { text: 'César Lattes nasceu em Curitiba e foi um dos fundadores do Centro Brasileiro de Pesquisas Físicas (CBPF), no Rio de Janeiro, em 1949.' },
   ],
   franklin: [
-    { text: 'A "Foto 51", feita pela equipe de Rosalind Franklin em 1952 com raios X, mostrou o padrão em forma de X que revelou a dupla hélice do DNA.', quiz: { q: 'Que técnica Rosalind Franklin usou para fotografar o DNA?', options: ['Difração de raios X', 'Microscópio comum', 'Ultrassom', 'Telescópio'], answer: 0 } },
+    { text: 'A "Foto 51", feita pela equipe de Rosalind Franklin em 1952 com raios X, mostrou o padrão em forma de X de uma hélice, pista decisiva para descobrir a dupla hélice do DNA.', quiz: { q: 'Que técnica Rosalind Franklin usou para fotografar o DNA?', options: ['Difração de raios X', 'Microscópio comum', 'Ultrassom', 'Telescópio'], answer: 0 } },
     { text: 'Rosalind Franklin morreu em 1958, aos 37 anos. O Nobel de 1962 pela estrutura do DNA foi para Watson, Crick e Wilkins: o prêmio não é dado a quem já morreu.' },
     { text: 'Além do DNA, Rosalind Franklin estudou a estrutura de vírus, como o do mosaico do tabaco, e a do carvão.' },
     { text: 'O DNA guarda as instruções genéticas dos seres vivos em uma sequência de quatro bases: A, T, C e G.', quiz: { q: 'Quantos tipos de base formam o "alfabeto" do DNA?', options: ['Quatro (A, T, C e G)', 'Duas', 'Vinte e seis', 'Cem'], answer: 0 } },

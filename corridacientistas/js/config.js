@@ -178,7 +178,7 @@ export const CHARACTERS = [
       skin: 0xf0c8a0, hair: 0x2a1f18, hairStyle: 'cabelo escuro penteado para trás, com topete',
       outfit: 0x3a4a5c, outfitAccent: 0xffffff, extras: 'paletó cinza-azulado com camisa branca e gravata; chapa fotográfica (emulsão) com rastros de partículas no kart, lembrando os raios cósmicos da montanha de Chacaltaya',
     },
-    bio: 'Físico curitibano que ajudou a descobrir o méson pi (píon) em 1947, estudando raios cósmicos em chapas fotográficas no alto dos Andes. Foi um dos fundadores do Centro Brasileiro de Pesquisas Físicas (CBPF), em 1949.',
+    bio: 'Físico curitibano que ajudou a descobrir o méson pi (píon) em 1947, no grupo da Universidade de Bristol (Inglaterra), com chapas fotográficas expostas aos raios cósmicos nos Pireneus e nos Andes. Foi um dos fundadores do Centro Brasileiro de Pesquisas Físicas (CBPF), em 1949.',
     fact: 'A Plataforma Lattes, onde ficam os currículos dos pesquisadores brasileiros, tem esse nome em homenagem a ele.',
   },
   {
@@ -196,7 +196,7 @@ export const CHARACTERS = [
       skin: 0xf4d6c0, hair: 0x3b2418, hairStyle: 'cabelo castanho-escuro curto e ondulado, repartido de lado',
       outfit: 0xf7f7f7, outfitAccent: 0x33415c, extras: 'jaleco branco de laboratório sobre blusa azul-escura; modelo de dupla hélice do DNA girando no kart',
     },
-    bio: 'Química inglesa especialista em difração de raios X. Sua "Foto 51", de 1952, mostrou o padrão em X que revelou a forma de dupla hélice do DNA. Também estudou vírus e o carvão.',
+    bio: 'Química inglesa especialista em difração de raios X. Sua equipe fez a "Foto 51", em 1952: o padrão em X mostrou que o DNA é uma hélice e foi a pista decisiva para o modelo da dupla hélice (1953). Também estudou vírus e o carvão.',
     fact: 'Ela morreu em 1958, aos 37 anos. O Nobel de 1962 pela estrutura do DNA foi para Watson, Crick e Wilkins: o prêmio não é dado a quem já morreu.',
   },
   {
@@ -234,7 +234,7 @@ export const CHARACTERS = [
       hat: 'capacete de obra branco',
       outfit: 0x5c6b73, outfitAccent: 0xffffff, extras: 'blusa cinza de engenheira com gola branca; rolo de planta (projeto) e uma pequena turbina de usina no kart',
     },
-    bio: 'Primeira mulher negra a se formar em engenharia no Brasil, pela Universidade Federal do Paraná, em 1945. Trabalhou no projeto da Usina Hidrelétrica Capivari-Cachoeira, no Paraná.',
+    bio: 'Primeira mulher negra a se formar em engenharia no Brasil, pela Faculdade de Engenharia do Paraná (hoje parte da UFPR), em 1945. Trabalhou no projeto da Usina Hidrelétrica Capivari-Cachoeira, no Paraná.',
     fact: 'Enedina pagou os estudos trabalhando como professora e empregada doméstica enquanto cursava engenharia.',
   },
 ];

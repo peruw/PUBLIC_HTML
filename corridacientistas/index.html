@@ -188,8 +188,8 @@
           <h3>Entrar numa sala</h3>
           <p>Digite o código que o professor passou.</p>
           <div class="turma-row">
-            <input id="room-code" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off" aria-label="Código da sala" />
-            <input id="room-name" maxlength="20" placeholder="Seu nome" aria-label="Seu nome na sala" />
+            <input id="room-code" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off" aria-label="Código da sala" enterkeyhint="go" />
+            <input id="room-name" maxlength="20" placeholder="Seu nome" aria-label="Seu nome na sala" enterkeyhint="go" />
             <button class="btn btn-primary btn-small" data-action="room-join">Entrar</button>
           </div>
           <p class="turma-msg" id="room-msg" aria-live="polite"></p>
@@ -280,9 +280,9 @@
       <p class="results-record hidden" id="results-record"></p>
       <ol class="results-list" id="results-list"></ol>
       <div class="results-side">
+        <div class="results-online" id="results-online" aria-live="polite"></div>
         <div class="fact-card" id="results-fact"></div>
         <div class="results-quiz" id="results-quiz"></div>
-        <div class="results-online" id="results-online" aria-live="polite"></div>
         <div class="results-rank" id="results-rank"></div>
       </div>
       <div class="row">

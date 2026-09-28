@@ -84,7 +84,8 @@ async function init() {
     },
     // 'Trocar cientista' no resultado: volta ao estado de título de verdade
     onPlay: () => { if (game.state !== 'title') enterTitle(); },
-    onRestart: () => startRace(game.opts),
+    // a sala vem do menu: se o aluno saiu dela (fechada, nome recusado), a nova corrida não vai para ela
+    onRestart: () => startRace({ ...game.opts, room: game.opts?.room ? menu.room : null }),
     onQuit: () => enterTitle(),
     onToggleSound: () => toggleSound(),
     onCharacter: (id) => preview?.setCharacter(id),
@@ -202,7 +203,8 @@ async function init() {
   input.setAutoAccelerate(store.get('auto', input.touchEnabled));
   menu.setAutoLabel(input.autoAccelerate);
   const race = new RaceManager({ bus });
-  // ranking online (conta do site): carrega em segundo plano; sem ela o jogo segue normal
+  // ranking online (conta do site): carrega em segundo plano (mesmo passando dos 8 s de espera);
+  // sem ela o jogo segue normal
   Online.init();
   let runTicket = null; // promessa do bilhete da corrida atual (kart_start_run)
   const hud = new Hud({ bus });
@@ -456,8 +458,11 @@ async function init() {
     const room = opts.room && opts.room.board === board ? opts.room : null;
     const ticket = runTicket;
     runTicket = null;
+    // conta conectada só depois da largada (ex.: internet lenta): sem bilhete, não vale para o ranking
+    const noTicket = !ticket && !!Online.user;
     if (!ticket && !room) {
-      if (Online.available) menu.renderOnlineResult({ loginHint: true });
+      if (noTicket) menu.renderOnlineResult({ board, global: { ok: false, error: 'no_ticket' } });
+      else if (Online.available) menu.renderOnlineResult({ loginHint: true });
       return;
     }
     const run = {
@@ -468,7 +473,8 @@ async function init() {
       place: me.place,
     };
     menu.renderOnlineResult({ pending: true });
-    const res = { roomCode: room?.code, loginHint: !Online.user };
+    const res = { board, roomCode: room?.code, loginHint: !Online.user };
+    if (noTicket) res.global = { ok: false, error: 'no_ticket' };
     try {
       if (ticket) {
         const runId = await ticket;
@@ -477,7 +483,7 @@ async function init() {
       }
       if (room) {
         res.room = await Online.roomSubmit(room.code, run, room.guestName);
-        if (res.room?.ok) res.roomBoard = await Online.roomBoard(room.code, 8);
+        if (res.room?.ok) res.roomBoard = await Online.roomBoard(room.code, 8, room.guestName);
       }
     } catch {
       /* sem conexão: o resultado local já foi salvo */
@@ -780,7 +786,7 @@ async function init() {
       if (edgeRB) menu.cycleOpt('laps', 1);
     }
     if (edgeB) {
-      if (cur === 'select' || cur === 'howto') menu.action('back');
+      if (cur === 'select' || cur === 'howto' || cur === 'online' || cur === 'turma') menu.action('back');
       else if (cur === 'pause') menu.action('resume');
       else if (cur === 'results') menu.action('quit');
     }
