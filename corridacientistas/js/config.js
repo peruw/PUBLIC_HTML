@@ -272,7 +272,7 @@ export const ITEMS = {
   eletron: {
     id: 'eletron', name: 'Elétron Teleguiado', icon: 'e⁻', color: 0x4cc9f0,
     effect: 'Persegue o kart da frente. Em 1º lugar, vai atrás de quem vem logo depois.', // (casco vermelho)
-    fact: 'Cargas opostas se atraem (Lei de Coulomb). No jogo, o kart da frente faz o papel da carga positiva que puxa o elétron.',
+    fact: 'Cargas de sinais opostos se atraem. A Lei de Coulomb diz que essa força fica mais forte quanto mais perto as cargas estão. No jogo, o kart da frente faz o papel da carga positiva que puxa o elétron.',
     weights: [0, 20, 25, 25, 25, 20, 15, 10],
   },
   faraday: {

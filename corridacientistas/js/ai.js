@@ -148,8 +148,25 @@ export class AIDriver {
     // entrou numa curva nova (raio < 50 m; histerese até a reta): sorteia um erro visível
     if (!this._inCurve && maxK > 1 / 50) {
       this._inCurve = true;
-      this._rollMistakes(world, kSign);
+      // onde a curva começa: o erro "sair largo" só vale perto dela, não na reta de aproximação
+      let dStart = 0;
+      for (let i = 0; i < SCAN.length; i++) {
+        if (Math.abs(track.curvature(k.s + SCAN[i] * scale)) > 1 / 50) {
+          dStart = SCAN[i] * scale;
+          break;
+        }
+      }
+      this._rollMistakes(world, kSign, k.s + dStart);
     } else if (this._inCurve && maxK < 1 / 100) this._inCurve = false;
+    if (this._errWidePending) {
+      const pend = this._errWidePending;
+      this._driftCd = Math.max(this._driftCd, 0.2); // não drifta na curva em que vai errar
+      if (wrapSigned(k.s - (pend.s - 10), L) >= 0) {
+        this._errWideT = pend.t;
+        this._driftCd = Math.max(this._driftCd, pend.t);
+        this._errWidePending = null;
+      }
+    }
     this._errWideT = Math.max(0, this._errWideT - dt);
     const wide = this._errWideT > 0;
 
@@ -288,17 +305,18 @@ export class AIDriver {
 
   // Sorteia os erros desta curva. CLASSES[cc].aiMistakes escala (0 no 150cc: IA limpa).
   // O kart do jogador (piloto automático) não erra de propósito.
-  _rollMistakes(world, dir) {
+  _rollMistakes(world, dir, sCurve) {
     this._errHoldArmed = false;
+    this._errWidePending = null;
     const m = this.kart.isPlayer ? 0 : (world.cc?.aiMistakes ?? 0) * (1 - this.skill);
     if (m <= 0 || dir === 0) return;
     if (Math.random() < 0.35 * m) {
-      // freada atrasada: entra rápido, não drifta e sai largo (às vezes pisa na zebra/grama)
-      this._errWideT = rand(0.8, 1.2);
+      // freada atrasada: entra rápido, não drifta e sai largo (às vezes pisa na zebra/grama).
+      // Fica pendente até ~10 m antes da curva (a varredura enxerga a curva ~45 m antes).
+      this._errWidePending = { s: sCurve, t: rand(0.8, 1.2) };
       this._errWideDir = dir;
       // m além da borda do asfalto: às vezes só chega perto, às vezes pisa na zebra/grama
       this._errWideAmt = rand(-0.8, 3);
-      this._driftCd = Math.max(this._driftCd, this._errWideT);
     }
     this._errHoldArmed = Math.random() < 0.3 * m;
   }
@@ -479,7 +497,8 @@ export class AIDriver {
         break;
       case 'tesla':
       case 'buraco':
-        use = t > this._itemDelay && (!this._itemHold || this._holdOver(k, world));
+        // guarda por no máximo 15 s: enquanto alguém segura a Tesla/Buraco, ninguém mais os tira
+        use = t > this._itemDelay && (!this._itemHold || t > 15 || this._holdOver(k, world));
         break;
       case 'faraday':
         use = t > this._itemDelay;

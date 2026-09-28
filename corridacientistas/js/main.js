@@ -40,8 +40,9 @@ function dailyChallenge() {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
   const ch = CHARACTERS[Math.floor(rnd() * CHARACTERS.length)];
-  const ccs = is150Unlocked() ? ['50cc', '100cc', '150cc'] : ['50cc', '100cc'];
-  const cc = ccs[Math.floor(rnd() * ccs.length)];
+  const ccs = ['50cc', '100cc', '150cc'];
+  let cc = ccs[Math.floor(rnd() * ccs.length)];
+  if (cc === '150cc' && !is150Unlocked()) cc = '100cc'; // o sorteio é igual para todos; só a classe cai
   const podium = rnd() < 0.5;
   return { key, character: ch.id, cc, laps: 2, maxPlace: podium ? 3 : 1, label: `${ch.name} · ${cc} · ${podium ? 'chegar no pódio' : 'vencer'}` };
 }
@@ -105,7 +106,11 @@ async function init() {
     dailyInfo: () => {
       const d = dailyChallenge();
       const st = store.get('daily', {});
-      return { label: d.label, done: !!st[d.key], streak: store.get('dailyStreak', { n: 0 }).n };
+      const sk = store.get('dailyStreak', { last: '', n: 0 });
+      const y = new Date(Date.now() - 864e5);
+      const yKey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+      const alive = sk.last === d.key || sk.last === yKey;
+      return { label: d.label, done: !!st[d.key], streak: alive ? sk.n : 0 };
     },
     qualityId: () => qualityId,
     onSetQuality: (id) => {
@@ -218,6 +223,7 @@ async function init() {
   let playerAI = null;
   let resultsTimer = -1;
   let pendingUse = false; // aperto de item guardado até o próximo passo (telas > 60 Hz)
+  let holdLatch = false; // item seguro mantido depois da pausa até um novo aperto
 
   // Pré-compila os shaders para evitar travadas na primeira corrida.
   try {
@@ -254,6 +260,7 @@ async function init() {
     }
     setGhost(null);
     env.setMood?.(0);
+    moodT = -1; // não deixa a hora dourada continuar animando no título
     items.setMode?.('race');
     world.rival = null;
     setupGrid(order);
@@ -375,6 +382,7 @@ async function init() {
     const me = results.find((r) => r.kart === p);
     hud.show(false);
     input.showTouch(false);
+    const prevGhostTime = ghostPrevTime; // setGhost(null) zera o tempo do fantasma
     setGhost(null);
     const rec = saveRecords(results);
     const info = { rec, cc: opts.cc, laps: opts.laps, mode: opts.mode, facts: hud.raceFacts.slice() };
@@ -397,7 +405,7 @@ async function init() {
     }
     // fantasma
     if (tt && valid) {
-      const prev = ghostPrevTime;
+      const prev = prevGhostTime;
       if (prev) info.ghost = me.time - prev;
       if (!prev || me.time < prev) saveGhost(me.time);
     }
@@ -597,7 +605,9 @@ async function init() {
     const gT = ghost.laps.slice(0, n).reduce((a, b) => a + b, 0);
     const dT = race.time - gT;
     const txt = `${dT < 0 ? '−' : '+'}${Math.abs(dT).toFixed(2).replace('.', ',')} s`;
-    hud.center(`Volta ${lap}<small class="${dT < 0 ? 'ahead' : 'behind'}">👻 ${txt}</small>`, 'msg pop', 1800);
+    const title = lap >= world.totalLaps ? 'ÚLTIMA VOLTA!' : `Volta ${lap}`;
+    // depois do passo atual: o HUD escreve 'ÚLTIMA VOLTA!' no mesmo passo e sobrescreveria
+    setTimeout(() => hud.center(`${title}<small class="${dT < 0 ? 'ahead' : 'behind'}">👻 ${txt}</small>`, 'msg pop', 1800), 0);
   });
 
   // ---------- rival e hora dourada ----------
@@ -613,6 +623,9 @@ async function init() {
 
   function setPaused(on, silent) {
     if (on && game.state !== 'race') return;
+    // voltando da pausa com um item seguro atrás do kart: ele continua seguro até um novo
+    // aperto (a pausa solta todas as teclas, e isso dispararia o item sozinho)
+    if (!on && game.paused) holdLatch = !!world.player?.itemHeld;
     game.paused = on;
     audio.pauseAll?.(on);
     needsRender = true;
@@ -762,19 +775,9 @@ async function init() {
     if (!cur || !act) return;
     if (cur === 'select') {
       if (move) menu.moveSelection(dx, dy);
-      if (edgeLB || edgeRB) {
-        const o = menu.opts;
-        if (edgeLB) {
-          const ids = Object.keys(CLASSES);
-          o.cc = ids[(ids.indexOf(o.cc) + 1) % ids.length];
-        }
-        if (edgeRB) {
-          const L = RACE.lapOptions;
-          o.laps = L[(L.indexOf(o.laps) + 1) % L.length];
-        }
-        audio.sfx('menuMove');
-        menu.refreshSelect();
-      }
+      // mesmo caminho do teclado: respeita o cadeado do 150cc
+      if (edgeLB) menu.cycleOpt('cc', 1);
+      if (edgeRB) menu.cycleOpt('laps', 1);
     }
     if (edgeB) {
       if (cur === 'select' || cur === 'howto') menu.action('back');
@@ -801,7 +804,8 @@ async function init() {
         c.drift = ctrl.drift;
         c.lookBack = ctrl.lookBack;
         // segurar o item atrás (escudo) e o gesto de tiro para trás no toque
-        c.holdItem = !!ctrl.holdItem;
+        if (holdLatch && (ctrl.holdItem || ctrl.useItem || !player.itemHeld)) holdLatch = false;
+        c.holdItem = !!ctrl.holdItem || holdLatch;
         c.itemBack = !!ctrl.itemBack;
         if (pendingUse) {
           c.useItem = true;
@@ -1050,9 +1054,13 @@ async function init() {
     const md = q.get('modo');
     let any = false;
     if (ch && CHARACTERS.some((c) => c.id === ch)) { menu.opts.character = ch; any = true; }
-    if (mo && CLASSES[mo]) { menu.opts.cc = mo; any = true; }
+    if (mo && CLASSES[mo]) { menu.opts.cc = mo === '150cc' && !is150Unlocked() ? '100cc' : mo; any = true; }
     if (RACE.lapOptions.includes(vo)) { menu.opts.laps = vo; any = true; }
-    if (md) { menu.opts.mode = /relogio|timetrial/i.test(md) ? 'timetrial' : 'race'; any = true; }
+    if (md) {
+      const plain = md.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      menu.opts.mode = /relogio|timetrial/i.test(plain) ? 'timetrial' : 'race';
+      any = true;
+    }
     if (any) menu.show('select');
   } catch {
     /* parâmetros inválidos: segue no título */

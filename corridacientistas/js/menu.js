@@ -84,6 +84,8 @@ export class Menu {
     if (!CLASSES[this.opts.cc] || (this.opts.cc === '150cc' && !is150Unlocked())) this.opts.cc = CLASSES[this.opts.cc] ? '100cc' : '50cc';
     if (!RACE.lapOptions.includes(this.opts.laps)) this.opts.laps = RACE.defaultLaps;
 
+    // quem já jogava em 150cc (antes do cadeado) fica com ele liberado de vez
+    if (store.get('cc', '') === '150cc') store.set('unlock150', true);
     this.room = store.get('room', null); // sala de turma em que o aluno entrou
     this.tabNav = false; // foco veio do Tab (não do mouse/toque)
     this.buildSelect();
@@ -517,7 +519,10 @@ export class Menu {
         else if (rec.prevLap) parts.push(`melhor volta ${formatTime(rec.bestLap)} (recorde ${formatTime(rec.prevLap.time)})`);
       }
     }
-    if (info.ghost != null) parts.push(info.ghost < 0 ? `👻 ${formatTime(-info.ghost).replace(/^0:/, '')} s mais rápido que o fantasma` : `👻 ${formatTime(info.ghost).replace(/^0:/, '')} s atrás do fantasma`);
+    if (info.ghost != null) {
+      const g = Math.abs(info.ghost).toFixed(2).replace('.', ',');
+      parts.push(info.ghost < 0 ? `👻 ${g} s mais rápido que o fantasma` : `👻 ${g} s atrás do fantasma`);
+    }
     if (info.rival && !tt) {
       const d = info.rival.delta;
       const n = info.rival.name;
