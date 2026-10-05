@@ -88,11 +88,20 @@ export function toFEN(state) {
   return `${out} ${state.turn} ${c} ${state.ep >= 0 ? squareName(state.ep) : '-'} ${state.halfmove} ${state.fullmove}`;
 }
 
-// Chave da posição para repetição (sem contadores)
+// Chave da posição para repetição (sem contadores). A casa de en passant só conta se houver um peão do lado
+// a jogar pronto para capturar nela; senão a mesma posição pareceria diferente logo após um avanço duplo.
 function positionKey(state) {
   let s = '';
   for (let i = 0; i < 64; i++) s += String.fromCharCode(80 + state.board[i]);
-  return s + state.turn + state.castling + state.ep;
+  return s + state.turn + state.castling + (epCapturable(state) ? state.ep : -1);
+}
+function epCapturable(state) {
+  const ep = state.ep;
+  if (ep < 0) return false;
+  const sign = state.turn === 'w' ? 1 : -1;
+  const from = ep - sign * 8; // linha dos peões que capturariam
+  const f = ep & 7;
+  return (f > 0 && state.board[from - 1] === sign * P) || (f < 7 && state.board[from + 1] === sign * P);
 }
 function bumpPosition(state, delta) {
   if (!state.trackRepetition) return;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="theme-color" content="#1c1a17" />
+  <meta name="theme-color" content="#101a16" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Xadrez em Primeira Pessoa</title>
@@ -46,10 +46,12 @@
     </div>
 
     <aside class="hud-panel">
-      <h3>Vantagem</h3>
-      <canvas id="hud-graph" class="hud-graph"></canvas>
-      <h3>Melhores lances</h3>
-      <ol id="hud-lines" class="hud-lines"></ol>
+      <div class="hud-analysis">
+        <h3>Vantagem</h3>
+        <canvas id="hud-graph" class="hud-graph"></canvas>
+        <h3>Melhores lances</h3>
+        <ol id="hud-lines" class="hud-lines"></ol>
+      </div>
       <h3>Lances</h3>
       <div id="hud-history" class="hud-history"></div>
       <div id="hud-engine" class="hud-engine" data-state=""></div>
@@ -75,6 +77,7 @@
         <button data-piece="b" title="Bispo">♗</button>
         <button data-piece="n" title="Cavalo">♘</button>
       </div>
+      <button class="btn ghost promo-cancel" data-cancel>Cancelar</button>
     </div>
   </div>
 
@@ -82,8 +85,12 @@
   <div id="screens">
     <section class="screen" data-screen="loading">
       <div class="card">
+        <div class="brand-row">
+          <img class="brand-logo" src="./assets/logo-quanta.png" alt="" width="64" height="63" />
+          <span class="brand-name">QUANTA<b>AULAS</b></span>
+        </div>
         <h1>Xadrez em Primeira Pessoa</h1>
-        <p id="loading-text">Carregando motor…</p>
+        <p id="loading-text">Carregando…</p>
         <div class="spinner"></div>
       </div>
     </section>
@@ -171,11 +178,11 @@
           <li><b>Toque numa peça sua no tabuleiro pequeno</b> (ou na cena). A câmera vai para os olhos do personagem e as casas possíveis aparecem em azul (vermelho = captura).</li>
           <li><b>Toque na casa de destino</b> para mover. O personagem anda até lá; nas capturas você assiste à luta pelos olhos dele.</li>
           <li>Sem peça escolhida, a câmera passeia atrás da sua linha de frente. <b>Arraste</b> para olhar em volta. <b>Esc</b> cancela a escolha.</li>
-          <li><b>Online:</b> em “Jogar online com um amigo”, crie uma sala e mande o código (ou o convite) para o seu amigo. Ele entra com o código e cada um joga do próprio aparelho. “Reiniciar” pede revanche, com as cores trocadas.</li>
+          <li><b>Online:</b> em “Jogar online com um amigo”, crie uma sala e mande o código (ou o convite) para o seu amigo. Ele entra com o código e cada um joga do próprio aparelho. Se a página recarregar, você volta para a mesma sala. “Reiniciar” pede revanche (o amigo precisa aceitar), com as cores trocadas.</li>
           <li>O botão <b>“3ª pessoa”</b> (ou a tecla <b>V</b>) põe a câmera atrás do personagem, como num jogo de ação, para ver o corpo dele andando e lutando. “1ª pessoa” volta para os olhos dele.</li>
           <li>O botão “Vista de cima” alterna entre o campo de batalha e a vista aérea 3D.</li>
           <li>O painel mostra a <b>vantagem</b> ao longo da partida, os <b>melhores lances</b> e o <b>histórico</b>.</li>
-          <li>Roque: mova o rei duas casas. Promoção: escolha a peça no painel.</li>
+          <li>Roque: mova o rei duas casas. Promoção: escolha a peça no painel. No menu ☰ dá para <b>desistir</b>; no fim, “Ver tabuleiro” mostra a posição final.</li>
         </ul>
         <button id="btn-howto-back" class="btn primary">Entendi</button>
       </div>
@@ -187,6 +194,7 @@
         <div class="stack">
           <button id="btn-pause-resume" class="btn primary">Continuar</button>
           <button id="btn-pause-restart" class="btn">Reiniciar partida</button>
+          <button id="btn-pause-resign" class="btn">🏳 Desistir</button>
           <button id="btn-pause-quit" class="btn ghost">Sair para o menu</button>
         </div>
       </div>
@@ -198,7 +206,19 @@
         <p id="over-detail" class="lead"></p>
         <div class="stack">
           <button id="btn-over-again" class="btn primary">Jogar de novo</button>
+          <button id="btn-over-view" class="btn">👀 Ver tabuleiro</button>
           <button id="btn-over-menu" class="btn ghost">Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen hidden" data-screen="confirm">
+      <div class="card">
+        <h2 id="confirm-title">Tem certeza?</h2>
+        <p id="confirm-text" class="lead"></p>
+        <div class="stack row">
+          <button id="btn-confirm-no" class="btn ghost">Cancelar</button>
+          <button id="btn-confirm-yes" class="btn primary">Sim</button>
         </div>
       </div>
     </section>

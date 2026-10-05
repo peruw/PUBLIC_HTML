@@ -213,11 +213,13 @@ export class Animator {
     this.current = null;
     this.busy = false;
     this.active = new Set();   // personagens sendo animados (o idle não mexe neles)
+    this._waiting = new Set(); // resolve() das sequências na fila (clear() libera quem espera)
   }
 
   _run(seqList) {
     return new Promise((resolve) => {
-      this.queue.push(...seqList, call(() => resolve()));
+      this._waiting.add(resolve);
+      this.queue.push(...seqList, call(() => { this._waiting.delete(resolve); resolve(); }));
       this.busy = true;
     });
   }
@@ -324,11 +326,16 @@ export class Animator {
     ]);
   }
 
+  // Interrompe tudo. As promessas de playMove/kingFall pendentes resolvem na hora (quem esperava confere
+  // em main.js se a partida ainda é a mesma antes de continuar).
   clear() {
     this.queue.length = 0;
     this.current = null;
     this.busy = false;
     this.active.clear();
+    const waiting = [...this._waiting];
+    this._waiting.clear();
+    for (const r of waiting) r();
   }
 }
 

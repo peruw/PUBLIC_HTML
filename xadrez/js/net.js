@@ -1,7 +1,9 @@
 // Partida online por código de sala.
 // Transporte: canal em tempo real do Supabase do site (broadcast + presença; não usa banco de dados).
 // Para testes ou duas abas no mesmo aparelho: ?net=local usa BroadcastChannel.
-// Mensagens do jogo (payload): { t: 'join' | 'start' | 'move' | 'ack' | 'sync?' | 'state' | 'rematch' | 'bye', ... }
+// Mensagens do jogo (payload): { t, from, to?, ... }; t = 'join' | 'start' | 'started' | 'full' | 'move' | 'ack' |
+// 'sync?' | 'state' | 'rematch?' | 'rematch-ok' | 'rematch-no' | 'resign' | 'resign-ok' | 'bye'.
+// `from` é o id da aba (fixo enquanto a aba existir, mesmo recarregando); `to` restringe a um destinatário.
 
 const SUPABASE = {
   // Chave pública (publishable) do projeto do site — a mesma de /conta/config.mjs. Não é segredo.
@@ -22,9 +24,20 @@ export function normalizeCode(s) {
   return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
 }
 
-function myId() {
-  return (crypto.randomUUID && crypto.randomUUID()) || Math.random().toString(36).slice(2) + Date.now().toString(36);
+// Id desta aba: guardado no sessionStorage, então sobrevive a recarregar a página (o celular costuma
+// recarregar a aba quando o jogador sai para o WhatsApp e volta) e a sala reconhece o mesmo jogador.
+const ID_KEY = 'xadrez-net-id';
+export function tabId() {
+  const fresh = () => (crypto.randomUUID && crypto.randomUUID()) || Math.random().toString(36).slice(2) + Date.now().toString(36);
+  try {
+    let v = sessionStorage.getItem(ID_KEY);
+    if (!v) { v = fresh(); sessionStorage.setItem(ID_KEY, v); }
+    return v;
+  } catch { return fresh(); }
 }
+
+// Fechamentos em andamento por código: reabrir a mesma sala espera o canal antigo terminar de fechar.
+const closing = new Map();
 
 function transportKind() {
   try { return new URLSearchParams(location.search).get('net') === 'local' ? 'local' : 'supabase'; } catch { return 'supabase'; }
@@ -47,19 +60,21 @@ function supabaseClient() {
   return clientPromise;
 }
 
-// Abre a sala `code`. Callbacks: onMessage(payload), onPeers(n outros presentes), onStatus('conectado'|'erro'|...)
+// Abre a sala `code`. Callbacks: onMessage(payload), onPeers(n, ids dos outros presentes), onStatus('conectado'|'erro'|...)
 export async function openRoom(code, { role, onMessage, onPeers, onStatus }) {
-  const id = myId();
-  if (transportKind() === 'local') return openLocal(code, id, { role, onMessage, onPeers, onStatus });
+  const id = tabId();
+  if (closing.has(code)) await closing.get(code);
+  const deliver = (payload) => { if (payload && payload.from !== id && (!payload.to || payload.to === id)) onMessage(payload); };
+  if (transportKind() === 'local') return openLocal(code, id, { role, deliver, onPeers, onStatus });
 
   const client = await supabaseClient();
   const ch = client.channel('xadrez-' + code, { config: { broadcast: { self: false, ack: false }, presence: { key: id } } });
   let closed = false;
-  ch.on('broadcast', { event: 'm' }, ({ payload }) => { if (!closed && payload && payload.from !== id) onMessage(payload); });
+  ch.on('broadcast', { event: 'm' }, ({ payload }) => { if (!closed) deliver(payload); });
   ch.on('presence', { event: 'sync' }, () => {
     if (closed) return;
-    const st = ch.presenceState();
-    onPeers(Object.keys(st).filter((k) => k !== id).length);
+    const ids = Object.keys(ch.presenceState()).filter((k) => k !== id);
+    onPeers(ids.length, ids);
   });
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('sem resposta do servidor')), 15000);
@@ -81,18 +96,27 @@ export async function openRoom(code, { role, onMessage, onPeers, onStatus }) {
   return {
     id, code, role,
     send(payload) { if (!closed) ch.send({ type: 'broadcast', event: 'm', payload: { ...payload, from: id } }); },
-    close() { closed = true; try { ch.untrack(); } catch { /* ok */ } try { client.removeChannel(ch); } catch { /* ok */ } },
+    close() {
+      if (closed) return closing.get(code) || Promise.resolve();
+      closed = true;
+      const p = (async () => {
+        try { await ch.untrack(); } catch { /* ok */ }
+        try { await Promise.race([client.removeChannel(ch), new Promise((r) => setTimeout(r, 3000))]); } catch { /* ok */ }
+      })().finally(() => { if (closing.get(code) === p) closing.delete(code); });
+      closing.set(code, p);
+      return p;
+    },
   };
 }
 
 // Transporte local (mesmo navegador, abas diferentes): BroadcastChannel com presença simulada.
-function openLocal(code, id, { role, onMessage, onPeers, onStatus }) {
+function openLocal(code, id, { role, deliver, onPeers, onStatus }) {
   const bc = new BroadcastChannel('xadrez-' + code);
   const peers = new Map(); // id -> último sinal
   let closed = false;
   const post = (m) => bc.postMessage({ ...m, from: id });
   const beat = () => post({ __p: 'here', role });
-  const report = () => onPeers(peers.size);
+  const report = () => onPeers(peers.size, [...peers.keys()]);
   bc.onmessage = (e) => {
     const m = e.data;
     if (closed || !m || m.from === id) return;
@@ -102,7 +126,7 @@ function openLocal(code, id, { role, onMessage, onPeers, onStatus }) {
       report();
       return;
     }
-    onMessage(m);
+    deliver(m);
   };
   post({ __p: 'hello', role });
   const timer = setInterval(() => {
@@ -118,6 +142,6 @@ function openLocal(code, id, { role, onMessage, onPeers, onStatus }) {
   return Promise.resolve({
     id, code, role,
     send(payload) { if (!closed) post(payload); },
-    close() { if (closed) return; post({ __p: 'bye' }); closed = true; clearInterval(timer); removeEventListener('pagehide', onUnload); bc.close(); },
+    close() { if (!closed) { post({ __p: 'bye' }); closed = true; clearInterval(timer); removeEventListener('pagehide', onUnload); bc.close(); } return Promise.resolve(); },
   });
 }

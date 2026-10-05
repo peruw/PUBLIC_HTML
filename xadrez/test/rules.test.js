@@ -164,3 +164,22 @@ test('inCheck', () => {
   const s4 = fromFEN('4k3/8/8/8/4Q3/8/8/4K3 b - - 0 1');
   assert.equal(inCheck(s4), true);
 });
+
+test('repetição: casa de en passant sem captura possível não diferencia a posição', () => {
+  // A posição depois de 1.e4 (pretas a jogar) volta depois de Nf6 Nf3 Ng8 Ng1, duas vezes.
+  const s = createGame();
+  play(s, 'e2e4', 'g8f6', 'g1f3', 'f6g8', 'f3g1');
+  assert.equal(gameStatus(s).over, false);
+  play(s, 'g8f6', 'g1f3', 'f6g8', 'f3g1');
+  const st = gameStatus(s);
+  assert.equal(st.over, true);
+  assert.equal(st.reason, 'tripla repetição');
+});
+
+test('repetição: casa de en passant com captura possível diferencia a posição', () => {
+  // 1...d5 com peão branco em e5: exd6 e.p. possível só logo depois do avanço duplo.
+  const s = fromFEN('rnbqkbnr/pppppppp/8/4P3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2');
+  play(s, 'd7d5', 'g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1', 'f6g8');
+  // posição "brancas a jogar, peão d5" ocorreu 3 vezes, mas a 1ª tinha en passant possível
+  assert.equal(gameStatus(s).over, false);
+});

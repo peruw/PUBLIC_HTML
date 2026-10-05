@@ -37,8 +37,9 @@ export class Hud {
 
   show(v) { this.root.classList.toggle('hidden', !v); this.root.setAttribute('aria-hidden', v ? 'false' : 'true'); if (v) { this.drawGraph(); this.mini.draw(); } }
 
-  setTurn(color, check, mode) {
-    const who = color === 'w' ? 'Brancas' : 'Pretas';
+  // you: cor do jogador neste aparelho (contra o computador e online), para mostrar "(você)"
+  setTurn(color, check, you = null) {
+    const who = (color === 'w' ? 'Brancas' : 'Pretas') + (you === color ? ' (você)' : '');
     this.turn.textContent = who + (check ? ' — xeque!' : '');
     this.turn.classList.toggle('black', color === 'b');
     this.turn.classList.toggle('check', !!check);
@@ -166,4 +167,7 @@ export class Hud {
   }
 
   setUndoEnabled(v) { $('btn-undo').disabled = !v; }
+
+  // Partida online não tem motor: esconde avaliação, gráfico e melhores lances (ficaria parado em +0.0).
+  setAnalysisVisible(v) { this.root.classList.toggle('no-analysis', !v); if (v) this.drawGraph(); }
 }

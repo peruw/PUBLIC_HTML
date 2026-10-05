@@ -352,6 +352,16 @@ function withLogo(cb) {
   else _logoImg.addEventListener('load', () => cb(_logoImg), { once: true });
 }
 
+// Fonte da marca (a mesma do título). Os textos das placas são redesenhados quando ela termina de carregar,
+// senão ficariam para sempre na fonte reserva do sistema.
+const BRAND_FONT = "'Plus Jakarta Sans', Inter, system-ui, sans-serif";
+function whenFontsReady(cb) {
+  try {
+    if (!document.fonts || !document.fonts.load) return;
+    Promise.all([document.fonts.load(`800 92px ${BRAND_FONT}`), document.fonts.load(`700 64px ${BRAND_FONT}`)]).then(cb, () => {});
+  } catch { /* sem API de fontes: fica a reserva */ }
+}
+
 function canvasTex(c) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -387,15 +397,18 @@ function addBranding(scene, FW) {
   const sc = document.createElement('canvas');
   sc.width = 2048; sc.height = 128;
   const sctx = sc.getContext('2d');
-  sctx.fillStyle = '#' + new THREE.Color(COLORS.brand).getHexString();
-  sctx.fillRect(0, 0, 2048, 128);
-  sctx.fillStyle = COLORS.brandText;
-  sctx.font = '700 64px Fredoka, Inter, system-ui, sans-serif';
-  sctx.textAlign = 'center';
-  sctx.textBaseline = 'middle';
-  const slogan = 'QUANTA AULAS   \u2022   quantaaulas.com   \u2022   QUANTA AULAS';
-  sctx.fillText(slogan, 1024, 68);
+  const drawStrip = () => {
+    sctx.fillStyle = '#' + new THREE.Color(COLORS.brand).getHexString();
+    sctx.fillRect(0, 0, 2048, 128);
+    sctx.fillStyle = COLORS.brandText;
+    sctx.font = `700 64px ${BRAND_FONT}`;
+    sctx.textAlign = 'center';
+    sctx.textBaseline = 'middle';
+    sctx.fillText('QUANTA AULAS   \u2022   quantaaulas.com   \u2022   QUANTA AULAS', 1024, 68);
+  };
+  drawStrip();
   const stex = canvasTex(sc);
+  whenFontsReady(() => { drawStrip(); stex.needsUpdate = true; });
   const stripLen = BOARD_HALF * 2 + FW * 2;
   const stripGeo = new THREE.PlaneGeometry(stripLen, stripLen / 16);
   stripGeo.rotateX(-Math.PI / 2);
@@ -428,15 +441,17 @@ function addBranding(scene, FW) {
     }
     ctx.fillStyle = COLORS.brandText;
     ctx.textBaseline = 'middle';
-    ctx.font = '700 92px Fredoka, Inter, system-ui, sans-serif';
+    ctx.font = `800 92px ${BRAND_FONT}`;
     ctx.fillText('QUANTA AULAS', x0, 104);
     ctx.fillStyle = COLORS.brandAccent;
-    ctx.font = '600 50px Inter, system-ui, sans-serif';
+    ctx.font = `700 50px ${BRAND_FONT}`;
     ctx.fillText('quantaaulas.com', x0, 186);
     ptex.needsUpdate = true;
   };
+  let logoImg = null;
   drawPanel(null);
-  withLogo(drawPanel);
+  withLogo((img) => { logoImg = img; drawPanel(img); });
+  whenFontsReady(() => drawPanel(logoImg));
   const PW = 6, PH = 1.5;
   const faceGeo = new THREE.PlaneGeometry(PW, PH);
   const backGeo = new THREE.BoxGeometry(PW + 0.12, PH + 0.12, 0.12);

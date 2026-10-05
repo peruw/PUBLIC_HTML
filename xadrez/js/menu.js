@@ -1,4 +1,4 @@
-// Telas DOM: carregando, título, configuração, como jogar, pausa/menu, fim de jogo, promoção.
+// Telas DOM: carregando, título, configuração, como jogar, pausa/menu, fim de jogo, confirmação, promoção.
 import { DIFFICULTY, STORE_PREFIX } from './config.js';
 
 const $ = (id) => document.getElementById(id);
@@ -8,8 +8,10 @@ const store = {
 };
 
 export class Menu {
-  constructor({ onStart, onResume, onRestart, onQuit, onOnlineCreate, onOnlineJoin, onOnlineCancel }) {
+  constructor({ onStart, onResume, onRestart, onQuit, onResign, onOnlineCreate, onOnlineJoin, onOnlineCancel }) {
     this.screens = {};
+    this.current = null;        // tela visível (ou null)
+    this._confirmDone = null;
     for (const el of document.querySelectorAll('.screen')) this.screens[el.dataset.screen] = el;
     this.opts = {
       mode: store.get('mode', 'cpu'),
@@ -73,8 +75,12 @@ export class Menu {
     $('btn-pause-resume').addEventListener('click', () => { this.hide(); onResume(); });
     $('btn-pause-restart').addEventListener('click', () => { this.hide(); onRestart(); });
     $('btn-pause-quit').addEventListener('click', () => { this.show('title'); onQuit(); });
+    $('btn-pause-resign').addEventListener('click', () => onResign());
     $('btn-over-again').addEventListener('click', () => { this.hide(); onRestart(); });
+    $('btn-over-view').addEventListener('click', () => this.hide());
     $('btn-over-menu').addEventListener('click', () => { this.show('title'); onQuit(); });
+    $('btn-confirm-yes').addEventListener('click', () => this._confirmDone && this._confirmDone(true));
+    $('btn-confirm-no').addEventListener('click', () => this._confirmDone && this._confirmDone(false));
   }
 
   _syncOnline() {
@@ -116,10 +122,12 @@ export class Menu {
   show(name) {
     for (const [k, el] of Object.entries(this.screens)) el.classList.toggle('hidden', k !== name);
     $('screens').classList.remove('hidden');
+    this.current = name;
   }
   hide() {
     for (const el of Object.values(this.screens)) el.classList.add('hidden');
     $('screens').classList.add('hidden');
+    this.current = null;
   }
 
   setLoading(text) { $('loading-text').textContent = text; }
@@ -130,20 +138,45 @@ export class Menu {
     this.show('gameover');
   }
 
-  // Popup de promoção: resolve com 'q' | 'r' | 'b' | 'n'
+  // Pergunta sim/não numa tela própria; ao responder, volta para a tela que estava aberta (ou para o jogo).
+  confirm({ title, text = '', yes = 'Sim', no = 'Cancelar' }) {
+    if (this._confirmDone) this._confirmDone(false);
+    const prev = this.current;
+    $('confirm-title').textContent = title;
+    $('confirm-text').textContent = text;
+    $('btn-confirm-yes').textContent = yes;
+    $('btn-confirm-no').textContent = no;
+    this.show('confirm');
+    return new Promise((resolve) => {
+      this._confirmDone = (v) => {
+        this._confirmDone = null;
+        if (this.current === 'confirm') { if (prev && prev !== 'confirm') this.show(prev); else this.hide(); }
+        resolve(v);
+      };
+    });
+  }
+  closeConfirm() { if (this._confirmDone) this._confirmDone(false); }
+
+  // Popup de promoção: resolve com 'q' | 'r' | 'b' | 'n', ou null se cancelar (botão, Esc ou toque fora).
   askPromotion(color) {
     return new Promise((resolve) => {
       const el = $('promo');
       el.classList.remove('hidden');
       el.dataset.color = color;
-      const done = (e) => {
-        const t = e.target.closest('[data-piece]');
-        if (!t) return;
-        el.removeEventListener('click', done);
+      const finish = (v) => {
+        el.removeEventListener('click', onClick);
+        removeEventListener('keydown', onKey);
         el.classList.add('hidden');
-        resolve(t.dataset.piece);
+        resolve(v);
       };
-      el.addEventListener('click', done);
+      const onClick = (e) => {
+        const t = e.target.closest('[data-piece]');
+        if (t) finish(t.dataset.piece);
+        else if (e.target === el || e.target.closest('[data-cancel]')) finish(null);
+      };
+      const onKey = (e) => { if (e.key === 'Escape') finish(null); };
+      el.addEventListener('click', onClick);
+      addEventListener('keydown', onKey);
     });
   }
 }

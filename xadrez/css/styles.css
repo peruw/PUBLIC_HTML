@@ -48,6 +48,7 @@ button { font: inherit; cursor: pointer; }
   padding: 10px 14px; font-size: 18px; line-height: 1; backdrop-filter: blur(6px); min-width: 46px;
 }
 .hud-btn.wide { font-size: 15px; font-weight: 600; padding: 12px 16px; }
+#hud.no-analysis .hud-eval, #hud.no-analysis .hud-analysis { display: none; }
 .hud-btn:disabled { opacity: 0.4; cursor: default; }
 .hud-btn:active { transform: scale(0.97); }
 #btn-menu { margin-left: auto; }
@@ -71,6 +72,7 @@ button { font: inherit; cursor: pointer; }
   display: flex; flex-direction: column; gap: 6px; backdrop-filter: blur(8px); overflow: hidden;
 }
 .hud-panel h3 { margin: 4px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+.hud-analysis { display: flex; flex-direction: column; gap: 6px; }
 .hud-graph { width: 100%; height: 90px; border-radius: 8px; display: block; }
 .hud-lines { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 .hud-lines li { display: flex; justify-content: space-between; padding: 3px 6px; border-radius: 6px; }
@@ -98,6 +100,7 @@ button { font: inherit; cursor: pointer; }
 .promo-box { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 16px; padding: 18px 22px; text-align: center; }
 .promo-box p { margin: 0 0 10px; font-family: var(--font-title); font-size: 18px; }
 .promo-row { display: flex; gap: 10px; }
+.promo-cancel { margin-top: 12px; font-size: 15px; padding: 10px 16px; }
 .promo-row button { font-size: 40px; width: 70px; height: 70px; border-radius: 14px; border: 1px solid var(--panel-border); background: #f1ebe0; color: #1c1a17; }
 #promo[data-color="b"] .promo-row button { background: #2a2624; color: #f1ebe0; }
 
@@ -127,16 +130,16 @@ button { font: inherit; cursor: pointer; }
 .label { text-align: left; margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { background: #16261e; color: var(--text); border: 1px solid var(--panel-border); border-radius: 999px; padding: 9px 14px; font-size: 14px; }
-.chip.active { background: var(--accent-2); color: #0f1a22; border-color: transparent; font-weight: 600; }
+.chip.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
 .check { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 10px; }
-.howto { text-align: left; color: #e1dbd0; line-height: 1.5; padding-left: 20px; margin: 0 0 18px; }
+.howto { text-align: left; color: #dfe8e2; line-height: 1.5; padding-left: 20px; margin: 0 0 18px; }
 .howto li { margin-bottom: 8px; }
 .online-join { display: flex; gap: 10px; justify-content: center; }
 .code-input {
   width: 9.5ch; font: 700 26px var(--font-title); letter-spacing: 0.25em; text-transform: uppercase; text-align: center;
-  background: #1a1815; color: var(--text); border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px 12px;
+  background: #0c1712; color: var(--text); border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px 12px;
 }
-.code-input:focus { outline: 2px solid var(--accent-2); }
+.code-input:focus { outline: 2px solid var(--accent); }
 .room-code { font: 700 46px var(--font-title); letter-spacing: 0.3em; color: var(--accent); margin: 4px 0 8px; user-select: all; }
 .online-status { min-height: 1.4em; margin: 14px 0 0; }
 .online-status.error { color: var(--danger); }
