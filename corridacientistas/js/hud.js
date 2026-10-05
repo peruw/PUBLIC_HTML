@@ -241,6 +241,8 @@ export class Hud {
     if (this.el.vignette) this.el.vignette.style.opacity = 0;
     this.el.total.textContent = `/${karts.length}`;
     this._total = karts.length;
+    // contrarrelógio (só o jogador na pista): "1º/1" não informa nada e parece erro
+    this.el.posBox.style.display = karts.length > 1 ? '' : 'none';
     this.last = {};
     this.el.center.textContent = '';
     if (this.index === 0) {
@@ -477,6 +479,7 @@ export class Hud {
     if (this.karts && this.karts.length !== this._total) {
       this._total = this.karts.length;
       this.el.total.textContent = `/${this._total}`;
+      this.el.posBox.style.display = this._total > 1 ? '' : 'none';
     }
     if (this.index === 0) this.updateTags(world);
 

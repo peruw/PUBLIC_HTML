@@ -1096,6 +1096,8 @@ function collideKarts(karts) {
       const aR = a.remote;
       const bR = b.remote;
       if (aR && bR) continue;
+      // kart remoto sem sinal (dono com a aba escondida): fantasma até voltar a mandar estado
+      if (a.netStale || b.netStale) continue;
       const dy = a.position.y - b.position.y;
       if (dy > 1.5 || dy < -1.5) continue;
       let dx = b.position.x - a.position.x;

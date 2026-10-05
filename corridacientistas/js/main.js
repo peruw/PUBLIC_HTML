@@ -287,6 +287,7 @@ async function init() {
     }
   }
   let holdLatch = false; // item seguro mantido depois da pausa até um novo aperto
+  let holdLatch2 = false; // o mesmo para o J2 (tela dividida)
 
   // Pré-compila os shaders para evitar travadas na primeira corrida.
   try {
@@ -425,7 +426,7 @@ async function init() {
     setSplit(duo);
     // dicas contextuais nas duas primeiras corridas
     const played = store.get('played', 0);
-    store.set('played', played + 1);
+    if (!duo) store.set('played', played + 1); // corrida em dupla não gasta as dicas do modo 1 jogador
     hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tutorial: !duo && played < 2, touch: input.touchEnabled, split: duo, players: humans });
     if (duo) hud2.setRace({ player: player2, karts: world.karts, totalLaps: opts.laps, track, split: true, players: humans });
     else hud2.player = null;
@@ -531,6 +532,12 @@ async function init() {
       if (game.state === 'results') showResults();
       else if (game.state === 'race' && !(resultsTimer > 0)) resultsTimer = 1.2;
     };
+    // largada recebida pela repetição do 'start': adianta a contagem para largar junto com os outros
+    const late = THREE.MathUtils.clamp(Number(msg.late) || 0, 0, 3);
+    if (late) {
+      netRace.lag(late);
+      race.addTime(late);
+    }
     netRace.onTimeUp = () => hud.center('TEMPO ESGOTADO!', 'msg pop', 2500);
     netRace.onLeft = (k) => {
       if (game.state === 'race') hud.toast(`<div class="item-ico">🔌</div><div><b>${escHTML(k.netName || k.character.name)} saiu da corrida</b></div>`, 2600);
@@ -608,7 +615,7 @@ async function init() {
     }
     // rival: diferença de tempo na chegada (estimada se ele não terminou)
     const rv = world.rival && results.find((r) => r.kart === world.rival);
-    if (rv && me && !tt) info.rival = { name: rv.kart.character.name, delta: me.time - rv.time };
+    if (rv && me && !tt) info.rival = { name: rv.kart.character.name, delta: me.time - rv.time, estimated: !!(rv.estimated || me.estimated) };
     // desafio do dia
     if (opts.daily) {
       const ok = valid && me.place <= opts.daily.maxPlace;
@@ -797,15 +804,18 @@ async function init() {
     if (ghost?.model) {
       scene.remove(ghost.model.group);
       ghost.model.dispose?.();
+      ghost.mats.forEach((m) => m.dispose()); // clones não são liberados pelo modelo
     }
     ghost = null;
     ghostPrevTime = g?.time || 0;
     if (!g || !g.frames?.length) return;
     const model = kartModel(g.character);
     // materiais próprios e translúcidos (os do kart são compartilhados)
+    const mats = [];
     model.group.traverse((o) => {
       if (!o.material) return;
       o.material = o.material.clone();
+      mats.push(o.material);
       o.material.transparent = true;
       o.material.opacity = 0.38;
       o.material.depthWrite = false;
@@ -813,7 +823,7 @@ async function init() {
     });
     model.group.visible = false;
     scene.add(model.group);
-    ghost = { data: g.frames, model, time: g.time, laps: g.lapTimes || [] };
+    ghost = { data: g.frames, model, mats, time: g.time, laps: g.lapTimes || [] };
   }
   function saveGhost(time) {
     if (!ghostRec?.length) return;
@@ -902,6 +912,7 @@ async function init() {
     if (!on && game.paused) {
       resumeFlush = true;
       holdLatch = !!world.player?.itemHeld;
+      holdLatch2 = !!(world.split && world.players[1]?.itemHeld);
     }
     game.paused = on;
     audio.pauseAll?.(on);
@@ -1089,14 +1100,14 @@ async function init() {
   let ctrl = null;
   let ctrl2 = null; // controles do J2 (tela dividida)
   // Copia a entrada do jogador para os controles do kart (item guardado até o próximo passo).
-  function applyCtrl(k, cs, pending) {
+  function applyCtrl(k, cs, pending, latch = false) {
     const c = k.controls;
     c.throttle = cs.throttle;
     c.brake = cs.brake;
     c.steer = cs.steer;
     c.drift = cs.drift;
     c.lookBack = cs.lookBack;
-    c.holdItem = !!cs.holdItem;
+    c.holdItem = !!cs.holdItem || latch;
     c.itemBack = !!cs.itemBack;
     if (pending) c.useItem = true;
   }
@@ -1138,7 +1149,8 @@ async function init() {
         playerAI2.update(h, world);
         pendingUse2 = false;
       } else if (ctrl2) {
-        applyCtrl(p2, ctrl2, pendingUse2);
+        if (holdLatch2 && (ctrl2.holdItem || ctrl2.useItem || pendingUse2 || !p2.itemHeld)) holdLatch2 = false;
+        applyCtrl(p2, ctrl2, pendingUse2, holdLatch2);
         pendingUse2 = false;
       }
     }
@@ -1252,7 +1264,14 @@ async function init() {
       }
       // corrida online: o tempo que a simulação deixou para trás (aparelho lento) ainda conta no
       // relógio da rede, para os karts dos outros andarem no ritmo de verdade
-      if (netRace) netRace.lag(rawDt - dt + (n === 5 ? acc : 0));
+      // (e no relógio da corrida, que mede a chegada: aba escondida não vira pausa grátis)
+      if (netRace) {
+        const lost = Math.min(rawDt - dt + (n === 5 ? acc : 0), 120);
+        if (lost > 0 && !netRace.final) {
+          netRace.lag(lost);
+          race.addTime(lost);
+        }
+      }
       if (n === 5) acc = 0;
       effects.update(dt, world);
 

@@ -13,6 +13,7 @@ export class RaceManager {
     this.totalLaps = RACE.defaultLaps;
     this.countdown = 0;
     this.time = 0;
+    this._carry = 0; // tempo somado por addTime além do fim da contagem
     this.finishOrder = [];
     this.results = null;
     this._lastCount = 0;
@@ -60,6 +61,17 @@ export class RaceManager {
     this.updatePlaces();
   }
 
+  // Corrida online: tempo real que a simulação deste aparelho não acompanhou (aba escondida,
+  // aparelho lento, largada recebida atrasada). Os karts não andam nesse tempo, mas o relógio
+  // da corrida corre como nos outros aparelhos; senão a chegada daqui sai adiantada.
+  addTime(sec) {
+    if (!(sec > 0)) return;
+    if (this.phase === 'countdown') {
+      this.countdown += sec;
+      this._carry = Math.max(0, this.countdown - RACE.countdownStep * 3);
+    } else if (this.phase === 'racing' || this.phase === 'finished') this.time += sec;
+  }
+
   update(dt, world) {
     if (this.phase === 'countdown') this.updateCountdown(dt, world);
     else if (this.phase === 'racing' || this.phase === 'finished') this.time += dt;
@@ -87,7 +99,8 @@ export class RaceManager {
     this._throttleStart = this.player ? this.player._thrStart : -1;
     if (this.countdown >= step * 3) {
       this.phase = 'racing';
-      this.time = 0;
+      this.time = this._carry;
+      this._carry = 0;
       for (const k of this.karts) k.frozen = false;
       this.bus.emit('race:go', {});
       for (const p of this.players) {

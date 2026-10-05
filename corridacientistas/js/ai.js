@@ -50,6 +50,7 @@ export class AIDriver {
     // recuperação
     this._stuckT = 0;
     this._reverseT = 0;
+    this._wrongT = 0; // tempo seguido na contramão
     // erros visíveis (sorteados uma vez por curva; menos habilidade = mais erros)
     this._inCurve = false;
     this._errWideT = 0; // s restantes do "entrou rápido demais e saiu largo"
@@ -125,14 +126,25 @@ export class AIDriver {
       return;
     }
     if (Math.abs(off) > 1.75) {
-      // contramão: vira de volta
+      // contramão: vira de volta. Perto do muro, vira para o centro (de frente
+      // para trás, virar à direita leva a -lateral); senão o raspão realinha o
+      // kart ao muro e ele segue de ré na pista sem parar.
+      this._wrongT += dt;
+      if (this._wrongT > 2.5) {
+        // muito tempo na contramão: manobra de ré
+        this._wrongT = 0;
+        this._reverseT = rand(0.8, 1.2);
+        return;
+      }
       c.throttle = 1;
       c.brake = 0;
       c.drift = false;
-      c.steer = off > 0 ? 1 : -1;
+      const nearWall = Math.abs(k.lateral) > hw - 1.5;
+      c.steer = nearWall ? Math.sign(k.lateral) : off > 0 ? 1 : -1;
       this._driftDir = 0;
       return;
     }
+    this._wrongT = 0;
 
     // ---------- curvatura à frente (para frear e sortear erros) ----------
     let maxK = 0;

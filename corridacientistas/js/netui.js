@@ -406,7 +406,8 @@ export class NetUI {
     };
     room.send('start', msg);
     // mensagens se perdem de vez em quando: repete a largada (quem já recebeu ignora)
-    for (const ms of [400, 1200]) setTimeout(() => { if (this.room === room && this.phase === 'race') room.send('start', msg); }, ms);
+    // (late: s desde a largada original, para quem só recebe a repetição largar no mesmo instante)
+    for (const ms of [400, 1200]) setTimeout(() => { if (this.room === room && this.phase === 'race') room.send('start', { ...msg, late: ms / 1000 }); }, ms);
     this.seenRaces.add(msg.race);
     this.h.onStart(msg);
   }

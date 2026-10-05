@@ -20,6 +20,7 @@ const EXTRAP = 0.25; // s máximos andando "no escuro" quando o estado atrasa
 export const WAIT_OTHERS = 60; // s depois da chegada do 1º humano
 const FIN_GRACE = 4; // s a mais esperando as estimativas dos outros aparelhos
 const LEAVE_GRACE = 2.5; // s antes de dar alguém como desconectado (reconexão rápida)
+const STALE = 1.5; // s sem estado: o kart remoto fica "sem sinal" (aba escondida) e deixa de bater
 
 // Estados por segundo de cada aparelho: menos com a sala cheia (o Realtime conta cada entrega).
 export const sendRate = (humans) => (humans <= 3 ? 15 : humans <= 5 ? 12 : 10);
@@ -100,6 +101,7 @@ export class NetRace {
       k.netId = null;
       k.netName = null;
       k.netHit = null;
+      k.netStale = false;
       k.itemHeld = null;
     }
     if (this.items.net === this) this.items.net = null;
@@ -117,6 +119,10 @@ export class NetRace {
     if (this.final) return;
     for (const e of this.remote.values()) {
       if (e.interp.sample(this.clock, POSE)) e.kart.netPose(POSE, h, this.track);
+      // dono com a aba em segundo plano (ou sem rede) não manda estado: o kart dele fica parado
+      // na pista e não pode virar parede para os outros (a IA inteira, se for o anfitrião)
+      if (e.lastT === undefined) e.lastT = this.clock;
+      e.kart.netStale = this.clock - e.lastT > STALE;
     }
     for (const [id, until] of this.leaving) {
       if (this.clock >= until) {
@@ -200,6 +206,7 @@ export class NetRace {
       const pose = { x: +s.x, y: +s.y, z: +s.z, h: +s.h, v: +s.v || 0, st: +s.st || 0, g: !s.ag, s: +s.s || 0 };
       if (![pose.x, pose.y, pose.z, pose.h].every(Number.isFinite)) continue;
       if (!e.interp.push(t, this.clock, pose)) continue; // fora de ordem
+      e.lastT = this.clock;
       k.netState(s);
       k.roulette = s.ro ? k.roulette || { time: 1, showing: null, result: null, remote: true } : null;
       if (s.hd) {
@@ -415,10 +422,11 @@ export class NetRace {
           estimated = true;
         } else running = true;
       }
-      rows.push({ kart: k, id: this.idOf.get(k), name: k.netName, human, time, estimated, running, left: false });
+      // (tempo na mesma precisão do que vai pela rede: senão o anfitrião arredonda diferente dos outros)
+      rows.push({ kart: k, id: this.idOf.get(k), name: k.netName, human, time: r3(time), estimated, running, left: false });
     }
     for (const l of this.left) {
-      if (l.finished) rows.push({ kart: l.kart, id: l.id, name: l.name, human: l.human, time: l.time, estimated: false, running: false, left: true });
+      if (l.finished) rows.push({ kart: l.kart, id: l.id, name: l.name, human: l.human, time: r3(l.time), estimated: false, running: false, left: true });
     }
     // quem chegou de verdade vem antes de quem só tem tempo estimado; quem corre, pelo progresso
     const fin = rows.filter((r) => !r.estimated && !r.running).sort((a, b) => a.time - b.time);

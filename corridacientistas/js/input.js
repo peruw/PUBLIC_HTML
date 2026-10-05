@@ -411,7 +411,8 @@ export class Input {
   _keySplit(e, down) {
     const m = KEYMAP_SPLIT[e.code];
     if (!m) return;
-    if (isEditable(e.target)) return;
+    // só o aperto é ignorado num campo editável: o soltar sempre passa, senão a tecla fica presa
+    if (down && isEditable(e.target)) return;
     // com a pausa aberta, Enter aciona o botão escolhido com Tab (só na corrida ele é bloqueado)
     const menuEnter = (e.code === 'Enter' || e.code === 'NumpadEnter') && this._overlayOpen();
     if (PREVENT_SPLIT.has(e.code) && !menuEnter) e.preventDefault();

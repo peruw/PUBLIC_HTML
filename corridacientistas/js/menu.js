@@ -704,7 +704,9 @@ export class Menu {
     if (info.rival && !tt) {
       const d = info.rival.delta;
       const n = info.rival.name;
-      parts.push(d < 0 ? `⚔️ Você venceu o rival ${n} por ${Math.abs(d).toFixed(1).replace('.', ',')} s` : `⚔️ O rival ${n} chegou ${d.toFixed(1).replace('.', ',')} s na sua frente`);
+      // tempo estimado (alguém não cruzou a chegada): diferença aproximada, em segundos inteiros
+      const ds = info.rival.estimated ? `cerca de ${Math.max(1, Math.round(Math.abs(d)))}` : Math.abs(d).toFixed(1).replace('.', ',');
+      parts.push(d < 0 ? `⚔️ Você venceu o rival ${n} por ${ds} s` : `⚔️ O rival ${n} chegou ${ds} s na sua frente`);
     }
     if (info.medal) parts.push(`${MEDAL_ICON[info.medal.type]} Medalha de ${info.medal.type} com ${player.character.name} no ${info.cc}!`);
     if (info.unlocked150) parts.push('🔓 150cc liberado!');
