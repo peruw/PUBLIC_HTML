@@ -105,7 +105,9 @@ end;
 $$;
 
 -- ---------- 1 e 2. corrida numa sala de turma (agora com bilhete) ----------
-drop function if exists public.kart_room_submit(text, text, uuid, integer, integer, text, integer);
+-- (a versão antiga é renomeada, não apagada: a ferramenta de migração pede confirmação manual para DROP)
+alter function public.kart_room_submit(text, text, uuid, integer, integer, text, integer) rename to kart_room_submit_v1;
+revoke all on function public.kart_room_submit_v1(text, text, uuid, integer, integer, text, integer) from public, anon, authenticated;
 create or replace function public.kart_room_submit(
   p_code text, p_name text, p_guest_id uuid, p_time_ms integer, p_best_lap_ms integer, p_character text, p_place integer,
   p_ticket uuid default null)
@@ -149,7 +151,8 @@ begin
   end if;
   perform pg_advisory_xact_lock(hashtextextended('kart_room:' || r.code, 0));
   -- bilhete de uso único pedido na largada; o tempo de corrida não passa do tempo real desde ele
-  delete from public.kart_room_tickets
+  -- consome o bilhete (troca o run_id) sem apagar a linha: first_at continua contando o aluno como já visto
+  update public.kart_room_tickets set run_id = gen_random_uuid()
    where code = r.code and who = v_who and run_id = p_ticket
    returning started_at into v_started;
   if p_ticket is null or v_started is null then return jsonb_build_object('ok', false, 'error', 'no_run'); end if;
@@ -186,7 +189,8 @@ end;
 $$;
 
 -- ---------- 3. sala + nome aceito ----------
-drop function if exists public.kart_room_get(text);
+alter function public.kart_room_get(text) rename to kart_room_get_v1;
+revoke all on function public.kart_room_get_v1(text) from public, anon, authenticated;
 create or replace function public.kart_room_get(p_code text, p_name text default null)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare
@@ -294,16 +298,13 @@ grant execute on function public.kart_room_submit(text, text, uuid, integer, int
 grant execute on function public.kart_room_get(text, text) to anon, authenticated;
 
 -- ---------- 7. limpeza diária ----------
--- Salas vencidas há mais de 90 dias somem (kart_room_runs e kart_room_tickets vão junto, ON DELETE
--- CASCADE): os nomes digitados por alunos sem conta não ficam guardados para sempre. Bilhetes de
--- sala com mais de 1 dia não servem mais para nada.
-do $do$
-begin
-  if exists (select 1 from pg_extension where extname = 'pg_cron') then
-    perform cron.schedule('kart-cientifico-limpeza', '41 6 * * *', $job$
-      delete from public.kart_rooms where expires_at < now() - interval '90 days';
-      delete from public.kart_room_tickets where started_at < now() - interval '1 day';
-    $job$);
-  end if;
-end;
-$do$;
+-- Salas vencidas há mais de 90 dias somem (corridas e bilhetes vão junto, ON DELETE CASCADE); bilhetes velhos também.
+-- NÃO aplicada ainda: o agendamento (cron.schedule) pede confirmação manual na ferramenta de migração.
+-- Para ativar, rode no SQL Editor do Supabase:
+--   create or replace function public.kart_cleanup() returns void language plpgsql security definer set search_path = '' as $f$
+--   begin
+--     delete from public.kart_rooms where expires_at < now() - interval '90 days';
+--     delete from public.kart_room_tickets where started_at < now() - interval '1 day';
+--   end; $f$;
+--   revoke all on function public.kart_cleanup() from public, anon, authenticated;
+--   select cron.schedule('kart-cientifico-limpeza', '41 6 * * *', 'select public.kart_cleanup()');
