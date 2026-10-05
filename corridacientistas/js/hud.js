@@ -136,11 +136,11 @@ export class Hud {
     const ico = itemIconHTML(item);
     const squash = item === 'tesla' && type !== 'shock'; // passou por cima de um kart encolhido
     if (kart === p && squash) {
-      this.toast(`<div class="item-ico">${ico}</div><div><b>${by ? by.character.name + ' passou por cima de você!' : 'Amassado!'}</b></div>`, 1700, 'hit');
+      this.toast(`<div class="item-ico">${ico}</div><div><b>${by ? who(by) + ' passou por cima de você!' : 'Amassado!'}</b></div>`, 1700, 'hit');
       return;
     }
     if (by === p && squash && !kart.finished) {
-      this.toast(`<div class="item-ico">${ico}</div><div><b>Você amassou ${kart.character.name}!</b></div>`, 1500, 'good');
+      this.toast(`<div class="item-ico">${ico}</div><div><b>Você amassou ${who(kart)}!</b></div>`, 1500, 'good');
       return;
     }
     if (kart === p) {
@@ -223,8 +223,14 @@ export class Hud {
       this.el.tag.textContent = split ? `J${this.index + 1} · ${player.character.name}` : '';
     }
     if (this.el.key) {
-      // tecla do item de cada jogador na tela dividida; com 1 jogador, o texto original
-      this.el.key.innerHTML = !split ? this.keyHTML : this.index === 0 ? '<kbd>E</kbd> usa o item' : '<kbd>Enter</kbd> usa o item';
+      // tecla do item de cada jogador na tela dividida; com 1 jogador, o texto original.
+      // Na tela dividida não há dicas: na largada e nos primeiros segundos a linha mostra
+      // também o drift e o olhar para trás de cada um (antes só apareciam em "Como jogar")
+      this._keyShort = !split ? this.keyHTML : this.index === 0 ? '<kbd>E</kbd> usa o item' : '<kbd>Enter</kbd> usa o item';
+      this.el.key.innerHTML = !split ? this.keyHTML : this.index === 0
+        ? '<kbd>E</kbd> item · <kbd>Espaço</kbd> drift · <kbd>Q</kbd> olha atrás'
+        : '<kbd>Enter</kbd> item · <kbd>.</kbd> drift · <kbd>,</kbd> olha atrás';
+      this._keyLong = split ? 10 : 0; // s (contagem + começo da corrida)
     }
     if (this.index === 0) this.root.classList.toggle('split', split && this.active);
     this.karts = karts;
@@ -522,6 +528,10 @@ export class Hud {
     if (race.phase === 'racing' && !p.finished) {
       if (this.index === 0) this.updateZones(world, p);
       this.updateTips(world, p);
+    }
+    if (this._keyLong > 0) {
+      this._keyLong -= dt;
+      if (this._keyLong <= 0 && this.el.key) this.el.key.innerHTML = this._keyShort;
     }
     if (this.driftTip > 0) {
       this.driftTip -= dt * 1000;

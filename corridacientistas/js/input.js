@@ -608,6 +608,21 @@ export class Input {
     const dx = W - sr - size.drift;
     pos.drift = [dx, sb];
     pos.brake = [dx - size.brake - gap * 1.2, sb];
+    // tela estreita (celular em pé, "Jogar assim mesmo"): a zona do FREIO invadia a de ▶ e o lado
+    // direito do ▶ freava. Encolhe o FREIO e depois ◀ ▶ até as zonas não se tocarem
+    let over = pos.right[0] + size.right + PAD * 2 + 10 - pos.brake[0];
+    if (over > 0) {
+      const cut = Math.min(over, size.brake - 46);
+      size.brake -= cut;
+      over -= cut;
+      if (over > 0) {
+        const c2 = Math.min(over / 2, size.left - 60);
+        size.left = size.right = size.left - c2;
+        pos.right[0] = sl + size.left + gap * 1.4;
+      }
+      pos.brake = [Math.max(dx - size.brake - gap * 1.2, pos.right[0] + size.right + PAD * 2 + 10), sb];
+    }
+    B.brake.style.fontSize = size.brake < 56 ? '10px' : ''; // "FREIO" cabe no botão menor
     if (this._autoAccelerate) {
       pos.item = [dx - size.item * 0.55, sb + size.drift + gap * 0.6];
       pos.gas = [W - sr - size.gas, sb + size.drift + gap * 0.7];

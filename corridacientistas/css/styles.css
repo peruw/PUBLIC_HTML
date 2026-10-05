@@ -430,6 +430,20 @@ a.btn-primary {
   max-width: 100%;
 }
 
+/* palavra longa sem espaço (Mendeleev): letra um pouco menor e mais junta, em vez de "Mendel…" */
+.char-card span.long {
+  letter-spacing: -0.03em;
+  font-size: clamp(10px, 1.4vw, 14px);
+}
+
+/* notebook de escola (1366x657, 1280x720): as 3 fileiras de cientistas cabem sem rolar
+   (antes Franklin, K. Johnson e Enedina ficavam escondidas atrás das opções) */
+@media (min-width: 1000px) and (max-height: 740px) {
+  .char-card img,
+  .char-card .ph { width: auto; height: clamp(50px, 9.5vh, 80px); margin: 0 auto; }
+  .char-grid { gap: 8px; }
+}
+
 .char-card .flag {
   position: absolute;
   top: 6px;
@@ -2296,4 +2310,27 @@ body.touch .toast p { font-size: 12px; }
 .results-side .fact-card {
   max-height: min(44vh, 360px);
   overflow: auto;
+}
+
+/* ---------- verificação de outubro/2026 (celular) ---------- */
+/* resultado em tela baixa: só o painel rola (o cartão "Você sabia?" rolando por dentro prendia o
+   dedo e escondia a lista e o quiz) */
+@media (max-height: 520px) {
+  .results-side .fact-card { max-height: none; overflow: visible; }
+}
+
+/* sala de espera no celular deitado: nome curto embaixo do rosto e o rótulo "Voltas"/"Motor" pequeno
+   (antes eram 13 rostos sem nome e "1 2 3 5" sem dizer o que era) */
+@media (max-height: 400px) {
+  .lb-char span { display: block; font-size: 9px; line-height: 1.05; letter-spacing: -0.2px; }
+  .lb-char .lb-face { width: 28px; height: 28px; }
+  .lobby-foot .opt-label { display: inline; font-size: 10px; }
+}
+
+/* toque: alvos maiores (botões do resultado, opções da sala, nome do ranking e volume) */
+@media (pointer: coarse) {
+  #screen-results .row .btn { min-height: 40px; }
+  #rank-name { min-height: 36px; font-size: 16px; }
+  .lobby-foot .seg button { min-height: 40px; }
+  input[type='range'][data-vol] { height: 32px; }
 }

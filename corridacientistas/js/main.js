@@ -50,7 +50,7 @@ function dailyChallenge() {
   let cc = ccs[Math.floor(rnd() * ccs.length)];
   if (cc === '150cc' && !is150Unlocked()) cc = '100cc'; // o sorteio é igual para todos; só a classe cai
   const podium = rnd() < 0.5;
-  return { key, character: ch.id, cc, laps: 2, maxPlace: podium ? 3 : 1, label: `${ch.name} · ${cc} · ${podium ? 'chegar no pódio' : 'vencer'}` };
+  return { key, character: ch.id, cc, laps: 2, maxPlace: podium ? 3 : 1, label: `${ch.name} · ${cc} · ${podium ? 'chegar ao pódio' : 'vencer'}` };
 }
 
 // Só 'pointer: coarse' conta como celular/tablet (notebooks com tela de toque têm ontouchstart).
@@ -233,6 +233,7 @@ async function init() {
   // sem ela o jogo segue normal
   Online.init();
   let runTicket = null; // promessa do bilhete da corrida atual (kart_start_run)
+  let roomTicket = null; // idem, da sala de turma (kart_room_start; vale também sem conta)
   const hud = new Hud({ bus });
   const hud2 = new Hud({ bus, index: 1 }); // painel do J2 (só aparece na tela dividida)
 
@@ -270,6 +271,8 @@ async function init() {
   });
   let netRace = null;
   let netListT = 0; // atualização da lista viva do resultado online
+  let netStatusOff = null; // aviso de conexão caída durante a corrida online
+  let netOffline = false;
 
   // Liga/desliga a tela dividida: teclado dividido, FOV mais aberto e proporção da metade.
   function setSplit(on) {
@@ -433,6 +436,8 @@ async function init() {
     // fantasma do recorde (contrarrelógio)
     // bilhete do ranking online: o servidor marca a hora da largada (2 jogadores não contam)
     runTicket = Online.user && !duo ? Online.startRun(boardOf(opts)) : null;
+    const tr = !duo && opts.room && opts.room.board === boardOf(opts) ? opts.room : null;
+    roomTicket = tr ? Online.roomStart(tr.code, tr.guestName) : null;
     ghostRec = tt ? [] : null;
     ghostSampleT = 0;
     setGhost(tt ? store.get(ghostKey(opts), null) : null);
@@ -538,6 +543,20 @@ async function init() {
       netRace.lag(late);
       race.addTime(late);
     }
+    // canal caído (o realtime-js tenta de novo sozinho): sem aviso, os karts dos outros
+    // congelavam e o aluno não sabia por quê
+    netStatusOff?.();
+    netOffline = false;
+    netStatusOff = room.on('status', (st) => {
+      if (netUI.room !== room || !netRace) return;
+      if (st === 'error' && !netOffline) {
+        netOffline = true;
+        if (game.state === 'race') hud.toast('<div class="item-ico">📶</div><div><b>Sem conexão…</b><p>Tentando de novo. Os outros karts podem parar até voltar.</p></div>', 60000, 'hit');
+      } else if (st === 'connected' && netOffline) {
+        netOffline = false;
+        if (game.state === 'race') hud.toast('<div class="item-ico">📶</div><div><b>Conexão de volta!</b></div>', 1800, 'good');
+      }
+    });
     netRace.onTimeUp = () => hud.center('TEMPO ESGOTADO!', 'msg pop', 2500);
     netRace.onLeft = (k) => {
       if (game.state === 'race') hud.toast(`<div class="item-ico">🔌</div><div><b>${escHTML(k.netName || k.character.name)} saiu da corrida</b></div>`, 2600);
@@ -545,7 +564,7 @@ async function init() {
     const tags = netRace.humans.filter((k) => k !== me).map((k) => ({ kart: k, name: k.netName || k.character.name }));
     hud.setRace({ player: me, karts: world.karts, totalLaps: laps, track, tutorial: false, touch: input.touchEnabled, tags });
     hud2.player = null;
-    runTicket = null; // online não vale para o ranking
+    runTicket = roomTicket = null; // online não vale para o ranking
     ghostRec = null;
     setGhost(null);
     hud.show(true);
@@ -615,7 +634,7 @@ async function init() {
     }
     // rival: diferença de tempo na chegada (estimada se ele não terminou)
     const rv = world.rival && results.find((r) => r.kart === world.rival);
-    if (rv && me && !tt) info.rival = { name: rv.kart.character.name, delta: me.time - rv.time, estimated: !!(rv.estimated || me.estimated) };
+    if (rv && me && !tt) info.rival = { name: rv.kart.character.name, female: rv.kart.character.gender === 'f', delta: me.time - rv.time, estimated: !!(rv.estimated || me.estimated) };
     // desafio do dia
     if (opts.daily) {
       const ok = valid && me.place <= opts.daily.maxPlace;
@@ -715,7 +734,8 @@ async function init() {
     const board = boardOf(opts);
     const room = opts.room && opts.room.board === board ? opts.room : null;
     const ticket = runTicket;
-    runTicket = null;
+    const rTicket = roomTicket;
+    runTicket = roomTicket = null;
     // conta conectada só depois da largada (ex.: internet lenta): sem bilhete, não vale para o ranking
     const noTicket = !ticket && !!Online.user;
     if (!ticket && !room) {
@@ -736,11 +756,13 @@ async function init() {
     try {
       if (ticket) {
         const runId = await ticket;
-        res.global = runId ? await Online.submitRun({ runId, ...run }) : { ok: false, error: 'offline' };
+        // sem bilhete (sem internet na largada): o tempo não vale mais, não é falha passageira
+        res.global = runId ? await Online.submitRun({ runId, ...run }) : { ok: false, error: 'no_ticket_net' };
         if (res.global?.ok && !res.global.rank_all) menu.me = await Online.getMe();
       }
       if (room) {
-        res.room = await Online.roomSubmit(room.code, run, room.guestName);
+        const rid = rTicket ? await rTicket : null;
+        res.room = rid ? await Online.roomSubmit(room.code, run, room.guestName, rid) : { ok: false, error: 'no_ticket_room' };
         if (res.room?.ok) res.roomBoard = await Online.roomBoard(room.code, 8, room.guestName);
       }
     } catch {
@@ -880,7 +902,8 @@ async function init() {
   // ---------- rival e hora dourada ----------
   bus.on('race:go', () => {
     if (game.state === 'race' && world.rival) {
-      hud.toast(`<div class="item-ico">⚔️</div><div><small>Seu rival</small><b>${world.rival.character.name}</b><p>O adversário mais rápido desta corrida.</p></div>`, 3200);
+      const f = world.rival.character.gender === 'f'; // Marie Curie, Rosalind Franklin…: "Sua rival"
+      hud.toast(`<div class="item-ico">⚔️</div><div><small>${f ? 'Sua rival' : 'Seu rival'}</small><b>${world.rival.character.name}</b><p>${f ? 'A adversária mais rápida' : 'O adversário mais rápido'} desta corrida.</p></div>`, 3200);
     }
   });
   let moodT = -1; // -1 = parado; 0..1 animando para a hora dourada

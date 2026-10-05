@@ -61,7 +61,7 @@ export const CHARACTERS = [
     name: 'Einstein',
     fullName: 'Albert Einstein',
     years: '1879–1955',
-    country: 'Alemanha',
+    country: 'Alemanha / EUA',
     field: 'Física',
     stats: { speed: 4, accel: 2, handling: 3, weight: 3 },
     colors: { kart: 0x1d7bd8, kartAccent: 0xffffff, ui: '#1d7bd8' },
@@ -96,7 +96,7 @@ export const CHARACTERS = [
     name: 'Darwin',
     fullName: 'Charles Darwin',
     years: '1809–1882',
-    country: 'Inglaterra',
+    country: 'Reino Unido',
     field: 'Biologia',
     stats: { speed: 4, accel: 2, handling: 3, weight: 4 },
     colors: { kart: 0x8a6d3b, kartAccent: 0xe9c46a, ui: '#a07a3c' }, // marrom-oliva do Beagle (distinto da Curie)
@@ -188,7 +188,7 @@ export const CHARACTERS = [
     gender: 'f',
     fullName: 'Rosalind Elsie Franklin',
     years: '1920–1958',
-    country: 'Inglaterra',
+    country: 'Reino Unido',
     field: 'Química e Biofísica',
     stats: { speed: 3, accel: 4, handling: 4, weight: 1 },
     colors: { kart: 0x9b5de5, kartAccent: 0xf1faee, ui: '#9b5de5' },
@@ -196,7 +196,7 @@ export const CHARACTERS = [
       skin: 0xf4d6c0, hair: 0x3b2418, hairStyle: 'cabelo castanho-escuro curto e ondulado, repartido de lado',
       outfit: 0xf7f7f7, outfitAccent: 0x33415c, extras: 'jaleco branco de laboratório sobre blusa azul-escura; modelo de dupla hélice do DNA girando no kart',
     },
-    bio: 'Química inglesa especialista em difração de raios X. Sua equipe fez a "Foto 51", em 1952: o padrão em X mostrou que o DNA é uma hélice e foi a pista decisiva para o modelo da dupla hélice (1953). Também estudou vírus e o carvão.',
+    bio: 'Química inglesa especialista em difração de raios X. Sua equipe fez a “Foto 51”, em 1952: o padrão em X mostrou que o DNA é uma hélice e foi a pista decisiva para o modelo da dupla hélice (1953). Também estudou vírus e o carvão.',
     fact: 'Ela morreu em 1958, aos 37 anos. O Nobel de 1962 pela estrutura do DNA foi para Watson, Crick e Wilkins: o prêmio não é dado a quem já morreu.',
   },
   {
@@ -265,7 +265,7 @@ export const ITEMS = {
   },
   alfa: {
     id: 'alfa', name: 'Partícula Alfa', icon: 'α', color: 0xffd23f, hold: true,
-    effect: 'Tiro reto que ricocheteia nos muros. Segure o botão de item para levá-la atrás como escudo. Para atirar para trás, solte segurando FREIO ou C (no celular, arraste o dedo para baixo no ITEM).', // (casco verde)
+    effect: 'Tiro reto que ricocheteia nos muros. Segure o botão de item para levá-la atrás como escudo. Para atirar para trás, solte segurando FREIO ou a tecla de olhar para trás: C (em 2 jogadores, Q ou vírgula); no celular, arraste o dedo para baixo no ITEM.', // (casco verde)
     fact: 'Em 1909, a equipe de Rutherford disparou partículas alfa contra uma folha de ouro. Algumas ricochetearam: o átomo tem um núcleo pequeno e denso!',
     weights: [40, 25, 20, 15, 10, 5, 0, 0],
   },

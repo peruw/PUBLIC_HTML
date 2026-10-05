@@ -24,7 +24,10 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <!-- fontes sem bloquear a página: numa rede de escola que segura o Google Fonts, o jogo abre com as
+       fontes do sistema em vez de ficar em branco esperando -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" /></noscript>
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
@@ -198,7 +201,7 @@
       <div class="online-body turma-body">
         <div class="turma-box">
           <h3>Entrar numa sala</h3>
-          <p>Digite o código que o professor passou.</p>
+          <p>Digite o código que o professor passou e o seu nome (é ele que aparece para o professor).</p>
           <div class="turma-row">
             <input id="room-code" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off" aria-label="Código da sala" enterkeyhint="go" />
             <input id="room-name" maxlength="20" placeholder="Seu nome" aria-label="Seu nome na sala" enterkeyhint="go" />
@@ -305,7 +308,7 @@
               <li><kbd>W</kbd>/<kbd>↑</kbd> acelera · <kbd>S</kbd>/<kbd>↓</kbd> freia e dá ré</li>
               <li><kbd>A</kbd><kbd>D</kbd> ou <kbd>←</kbd><kbd>→</kbd> vira</li>
               <li><kbd>Espaço</kbd> pula e faz <b>drift</b></li>
-              <li><kbd>E</kbd>, <kbd>X</kbd> ou <kbd>Shift</kbd> usa o item · <b>segure</b> para levar a maçã ou a alfa atrás como escudo</li>
+              <li><kbd>E</kbd>, <kbd>X</kbd> ou <kbd>Shift</kbd> usa o item · <b>segure</b> para levar a maçã ou a alfa atrás como escudo · para atirar para trás, use o item segurando <kbd>C</kbd> (ou solte-o segurando <kbd>S</kbd>/<kbd>↓</kbd>)</li>
               <li><kbd>C</kbd> olha para trás · <kbd>Esc</kbd>/<kbd>P</kbd> pausa · <kbd>M</kbd> som</li>
               <li>Controle: <kbd>A</kbd>/<kbd>RT</kbd> acelera · <kbd>B</kbd>/<kbd>LT</kbd> freia · <kbd>RB</kbd>/<kbd>X</kbd> drift · <kbd>LB</kbd>/<kbd>Y</kbd> item · <kbd>Start</kbd> pausa</li>
             </ul>
@@ -327,6 +330,7 @@
               <li>Na escolha, marque <b>Jogadores: 2</b>. Cada um escolhe o seu cientista: J1 com <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, J2 com as setas.</li>
               <li><b>J1</b> (esquerda): <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> dirige · <kbd>Espaço</kbd> drift · <kbd>E</kbd> item · <kbd>Q</kbd> olha para trás</li>
               <li><b>J2</b> (direita): setas dirigem · <kbd>.</kbd> ou <kbd>/</kbd> drift · <kbd>Enter</kbd> ou <kbd>Shift</kbd> direito item · <kbd>,</kbd> ou <kbd>End</kbd> olha para trás</li>
+              <li>Para atirar o item para trás, use-o segurando a tecla de olhar para trás (<kbd>Q</kbd> no J1, <kbd>,</kbd> no J2).</li>
               <li>Com controles: o 1º é do J1 e o 2º é do J2. <kbd>Esc</kbd>/<kbd>P</kbd> de qualquer um pausa.</li>
               <li>No modo 2 jogadores, recordes, medalhas e rankings não contam: vale o duelo!</li>
             </ul>

@@ -187,7 +187,12 @@ export class NetUI {
       if (st === 'error') this.note('Conexão instável… tentando de novo.', 'warn');
     });
     room.on('msg:start', (m) => this.onStart(m));
-    const ok = await room.join();
+    let ok = false;
+    try {
+      ok = await room.join();
+    } catch {
+      ok = false; // (erro do transporte: mesma mensagem de "não foi possível conectar")
+    }
     if (this.room !== room) return false; // saiu enquanto conectava
     if (!ok) {
       this.leave();
@@ -417,7 +422,7 @@ export class NetUI {
     if (!room || !m || typeof m.race !== 'string' || this.seenRaces.has(m.race)) return;
     // só vale a largada de quem é o anfitrião agora
     if (m.fr !== m.host || m.fr !== room.hostId) return;
-    if (!Array.isArray(m.grid) || !m.humans || typeof m.humans !== 'object') return;
+    if (!Array.isArray(m.grid) || !m.humans || typeof m.humans !== 'object' || !m.humans[m.fr]) return;
     this.seenRaces.add(m.race);
     if (this.phase !== 'lobby' || !m.humans[room.id]) return; // (no resultado: fica para a próxima)
     this.h.onStart(m);

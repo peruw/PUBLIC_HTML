@@ -195,22 +195,37 @@ export class SupabaseTransport extends Emitter {
 
   async connect(meta) {
     this.meta = { ...meta };
-    // saiu desta mesma sala agorinha: espera o canal antigo terminar de sair (no máximo 3 s)
+    // saiu desta mesma sala agorinha: espera o canal antigo terminar de sair (o unsubscribe do
+    // realtime-js desiste sozinho em 10 s). O client.channel() devolve o canal que ainda tiver o
+    // mesmo tópico: reaproveitado, ele lançava erro ao ligar a presença ou nunca conectava
     const pending = typeof this.client === 'object' && closingOf(this.client).get(this.topic);
-    if (pending) await Promise.race([pending, new Promise((r) => setTimeout(r, 3000))]);
+    if (pending) await Promise.race([pending, new Promise((r) => setTimeout(r, 11000))]);
     if (this.closed) return false; // desistiu enquanto esperava
-    const ch = this.client.channel(this.topic, {
-      config: { broadcast: { self: false }, presence: { key: this.id } },
-    });
+    let ch;
+    try {
+      const old = this.client.getChannels?.().find((c) => c.topic === 'realtime:' + this.topic);
+      if (old) await this.client.removeChannel(old).catch?.(() => {});
+      if (this.closed) return false;
+      ch = this.client.channel(this.topic, {
+        config: { broadcast: { self: false }, presence: { key: this.id } },
+      });
+    } catch {
+      return false;
+    }
     this.ch = ch;
     ch.on('broadcast', { event: EVENT }, (e) => {
       const m = e && e.payload;
       if (m && typeof m === 'object') this._emit('msg', m);
     });
     // 'sync' traz o estado inteiro; 'join'/'leave' só avisam (a NetRoom compara as listas)
-    ch.on('presence', { event: 'sync' }, () => this._sync());
-    ch.on('presence', { event: 'join' }, () => {});
-    ch.on('presence', { event: 'leave' }, () => {});
+    try {
+      ch.on('presence', { event: 'sync' }, () => this._sync());
+      ch.on('presence', { event: 'join' }, () => {});
+      ch.on('presence', { event: 'leave' }, () => {});
+    } catch {
+      this.ch = null;
+      return false;
+    }
     return new Promise((resolve) => {
       let done = false;
       const finish = (ok) => {

@@ -13,8 +13,10 @@ export class KartPreview {
     this.time = 0;
     this.ok = false;
     try {
-      this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-      this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      // qualidade baixa (celular fraco): este 2º contexto WebGL também sem MSAA e com menos pixels
+      const low = quality && quality.id === 'baixa';
+      this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: !low });
+      this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, low ? 1.25 : 2));
       this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
       this.ok = true;
     } catch (err) {

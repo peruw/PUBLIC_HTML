@@ -166,16 +166,24 @@ export const Online = {
     const r = await rpc('kart_room_create', { p_name: name, p_board: board });
     return r.error ? { ok: false, error: 'offline' } : r.data;
   },
-  // { code, name, board, owner, participants, open } | null (não existe) | undefined (falhou)
-  async roomGet(code) {
-    const r = await rpc('kart_room_get', { p_code: code });
+  // { code, name, board, owner, participants, open, name_ok } | null (não existe) | undefined (falhou)
+  // name: confere já na entrada se o nome é aceito na sala (name_ok)
+  async roomGet(code, name) {
+    const r = await rpc('kart_room_get', name ? { p_code: code, p_name: name } : { p_code: code });
     if (r.error) return undefined;
     return r.data || null;
   },
-  async roomSubmit(code, run, guestName) {
+  // Bilhete da sala pedido na largada (o servidor marca a hora): uuid ou null.
+  async roomStart(code, guestName) {
+    if (!sb) return null;
+    const r = await rpc('kart_room_start', { p_code: code, p_guest_id: Online.user ? null : guestId(guestName) });
+    return r.error ? null : r.data || null;
+  },
+  async roomSubmit(code, run, guestName, ticket) {
     const r = await rpc('kart_room_submit', {
       p_code: code, p_name: guestName || '', p_guest_id: Online.user ? null : guestId(guestName),
       p_time_ms: Math.round(run.timeMs), p_best_lap_ms: Math.round(run.bestLapMs), p_character: run.character, p_place: run.place,
+      p_ticket: ticket || null,
     }, 12000);
     return r.error ? { ok: false, error: r.error } : r.data;
   },
@@ -221,6 +229,9 @@ export const ERR_TEXT = {
   no_run: 'Esta corrida não valeu para o ranking.',
   run_invalid: 'Este tempo não foi aceito pelo ranking.',
   no_ticket: 'Sua conta ainda não estava conectada na largada: esta corrida não valeu para o ranking online.',
+  no_ticket_net: 'A largada não chegou ao ranking (sem internet naquela hora): esta corrida não valeu para o ranking online.',
+  no_ticket_room: 'A largada não chegou à sala (sem internet naquela hora): esta corrida não valeu para a sala.',
+  room_name_bad: 'Esse nome não é aceito na sala. Escolha outro.',
 };
 
 // Texto de erro de um envio de corrida ('invalid' ali é o tempo, não o apelido).

@@ -1,7 +1,7 @@
 // Corrida online ao vivo: sincroniza os karts entre os aparelhos durante a corrida.
 // - Cada aparelho simula só o PRÓPRIO kart (o anfitrião também simula a IA) e manda o estado
-//   ~15 vezes por segundo ('st'). Os karts dos outros são "remotos": sem física aqui, seguem a
-//   rede com ~100 ms de atraso, interpolados (kart.netPose). Posições (1º, 2º...) saem do
+//   6 a 10 vezes por segundo ('st'). Os karts dos outros são "remotos": sem física aqui, seguem a
+//   rede com ~150-220 ms de atraso, interpolados (kart.netPose). Posições (1º, 2º...) saem do
 //   progresso de todos (race.updatePlaces).
 // - Itens: quem usa simula. Acerto em kart remoto vira 'hit' e só o dono do kart aplica.
 //   Bobina de Tesla: 'tesla' e cada aparelho dá o choque nos próprios karts. Maçã: 'hazard'
@@ -15,15 +15,21 @@
 import { Vector3 } from './three.js';
 import { Interp } from './netplay.js';
 
-const DELAY = 0.1; // s de atraso da interpolação (dá tempo de o próximo estado chegar)
-const EXTRAP = 0.25; // s máximos andando "no escuro" quando o estado atrasa
+const EXTRAP = 0.35; // s máximos andando "no escuro" quando o estado atrasa
+// atraso da interpolação: um intervalo entre estados e mais uma folga (dá tempo de o próximo chegar)
+const delayFor = (rate) => 1 / rate + 0.05;
 export const WAIT_OTHERS = 60; // s depois da chegada do 1º humano
 const FIN_GRACE = 4; // s a mais esperando as estimativas dos outros aparelhos
 const LEAVE_GRACE = 2.5; // s antes de dar alguém como desconectado (reconexão rápida)
 const STALE = 1.5; // s sem estado: o kart remoto fica "sem sinal" (aba escondida) e deixa de bater
 
-// Estados por segundo de cada aparelho: menos com a sala cheia (o Realtime conta cada entrega).
-export const sendRate = (humans) => (humans <= 3 ? 15 : humans <= 5 ? 12 : 10);
+// Estados por segundo de cada aparelho: menos com a sala cheia. O limite do Realtime (plano
+// gratuito: ~100 mensagens/s e 2 milhões/mês) vale para o PROJETO inteiro, somando todas as
+// salas de todas as turmas e também o site; ver ARCHITECTURE.md. Na contagem e depois de
+// chegar (com a IA do anfitrião também chegada) o kart quase não muda: bem menos estados.
+export const sendRate = (humans) => (humans <= 2 ? 10 : humans <= 4 ? 8 : 6);
+const IDLE_RATE = 2; // na contagem (karts parados no grid)
+const DONE_RATE = 4; // todos os karts deste aparelho já chegaram
 
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -48,6 +54,8 @@ export class NetRace {
     for (const [id, k] of byId) this.idOf.set(k, id);
     this.me = byId.get(this.id);
     this.humans = Object.keys(msg.humans).map((id) => byId.get(id)).filter(Boolean);
+    this.rate = sendRate(this.humans.length);
+    this.delay = delayFor(this.rate);
     this.remote = new Map(); // id -> { kart, interp } (karts de outros aparelhos)
     this.owned = [];
     for (const [id, k] of byId) {
@@ -58,11 +66,10 @@ export class NetRace {
       k.netHit = mine ? null : (type, by, item) => this._sendHit(k, type, by, item);
       k.itemHeld = null;
       if (mine) this.owned.push(k);
-      else this.remote.set(id, { kart: k, interp: new Interp({ delay: DELAY, extrap: EXTRAP }) });
+      else this.remote.set(id, { kart: k, interp: new Interp({ delay: this.delay, extrap: EXTRAP }) });
     }
     this.clock = 0; // s de simulação desde a largada (carimbo dos estados)
     this.sendT = 0;
-    this.rate = sendRate(this.humans.length);
     this.left = []; // quem saiu: { id, kart, name, human, finished, time }
     this.leaving = new Map(); // id -> clock limite (saída ainda em carência)
     this.firstFin = -1;
@@ -142,7 +149,9 @@ export class NetRace {
     if (this.final) return;
     this.sendT -= h;
     if (this.sendT <= 0) {
-      this.sendT = Math.max(0, this.sendT + 1 / this.rate);
+      const done = this.owned.every((k) => k.finished || !this.world.karts.includes(k));
+      const rate = this.race.phase === 'countdown' ? IDLE_RATE : done ? DONE_RATE : this.rate;
+      this.sendT = Math.max(0, this.sendT + 1 / rate);
       this._sendState();
     }
     this._checkEnd();
@@ -238,6 +247,19 @@ export class NetRace {
     const k = this.byId.get(m.target);
     if (!k || !this.world.karts.includes(k)) return;
     const by = (m.by && this.byId.get(m.by)) || null;
+    // o canal é aberto (o remetente 'fr' é o próprio cliente que escreve): quem atirou tem de
+    // ser do aparelho que mandou (IA: o anfitrião) e cada kart aceita poucas batidas seguidas.
+    // Não impede quem forja a mensagem no console, mas corta o 'hit' em loop e os sem dono
+    const from = m.by ? (String(m.by).startsWith('ia:') ? this.hostId : m.by) : null;
+    if (from ? m.fr !== from : !(this.byId.has(m.fr) || m.fr === this.hostId)) return;
+    if (!k.remote) {
+      const now = this.clock;
+      const log = (this._hitLog ||= new Map());
+      const ts = (log.get(k) || []).filter((t) => now - t < 3);
+      if (ts.length >= 4) return;
+      ts.push(now);
+      log.set(k, ts);
+    }
     if (k.remote) {
       // não é meu: some a cópia do projétil que acertou (só visual)
       if (by && (m.item === 'alfa' || m.item === 'eletron')) this._killGhost(by, m.item, k);
@@ -493,7 +515,7 @@ export class NetRace {
       this.left.splice(i, 1);
       if (!this.world.karts.includes(k)) this.world.karts.push(k);
       k.object3d.visible = true;
-      this.remote.set(x, { kart: k, interp: new Interp({ delay: DELAY, extrap: EXTRAP }) });
+      this.remote.set(x, { kart: k, interp: new Interp({ delay: this.delay, extrap: EXTRAP }) });
     }
     this.world.humans = this.humans.filter((o) => this.world.karts.includes(o));
   }

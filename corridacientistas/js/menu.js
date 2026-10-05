@@ -12,7 +12,9 @@ const svgFlag = (body, vb = '0 0 30 20') => `<svg viewBox="${vb}" preserveAspect
 const hStripes = (...cs) => cs.map((c, i) => `<rect y="${(i * 20) / cs.length}" width="30" height="${20 / cs.length}" fill="${c}"/>`).join('');
 const vStripes = (...cs) => cs.map((c, i) => `<rect x="${i * 10}" width="10" height="20" fill="${c}"/>`).join('');
 const FLAGS = {
-  Inglaterra: svgFlag(
+  // Newton nasceu no Reino da Inglaterra (cruz de São Jorge); Darwin e Rosalind Franklin, já no Reino Unido
+  Inglaterra: svgFlag('<rect width="30" height="20" fill="#fff"/><rect x="12.5" width="5" height="20" fill="#ce1124"/><rect y="7.5" width="30" height="5" fill="#ce1124"/>'),
+  'Reino Unido': svgFlag(
     '<rect width="60" height="30" fill="#012169"/><path d="M0 0L60 30M60 0L0 30" stroke="#fff" stroke-width="6"/>' +
       '<path d="M0 0L60 30M60 0L0 30" stroke="#c8102e" stroke-width="2"/><path d="M30 0V30M0 15H60" stroke="#fff" stroke-width="10"/>' +
       '<path d="M30 0V30M0 15H60" stroke="#c8102e" stroke-width="6"/>',
@@ -26,6 +28,12 @@ const FLAGS = {
   ),
   Rússia: svgFlag(hStripes('#fff', '#0039a6', '#d52b1e')),
   Alemanha: svgFlag(hStripes('#000', '#dd0000', '#ffce00')),
+  // metade Alemanha (onde nasceu), metade EUA (onde viveu desde 1933 e se naturalizou)
+  'Alemanha / EUA': svgFlag(
+    '<rect width="15" height="6.67" fill="#000"/><rect y="6.67" width="15" height="6.67" fill="#dd0000"/><rect y="13.33" width="15" height="6.67" fill="#ffce00"/>' +
+      [0, 1, 2, 3, 4, 5, 6].map((i) => `<rect x="15" y="${(i * 20) / 7}" width="15" height="${20 / 7}" fill="${i % 2 ? '#fff' : '#b22234'}"/>`).join('') +
+      '<rect x="15" width="7" height="11" fill="#3c3b6e"/><rect x="14.6" width="0.8" height="20" fill="rgba(0,0,0,0.35)"/>',
+  ),
   Itália: svgFlag(vStripes('#009246', '#fff', '#ce2b37')),
   EUA: svgFlag(
     hStripes('#b22234', '#fff', '#b22234', '#fff', '#b22234', '#fff', '#b22234') + '<rect width="13" height="11" fill="#3c3b6e"/>',
@@ -35,6 +43,9 @@ const FLAGS = {
       '<circle cx="15" cy="10" r="4.6" fill="#002776"/><path d="M10.6 9.2Q15 7.6 19.5 10.8" stroke="#fff" stroke-width="1" fill="none"/>',
   ),
 };
+// Rótulo do cartão: palavra longa ganha um hífen opcional no meio ("Mende-leev", "Oswal-do")
+// em vez de ser cortada com "…" na tela estreita (só aparece se a palavra não couber)
+const cardLabel = (t) => t.split(' ').map((w) => (w.length >= 7 ? w.slice(0, Math.ceil(w.length / 2)) + '&shy;' + w.slice(Math.ceil(w.length / 2)) : w)).join(' ');
 const STAT_LABELS = [['speed', 'Velocidade'], ['accel', 'Aceleração'], ['handling', 'Controle'], ['weight', 'Peso']];
 
 const store = {
@@ -112,6 +123,16 @@ export class Menu {
       this.action(btn.dataset.action, btn);
     });
     document.addEventListener('keydown', (e) => this.onKey(e));
+    // resultado recém-aberto: Enter/Espaço segurados (repetição automática) ou martelados logo
+    // na chegada não acionam o botão focado ("Correr de novo"). No duelo o Enter é o item do J2,
+    // e a corrida recomeçava sem ninguém ver o resultado
+    window.addEventListener('keydown', (e) => {
+      if (this.current !== 'results' || (e.key !== 'Enter' && e.key !== ' ')) return;
+      if (e.target.closest?.('input:not([type=range]), textarea')) return;
+      if (!e.repeat && !this._resultsFresh()) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, { capture: true });
     // volumes de música e efeitos (tela inicial e pausa)
     document.addEventListener('input', (e) => {
       const r = e.target.closest?.('input[data-vol]');
@@ -287,7 +308,13 @@ export class Menu {
     }
   }
 
+  // a tela de resultado abriu há menos de 0,7 s
+  _resultsFresh() {
+    return this.current === 'results' && performance.now() - (this._resultsAt || 0) < 700;
+  }
+
   show(name) {
+    if (name === 'results' && this.current !== 'results') this._resultsAt = performance.now();
     if (name !== this.current) this.prev = this.current;
     this.current = name;
     for (const s of SCREENS) $('screen-' + s)?.classList.toggle('hidden', s !== name);
@@ -367,7 +394,7 @@ export class Menu {
         <span class="flag">${FLAGS[c.country] || ''}</span>
         <span class="medals" aria-hidden="true"></span>
         <div class="ph" style="--c:${c.colors.ui}">${c.name[0]}</div>
-        <span>${c.short || c.name}</span>
+        <span${(c.short || c.name).split(' ').some((w) => w.length > 8) ? ' class="long"' : ''}>${cardLabel(c.short || c.name)}</span>
       </button>`,
     ).join('');
     this.grid.addEventListener('click', (e) => {
@@ -613,7 +640,8 @@ export class Menu {
     if (note && !note.classList.contains('warn')) {
       const rec = store.get('records', {})[`${this.opts.mode === 'timetrial' ? 'tt-' : ''}${this.opts.cc}-${this.opts.laps}`];
       const v = this.opts.laps === 1 ? '1 volta' : `${this.opts.laps} voltas`;
-      note.textContent = rec ? `Seu recorde (${this.opts.cc}, ${v}): ${formatTime(rec.time)}` : this.opts.mode === 'timetrial' ? 'Sozinho na pista, só com foguetes. Bata o seu fantasma!' : '';
+      // em dupla os recordes não contam (o resultado diz o mesmo): não mostra o recorde pessoal
+      note.textContent = duo ? 'Duelo: recordes, medalhas e rankings não contam.' : rec ? `Seu recorde (${this.opts.cc}, ${v}): ${formatTime(rec.time)}` : this.opts.mode === 'timetrial' ? 'Sozinho na pista, só com foguetes. Bata o seu fantasma!' : '';
     }
 
     this.h.onCharacter?.(c.id);
@@ -632,7 +660,7 @@ export class Menu {
     // uma curiosidade diferente a cada vez que o cientista é escolhido
     if (this._factFor !== c.id) {
       this._factFor = c.id;
-      const f = pickFact('sci:' + c.id, SCIENTIST_FACTS[c.id]);
+      const f = pickFact('ficha:' + c.id, (SCIENTIST_FACTS[c.id] || []).filter((x) => !x.inBio));
       const el = $('detail-fact');
       if (el) el.innerHTML = f ? `<b>Você sabia?</b> ${esc(f.text)}` : '';
     }
@@ -706,7 +734,8 @@ export class Menu {
       const n = info.rival.name;
       // tempo estimado (alguém não cruzou a chegada): diferença aproximada, em segundos inteiros
       const ds = info.rival.estimated ? `cerca de ${Math.max(1, Math.round(Math.abs(d)))}` : Math.abs(d).toFixed(1).replace('.', ',');
-      parts.push(d < 0 ? `⚔️ Você venceu o rival ${n} por ${ds} s` : `⚔️ O rival ${n} chegou ${ds} s na sua frente`);
+      const o = info.rival.female ? 'a' : 'o';
+      parts.push(d < 0 ? `⚔️ Você venceu ${o} rival ${n} por ${ds} s` : `⚔️ ${o.toUpperCase()} rival ${n} chegou ${ds} s na sua frente`);
     }
     if (info.medal) parts.push(`${MEDAL_ICON[info.medal.type]} Medalha de ${info.medal.type} com ${player.character.name} no ${info.cc}!`);
     if (info.unlocked150) parts.push('🔓 150cc liberado!');
@@ -865,8 +894,10 @@ export class Menu {
     const waiting = results.filter((r) => r.human && r.running);
     const parts = [];
     if (!final && waiting.length) {
-      const names = waiting.map((r) => esc(r.name || r.kart.character.name)).join(', ');
-      parts.push(`⏳ Esperando ${names} chegar${info.timeLeft != null ? ` · o resultado fecha em <b>${Math.ceil(info.timeLeft)} s</b>` : ''}`);
+      // "Esperando Ana chegar" / "Esperando Ana, Bia e Caio chegarem"
+      const list = waiting.map((r) => esc(r.name || r.kart.character.name));
+      const names = list.length > 1 ? `${list.slice(0, -1).join(', ')} e ${list[list.length - 1]}` : list[0];
+      parts.push(`⏳ Esperando ${names} ${list.length > 1 ? 'chegarem' : 'chegar'}${info.timeLeft != null ? ` · o resultado fecha em <b>${Math.ceil(info.timeLeft)} s</b>` : ''}`);
     } else if (final) parts.push('🏁 Resultado final');
     parts.push(`<small>🌐 Sala ${esc(info.room || '')} · ${esc(info.cc)}, ${v} · corridas online não contam para recordes e medalhas</small>`);
     const recEl = $('results-record');
@@ -932,7 +963,7 @@ export class Menu {
     const r = this.lastRun;
     if (!r) return;
     const v = r.laps === 1 ? '1 volta' : `${r.laps} voltas`;
-    const what = r.mode === 'timetrial' ? `fiz ${formatTime(r.time)} no contra o relógio` : `cheguei em ${r.place}º lugar${r.estimated ? '' : ` em ${formatTime(r.time)}`}`;
+    const what = r.mode === 'timetrial' ? `fiz ${formatTime(r.time)} no modo contra o relógio` : `cheguei em ${r.place}º lugar${r.estimated ? '' : ` em ${formatTime(r.time)}`}`;
     const text = r.duel
       ? `No Kart Científico, corremos em dupla: ${r.duel[0].name} (J1) chegou em ${r.duel[0].place}º e ${r.duel[1].name} (J2) em ${r.duel[1].place}º (${r.cc}, ${v})! Topa o desafio?`
       : r.online
@@ -1140,7 +1171,7 @@ export class Menu {
           this.setRoom(null);
           res.leftRoom = true;
         }
-        const t = r.error === 'limit' ? ERR_TEXT.room_limit : runErrText(r.error, 'Sem conexão com a sala agora: este tempo não foi enviado.');
+        const t = r.error === 'limit' ? ERR_TEXT.room_limit : r.error === 'no_run' ? ERR_TEXT.no_ticket_room : runErrText(r.error, 'Sem conexão com a sala agora: este tempo não foi enviado.');
         parts.push(`<p class="muted">🏫 ${t}${res.leftRoom ? ` Você saiu da sala ${esc(res.roomCode)}.` : ''}</p>`);
       }
       // o servidor já limita (os 8 primeiros e a linha do próprio aluno, se ele ficou de fora)
@@ -1173,14 +1204,14 @@ export class Menu {
       msg.textContent = 'O código tem 5 letras ou números.';
       return;
     }
-    // com conta e apelido, o nome na sala é o apelido do ranking (já validado)
-    const nick = Online.user && this.me && this.me.nickname;
-    if (!nick && name.length < 2) {
+    // o nome na sala é o digitado (com conta, o campo já vem com o apelido do ranking, mas o
+    // professor precisa reconhecer o aluno no relatório)
+    if (name.length < 2) {
       msg.textContent = 'Escreva seu nome para a turma ver no placar.';
       return;
     }
     // mesma regra do banco: um nome recusado lá só apareceria no fim da corrida
-    if (!nick && !ROOM_NAME_RE.test(name)) {
+    if (!ROOM_NAME_RE.test(name)) {
       msg.textContent = ERR_TEXT.room_name;
       return;
     }
@@ -1194,15 +1225,17 @@ export class Menu {
       msg.textContent = Online.onSite || Online.status === 'loading' ? ERR_TEXT.room_offline : 'As salas funcionam no site quantaaulas.com, com internet.';
       return;
     }
-    const r = await Online.roomGet(code);
+    const r = await Online.roomGet(code, name);
     if (stale()) return;
     if (r === undefined) msg.textContent = ERR_TEXT.room_offline;
     else if (!r) msg.textContent = ERR_TEXT.not_found;
     else if (!r.open) msg.textContent = ERR_TEXT.closed;
+    // nome recusado pela lista do banco: avisa já na entrada, e não no fim da corrida
+    else if (r.name_ok === false) msg.textContent = ERR_TEXT.room_name_bad;
     else {
       store.set('room-name', name);
       store.set('room-code', r.code);
-      this.setRoom({ code: r.code, name: r.name, board: r.board, guestName: nick || name });
+      this.setRoom({ code: r.code, name: r.name, board: r.board, guestName: name });
       this.h.sfx('menuSelect');
       this.show('select');
     }
@@ -1241,15 +1274,15 @@ export class Menu {
         if (this.current === 'turma') $('room-msg').textContent = `Você saiu da sala ${code}: ${r ? 'ela foi fechada' : 'ela não existe mais'}.`;
       });
     }
-    // com conta e apelido, o nome na sala é o apelido do ranking
+    // com conta e apelido, o campo vem com o apelido do ranking (o aluno pode trocar pelo nome
+    // dele: é o que o professor vê no relatório)
     const me = Online.user ? await Online.getMe() : null;
     if (stale()) return;
     if (me !== undefined) this.me = me;
     const nameIn = $('room-name');
-    const nick = this.me && this.me.nickname;
-    nameIn.disabled = !!nick;
-    if (nick) nameIn.value = nick;
-    nameIn.title = nick ? 'Na sala aparece o seu apelido do ranking online' : '';
+    const nick = Online.user && this.me && this.me.nickname;
+    nameIn.disabled = false;
+    if (nick && !nameIn.value.trim()) nameIn.value = nick;
     if (!Online.user) {
       create.innerHTML = `<p>Para criar uma sala, entre com a sua conta.</p><a class="btn btn-small" href="${Online.loginUrl}">Entrar com Google</a>`;
       return;
@@ -1304,7 +1337,10 @@ export class Menu {
     if (btn) btn.disabled = true;
     const r = await Online.roomOpen(code, open);
     if (this.current !== 'turma') return;
+    const hadReport = this._report?.room?.code === code && !$('room-report')?.classList.contains('hidden');
     await this.refreshTurma(false);
+    // fechar a sala no fim da aula não some com o relatório aberto (o professor ainda vai copiá-lo)
+    if (hadReport && this.current === 'turma') this.showReport(code);
     // teclado: o foco volta ao botão da mesma sala (a lista foi redesenhada)
     if (this.tabNav) $('turma-list')?.querySelector(`[data-action=room-toggle][data-code="${code}"]`)?.focus({ preventScroll: true });
     const m = $('room-new-msg');
@@ -1365,10 +1401,12 @@ export class Menu {
   async copyReport(btn) {
     const r = this._report;
     if (!r) return;
-    const lines = [['Posição', 'Aluno', 'Sem conta', 'Melhor tempo', 'Melhor volta', 'Cientista', 'Corridas'].join('\t')];
+    // colunas em segundos com vírgula decimal: a planilha em português ordena e tira média direto
+    const sec = (ms) => (ms / 1000).toFixed(2).replace('.', ',');
+    const lines = [['Posição', 'Aluno', 'Sem conta', 'Melhor tempo', 'Melhor volta', 'Tempo (s)', 'Volta (s)', 'Cientista', 'Corridas'].join('\t')];
     (r.players || []).forEach((p, i) => {
       const c = CHARACTERS.find((x) => x.id === p.character);
-      lines.push([i + 1, p.name, p.guest ? 'sim' : '', formatTime(p.time_ms / 1000), formatTime(p.best_lap_ms / 1000), c ? c.name : '', p.runs].join('\t'));
+      lines.push([i + 1, p.name, p.guest ? 'sim' : '', formatTime(p.time_ms / 1000), formatTime(p.best_lap_ms / 1000), sec(p.time_ms), sec(p.best_lap_ms), c ? c.name : '', p.runs].join('\t'));
     });
     const text = lines.join('\n');
     let ok = false;
@@ -1460,6 +1498,6 @@ export class Menu {
     else if (this.current === 'select') this.action('start');
     else if (this.current === 'howto') this.action('back');
     else if (this.current === 'pause') this.action('resume');
-    else if (this.current === 'results') this.action('restart');
+    else if (this.current === 'results' && !this._resultsFresh()) this.action('restart');
   }
 }
