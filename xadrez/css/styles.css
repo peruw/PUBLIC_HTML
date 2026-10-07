@@ -215,3 +215,7 @@ button:focus-visible, .chip:focus-visible, a:focus-visible, input:focus-visible 
 .hud-captured { font-size: 15px; line-height: 1.25; color: var(--muted); letter-spacing: 0.02em; margin-top: 2px; }
 .hud-captured:empty { display: none; }
 .hud-captured b { color: var(--accent); font-size: 12px; margin-left: 3px; }
+
+@media (max-width: 820px), (max-height: 560px) {
+  .hud-hint { top: calc(max(10px, env(safe-area-inset-top)) + 92px); }
+}
