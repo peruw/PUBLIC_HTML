@@ -12,6 +12,7 @@ import { Input } from './input.js';
 import { Animator } from './animations.js';
 import { Hud } from './hud.js';
 import { Menu } from './menu.js';
+import { sound } from './sound.js';
 import { createIdle } from './battle.js';
 import { setStyle, getStyle } from './skins.js';
 import { openRoom, newRoomCode, normalizeCode } from './net.js';
@@ -162,7 +163,7 @@ async function startGame(opts) {
   board.setPosition(G.game);
   refreshHighlights();
   hud.resetEval();
-  hud.setHistory(G.sans);
+  hud.setHistory(G.sans); hud.setCaptured(G.game.history);
   hud.setLines([]);
   hud.setEval({ cp: 0, mateIn: null });
   hud.setAnalysisVisible(opts.mode !== 'online');
@@ -216,6 +217,8 @@ const youColor = () => (G.opts && G.opts.mode !== '2p' ? G.humanColor : null);
 function updateTurnUi() {
   const check = inCheck(G.game);
   hud.setTurn(G.game.turn, check, youColor());
+  if (check && G._checkPly !== G.game.history.length) sound.check();
+  G._checkPly = check ? G.game.history.length : -1;
   hud.setUndoEnabled(G.opts.mode !== 'online' && G.game.history.length > 0);
   if (G.status === 'playing') {
     if (G.opts.mode === 'online' && NET.peers === 0) hud.showHint('Seu amigo desconectou… esperando ele voltar.');
@@ -315,6 +318,12 @@ function togglePerson() {
   try { localStorage.setItem(PERSON_KEY, p); } catch { /* sem armazenamento: vale só nesta sessão */ }
 }
 rig.setPerson(loadPerson());
+{ // letras do tabuleiro só aparecem na vista de cima (de perto elas ficam enormes)
+  const setView = hud.setView.bind(hud);
+  hud.setView = (mode) => { setView(mode); board.setLabelsVisible(mode === 'overhead'); };
+  board.setLabelsVisible(false);
+}
+addEventListener('pointerdown', () => sound.unlock(), { once: true });
 hud.setPerson(rig.person);
 window.addEventListener('keydown', (e) => {
   if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, textarea')) togglePerson();
@@ -356,7 +365,7 @@ function applyMoveToState(move) {
   makeMove(G.game, move);
   G.sans.push(san);
   G.lastMove = { from: move.from, to: move.to };
-  hud.setHistory(G.sans);
+  hud.setHistory(G.sans); hud.setCaptured(G.game.history);
   if (G.cancelAnalysis) { G.cancelAnalysis(); G.cancelAnalysis = null; }
   if (G.opts.mode === 'online') saveSession();
 }
@@ -444,6 +453,7 @@ async function checkGameOver() {
     hud.pushEval(G.game.history.length, 0);
   }
   hud.setTurn(G.game.turn, st.check, youColor());
+  sound.end(st.reason !== 'xeque-mate' || G.opts.mode === '2p' || (st.result === '1-0') === (G.humanColor === 'w'));
   showOver({ title, detail }, gen);
   return true;
 }
@@ -517,7 +527,7 @@ async function undo() {
   G.lastMove = h.length ? { from: h[h.length - 1].move.from, to: h[h.length - 1].move.to } : null;
   G.selected = -1; G.legal = [];
   board.setPosition(G.game);
-  hud.setHistory(G.sans);
+  hud.setHistory(G.sans); hud.setCaptured(G.game.history);
   hud.truncateEval(G.game.history.length);
   hud.setLines([]);
   refreshHighlights();

@@ -1,6 +1,11 @@
 // HUD: turno, avaliação, gráfico de vantagem, melhores lances, histórico, dicas e botões.
 import { MATE_CP } from './engine.js';
 import { MiniBoard } from './miniboard.js';
+import { sound } from './sound.js';
+import { typeOf } from './rules.js';
+
+const GLYPH = { 1: '♟', 2: '♞', 3: '♝', 4: '♜', 5: '♛' };
+const VALUE = { 1: 1, 2: 3, 3: 3, 4: 5, 5: 9 };
 
 const $ = (id) => document.getElementById(id);
 const CLAMP = 10; // peões
@@ -32,7 +37,30 @@ export class Hud {
       this.root.classList.toggle('panel-open');
       this.drawGraph();
     });
+    this.captured = $('hud-captured');
+    this.soundBtn = $('btn-sound');
+    const syncSound = () => { this.soundBtn.textContent = sound.muted ? '🔇' : '🔊'; this.soundBtn.setAttribute('aria-pressed', String(!sound.muted)); };
+    this.soundBtn.addEventListener('click', () => { sound.setMuted(!sound.muted); syncSound(); });
+    syncSound();
     this.setEval({ cp: 0, mateIn: null });
+  }
+
+  // Peças capturadas por cada lado (ordenadas por valor) e a vantagem de material de quem está na frente.
+  setCaptured(history) {
+    const got = { w: [], b: [] };   // got.w = peças pretas que as brancas capturaram
+    let diff = 0;
+    for (const h of history) {
+      const cap = h.move.captured;
+      if (!cap) continue;
+      const t = typeOf(cap), by = cap < 0 ? 'w' : 'b';
+      got[by].push(t); diff += (by === 'w' ? 1 : -1) * VALUE[t];
+    }
+    const line = (side) => {
+      const s = got[side].sort((a, b) => VALUE[b] - VALUE[a]).map((t) => GLYPH[t]).join('');
+      const lead = side === 'w' ? diff : -diff;
+      return s ? `${side === 'w' ? '○' : '●'} ${s}${lead > 0 ? `<b>+${lead}</b>` : ''}` : '';
+    };
+    this.captured.innerHTML = [line('w'), line('b')].filter(Boolean).join('<br>');
   }
 
   show(v) { this.root.classList.toggle('hidden', !v); this.root.setAttribute('aria-hidden', v ? 'false' : 'true'); if (v) { this.drawGraph(); this.mini.draw(); } }

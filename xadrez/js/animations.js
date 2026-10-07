@@ -1,6 +1,7 @@
 // Coreografia dos lances com os personagens: andar até a casa, roque, en passant, promoção,
 // captura = batalha (aproximação, golpe, queda da vítima, gesto de vitória), rei caindo no mate e poeira.
 // A câmera em 1ª pessoa segue o atacante; na vista de cima a captura ganha um plano cinematográfico.
+import { sound } from './sound.js';
 import * as THREE from './three.js';
 import { ANIM, COLORS } from './config.js';
 import { squareToWorld } from './board3d.js';
@@ -271,6 +272,7 @@ export class Animator {
       ));
       s.push(turnTo(moverGroup, yawToVictim, 0.15));
       s.push(combat(mover, victim, () => {
+        sound.capture();
         this.dust.burst(vpos, 45, 1.2);
         rig.shake(firstPerson ? 0.35 : 0.2, 0.45);
       }));
@@ -300,6 +302,7 @@ export class Animator {
     }
 
     s.push(call(() => {
+      if (!victim) sound.move();
       board.applyMoveInstant(move);
       for (const c of active) this.active.delete(c);
     }));

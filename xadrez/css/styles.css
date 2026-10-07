@@ -51,7 +51,7 @@ button { font: inherit; cursor: pointer; }
 #hud.no-analysis .hud-eval, #hud.no-analysis .hud-analysis { display: none; }
 .hud-btn:disabled { opacity: 0.4; cursor: default; }
 .hud-btn:active { transform: scale(0.97); }
-#btn-menu { margin-left: auto; }
+#btn-sound { margin-left: auto; padding: 10px 12px; }
 
 .hud-hint {
   position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 62px);
@@ -211,3 +211,7 @@ button:focus-visible, .chip:focus-visible, a:focus-visible, input:focus-visible 
   .hud-eval-fill { transition: none; }
   .btn:active, .hud-btn:active { transform: none; }
 }
+
+.hud-captured { font-size: 15px; line-height: 1.25; color: var(--muted); letter-spacing: 0.02em; margin-top: 2px; }
+.hud-captured:empty { display: none; }
+.hud-captured b { color: var(--accent); font-size: 12px; margin-left: 3px; }

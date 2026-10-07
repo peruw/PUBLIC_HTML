@@ -97,6 +97,7 @@ export function buildBoard(scene, quality) {
   }
   const labels = addCoordinates(scene, FW);
   addBranding(scene, FW);
+  board.setLabelsVisible = (v) => { for (const m of labels) m.visible = !!v; };
   board.setLabelSide = (side) => { for (const m of labels) m.rotation.y = side === 'b' ? Math.PI : 0; };
 
   // ---------- Realces ----------
