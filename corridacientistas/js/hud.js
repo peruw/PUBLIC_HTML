@@ -229,7 +229,7 @@ export class Hud {
       this._keyShort = !split ? this.keyHTML : this.index === 0 ? '<kbd>E</kbd> usa o item' : '<kbd>Enter</kbd> usa o item';
       this.el.key.innerHTML = !split ? this.keyHTML : this.index === 0
         ? '<kbd>E</kbd> item · <kbd>Espaço</kbd> drift · <kbd>Q</kbd> olha atrás'
-        : '<kbd>Enter</kbd> item · <kbd>.</kbd> drift · <kbd>,</kbd> olha atrás';
+        : '<kbd>Enter</kbd> item · <kbd>. ponto</kbd> drift · <kbd>, vírgula</kbd> olha atrás';
       this._keyLong = split ? 10 : 0; // s (contagem + começo da corrida)
     }
     if (this.index === 0) this.root.classList.toggle('split', split && this.active);
@@ -542,7 +542,7 @@ export class Hud {
     // contramão
     const wrong = p.wrongWay > 45 && race.phase === 'racing';
     if (wrong && !this.centerSticky) {
-      this.center('CONTRAMÃO! ↩', 'msg', 0, true);
+      this.center('CONTRAMÃO! Vire e volte pela pista ↩', 'msg', 0, true);
     } else if (!wrong && this.centerSticky) {
       this.centerSticky = false;
       this.el.center.textContent = '';

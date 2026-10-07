@@ -175,7 +175,7 @@ export class NetUI {
     const want = this.store.get('net-character', s.character);
     const room = new NetRoom(t, {
       code, id: this.id, name, character: pool.includes(want) ? want : 'newton', creator,
-      cc: CLASSES[s.cc] ? s.cc : '100cc', laps: RACE.lapOptions.includes(s.laps) ? s.laps : RACE.defaultLaps,
+      cc: Object.hasOwn(CLASSES, s.cc) ? s.cc : '100cc', laps: RACE.lapOptions.includes(s.laps) ? s.laps : RACE.defaultLaps,
     });
     this.room = room;
     this.creator = creator;
@@ -304,7 +304,7 @@ export class NetUI {
       this.note('Quem escolhe o motor e as voltas é o anfitrião (👑).', 'warn');
       return;
     }
-    if (patch.cc && !CLASSES[patch.cc]) return;
+    if (patch.cc && !Object.hasOwn(CLASSES, patch.cc)) return;
     if (patch.laps && !RACE.lapOptions.includes(patch.laps)) return;
     this.h.sfx('menuMove');
     room.update(patch);
@@ -391,7 +391,7 @@ export class NetUI {
       humans[m.id] = { name: m.name, character: c };
     }
     const st = room.settings;
-    const cc = CLASSES[st.cc] || CLASSES['100cc'];
+    const cc = (Object.hasOwn(CLASSES, st.cc) && CLASSES[st.cc]) || CLASSES['100cc'];
     const ladder = this.h.aiLadder || [0];
     // IA (só cientistas com modelo 3D): a escada vai do mais forte ao mais fraco. Quem escolheu
     // um cientista ainda sem modelo usa o kart reserva (Curie ou Newton, main.js): a IA evita

@@ -1900,9 +1900,10 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
 
   // ------------------------------------------------------------ malha estática dos marcos
   {
-    // em pedaços por célula para o culling (câmera e sombra). Na baixa (com a vegetação junto) um
-    // pedaço só: a câmera via 4 de 5 pedaços na maior parte do tempo, então dividir só somava chamadas.
-    (hi ? splitGeometry(st.build(true), 150, 2000) : [st.build(true)]).forEach((g, k) => {
+    // em pedaços por célula para o culling (câmera e sombra). Na baixa, células grandes (250 m):
+    // a malha única (68 mil triângulos) nunca saía do campo de visão; em ~10 pedaços visíveis
+    // caem a ~40 mil, por poucas chamadas a mais.
+    (hi ? splitGeometry(st.build(true), 150, 2000) : splitGeometry(st.build(true), 250, 4000)).forEach((g, k) => {
       const m = new THREE.Mesh(keep(g), matAtlas);
       m.castShadow = true;
       m.receiveShadow = true;

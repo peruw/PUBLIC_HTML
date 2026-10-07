@@ -93,7 +93,7 @@ async function init() {
     onPlay: () => { if (game.state !== 'title') enterTitle(); },
     // corrida online: "de novo" é voltar para a sala de espera (o anfitrião começa a próxima);
     // a sala de turma vem do menu: se o aluno saiu dela (fechada, nome recusado), a nova corrida não vai para ela
-    onRestart: () => (game.opts?.net ? netBackToLobby() : startRace({ ...game.opts, room: game.opts?.room ? menu.room : null })),
+    onRestart: () => (game.opts?.net ? netBackToLobby() : startRace({ ...game.opts, room: game.opts?.room ? menu.room : null, daily: game.opts?.daily?.key === dailyChallenge().key ? game.opts.daily : undefined })),
     onQuit: () => enterTitle(),
     onNet: (a, btn) => netUI?.action(a, btn),
     onNetLobby: () => netBackToLobby(),
@@ -157,7 +157,8 @@ async function init() {
   document.getElementById('app').appendChild(renderer.domElement);
   let needsRender = true; // redesenha uma vez mesmo em pausa/menus
   // Perda do contexto WebGL: pausa em vez de correr às cegas.
-  renderer.domElement.addEventListener('webglcontextlost', () => {
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault(); // sem isso o navegador não tenta restaurar o contexto
     if (game.state === 'race' && !game.paused && !game.netMenu) setPaused(true);
   });
   renderer.domElement.addEventListener('webglcontextrestored', () => { needsRender = true; });
@@ -205,11 +206,16 @@ async function init() {
   await nextFrame();
   preview = new KartPreview(document.getElementById('detail-kart'), { quality });
   document.getElementById('detail-visual').classList.toggle('has-3d', preview.ok);
-  try {
-    menu.setPortraits(await Promise.resolve(renderPortraits(renderer, 256, { ss: quality.id === 'baixa' ? 1 : 2 })));
-  } catch (err) {
-    console.warn('retratos indisponíveis', err);
-  }
+  // Retratos: custam 1,5 a 2,5 s de CPU; o menu já tem cartões provisórios (inicial do nome) e troca
+  // por eles quando ficam prontos. Por isso vêm depois do título aparecer, sem segurar o carregamento.
+  const makePortraits = () => {
+    try {
+      menu.setPortraits(renderPortraits(renderer, 256, { ss: quality.id === 'baixa' ? 1 : 2 }));
+    } catch (err) {
+      console.warn('retratos indisponíveis', err);
+    }
+  };
+  setTimeout(makePortraits, 400);
 
   const rig = new CameraRig(camera);
   // tela dividida: segunda câmera (J2), com o próprio CameraRig
@@ -381,7 +387,7 @@ async function init() {
     setPaused(false, true);
     pendingUse = pendingUse2 = false;
     bus.emit('race:reset');
-    const cc = CLASSES[opts.cc] || CLASSES['100cc'];
+    const cc = (Object.hasOwn(CLASSES, opts.cc) && CLASSES[opts.cc]) || CLASSES['100cc'];
     world.cc = cc;
     world.totalLaps = opts.laps;
     world.mode = opts.mode;
@@ -470,7 +476,7 @@ async function init() {
     if (!room || !msg?.humans?.[room.id]) return false;
     netRace?.dispose();
     netRace = null;
-    const cc = CLASSES[msg.cc] || CLASSES['100cc'];
+    const cc = (Object.hasOwn(CLASSES, msg.cc) && CLASSES[msg.cc]) || CLASSES['100cc'];
     const laps = RACE.lapOptions.includes(msg.laps) ? msg.laps : RACE.defaultLaps;
     // karts por id: cada cientista uma vez (sem modelo 3D aqui, o kart reserva)
     const byId = new Map();
@@ -810,7 +816,9 @@ async function init() {
     while (keys.length > 30) delete st[keys.shift()];
     store.set('daily', st);
     const streak = store.get('dailyStreak', { last: '', n: 0 });
-    const y = new Date(Date.now() - 864e5);
+    // "ontem" em relação ao dia do desafio (e não ao fim da corrida, que pode passar da meia-noite)
+    const [ky, km, kd] = key.split('-').map(Number);
+    const y = Number.isFinite(ky) ? new Date(ky, km - 1, kd - 1) : new Date(Date.now() - 864e5);
     const yKey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
     streak.n = streak.last === yKey ? streak.n + 1 : 1;
     streak.last = key;
@@ -1256,6 +1264,8 @@ async function init() {
   let frameNo = 0;
   let noLowerT = 0; // noLower expira: a adaptação volta a tentar depois de um tempo
   let shadowsCut = false;
+  let failedCuts = 0; // reduções de resolução que não melhoraram (ver adaptResolution)
+  const matQueue = []; // materiais a recompilar depois de cortar as sombras, poucos por quadro
   function frame() {
     const rawDt = clock.getDelta();
     const dt = Math.min(rawDt, 0.1);
@@ -1370,6 +1380,7 @@ async function init() {
     renderer.setPixelRatio(r);
   }
   function adaptResolution(dt) {
+    for (let i = 0; i < 6 && matQueue.length; i++) matQueue.pop().needsUpdate = true;
     if (game.state !== 'race' || game.paused) {
       slowTime = fastTime = 0;
       return;
@@ -1379,10 +1390,12 @@ async function init() {
       // Reduziu e não melhorou pelo menos 8%: volta e para de reduzir por 20 s.
       checkTime -= dt;
       if (checkTime <= 0 && dtAvg > dtBefore * 0.92) {
+        // o teto pode ser do aparelho (30 fps do modo economia): cada falha dobra a espera, sem ficar oscilando
+        failedCuts++;
         setPR(prBefore);
         noLower = true;
-        noLowerT = 20;
-      }
+        noLowerT = 20 * 2 ** Math.min(failedCuts, 4);
+      } else if (checkTime <= 0) failedCuts = 0;
       return;
     }
     // abaixo de ~45 quadros por segundo já trepida: reage antes de ficar injogável
@@ -1400,9 +1413,11 @@ async function init() {
           // resolução no mínimo e ainda lento: desliga as sombras sem recarregar
           shadowsCut = true;
           renderer.shadowMap.enabled = false;
+          // recompila aos poucos (um lote por quadro) em vez de tudo no mesmo quadro
+          const seen = new Set();
           scene.traverse((o) => {
             const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
-            for (const m of ms) m.needsUpdate = true;
+            for (const m of ms) if (!seen.has(m)) { seen.add(m); matQueue.push(m); }
           });
         } else if (quality.id === 'alta' && !slowWarned && dtAvg > 1 / 32) {
           // Ainda lento em 'alta': sugere a qualidade baixa (sem trocar sozinho).
@@ -1524,7 +1539,7 @@ async function init() {
     const md = q.get('modo');
     let any = false;
     if (ch && CHARACTERS.some((c) => c.id === ch)) { menu.opts.character = ch; any = true; }
-    if (mo && CLASSES[mo]) { menu.opts.cc = mo === '150cc' && !is150Unlocked() ? '100cc' : mo; any = true; }
+    if (mo && Object.hasOwn(CLASSES, mo)) { menu.opts.cc = mo === '150cc' && !is150Unlocked() ? '100cc' : mo; any = true; }
     if (RACE.lapOptions.includes(vo)) { menu.opts.laps = vo; any = true; }
     if (md) {
       const plain = md.normalize('NFD').replace(/[\u0300-\u036f]/g, '');

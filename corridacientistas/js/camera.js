@@ -55,6 +55,9 @@ const KICK = { dist: 0.9, height: -0.2, fov: 11, attack: 0.05, release: 0.25, st
 const DRIFT_ROLL = 0.04; // rad de inclinação extra no drift (sensação de derrapagem)
 const PODIUM_INTRO = 2.4; // s de aproximação ao entrar no modo pódio
 
+// Preferência do sistema "reduzir movimento" (lida uma vez)
+const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export class CameraRig {
   constructor(camera) {
     this.camera = camera;
@@ -129,6 +132,7 @@ export class CameraRig {
   }
 
   shake(intensity = 0.3, duration = 0.4) {
+    if (REDUCED_MOTION) intensity *= 0.25; // quem pede menos movimento no sistema sente só um toque
     const left = this.shakeDur > 0 ? this.shakeI * (this.shakeT / this.shakeDur) : 0;
     if (intensity >= left) {
       this.shakeI = intensity;

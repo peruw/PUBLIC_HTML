@@ -103,12 +103,22 @@ fs.writeFileSync(
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
 </IfModule>
+# compressão: o jogo vai de ~1,1 MB para ~350 KB (importa em 4G e na rede da escola)
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript text/javascript application/json application/manifest+json image/svg+xml
+</IfModule>
+<IfModule mod_brotli.c>
+  AddOutputFilterByType BROTLI_COMPRESS text/html application/javascript text/javascript application/manifest+json
+</IfModule>
 `,
 );
 
 // Manifest e ícones do aplicativo (Adicionar à tela inicial).
 fs.copyFileSync(path.join(SRC, 'manifest.webmanifest'), path.join(OUT, 'manifest.webmanifest'));
-for (const f of ['icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join(SRC, f), path.join(OUT, f));
+for (const f of ['icon-192.png', 'icon-512.png', 'preview.jpg']) {
+  if (!fs.existsSync(path.join(SRC, f))) throw new Error(`falta ${f} em ${SRC} (o cartão de compartilhamento depende dele)`);
+  fs.copyFileSync(path.join(SRC, f), path.join(OUT, f));
+}
 
 // Remove sobras da versão antiga (módulos soltos).
 for (const dir of ['js', 'css']) fs.rmSync(path.join(OUT, dir), { recursive: true, force: true });

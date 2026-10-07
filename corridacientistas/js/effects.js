@@ -1060,6 +1060,8 @@ export class Effects {
   // Flash de tela: overlay DOM #flash com opacidade que some.
   // Sem clarão de tela na corrida de demonstração da tela de título (fica por cima dos menus).
   _canFlash() {
+    // sem clarões para quem pede menos movimento (fotossensibilidade)
+    if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
     return !!this.world && this.world.phase !== 'title';
   }
 

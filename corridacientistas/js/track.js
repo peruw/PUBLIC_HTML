@@ -297,7 +297,8 @@ function asphaltTexture(hi, aniso) {
   const img = g.getImageData(0, 0, W, H);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
-    const n = (r() - 0.5) * 34 + (r() < 0.04 ? 30 : 0) - (r() < 0.04 ? 26 : 0);
+    const u = r(); // um sorteio por pixel (eram três): mesma distribuição, 1/3 do custo
+    const n = (u - 0.5) * 34 + (u < 0.04 ? 30 : 0) - (u > 0.96 ? 26 : 0);
     d[i] += n; d[i + 1] += n; d[i + 2] += n + 2;
   }
   g.putImageData(img, 0, 0);
@@ -1814,7 +1815,7 @@ export function buildTrack(scene, quality = {}) {
 
   // ------------------------------------------------------------ malha das estruturas
   // (na baixa ela é montada depois, com os pneus e as rampas juntos: mesmo material, sem sombras)
-  const buildStructures = () => mkMesh(sb.build(), matAtlas, { cast: true, receive: true, name: 'estruturas', split: hi ? SPLIT : 0 });
+  const buildStructures = () => mkMesh(sb.build(), matAtlas, { cast: true, receive: true, name: 'estruturas', split: hi ? SPLIT : 250, splitMin: hi ? SPLIT_MIN : 4000 });
   if (hi) buildStructures();
 
   // ------------------------------------------------------------ pilhas de pneus (mescladas por célula)

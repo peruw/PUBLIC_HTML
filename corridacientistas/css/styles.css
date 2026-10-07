@@ -42,6 +42,13 @@ body {
   overscroll-behavior: none;
 }
 
+/* campos de texto precisam aceitar digitação no Safari/iOS, que não digita em input dentro de user-select:none */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 #app {
   position: fixed;
   inset: 0;
@@ -666,6 +673,7 @@ kbd {
   border-bottom: 2px solid rgba(0, 0, 0, 0.35);
   font-family: inherit;
   font-size: 13px;
+  font-weight: 800;
   text-align: center;
 }
 
@@ -1455,7 +1463,9 @@ body.touch #hud-minimap {
     grid-template-columns: 1fr;
   }
   /* celular em pé: 4 cartões por fileira, para os nomes caberem */
-  .char-grid { grid-template-columns: repeat(4, 1fr); }
+  .char-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .char-card { min-height: 0; overflow: visible; }
+  .char-card span { font-size: 10px; letter-spacing: -0.5px; }
   #hud-toasts {
     width: min(300px, 46vw);
   }
@@ -1466,6 +1476,13 @@ body.touch #hud-minimap {
   .seg button small { display: none; }
   .opt-label { font-size: 14px; }
   .btn-go { font-size: 17px; padding: 9px 14px; }
+  /* sem espaço para a biografia: ficam nome, dados e as 4 barras (o que decide a escolha) */
+  .detail-bio, .detail-fact { display: none; }
+  .char-detail { grid-template-columns: 1fr; }
+  .detail-visual { display: none; }
+  .detail-text { min-width: 0; }
+  .detail-text h3 { font-size: 16px; }
+  .stat { grid-template-columns: 76px 1fr; }
 }
 
 /* telas bem baixas: título compacto */

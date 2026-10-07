@@ -54,7 +54,15 @@ const store = {
   get(k, def) {
     try {
       const v = localStorage.getItem('kartcientifico-' + k);
-      return v === null ? def : JSON.parse(v);
+      if (v === null) return def;
+      const r = JSON.parse(v);
+      // dado de versão antiga ou editado à mão (null, texto no lugar de objeto...) volta ao padrão
+      if (def !== null && def !== undefined) {
+        if (r === null || typeof r !== typeof def) return def;
+        if (typeof def === 'object' && Array.isArray(r) !== Array.isArray(def)) return def;
+        if (typeof def === 'number' && !Number.isFinite(r)) return def;
+      }
+      return r;
     } catch {
       return def;
     }
@@ -100,7 +108,8 @@ export class Menu {
       this.opts.character2 = CHARACTERS.find((c) => c.id !== this.opts.character).id;
     }
     this.editing = 0; // dois jogadores: de quem é a ficha mostrada (0 = J1, 1 = J2)
-    if (!CLASSES[this.opts.cc] || (this.opts.cc === '150cc' && !is150Unlocked())) this.opts.cc = CLASSES[this.opts.cc] ? '100cc' : '50cc';
+    const okCC = Object.hasOwn(CLASSES, this.opts.cc);
+    if (!okCC || (this.opts.cc === '150cc' && !is150Unlocked())) this.opts.cc = okCC ? '100cc' : '50cc';
     if (!RACE.lapOptions.includes(this.opts.laps)) this.opts.laps = RACE.defaultLaps;
 
     // quem já jogava em 150cc (antes do cadeado) fica com ele liberado de vez
@@ -631,8 +640,9 @@ export class Menu {
     let got = 0;
     for (const card of this.grid.children) {
       const m = medals[card.dataset.id] || {};
-      card.querySelector('.medals').innerHTML = Object.keys(CLASSES).map((cc) => (m[cc] ? `<i title="${cc}">${MEDAL_ICON[m[cc]]}</i>` : '')).join('');
-      got += Object.keys(m).length;
+      const mine = Object.keys(CLASSES).filter((cc) => MEDAL_ICON[m[cc]]);
+      card.querySelector('.medals').innerHTML = mine.map((cc) => `<i title="${cc}">${MEDAL_ICON[m[cc]]}</i>`).join('');
+      got += mine.length;
     }
     const total = CHARACTERS.length * Object.keys(CLASSES).length;
     const tro = $('select-trophies');
@@ -1190,7 +1200,7 @@ export class Menu {
       store.set('room', null);
       // ao sair da sala, volta às escolhas do próprio jogador
       const cc = store.get('cc', '50cc');
-      this.opts.cc = CLASSES[cc] && (cc !== '150cc' || is150Unlocked()) ? cc : '100cc';
+      this.opts.cc = Object.hasOwn(CLASSES, cc) && (cc !== '150cc' || is150Unlocked()) ? cc : '100cc';
       const laps = store.get('laps', RACE.defaultLaps);
       this.opts.laps = RACE.lapOptions.includes(laps) ? laps : RACE.defaultLaps;
       this.opts.mode = store.get('mode', 'race') === 'timetrial' ? 'timetrial' : 'race';
@@ -1469,16 +1479,18 @@ export class Menu {
     } else if (this.current === 'select') {
       // dois jogadores: WASD move o J1 e as setas movem o J2 (com 1 jogador, os dois movem o mesmo)
       const p2 = this.duo() && k.startsWith('Arrow') ? 1 : 0;
-      if (k === 'ArrowLeft' || k === 'a' || k === 'A') this.moveSelection(-1, 0, p2);
-      else if (k === 'ArrowRight' || k === 'd' || k === 'D') this.moveSelection(1, 0, p2);
-      else if (k === 'ArrowUp' || k === 'w' || k === 'W') this.moveSelection(0, -1, p2);
-      else if (k === 'ArrowDown' || k === 's' || k === 'S') this.moveSelection(0, 1, p2);
+      // letras pela posição física da tecla (e.code), como na corrida: vale em AZERTY e em outros alfabetos
+      const c = e.code;
+      if (k === 'ArrowLeft' || c === 'KeyA') this.moveSelection(-1, 0, p2);
+      else if (k === 'ArrowRight' || c === 'KeyD') this.moveSelection(1, 0, p2);
+      else if (k === 'ArrowUp' || c === 'KeyW') this.moveSelection(0, -1, p2);
+      else if (k === 'ArrowDown' || c === 'KeyS') this.moveSelection(0, 1, p2);
       else if (k === 'Enter' || k === ' ') this.action('start');
       else if (k === 'Escape') this.action('back');
-      else if (k === 'q' || k === 'Q') this.cycleOpt('cc', -1);
-      else if (k === 'e' || k === 'E') this.cycleOpt('cc', 1);
-      else if (k === 'z' || k === 'Z') this.cycleOpt('laps', -1);
-      else if (k === 'x' || k === 'X') this.cycleOpt('laps', 1);
+      else if (c === 'KeyQ') this.cycleOpt('cc', -1);
+      else if (c === 'KeyE') this.cycleOpt('cc', 1);
+      else if (c === 'KeyZ') this.cycleOpt('laps', -1);
+      else if (c === 'KeyX') this.cycleOpt('laps', 1);
       else return;
       e.preventDefault();
     } else if (this.current === 'howto' && (k === 'Escape' || k === 'Enter')) {
