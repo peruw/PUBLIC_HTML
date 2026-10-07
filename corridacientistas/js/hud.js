@@ -472,6 +472,7 @@ export class Hud {
       this.el.slot.classList.toggle('back', held === 'back');
       this.el.icon.innerHTML = showing ? itemIconHTML(showing) : '';
       this.el.slot.classList.toggle('rolling', !!p.roulette);
+      this.el.slot.parentElement?.classList.toggle('empty', !showing); // sem item: caixa tracejada com "?"
       // itens de vários usos (Pilha ×3): contador 3/2/1 e nome sem o "×3"
       const multi = !!p.item && (ITEMS[p.item].uses || 1) > 1;
       const showCount = !p.roulette && multi;

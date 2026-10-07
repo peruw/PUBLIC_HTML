@@ -301,10 +301,30 @@ function asphaltTexture(hi, aniso) {
     d[i] += n; d[i + 1] += n; d[i + 2] += n + 2;
   }
   g.putImageData(img, 0, 0);
-  // faixa de desgaste no meio de cada metade
-  g.fillStyle = 'rgba(30,30,34,0.10)';
-  g.fillRect(W * 0.22, 0, W * 0.12, H);
-  g.fillRect(W * 0.66, 0, W * 0.12, H);
+  // trilhas de pneu (linha de corrida) no meio de cada metade: borda macia, mais escura no centro
+  for (const cx of [0.27, 0.73]) {
+    const lg = g.createLinearGradient(W * (cx - 0.1), 0, W * (cx + 0.1), 0);
+    lg.addColorStop(0, 'rgba(24,24,28,0)');
+    lg.addColorStop(0.5, 'rgba(24,24,28,0.2)');
+    lg.addColorStop(1, 'rgba(24,24,28,0)');
+    g.fillStyle = lg;
+    g.fillRect(W * (cx - 0.1), 0, W * 0.2, H);
+  }
+  // manchas de óleo nas trilhas e rachaduras finas (repetem a cada 12 m, sem chamar atenção)
+  for (let i = 0; i < 7; i++) {
+    const x = W * (r() < 0.5 ? 0.27 : 0.73) + (r() - 0.5) * W * 0.1, y = r() * H;
+    const rx = W * (0.01 + r() * 0.02), ry = rx * (1.6 + r() * 1.8);
+    g.fillStyle = 'rgba(14,14,18,0.13)';
+    g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill();
+  }
+  g.strokeStyle = 'rgba(28,28,32,0.3)';
+  g.lineWidth = hi ? 1.2 : 1;
+  for (let i = 0; i < 5; i++) {
+    let x = W * (0.08 + r() * 0.84), y = r() * H;
+    g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 5; k++) { x += (r() - 0.5) * W * 0.05; y += H * (0.01 + r() * 0.03); g.lineTo(x, y); }
+    g.stroke();
+  }
   // linhas de borda e tracejado central
   const line = (x0, w, y0, h) => {
     g.fillStyle = '#f4f4ee';
@@ -1129,7 +1149,8 @@ export function buildTrack(scene, quality = {}) {
     for (let r = 0; r <= N; r++) {
       const i = r % N;
       const s = r * ds;
-      const dk = tunnelDark(i * ds);
+      // tom do asfalto varia de leve ao longo da pista (remendos mais claros e escuros)
+      const dk = tunnelDark(i * ds) * (1 + 0.045 * Math.sin(i * ds * 0.021 + 1.3) + 0.03 * Math.sin(i * ds * 0.057));
       shade.setRGB(dk, dk, dk * 1.02);
       P(i, -HW[i], 0, va); P(i, HW[i], 0, vb);
       b.vert(va.x, va.y, va.z, UX[i], UY[i], UZ[i], shade, 0, s / 12);

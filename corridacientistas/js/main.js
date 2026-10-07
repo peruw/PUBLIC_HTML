@@ -196,6 +196,7 @@ async function init() {
   const karts = CHARACTERS.map((character, index) => {
     const model = kartModel(character.id);
     const kart = new Kart({ character, isPlayer: false, model, bus, index });
+    if (!quality.shadows) kart.addBlobShadow(); // sem sombra de verdade: mancha redonda no chão
     scene.add(kart.object3d);
     return kart;
   });

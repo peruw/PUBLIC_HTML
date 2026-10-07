@@ -111,7 +111,7 @@ export const CHARACTERS = [
   {
     id: 'dumont',
     name: 'Santos Dumont',
-    short: 'S. Dumont',
+    short: 'Dumont',
     fullName: 'Alberto Santos Dumont',
     years: '1873–1932',
     country: 'Brasil',
@@ -184,7 +184,7 @@ export const CHARACTERS = [
   {
     id: 'franklin',
     name: 'Rosalind Franklin',
-    short: 'R. Franklin',
+    short: 'Franklin',
     gender: 'f',
     fullName: 'Rosalind Elsie Franklin',
     years: '1920–1958',
@@ -202,7 +202,7 @@ export const CHARACTERS = [
   {
     id: 'johnson',
     name: 'Katherine Johnson',
-    short: 'K. Johnson',
+    short: 'Johnson',
     gender: 'f',
     fullName: 'Katherine Coleman Goble Johnson',
     years: '1918–2020',

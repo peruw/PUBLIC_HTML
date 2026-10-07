@@ -45,7 +45,9 @@ const FLAGS = {
 };
 // Rótulo do cartão: palavra longa ganha um hífen opcional no meio ("Mende-leev", "Oswal-do")
 // em vez de ser cortada com "…" na tela estreita (só aparece se a palavra não couber)
-const cardLabel = (t) => t.split(' ').map((w) => (w.length >= 7 ? w.slice(0, Math.ceil(w.length / 2)) + '&shy;' + w.slice(Math.ceil(w.length / 2)) : w)).join(' ');
+const cardLabel = (t) => t.split(' ').map((w) => (w.length >= 9 ? w.slice(0, Math.ceil(w.length / 2)) + '&shy;' + w.slice(Math.ceil(w.length / 2)) : w)).join(' ');
+// Linha de conquistas do resultado: cada item vira uma "pílula" (fica fácil achar "150cc liberado!")
+const chipsHTML = (parts) => parts.map((t) => `<span class="res-chip">${t}</span>`).join('');
 const STAT_LABELS = [['speed', 'Velocidade'], ['accel', 'Aceleração'], ['handling', 'Controle'], ['weight', 'Peso']];
 
 const store = {
@@ -741,7 +743,7 @@ export class Menu {
     if (info.unlocked150) parts.push('🔓 150cc liberado!');
     if (info.daily) parts.push(info.daily.done ? '⭐ Desafio do dia cumprido!' : `⭐ Desafio do dia: ${esc(info.daily.goal)}`);
     recEl.classList.toggle('hidden', !parts.length);
-    recEl.innerHTML = parts.join(' · ');
+    recEl.innerHTML = chipsHTML(parts);
     recEl.classList.toggle('new', !!(rec && (rec.newTotal || rec.newLap)) || !!info.medal || !!info.unlocked150);
 
     const list = tt ? results.filter((r) => r.kart === player) : results;
@@ -808,7 +810,7 @@ export class Menu {
     const recEl = $('results-record');
     recEl.classList.remove('hidden');
     recEl.classList.add('new');
-    recEl.innerHTML = parts.join(' · ');
+    recEl.innerHTML = chipsHTML(parts);
 
     $('results-list').innerHTML = results
       .map((r) => {
@@ -903,7 +905,7 @@ export class Menu {
     const recEl = $('results-record');
     recEl.classList.remove('hidden');
     recEl.classList.toggle('new', final);
-    recEl.innerHTML = parts.join(' · ');
+    recEl.innerHTML = chipsHTML(parts);
     // volta para a sala só com o resultado fechado: quem sai antes deixaria o kart (e, se for o
     // anfitrião, a IA) parado na pista de quem ainda corre
     const back = $('btn-net-lobby');
@@ -995,7 +997,7 @@ export class Menu {
       return;
     }
     const rows = list
-      .map((e, i) => `<li class="${i === idx ? 'me' : ''}"><span>${i + 1}º</span><span>${i === idx && !e.name ? `<input id="rank-name" maxlength="14" placeholder="Seu nome" value="${esc(store.get('nick', '') || this.me?.nickname || '')}" aria-label="Seu nome no ranking" /><button class="btn btn-small" id="rank-save">Salvar</button>` : esc(e.name || 'Jogador')}</span><span class="t">${formatTime(e.time)}</span></li>`)
+      .map((e, i) => `<li class="${i === idx ? 'me' : ''}"><span>${i + 1}º</span><span${i === idx && !e.name ? ' class="rank-edit"' : ''}>${i === idx && !e.name ? `<input id="rank-name" maxlength="14" placeholder="Seu nome" value="${esc(store.get('nick', '') || this.me?.nickname || '')}" aria-label="Seu nome no ranking" /><button class="btn btn-small" id="rank-save">Salvar</button>` : esc(e.name || 'Jogador')}</span><span class="t">${formatTime(e.time)}</span></li>`)
       .join('');
     box.innerHTML = `<details ${idx >= 0 ? 'open' : ''}><summary>🏆 Ranking deste aparelho</summary><ol class="rank-list">${rows}</ol></details>`;
     const save = $('rank-save');
@@ -1024,7 +1026,7 @@ export class Menu {
     if (!u) return `<p>Entre com sua conta Google para aparecer no ranking.</p><a class="btn btn-primary btn-small" href="${Online.loginUrl}">Entrar com Google</a>`;
     if (me === undefined) return '<p class="muted">Não deu para carregar o seu apelido agora.</p><button class="btn btn-small" data-action="online-retry">Tentar de novo</button>';
     if (me && me.nickname) return `<p>Você aparece como <b>${esc(me.nickname)}</b>.</p>` + this.nickForm(me.nickname, 'Trocar apelido', 'nick');
-    return '<p>Escolha um apelido para aparecer no ranking (os colegas veem esse nome, não o seu e-mail).</p>' + this.nickForm(me?.suggest || u.firstName || '', 'Salvar apelido', 'nick');
+    return '<p>Escolha um apelido para aparecer no ranking (os colegas veem esse nome, não o seu e&#8209;mail).</p>' + this.nickForm(me?.suggest || u.firstName || '', 'Salvar apelido', 'nick');
   }
 
   // Online indisponível: ainda carregando (rede lenta), sem conexão no site ou fora do site.
@@ -1154,7 +1156,7 @@ export class Menu {
         else if (g.nick) parts.push(`<p>🌐 Apelido salvo: <b>${esc(g.nick)}</b>. Seu tempo já aparece no ranking online.</p>`);
         else {
           // tempo gravado, mas sem apelido ele não aparece na lista
-          parts.push('<p>🌐 Tempo salvo no ranking online. Escolha um apelido para ele aparecer na lista (os colegas veem o apelido, não o seu e-mail):</p>');
+          parts.push('<p>🌐 Tempo salvo no ranking online. Escolha um apelido para ele aparecer na lista (os colegas veem o apelido, não o seu e&#8209;mail):</p>');
           parts.push(this.nickForm(this.me?.suggest || Online.user?.firstName || '', 'Salvar apelido', 'res-nick'));
         }
       } else parts.push(`<p class="muted">🌐 ${runErrText(g.error)}</p>`);

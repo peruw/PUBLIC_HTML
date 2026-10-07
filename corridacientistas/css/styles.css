@@ -1314,7 +1314,7 @@ body.touch .hud-item-key {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(8, 16, 12, 0.94);
+  background: rgb(8, 16, 12); /* opaco: o menu de pausa por trás não pode aparecer através do aviso */
   display: grid;
   place-content: center;
   justify-items: center;
@@ -2333,4 +2333,135 @@ body.touch .toast p { font-size: 12px; }
   #rank-name { min-height: 36px; font-size: 16px; }
   .lobby-foot .seg button { min-height: 40px; }
   input[type='range'][data-vol] { height: 32px; }
+}
+
+/* ================= Revisão de gráficos e design ================= */
+
+/* ---------- Menu do título: botões em coluna alinhada (só em tela alta; celular deitado mantém o compacto) ---------- */
+@media (min-height: 521px) {
+  .menu-buttons {
+    width: min(480px, 100%);
+    justify-items: stretch;
+  }
+  .menu-buttons .btn { white-space: nowrap; }
+  .menu-buttons .row > .btn { flex: 1 1 130px; min-width: 0; }
+  .menu-buttons .row.play-row > .btn-primary { flex: 1 1 150px; }
+  .menu-buttons > .btn { text-align: center; }
+  .menu-buttons .vol-row { justify-content: space-between; }
+}
+
+/* ---------- HUD de corrida: leitura sobre céu e outdoors claros ---------- */
+.hud-race {
+  padding: 4px 18px 8px 56px;
+  margin-right: -14px; /* o degradê vai até a borda da tela */
+  border-radius: 16px 0 0 16px;
+  background: linear-gradient(270deg, rgba(8, 18, 13, 0.5), rgba(8, 18, 13, 0));
+}
+.hud-lap {
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 8px rgba(0, 0, 0, 0.6);
+}
+.hud-time {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 3px #0b2a1d;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 0, 0, 0.55);
+}
+
+/* mensagem grande do centro: contorno forte, legível sobre muro, faixa e outdoor */
+.hud-center.msg {
+  font-weight: 800;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 6px #2a1a00;
+  text-shadow: 0 4px 0 #2a1a00, 0 8px 18px rgba(0, 0, 0, 0.5);
+}
+.hud-center.msg small {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 4px #06170f;
+}
+/* celular: sem a curiosidade empilhada abaixo da mensagem */
+body.touch #hud-toasts.dim { opacity: 0; }
+
+/* ---------- Caixa de item: estado vazio ---------- */
+.hud-item.empty .hud-item-slot {
+  opacity: 0.62;
+  border-style: dashed;
+  background: rgba(10, 20, 15, 0.45);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.hud-item.empty .hud-item-slot::after {
+  content: '?';
+  font: 800 0.62em var(--display);
+  color: rgba(255, 255, 255, 0.4);
+}
+.hud-item.empty .hud-item-key { display: none; }
+/* minimapa do celular: fundo suave para ler contra o céu claro */
+body.touch #hud-minimap {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 14px;
+}
+
+/* ---------- Resultado: conquistas em pílulas ---------- */
+.results-record {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.results-record.hidden { display: none; }
+.res-chip {
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.results-record.new .res-chip {
+  background: rgba(245, 185, 74, 0.14);
+  border-color: rgba(245, 185, 74, 0.5);
+}
+.res-chip small { font-size: 12px; font-weight: 400; }
+@media (max-height: 520px) {
+  .res-chip { font-size: 11px; padding: 1px 8px; }
+}
+
+/* ranking do aparelho: nome e botão alinhados */
+.rank-list .rank-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.rank-list .rank-edit input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  height: 34px;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+.rank-list .rank-edit .btn { height: 34px; padding: 0 14px; }
+
+/* ---------- Celular deitado: painéis respiram nas bordas ---------- */
+@media (max-height: 520px) {
+  .screen { padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+  .small-panel { max-height: calc(100dvh - 16px); overflow: auto; }
+}
+
+/* ---------- TV e projetor da sala: interface maior em telas grandes ---------- */
+@media (min-width: 1600px) and (min-height: 900px) and (hover: hover) and (pointer: fine) {
+  html { --ui: 1.25; }
+}
+@media (min-width: 2400px) and (min-height: 1300px) and (hover: hover) and (pointer: fine) {
+  html { --ui: 1.6; }
+}
+@media (min-width: 1600px) and (min-height: 900px) and (hover: hover) and (pointer: fine) {
+  #hud:not(.split) :is(.hud-race, .hud-item, #hud-minimap, #hud-toasts),
+  .title-wrap,
+  .select-wrap,
+  .small-panel,
+  .results-wrap,
+  .howto-wrap { zoom: var(--ui); }
 }

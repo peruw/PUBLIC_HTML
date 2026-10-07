@@ -30,7 +30,7 @@ export class KartPreview {
     this.scene.add(sun);
     // base giratória verde Quanta
     const base = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.55, 1.7, 0.12, 48),
+      new THREE.CylinderGeometry(1.0, 1.12, 0.1, 48),
       new THREE.MeshStandardMaterial({ color: 0x16a86a, roughness: 0.5, metalness: 0.1 }),
     );
     base.position.y = -0.06;
@@ -38,8 +38,8 @@ export class KartPreview {
     this.turntable.add(base);
     this.scene.add(this.turntable);
     this.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
-    this.camera.position.set(0, 1.8, 4.3);
-    this.camera.lookAt(0, 0.7, 0);
+    this.camera.position.set(0, 1.9, 5.0); // mais longe: o kart e a base cabem inteiros no quadrado
+    this.camera.lookAt(0, 0.6, 0);
     this.clock = new THREE.Clock();
     this.loop = this.loop.bind(this);
   }

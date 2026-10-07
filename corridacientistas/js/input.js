@@ -55,7 +55,7 @@ const CSS = `
 .tc-root.tc-hidden{display:none}
 .tc-zone{position:absolute;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
 .tc-btn{position:absolute;display:grid;place-items:center;border-radius:50%;color:#fff;font-weight:700;
-  letter-spacing:.5px;line-height:1;text-align:center;background:rgba(18,26,60,.45);
+  letter-spacing:.5px;line-height:1;text-align:center;background:rgba(10,20,15,.5);
   border:3px solid rgba(255,255,255,.55);box-shadow:0 4px 14px rgba(0,0,0,.28),inset 0 0 0 2px rgba(255,255,255,.08);
   text-shadow:0 2px 3px rgba(0,0,0,.6);
   transition:transform .06s ease,background .1s ease,border-color .1s ease;pointer-events:none;box-sizing:border-box}
@@ -63,16 +63,16 @@ const CSS = `
 .tc-btn.tc-on{transform:scale(.92);background:rgba(255,255,255,.38);border-color:#fff}
 .tc-steer{width:clamp(78px,22vmin,94px);height:clamp(78px,22vmin,94px);font-size:clamp(34px,10vmin,44px);border-radius:26px}
 .tc-drift{width:clamp(88px,25vmin,104px);height:clamp(88px,25vmin,104px);font-size:clamp(17px,5vmin,21px);
-  border-color:rgba(255,190,90,.8);background:rgba(120,60,10,.34)}
+  border-color:rgba(255,190,90,.9);background:rgba(10,20,15,.5)}
 .tc-drift.tc-on{background:rgba(255,160,40,.55);border-color:#ffd9a0}
 .tc-item{width:clamp(66px,19vmin,78px);height:clamp(66px,19vmin,78px);font-size:clamp(15px,4.4vmin,18px);
-  border-color:rgba(255,220,90,.85);background:rgba(110,90,10,.32)}
+  border-color:rgba(255,220,90,.9);background:rgba(10,20,15,.5)}
 .tc-item.tc-on{background:rgba(255,210,63,.55)}
 .tc-brake{width:clamp(56px,16vmin,66px);height:clamp(56px,16vmin,66px);font-size:clamp(12px,3.6vmin,14px);
-  border-color:rgba(255,120,120,.8);background:rgba(110,20,20,.32)}
+  border-color:rgba(255,120,120,.9);background:rgba(10,20,15,.5)}
 .tc-brake.tc-on{background:rgba(255,80,80,.55)}
 .tc-gas{width:clamp(70px,20vmin,84px);height:clamp(70px,20vmin,84px);font-size:clamp(24px,7vmin,30px);
-  border-color:rgba(120,255,160,.8);background:rgba(10,90,40,.32)}
+  border-color:rgba(120,255,160,.9);background:rgba(10,20,15,.5)}
 .tc-gas.tc-on{background:rgba(90,230,130,.55)}
 .tc-item.tc-back::after{content:'▼';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);
   font-size:14px;color:#ffe27a;text-shadow:0 1px 3px rgba(0,0,0,.8)}

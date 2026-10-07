@@ -127,6 +127,9 @@ function wrapSigned(d, L) {
   return d;
 }
 
+let blobShadowMat = null; // sombra falsa compartilhada (qualidade baixa)
+let blobShadowGeo = null;
+
 export class Kart {
   constructor({ character, isPlayer = false, model = null, bus = null, index = 0 } = {}) {
     this.character = character;
@@ -368,6 +371,35 @@ export class Kart {
     this.body.rotation.set(0, 0, 0);
     this.body.position.y = PIVOT;
     this.body.visible = true;
+  }
+
+  // Sombra falsa (mancha escura redonda) para a qualidade baixa, que não tem sombra de verdade:
+  // sem ela o kart parece flutuar. Um plano por kart, textura compartilhada; não muda a física.
+  addBlobShadow() {
+    if (this._blob) return;
+    if (!blobShadowMat) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const g = c.getContext('2d');
+      const grad = g.createRadialGradient(32, 32, 2, 32, 32, 31);
+      grad.addColorStop(0, 'rgba(0,0,0,0.9)');
+      grad.addColorStop(0.55, 'rgba(0,0,0,0.5)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 64, 64);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      blobShadowMat = new THREE.MeshBasicMaterial({
+        map: tex, transparent: true, opacity: 0.4, depthWrite: false, fog: false,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      });
+      blobShadowGeo = new THREE.PlaneGeometry(1.5, 2.1).rotateX(-Math.PI / 2);
+    }
+    this._blob = new THREE.Mesh(blobShadowGeo, blobShadowMat);
+    this._blob.renderOrder = 1;
+    this._blob.frustumCulled = true;
+    this._blob.matrixAutoUpdate = true;
+    this.object3d.add(this._blob);
   }
 
   update(dt, world) {
@@ -956,6 +988,14 @@ export class Kart {
     o.position.copy(this.position);
     o.rotation.y = this.heading;
     const speedAbs = Math.abs(this.speed);
+    if (this._blob) {
+      // fica no chão (mesmo no ar), cresce no drift e encolhe com o kart
+      const b = this._blob;
+      b.position.y = this.groundY - this.position.y + 0.04;
+      const air = this.onGround ? 1 : Math.max(0.35, 1 - this.airTime * 1.5);
+      const k = this._scale * (this.drifting ? 1.25 : 1) * (this._flat > 0 ? 1.2 : 1) * (0.7 + 0.3 * air);
+      b.scale.set(k, 1, k);
+    }
 
     // escala: encolhido e amassado
     this._scale = damp(this._scale, this.shrinkTime > 0 ? T.shrinkScale : 1, 7, dt);
