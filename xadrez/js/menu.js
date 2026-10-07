@@ -22,6 +22,11 @@ export class Menu {
       onlineColor: store.get('onlineColor', 'w'),
     };
     this.onStart = onStart;
+    addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const back = { setup: 'btn-setup-back', howto: 'btn-howto-back', online: 'btn-online-back', pause: 'btn-pause-resume', confirm: 'btn-confirm-no' }[this.current];
+      if (back) $(back).click();
+    });
 
     $('btn-play-cpu').addEventListener('click', () => { this.opts.mode = 'cpu'; this.show('setup'); this._syncSetup(); });
     $('btn-play-2p').addEventListener('click', () => { this.opts.mode = '2p'; this.show('setup'); this._syncSetup(); });
@@ -85,6 +90,7 @@ export class Menu {
 
   _syncOnline() {
     for (const b of document.querySelectorAll('.chip[data-ocolor]')) b.classList.toggle('active', b.dataset.ocolor === this.opts.onlineColor);
+    this._pressed();
   }
   _busy(v) { $('btn-online-create').disabled = v; $('btn-online-join').disabled = v; }
   resetOnline(code = '') {
@@ -117,12 +123,18 @@ export class Menu {
     for (const b of document.querySelectorAll('.chip[data-color]')) b.classList.toggle('active', b.dataset.color === this.opts.color);
     for (const b of document.querySelectorAll('.chip[data-style]')) b.classList.toggle('active', b.dataset.style === this.opts.style);
     $('setup-rotate').checked = !!this.opts.rotate;
+    this._pressed();
+  }
+  _pressed() {
+    for (const b of document.querySelectorAll('.chip')) b.setAttribute('aria-pressed', b.classList.contains('active') ? 'true' : 'false');
   }
 
   show(name) {
     for (const [k, el] of Object.entries(this.screens)) el.classList.toggle('hidden', k !== name);
     $('screens').classList.remove('hidden');
     this.current = name;
+    const first = this.screens[name] && this.screens[name].querySelector('.btn.primary:not(:disabled), .btn:not(:disabled)');
+    if (first && name !== 'loading') first.focus({ preventScroll: true });
   }
   hide() {
     for (const el of Object.values(this.screens)) el.classList.add('hidden');

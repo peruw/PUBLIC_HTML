@@ -56,7 +56,7 @@ button { font: inherit; cursor: pointer; }
 .hud-hint {
   position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 62px);
   background: rgba(0, 0, 0, 0.45); border-radius: 999px; padding: 6px 14px; font-size: 13px; color: #fff;
-  max-width: min(90vw, 480px); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: min(90vw, 480px); text-align: center; line-height: 1.3;
 }
 .hud-hint:empty { display: none; }
 
@@ -202,3 +202,12 @@ button { font: inherit; cursor: pointer; }
 .card-hero .lead { color: var(--muted); }
 .card-hero .btn:not(.primary):hover { border-color: rgba(118, 214, 172, 0.5); }
 .card-hero .small a { color: var(--accent); }
+
+/* ---------- Acessibilidade ---------- */
+button:focus-visible, .chip:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+.chip[aria-pressed="true"]:not(.active) { outline: 2px solid var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 3s; }
+  .hud-eval-fill { transition: none; }
+  .btn:active, .hud-btn:active { transform: none; }
+}

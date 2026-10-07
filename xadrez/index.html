@@ -2,14 +2,14 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#101a16" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Xadrez em Primeira Pessoa</title>
   <meta name="description" content="Xadrez 3D onde você vê o tabuleiro pelos olhos da peça. Jogue contra o computador (Stockfish) ou contra um amigo, com gráfico de vantagem e análise de lances." />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://www.quantaaulas.com/xadrez/" />
+  <meta property="og:url" content="https://quantaaulas.com/xadrez/" />
   <meta property="og:title" content="Xadrez em Primeira Pessoa" />
   <meta property="og:description" content="Clique numa peça e veja o tabuleiro pelos olhos dela. Contra o computador ou um amigo, com análise de lances." />
   <meta property="og:image" content="https://quantaaulas.com/xadrez/assets/capa.jpg" />
@@ -42,7 +42,7 @@
       <button id="btn-menu" class="hud-btn" aria-label="Menu">☰</button>
     </div>
 
-    <div id="hud-hint" class="hud-hint"></div>
+    <div id="hud-hint" class="hud-hint" role="status" aria-live="polite"></div>
 
     <div id="hud-mini-wrap" class="hud-mini-wrap">
       <canvas id="hud-mini" class="hud-mini" aria-label="Tabuleiro"></canvas>
@@ -85,7 +85,7 @@
   </div>
 
   <!-- Telas -->
-  <div id="screens">
+  <div id="screens" role="dialog" aria-modal="true" aria-label="Menu do jogo">
     <section class="screen" data-screen="loading">
       <div class="card">
         <div class="brand-row">
