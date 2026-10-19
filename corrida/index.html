@@ -240,6 +240,19 @@
   .dash-btn small { display: block; font-size: 7px; margin-top: 4px; }
   .dash-btn.on { transform: translateX(-50%) translateY(4px); box-shadow: inset -4px -4px 0 var(--brand-deep), inset 4px 4px 0 var(--brand-hi), 0 1px 0 #000; }
   @media (pointer: coarse) { body.playing .dash-btn { display: block; } }
+  /* celular deitado: no meio de baixo o botão cobria o corredor; vai para o canto, perto do polegar */
+  @media (pointer: coarse) and (orientation: landscape) {
+    .dash-btn { left: auto; transform: none; width: 72px; height: 72px;
+      right: max(16px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); }
+    .dash-btn.on { transform: translateY(4px); }
+  }
+  /* toque: alvos de pelo menos 44 px */
+  @media (pointer: coarse) {
+    .pbtn { width: 44px; height: 44px; font-size: 12px; }
+    .btn.alt, .tab { min-height: 44px; }
+    a.link, button.link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    .account .acts .link { min-width: 44px; }
+  }
 
   /* textos que saltam */
   #fx { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
@@ -1272,7 +1285,11 @@
     else if (k === 'arrowup' || k === 'w') { if (!e.repeat) dash(); S.dashHeld = true; e.preventDefault(); }
     else if (k === 'p') togglePause();
     else if (k === 'escape') { if (openPanel) closePanel(); else togglePause(); }
-    else if ((k === 'enter' || k === ' ') && !openPanel && (S.mode === 'menu' || S.mode === 'over') && ready) { startGame(); e.preventDefault(); }
+    else if (k === 'enter' || k === ' ') {
+      // com um botão ou link focado, deixa o próprio botão agir (antes Enter em SKINS começava a corrida)
+      if (e.target && e.target.closest && e.target.closest('button, a, [role="tab"]')) return;
+      if (!openPanel && (S.mode === 'menu' || S.mode === 'over') && ready) { startGame(); e.preventDefault(); }
+    }
   });
   let tx0 = null, ty0 = null, swiped = false;
   const cv = renderer.domElement;
@@ -1339,7 +1356,10 @@
     paintCombo(false);
     if (!store.get('quanta-corrida-dash-tip', false)) {
       store.set('quanta-corrida-dash-tip', true);
-      setTimeout(() => toast('DICA: JÁ SABE A RESPOSTA?<small>Aperte ▲ (ou W) para dar dash e chegar mais rápido</small>'), 1500);
+      const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+      setTimeout(() => toast(touch
+        ? 'DICA: JÁ SABE A RESPOSTA?<small>Toque em ▲ DASH (ou deslize pra cima) para chegar mais rápido</small>'
+        : 'DICA: JÁ SABE A RESPOSTA?<small>Aperte ▲ (ou W) para dar dash e chegar mais rápido</small>'), 1500);
     }
   }
 
