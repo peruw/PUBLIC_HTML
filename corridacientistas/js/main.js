@@ -15,6 +15,7 @@ import { AudioSystem } from './audio.js';
 import { RaceManager } from './race.js';
 import { Hud } from './hud.js';
 import { Menu, store } from './menu.js';
+import { Progress } from './progress.js';
 
 const STEP = 1 / 60; // passo fixo da simulação
 const PLAYER_SLOT = 5; // o jogador larga em 6º
@@ -39,6 +40,7 @@ const game = {
 async function init() {
   let audio = null;
   let input = null;
+  const progress = new Progress({ bus, store });
   const menu = new Menu({
     sfx: (n) => audio?.sfx(n),
     onStart: (opts) => startRace(opts),
@@ -52,14 +54,22 @@ async function init() {
     onQuit: () => enterTitle(),
     onToggleSound: () => toggleSound(),
     onToggleQuality: () => toggleQuality(),
+    onToggleAssist: (on) => {
+      if (game.opts) game.opts.assist = on;
+      if (world.player) world.player.assist = on;
+    },
     onToggleAuto: () => {
       input.setAutoAccelerate(!input.autoAccelerate);
       store.set('auto', input.autoAccelerate);
       menu.setAutoLabel(input.autoAccelerate);
     },
-  });
+  }, progress);
   menu.show('loading');
   menu.setLoading(0.1, 'Preparando o laboratório…');
+  {
+    const f = progress.randomFact();
+    menu.setLoadingFact(f.c, f.text);
+  }
 
   if (!webglAvailable()) {
     document.getElementById('error-text').textContent =
@@ -137,6 +147,7 @@ async function init() {
   input.showTouch(false);
   input.setAutoAccelerate(store.get('auto', input.touchEnabled));
   menu.setAutoLabel(input.autoAccelerate);
+  menu.setAssistLabel(menu.opts.assist);
   const race = new RaceManager({ bus });
   const hud = new Hud({ bus });
 
@@ -225,8 +236,9 @@ async function init() {
     );
     playerAI = new AIDriver(player, track, { skill: 0.9 });
     race.start(world.karts, { laps: opts.laps, player, track, cc });
+    progress.startRace(player);
     world.phase = 'countdown';
-    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track });
+    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tip: countdownTip(progress.races) });
     hud.show(true);
     input.showTouch(input.touchEnabled);
     rig.follow(player);
@@ -244,11 +256,31 @@ async function init() {
   function showResults() {
     game.state = 'results';
     const results = race.buildResults();
+    const summary = progress.finishRace(results, world.player, { cc: world.cc.id, laps: world.totalLaps });
     hud.show(false);
     input.showTouch(false);
     rig.setMode('orbit', { target: world.player, radius: 7, height: 2.6, speed: 0.35 });
-    menu.showResults(results, world.player);
+    menu.showResults(results, world.player, summary);
     audio.playMusic('results');
+    if (summary.newRecord || summary.newMedal) setTimeout(() => audio.sfx('record'), 700);
+  }
+
+  // Dica da contagem: alterna entre largada-foguete, drift e itens.
+  function countdownTip(n) {
+    const touch = input.touchEnabled;
+    const auto = touch && input.autoAccelerate;
+    const tips = [
+      touch
+        ? `Dica: segure ${auto ? '◀, ▶ ou <b>DRIFT</b>' : '<b>▲</b>'} logo depois do <b>2</b> para largar com turbo!`
+        : 'Dica: segure <kbd>W</kbd> ou <kbd>↑</kbd> logo depois do <b>2</b> para largar com turbo!',
+      touch
+        ? 'Dica: nas curvas, segure <b>DRIFT</b> e vire. Quando as faíscas ficarem laranja, solte para ganhar turbo!'
+        : 'Dica: nas curvas, segure <kbd>Espaço</kbd> e vire. Quando as faíscas ficarem laranja, solte para ganhar turbo!',
+      touch
+        ? 'Dica: passe pelas caixas de átomo e toque em <b>ITEM</b>. Cada item traz uma curiosidade da ciência!'
+        : 'Dica: passe pelas caixas de átomo e use o item com <kbd>E</kbd>. Cada item traz uma curiosidade da ciência!',
+    ];
+    return tips[n % tips.length];
   }
 
   function setPaused(on, silent) {
@@ -578,6 +610,10 @@ async function init() {
     },
     setPixelRatio(r) {
       setPR(r);
+    },
+    progress,
+    get shadowsOff() {
+      return shadowsOff;
     },
   };
 

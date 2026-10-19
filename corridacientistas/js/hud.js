@@ -32,7 +32,9 @@ export class Hud {
       center: $('hud-center'),
       toasts: $('hud-toasts'),
       map: $('hud-minimap'),
+      tip: $('hud-tip'),
     };
+    this.tipTimer = 0;
     this.ctx = this.el.map.getContext('2d');
     this.seenFacts = new Set();
     this.centerTimer = 0;
@@ -42,11 +44,24 @@ export class Hud {
     this.player = null;
     this.toastList = []; // toasts ativos com tempo de vida (em ms de jogo)
 
-    bus.on('race:countdown', ({ n }) => this.center(String(n), 'pop', RACE_COUNT_MS));
-    bus.on('race:go', () => this.center('VAI!', 'pop', 900));
+    bus.on('race:countdown', ({ n }) => {
+      this.center(String(n), 'pop', RACE_COUNT_MS);
+      if (n === 3 && this.tipText) this.showTip(this.tipText);
+    });
+    bus.on('race:go', () => {
+      this.center('VAI!', 'pop', 900);
+      if (this.tipTimer > 0) this.tipTimer = Math.min(this.tipTimer, 1200);
+    });
     bus.on('race:finalLap', () => this.center('ÚLTIMA VOLTA!', 'msg pop', 1800));
-    bus.on('race:lap', ({ kart, lap }) => {
-      if (kart === this.player && lap < this.totalLaps) this.center(`Volta ${lap}`, 'msg pop', 1300);
+    bus.on('race:lap', ({ kart, lap, lapTime }) => {
+      if (kart !== this.player) return;
+      if (lap < this.totalLaps) this.center(`Volta ${lap}`, 'msg pop', 1300);
+      // tempo da volta que acabou de terminar
+      if (lapTime > 0) {
+        const times = kart.lapTimes || [];
+        const best = times.length > 1 && lapTime <= Math.min(...times);
+        this.toast(`<p class="toast-full">Volta ${lap - 1}: <strong>${formatTime(lapTime)}</strong>${best ? ' · sua volta mais rápida! ⚡' : ''}</p>`, 2600);
+      }
     });
     bus.on('race:finish', ({ kart, place }) => {
       if (kart === this.player) this.center(place === 1 ? 'VITÓRIA! 🏆' : 'CHEGADA!', 'msg pop', 3500);
@@ -71,11 +86,15 @@ export class Hud {
       this.toastList = [];
       this.el.toasts.innerHTML = '';
       this.el.center.textContent = '';
+      this.hideTip();
     }
   }
 
-  setRace({ player, karts, totalLaps, track }) {
+  // tip: dica mostrada durante a contagem (ou null)
+  setRace({ player, karts, totalLaps, track, tip = null }) {
     this.player = player;
+    this.tipText = tip;
+    this.hideTip();
     this.karts = karts;
     this.totalLaps = totalLaps;
     this.el.total.textContent = `/${karts.length}`;
@@ -175,9 +194,19 @@ export class Hud {
     }
 
     if (p.place !== this.last.place) {
+      // ganhou/perdeu posição na corrida: pulso verde/vermelho no número
+      const delta = this.last.place && race.phase === 'racing' ? this.last.place - p.place : 0;
       this.last.place = p.place;
       this.el.pos.textContent = p.place;
       this.el.posBox.className = `hud-pos ${p.place <= 3 ? 'p' + p.place : 'px'}`;
+      if (delta) {
+        void this.el.posBox.offsetWidth; // reinicia a animação
+        this.el.posBox.classList.add(delta > 0 ? 'up' : 'down');
+      }
+    }
+    if (this.tipTimer > 0) {
+      this.tipTimer -= dt * 1000;
+      if (this.tipTimer <= 0) this.hideTip();
     }
     const lapTxt = `${Math.min(p.lap, this.totalLaps)}/${this.totalLaps}`;
     if (lapTxt !== this.last.lap) {
@@ -214,6 +243,19 @@ export class Hud {
     }
 
     this.drawMinimap();
+  }
+
+  showTip(html, ms = 6000) {
+    const el = this.el.tip;
+    if (!el) return;
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+    this.tipTimer = ms;
+  }
+
+  hideTip() {
+    this.tipTimer = 0;
+    this.el.tip?.classList.add('hidden');
   }
 
   center(text, cls = 'pop', ms = 1000, sticky = false) {

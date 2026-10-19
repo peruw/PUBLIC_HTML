@@ -20,7 +20,18 @@ export const CHARACTERS = [
       outfit: 0x5b3a29, outfitAccent: 0xf5f0e1, extras: 'casaca marrom com gola de renda branca; maçã vermelha no painel do kart',
     },
     bio: 'Formulou as três leis do movimento e a lei da gravitação universal. Também desenvolveu o cálculo (na mesma época que Leibniz, mas de forma independente) e mostrou que a luz branca é a mistura de todas as cores.',
-    fact: 'Newton construiu o primeiro telescópio refletor que funcionava, em 1668.',
+    // curiosidades (a 1ª é a mais conhecida); o jogo alterna entre elas
+    facts: [
+      'Newton construiu o primeiro telescópio refletor que funcionava, em 1668.',
+      'Com prismas de vidro, Newton mostrou que a luz branca se separa nas cores do arco-íris.',
+      'Em 1687, Newton publicou o livro “Principia”, com as três leis do movimento e a gravitação universal.',
+    ],
+    quiz: {
+      q: 'Pela 3ª Lei de Newton (ação e reação), o foguete empurra os gases para trás. E os gases…',
+      options: ['empurram o foguete para a frente', 'puxam o foguete para trás', 'não fazem força nenhuma'],
+      answer: 0,
+      explain: 'Toda ação tem uma reação de mesma força e sentido oposto. É assim que os foguetes sobem!',
+    },
   },
   {
     id: 'curie',
@@ -37,7 +48,17 @@ export const CHARACTERS = [
       outfit: 0x1c1c22, outfitAccent: 0xffffff, extras: 'vestido preto de gola alta; frasco com líquido verde brilhante (rádio) no kart',
     },
     bio: 'Descobriu, com o marido Pierre Curie, os elementos polônio e rádio, e criou o termo “radioatividade”. Foi a primeira pessoa a ganhar dois Prêmios Nobel e é a única premiada em duas ciências diferentes: Física (1903) e Química (1911).',
-    fact: 'Os cadernos de Marie Curie ainda são radioativos e ficam guardados em caixas forradas de chumbo.',
+    facts: [
+      'Os cadernos de Marie Curie ainda são radioativos e ficam guardados em caixas forradas de chumbo.',
+      'Marie Curie deu ao elemento polônio esse nome em homenagem à Polônia, o país onde nasceu.',
+      'Na Primeira Guerra Mundial, ela levou aparelhos de raios X em carros até perto das batalhas para ajudar a tratar soldados feridos.',
+    ],
+    quiz: {
+      q: 'Que elemento químico Marie Curie batizou em homenagem ao seu país natal?',
+      options: ['Polônio', 'Urânio', 'Hélio'],
+      answer: 0,
+      explain: 'Marie Curie nasceu em Varsóvia, na Polônia, e chamou de polônio o primeiro elemento que descobriu com Pierre Curie.',
+    },
   },
   {
     id: 'mendeleev',
@@ -54,7 +75,17 @@ export const CHARACTERS = [
       outfit: 0x2b2d42, outfitAccent: 0x8d99ae, extras: 'casaco escuro; kart decorado com quadradinhos coloridos da tabela periódica',
     },
     bio: 'Organizou a Tabela Periódica em 1869 e deixou espaços vazios para elementos ainda desconhecidos, prevendo suas propriedades. O gálio e o germânio foram descobertos depois, como ele previu.',
-    fact: 'O elemento químico 101 se chama mendelévio em homenagem a ele.',
+    facts: [
+      'O elemento químico 101 se chama mendelévio em homenagem a ele.',
+      'A tabela de Mendeleev tinha 63 elementos, os conhecidos em 1869. A Tabela Periódica de hoje tem 118.',
+      'Mendeleev ordenou os elementos pela massa atômica. Hoje a ordem é pelo número atômico: a quantidade de prótons no núcleo.',
+    ],
+    quiz: {
+      q: 'Por que Mendeleev deixou espaços vazios na sua Tabela Periódica?',
+      options: ['Para elementos que ainda não tinham sido descobertos', 'Porque faltou tinta para escrever', 'Para separar os metais dos gases'],
+      answer: 0,
+      explain: 'Ele previu como seriam esses elementos. O gálio e o germânio foram descobertos depois, como ele tinha previsto.',
+    },
   },
   {
     id: 'einstein',
@@ -71,7 +102,17 @@ export const CHARACTERS = [
       outfit: 0x8a8f99, outfitAccent: 0x3d3d3d, extras: 'suéter cinza; "E=mc²" pintado na lateral do kart',
     },
     bio: 'Criou as teorias da relatividade restrita e geral, que mudaram nossa ideia de espaço, tempo e gravidade. Ganhou o Nobel de Física de 1921 por explicar o efeito fotoelétrico.',
-    fact: 'Em 1919, fotos de um eclipse feitas em Sobral, no Ceará, ajudaram a confirmar a relatividade geral.',
+    facts: [
+      'Em 1919, fotos de um eclipse feitas em Sobral, no Ceará, ajudaram a confirmar a relatividade geral.',
+      'A fórmula E = mc² mostra que massa e energia são equivalentes: um pouquinho de massa guarda uma quantidade enorme de energia.',
+      'Os satélites de GPS precisam de correções da relatividade de Einstein. Sem elas, a localização do celular erraria cada vez mais.',
+    ],
+    quiz: {
+      q: 'Em 1919, fotos de um eclipse ajudaram a confirmar a relatividade de Einstein. Onde elas foram feitas?',
+      options: ['Em Sobral, no Ceará', 'Em Manaus, no Amazonas', 'Em Curitiba, no Paraná'],
+      answer: 0,
+      explain: 'As fotos mostraram que a luz das estrelas se curva perto do Sol, como a relatividade geral previa.',
+    },
   },
   {
     id: 'galileu',
@@ -89,7 +130,17 @@ export const CHARACTERS = [
       outfit: 0x1f1f1f, outfitAccent: 0xf1ede4, extras: 'roupa preta com gola branca; luneta dourada presa no kart',
     },
     bio: 'Aperfeiçoou a luneta e descobriu as quatro maiores luas de Júpiter. Também observou as fases de Vênus e estudou as manchas solares. É considerado um dos pais do método científico moderno.',
-    fact: 'Galileu mostrou que, sem a resistência do ar, objetos pesados e leves caem juntos.',
+    facts: [
+      'Galileu mostrou que, sem a resistência do ar, objetos pesados e leves caem juntos.',
+      'As quatro luas de Júpiter que Galileu descobriu (Io, Europa, Ganimedes e Calisto) são chamadas de luas galileanas.',
+      'Galileu defendeu a ideia de Copérnico de que a Terra gira em volta do Sol e, por isso, foi julgado pela Inquisição em 1633.',
+    ],
+    quiz: {
+      q: 'O que Galileu descobriu ao apontar sua luneta para Júpiter?',
+      options: ['Quatro luas girando em volta dele', 'Que Júpiter é feito de gelo', 'Que Júpiter não tem gravidade'],
+      answer: 0,
+      explain: 'Io, Europa, Ganimedes e Calisto, as luas galileanas. Foi a prova de que nem tudo gira em volta da Terra.',
+    },
   },
   {
     id: 'darwin',
@@ -106,7 +157,17 @@ export const CHARACTERS = [
       outfit: 0x3b2f2f, outfitAccent: 0xd9cbb0, extras: 'casaco marrom-escuro; tentilhão (passarinho) empoleirado no kart',
     },
     bio: 'Propôs a teoria da evolução por seleção natural no livro “A Origem das Espécies” (1859), depois de quase cinco anos de viagem ao redor do mundo a bordo do navio HMS Beagle.',
-    fact: 'O Beagle passou pelo Brasil: Darwin visitou Salvador e o Rio de Janeiro em 1832.',
+    facts: [
+      'O Beagle passou pelo Brasil: Darwin visitou Salvador e o Rio de Janeiro em 1832.',
+      'Nas Ilhas Galápagos, Darwin viu tentilhões com bicos de formatos diferentes, cada um adaptado a um tipo de alimento.',
+      'A viagem do Beagle durou quase cinco anos, de 1831 a 1836.',
+    ],
+    quiz: {
+      q: 'Qual é a ideia mais famosa de Charles Darwin?',
+      options: ['A evolução por seleção natural', 'A teoria da relatividade', 'A lei da gravitação universal'],
+      answer: 0,
+      explain: 'Darwin explicou a evolução por seleção natural no livro “A Origem das Espécies”, de 1859.',
+    },
   },
   {
     id: 'dumont',
@@ -125,7 +186,17 @@ export const CHARACTERS = [
       outfit: 0x2e3a4f, outfitAccent: 0xffffff, extras: 'terno escuro de colarinho alto; asinhas de tecido e hélice do 14-bis no kart',
     },
     bio: 'Pioneiro da aviação. Em 1906, em Paris, voou com o 14-bis, que decolou por meios próprios diante do público. Também construiu dirigíveis e o pequeno avião Demoiselle.',
-    fact: 'Santos Dumont ajudou a popularizar o relógio de pulso: o joalheiro Louis Cartier fez um para ele ver as horas enquanto pilotava.',
+    facts: [
+      'Santos Dumont ajudou a popularizar o relógio de pulso: o joalheiro Louis Cartier fez um para ele ver as horas enquanto pilotava.',
+      'Em 23 de outubro de 1906, o 14-bis voou cerca de 60 metros no Campo de Bagatelle, em Paris.',
+      'Santos Dumont não patenteou o avião Demoiselle: deixou os desenhos livres para quem quisesse construir um.',
+    ],
+    quiz: {
+      q: 'Qual era o nome do avião de Santos Dumont que voou em Paris em 1906?',
+      options: ['14-bis', 'Concorde', 'Zepelim'],
+      answer: 0,
+      explain: 'O 14-bis decolou por meios próprios diante do público, em Paris, em 1906.',
+    },
   },
   {
     id: 'oswaldo',
@@ -143,7 +214,17 @@ export const CHARACTERS = [
       outfit: 0xf7f7f7, outfitAccent: 0x2d3142, extras: 'jaleco branco de médico; microscópio no kart',
     },
     bio: 'Médico sanitarista que combateu a febre amarela, a peste bubônica e a varíola no Rio de Janeiro. Dirigiu o instituto que hoje leva seu nome: a Fiocruz.',
-    fact: 'Em 1904, a campanha de vacinação obrigatória contra a varíola, liderada por ele, gerou a Revolta da Vacina no Rio.',
+    facts: [
+      'Em 1904, a campanha de vacinação obrigatória contra a varíola, liderada por ele, gerou a Revolta da Vacina no Rio.',
+      'Para combater a febre amarela, as equipes de Oswaldo Cruz eliminavam os criadouros do mosquito Aedes aegypti, o mesmo que transmite a dengue.',
+      'Oswaldo Cruz estudou no Instituto Pasteur, em Paris, antes de voltar ao Brasil para cuidar da saúde pública.',
+    ],
+    quiz: {
+      q: 'Qual mosquito transmite a febre amarela nas cidades (e também a dengue)?',
+      options: ['Aedes aegypti', 'Mosca doméstica', 'Abelha-europeia'],
+      answer: 0,
+      explain: 'Acabar com a água parada, onde o mosquito põe ovos, ainda é a melhor forma de combater a dengue.',
+    },
   },
 ];
 
@@ -163,6 +244,7 @@ export const ITEMS = {
     effect: 'Três turbos: aperte o botão de item uma vez para cada pilha.', // (cogumelo triplo)
     fact: 'Em 1800, Alessandro Volta empilhou discos de zinco e cobre separados por pano molhado em água salgada e criou a primeira pilha elétrica.',
     weights: [0, 5, 10, 15, 20, 25, 25, 20],
+    quiz: { q: 'Quem criou a primeira pilha elétrica, em 1800?', options: ['Alessandro Volta', 'Thomas Edison', 'Isaac Newton'], answer: 0 },
   },
   maca: {
     id: 'maca', name: 'Maçã de Newton', icon: '🍎', color: 0xe63946,
@@ -175,30 +257,35 @@ export const ITEMS = {
     effect: 'Disparo em linha reta que ricocheteia nos muros. No computador, segure C para atirar para trás.', // (casco verde)
     fact: 'Em 1909, a equipe de Rutherford disparou partículas alfa contra uma folha de ouro. Algumas ricochetearam: o átomo tem um núcleo pequeno e denso!',
     weights: [40, 25, 20, 15, 10, 5, 0, 0],
+    quiz: { q: 'Algumas partículas alfa ricochetearam na folha de ouro de Rutherford. O que isso mostrou?', options: ['O átomo tem um núcleo pequeno e denso', 'O ouro é um ímã', 'O átomo é uma bolinha maciça por inteiro'], answer: 0 },
   },
   eletron: {
     id: 'eletron', name: 'Elétron Teleguiado', icon: 'e⁻', color: 0x4cc9f0,
     effect: 'Persegue o kart da frente.', // (casco vermelho)
     fact: 'Cargas opostas se atraem (Lei de Coulomb). O elétron, de carga negativa, é puxado por cargas positivas.',
     weights: [5, 20, 25, 25, 25, 20, 15, 10],
+    quiz: { q: 'Qual é a carga elétrica do elétron?', options: ['Negativa', 'Positiva', 'Neutra (sem carga)'], answer: 0 },
   },
   faraday: {
     id: 'faraday', name: 'Gaiola de Faraday', icon: '🛡️', color: 0xc0c7d1,
     effect: 'Por 7 segundos: invencível e mais rápido. Quem você encostar capota!', // (estrela)
     fact: 'Numa casca de metal, a carga elétrica fica do lado de fora e protege quem está dentro. Por isso um carro fechado é um lugar seguro durante uma tempestade de raios.',
     weights: [0, 0, 0, 5, 10, 15, 25, 30],
+    quiz: { q: 'Por que um carro fechado é um bom abrigo numa tempestade de raios?', options: ['A carga elétrica passa pela lataria de metal, por fora', 'Os pneus de borracha bloqueiam o raio', 'O vidro afasta os raios'], answer: 0 },
   },
   tesla: {
     id: 'tesla', name: 'Bobina de Tesla', icon: '⚡', color: 0xb388ff,
     effect: 'Um raio atinge todos os adversários: eles rodopiam, encolhem e ficam lentos. Quem está na Gaiola de Faraday fica protegido!', // (raio)
     fact: 'Nikola Tesla criou a bobina que gera faíscas de alta tensão. Um raio de verdade aquece o ar a cerca de 30.000 °C, cinco vezes a temperatura da superfície do Sol.',
     weights: [0, 0, 0, 0, 0, 2, 5, 8], // só um por vez e 30 s de intervalo (items.js)
+    quiz: { q: 'Um raio aquece o ar a cerca de quantos graus?', options: ['30.000 °C', '300 °C', '3.000.000 °C'], answer: 0 },
   },
   buraco: {
     id: 'buraco', name: 'Buraco Negro', icon: '🕳️', color: 0x7b2cbf,
     effect: 'Voa até o 1º colocado e o derruba, junto com quem estiver perto dele.', // (casco azul)
     fact: 'A gravidade de um buraco negro é tão forte que nem a luz escapa. Em 2019, foi divulgada a primeira imagem de um, na galáxia M87.',
     weights: [0, 0, 2, 3, 3, 4, 4, 4], // só um por vez e 25 s de intervalo (items.js)
+    quiz: { q: 'Por que um buraco negro é “negro”?', options: ['Nem a luz consegue escapar da gravidade dele', 'Ele é coberto de carvão', 'Ele só existe à noite'], answer: 0 },
   },
 };
 

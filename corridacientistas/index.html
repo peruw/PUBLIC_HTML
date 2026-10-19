@@ -46,7 +46,7 @@
     <button class="hud-pause" id="hud-pause" aria-label="Pausar">❚❚</button>
     <div id="hud-toasts"></div>
     <div id="hud-center"></div>
-    <div id="hud-drift" class="hidden"></div>
+    <div id="hud-tip" class="hidden"></div>
   </div>
 
   <!-- Carregando -->
@@ -55,6 +55,7 @@
       <div class="atom-logo small"><i></i><i></i><i></i><b></b></div>
       <p id="loading-text">Preparando o laboratório…</p>
       <div class="loading-bar"><div id="loading-fill"></div></div>
+      <p class="loading-fact" id="loading-fact"></p>
     </div>
   </section>
 
@@ -73,6 +74,7 @@
           <button class="btn btn-small" data-action="toggle-sound" id="btn-sound">🔊 Som: ligado</button>
           <button class="btn btn-small" data-action="toggle-quality" id="btn-quality">⚙️ Qualidade: alta</button>
         </div>
+        <p class="title-progress" id="title-progress"></p>
         <a class="back-site" href="/">← Voltar ao site Quanta Aulas</a>
       </div>
     </div>
@@ -95,6 +97,7 @@
             <p class="detail-meta" id="detail-meta"></p>
             <p class="detail-bio" id="detail-bio"></p>
             <div class="stats" id="detail-stats"></div>
+            <p class="detail-record" id="detail-record"></p>
           </div>
         </div>
       </div>
@@ -106,6 +109,10 @@
         <div class="opt">
           <span class="opt-label">Voltas</span>
           <div class="seg" id="opt-laps"></div>
+        </div>
+        <div class="opt opt-assist" title="Perto da borda, o kart vira sozinho de volta para a pista">
+          <span class="opt-label">🧭<span class="lbl-txt"> Ajuda</span></span>
+          <div class="seg" id="opt-assist"><button data-assist="1">Sim</button><button data-assist="0">Não</button></div>
         </div>
         <button class="btn btn-primary btn-go" data-action="start">CORRER! 🏁</button>
       </footer>
@@ -129,7 +136,7 @@
               <li><kbd>A</kbd><kbd>D</kbd> ou <kbd>←</kbd><kbd>→</kbd> vira</li>
               <li><kbd>Espaço</kbd> pula e faz <b>drift</b></li>
               <li><kbd>E</kbd>, <kbd>X</kbd> ou <kbd>Shift</kbd> usa o item</li>
-              <li><kbd>C</kbd> olha para trás · <kbd>Esc</kbd>/<kbd>P</kbd> pausa · <kbd>M</kbd> som</li>
+              <li><kbd>C</kbd> olha para trás · <kbd>Esc</kbd>/<kbd>P</kbd> pausa · <kbd>R</kbd> reinicia (na pausa) · <kbd>M</kbd> som</li>
               <li>Controle: <kbd>A</kbd>/<kbd>RT</kbd> acelera · <kbd>B</kbd>/<kbd>LT</kbd> freia · <kbd>RB</kbd>/<kbd>X</kbd> drift · <kbd>LB</kbd>/<kbd>Y</kbd> item · <kbd>Start</kbd> pausa</li>
             </ul>
           </div>
@@ -168,17 +175,30 @@
       <button class="btn" data-action="restart">↻ Reiniciar corrida</button>
       <button class="btn btn-small" data-action="toggle-sound" id="btn-sound-2">🔊 Som: ligado</button>
       <button class="btn btn-small touch-only" data-action="toggle-auto" id="btn-auto">Aceleração automática: ligada</button>
+      <button class="btn btn-small" data-action="toggle-assist" id="btn-assist">🧭 Ajuda na direção: ligada</button>
       <button class="btn" data-action="quit">✕ Sair para o menu</button>
+      <p class="pause-keys desktop-only"><kbd>Esc</kbd> continua · <kbd>R</kbd> reinicia</p>
     </div>
   </section>
 
   <!-- Resultado -->
   <section class="screen hidden dim-light" id="screen-results">
     <div class="panel results-wrap">
-      <h2 id="results-title">Resultado</h2>
-      <ol class="results-list" id="results-list"></ol>
-      <div class="fact-card" id="results-fact"></div>
-      <div class="row">
+      <header class="results-head">
+        <h2 id="results-title" aria-live="polite">Resultado</h2>
+        <p class="results-sub" id="results-sub"></p>
+      </header>
+      <div class="results-body">
+        <div class="results-col">
+          <ol class="results-list" id="results-list"></ol>
+          <div class="results-stats" id="results-stats"></div>
+        </div>
+        <div class="results-col">
+          <div class="fact-card" id="results-fact"></div>
+          <div class="quiz-card" id="results-quiz"></div>
+        </div>
+      </div>
+      <div class="row results-actions">
         <button class="btn btn-primary" data-action="restart">↻ Correr de novo</button>
         <button class="btn" data-action="play">Trocar cientista</button>
         <button class="btn" data-action="quit">Menu</button>

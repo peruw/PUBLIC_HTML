@@ -45,6 +45,8 @@ export class RaceManager {
       // progresso contínuo em metros a partir da linha (negativo no grid)
       k.progress = k.s > L / 2 ? k.s - L : k.s;
       k.wrongWay = 0;
+      k.lapTimes = []; // tempo de cada volta completa (s)
+      k._lapStart = 0;
       // largada-foguete da IA: chance conforme a habilidade
       k._aiRocket = !k.isPlayer && Math.random() < 0.25 + cc.aiSkill * 0.5;
     }
@@ -108,12 +110,18 @@ export class RaceManager {
       const lapNow = Math.floor(k.progress / L) + 1; // 0 no grid, 1 na primeira volta
       if (lapNow > k.maxLap) {
         k.maxLap = lapNow;
+        let lapTime = 0;
+        if (lapNow >= 2) {
+          lapTime = this.time - k._lapStart;
+          k._lapStart = this.time;
+          k.lapTimes.push(lapTime);
+        }
         if (lapNow > this.totalLaps) {
           this.finishKart(k);
           continue;
         }
         if (lapNow >= 2) {
-          this.bus.emit('race:lap', { kart: k, lap: lapNow });
+          this.bus.emit('race:lap', { kart: k, lap: lapNow, lapTime });
           if (k === this.player && lapNow === this.totalLaps && this.totalLaps > 1) {
             this.bus.emit('race:finalLap', { kart: k });
           }

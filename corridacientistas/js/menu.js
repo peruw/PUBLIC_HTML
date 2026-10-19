@@ -2,6 +2,7 @@
 import { CHARACTERS, CLASSES, ITEMS, RACE } from './config.js';
 import { itemIconHTML } from './hud.js';
 import { formatTime } from './race.js';
+import { MEDALS, Progress } from './progress.js';
 
 const $ = (id) => document.getElementById(id);
 const SCREENS = ['loading', 'title', 'select', 'howto', 'pause', 'results', 'error'];
@@ -48,8 +49,10 @@ export { store };
 
 export class Menu {
   // handlers: { onStart(opts), onResume, onRestart, onQuit, onToggleSound, onToggleQuality, onToggleAuto, sfx(name) }
-  constructor(handlers) {
+  // progress: Progress (recordes, troféus e perguntas)
+  constructor(handlers, progress = null) {
     this.h = handlers;
+    this.progress = progress;
     this.current = 'loading';
     this.prev = 'title';
     this.portraits = {};
@@ -57,6 +60,7 @@ export class Menu {
       character: store.get('character', 'newton'),
       cc: store.get('cc', '50cc'), // primeira vez: classe mais tranquila
       laps: store.get('laps', RACE.defaultLaps),
+      assist: store.get('assist', true), // ajuda na direção
     };
     if (!CHARACTERS.some((c) => c.id === this.opts.character)) this.opts.character = 'newton';
     if (!CLASSES[this.opts.cc]) this.opts.cc = '100cc';
@@ -96,6 +100,7 @@ export class Menu {
         store.set('character', this.opts.character);
         store.set('cc', this.opts.cc);
         store.set('laps', this.opts.laps);
+        store.set('assist', this.opts.assist);
         h.onStart({ ...this.opts });
         break;
       case 'resume':
@@ -118,6 +123,12 @@ export class Menu {
       case 'toggle-auto':
         h.onToggleAuto();
         break;
+      case 'toggle-assist':
+        this.opts.assist = !this.opts.assist;
+        store.set('assist', this.opts.assist);
+        this.setAssistLabel(this.opts.assist);
+        h.onToggleAssist?.(this.opts.assist);
+        break;
     }
   }
 
@@ -126,6 +137,24 @@ export class Menu {
     this.current = name;
     for (const s of SCREENS) $('screen-' + s)?.classList.toggle('hidden', s !== name);
     if (name === 'select') this.refreshSelect();
+    if (name === 'title') this.refreshTitle();
+  }
+
+  // Linha de progresso da tela inicial (troféus e perguntas).
+  refreshTitle() {
+    const el = $('title-progress');
+    if (!el || !this.progress) return;
+    const m = this.progress.medalCount();
+    const q = this.progress.quizScore();
+    el.innerHTML = this.progress.races
+      ? `🏆 Troféus: <b>${m.n}/${m.total}</b> · 🧠 Perguntas: <b>${q.right}/${q.total}</b>`
+      : '';
+  }
+
+  // Curiosidade na tela de carregamento.
+  setLoadingFact(c, text) {
+    const el = $('loading-fact');
+    if (el) el.innerHTML = `<b>Você sabia?</b> ${text}`;
   }
 
   hideAll() {
@@ -150,6 +179,10 @@ export class Menu {
     $('btn-quality').textContent = `⚙️ Qualidade: ${q}`;
   }
 
+  setAssistLabel(on) {
+    $('btn-assist').textContent = `🧭 Ajuda na direção: ${on ? 'ligada' : 'desligada'}`;
+  }
+
   setAutoLabel(on) {
     $('btn-auto').textContent = `Aceleração automática: ${on ? 'ligada' : 'desligada'}`;
   }
@@ -172,6 +205,7 @@ export class Menu {
         <span class="flag">${FLAGS[c.country] || ''}</span>
         <div class="ph" style="--c:${c.colors.ui}">${c.name[0]}</div>
         <span>${c.short || c.name}</span>
+        <i class="medal" aria-hidden="true"></i>
       </button>`,
     ).join('');
     this.grid.addEventListener('click', (e) => {
@@ -205,6 +239,14 @@ export class Menu {
       this.refreshSelect();
     });
 
+    $('opt-assist').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      this.opts.assist = b.dataset.assist === '1';
+      this.h.sfx('menuMove');
+      this.refreshSelect();
+    });
+
     const laps = $('opt-laps');
     laps.innerHTML = RACE.lapOptions.map((n) => `<button data-laps="${n}">${n}</button>`).join('');
     laps.addEventListener('click', (e) => {
@@ -218,9 +260,16 @@ export class Menu {
 
   refreshSelect() {
     const c = CHARACTERS.find((x) => x.id === this.opts.character);
-    for (const card of this.grid.children) card.classList.toggle('selected', card.dataset.id === c.id);
+    for (const card of this.grid.children) {
+      card.classList.toggle('selected', card.dataset.id === c.id);
+      // troféu na classe escolhida
+      const best = this.progress?.bestPlace(card.dataset.id, this.opts.cc);
+      const medal = card.querySelector('.medal');
+      if (medal) medal.textContent = best && best <= 3 ? MEDALS[best] : '';
+    }
     for (const b of $('opt-cc').children) b.classList.toggle('on', b.dataset.cc === this.opts.cc);
     for (const b of $('opt-laps').children) b.classList.toggle('on', Number(b.dataset.laps) === this.opts.laps);
+    for (const b of $('opt-assist').children) b.classList.toggle('on', (b.dataset.assist === '1') === !!this.opts.assist);
 
     const img = $('detail-portrait');
     img.style.setProperty('--c', c.colors.ui);
@@ -234,6 +283,18 @@ export class Menu {
     $('detail-name').textContent = c.fullName;
     $('detail-meta').textContent = `${c.years} · ${c.country} · ${c.field}`;
     $('detail-bio').textContent = c.bio;
+    const rec = $('detail-record');
+    if (rec && this.progress) {
+      const medals = Object.keys(CLASSES)
+        .map((cc) => {
+          const b = this.progress.bestPlace(c.id, cc);
+          return `<span class="${cc === this.opts.cc ? 'cur' : ''}">${cc} ${b && b <= 3 ? MEDALS[b] : b ? b + 'º' : '–'}</span>`;
+        })
+        .join('');
+      const r = this.progress.record(this.opts.cc, this.opts.laps);
+      const rt = r ? `Recorde ${this.opts.cc}, ${this.opts.laps} ${this.opts.laps > 1 ? 'voltas' : 'volta'}: <b>${formatTime(r.time)}</b>` : '';
+      rec.innerHTML = `<span class="medals" title="Melhor colocação com ${c.name} em cada motor">${medals}</span>${rt ? `<span class="rec">${rt}</span>` : ''}`;
+    }
     $('detail-stats').innerHTML = STAT_LABELS.map(
       ([k, label]) =>
         `<div class="stat"><span>${label}</span><div class="stat-bar">${[1, 2, 3, 4, 5]
@@ -266,10 +327,12 @@ export class Menu {
   }
 
   // ---------- resultado ----------
-  showResults(results, player) {
+  // summary: resumo do Progress.finishRace (tempo, melhor volta, recordes, troféu e estatísticas)
+  showResults(results, player, summary = null) {
     const me = results.find((r) => r.kart === player);
     const place = me ? me.place : 0;
-    $('results-title').textContent = place === 1 ? 'Você venceu! 🏆' : `Você chegou em ${place}º lugar`;
+    const mine = player.character;
+    $('results-title').textContent = place === 1 ? 'Você venceu! 🏆' : place <= 3 ? `${place}º lugar: pódio! ${MEDALS[place]}` : `Você chegou em ${place}º lugar`;
     $('results-list').innerHTML = results
       .map(
         (r) => `<li class="${r.kart === player ? 'me' : ''}">
@@ -280,13 +343,93 @@ export class Menu {
         </li>`,
       )
       .join('');
+
+    // conquistas desta corrida
+    const sub = [];
+    if (summary) {
+      if (summary.newRecord) sub.push(`<span class="badge gold">⏱️ Novo recorde! ${formatTime(summary.time)}</span>`);
+      else if (summary.firstRecord) sub.push(`<span class="badge">⏱️ Primeiro recorde: ${formatTime(summary.time)}</span>`);
+      if (summary.newMedal) sub.push(`<span class="badge gold">${MEDALS[summary.newMedal]} Troféu de ${Progress.medalName(summary.newMedal)} com ${mine.name} no ${summary.cc}!</span>`);
+      if (summary.newBestLap) sub.push(`<span class="badge">⚡ Volta mais rápida no ${summary.cc}!</span>`);
+      if (!sub.length && place > 3) sub.push(`<span class="tip">${this._tip(summary)}</span>`);
+    }
+    $('results-sub').innerHTML = sub.join('');
+
+    // estatísticas
+    const st = summary?.stats;
+    $('results-stats').innerHTML = summary
+      ? [
+          ['⏱️', 'Melhor volta', summary.bestLap ? formatTime(summary.bestLap) : '–'],
+          ['🔥', 'Turbos de drift', st.driftBoosts],
+          ['🧪', 'Itens usados', st.items],
+          ['💫', 'Batidas sofridas', st.hits],
+        ]
+          .map(([i, l, v]) => `<div class="chip" title="${l}"><span aria-hidden="true">${i}</span><b>${v}</b><small>${l}</small></div>`)
+          .join('')
+      : '';
+
+    // curiosidade do cientista escolhido (alterna a cada corrida) e do vencedor
     const winner = results[0].kart.character;
-    const mine = player.character;
-    const art = winner.gender === 'f' ? 'a vencedora' : 'o vencedor';
-    let html = `<b>Você sabia? Sobre ${winner.name}, ${art}:</b> ${winner.fact}`;
-    if (mine.id !== winner.id) html += `<br><br><b>E sobre ${mine.name}:</b> ${mine.fact}`;
+    const fact = (c) => (this.progress ? this.progress.nextFact(c.id) : c.facts[0]);
+    let html = `<b>Você sabia? Sobre ${mine.name}:</b> ${fact(mine)}`;
+    if (winner.id !== mine.id) {
+      const art = winner.gender === 'f' ? 'a vencedora' : 'o vencedor';
+      html += `<br><b>E sobre ${winner.name}, ${art}:</b> ${fact(winner)}`;
+    }
     $('results-fact').innerHTML = html;
+
+    this.showQuiz(mine.id);
     this.show('results');
+  }
+
+  // Dica para quem ficou fora do pódio, conforme o que aconteceu na corrida.
+  _tip(s) {
+    const st = s.stats || {};
+    if (st.driftBoosts === 0) return '💡 Dica: segure o DRIFT numa curva até as faíscas ficarem laranja e solte para ganhar turbo.';
+    if (!st.rocket) return '💡 Dica: acelere logo depois do “2” na contagem para largar com turbo.';
+    if (st.items === 0) return '💡 Dica: passe pelas caixas de átomo e use os itens da ciência!';
+    if (st.hits >= 3) return '💡 Dica: desvie das maçãs na pista e use a Gaiola de Faraday para ficar protegido.';
+    if (s.cc !== '50cc') return '💡 Dica: no motor 50cc a corrida é mais tranquila para treinar.';
+    return '💡 Dica: siga por dentro das curvas e pegue os aceleradores amarelos.';
+  }
+
+  // Pergunta-relâmpago sobre o cientista escolhido (ou outra ainda não acertada).
+  showQuiz(charId) {
+    const box = $('results-quiz');
+    if (!box) return;
+    if (!this.progress) {
+      box.innerHTML = '';
+      return;
+    }
+    const q = this.progress.pickQuiz(charId);
+    this.quiz = { ...q, answered: false };
+    box.innerHTML = `<b class="quiz-title">🧠 Pergunta-relâmpago</b>
+      <p class="quiz-q">${q.q}</p>
+      <div class="quiz-opts">${q.options
+        .map((o, i) => `<button class="btn btn-small quiz-opt" data-quiz="${i}"><kbd class="desktop-only">${i + 1}</kbd> ${o}</button>`)
+        .join('')}</div>
+      <p class="quiz-fb" aria-live="polite"></p>`;
+    box.querySelectorAll('.quiz-opt').forEach((b) => b.addEventListener('click', () => this.answerQuiz(Number(b.dataset.quiz))));
+  }
+
+  answerQuiz(i) {
+    const q = this.quiz;
+    if (!q || q.answered || i < 0 || i >= q.options.length) return;
+    q.answered = true;
+    const ok = i === q.correct;
+    this.progress.answerQuiz(q.id, ok);
+    this.h.sfx(ok ? 'quizRight' : 'quizWrong');
+    const box = $('results-quiz');
+    box.classList.toggle('right', ok);
+    box.classList.toggle('wrong', !ok);
+    box.querySelectorAll('.quiz-opt').forEach((b, j) => {
+      b.disabled = true;
+      b.classList.toggle('correct', j === q.correct);
+      b.classList.toggle('chosen', j === i);
+    });
+    const sc = this.progress.quizScore();
+    box.querySelector('.quiz-fb').innerHTML = `${ok ? '✅ <b>Acertou!</b>' : `❌ <b>Quase!</b> A resposta é: ${q.options[q.correct]}.`} ${q.explain || ''}
+      <small>Perguntas acertadas: ${sc.right} de ${sc.total}</small>`;
   }
 
   // ---------- teclado nos menus ----------
@@ -319,6 +462,10 @@ export class Menu {
     } else if (this.current === 'howto' && (k === 'Escape' || k === 'Enter')) {
       this.action('back');
     } else if (this.current === 'results' && k === 'Enter') {
+      this.action('restart');
+    } else if (this.current === 'results' && (k === '1' || k === '2' || k === '3')) {
+      this.answerQuiz(Number(k) - 1);
+    } else if ((this.current === 'results' || this.current === 'pause') && (k === 'r' || k === 'R')) {
       this.action('restart');
     }
   }
