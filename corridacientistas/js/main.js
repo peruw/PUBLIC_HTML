@@ -23,6 +23,8 @@ const RESULTS_DELAY = 3.2; // s entre a chegada e a tela de resultado
 
 // Só 'pointer: coarse' conta como celular/tablet (notebooks com tela de toque têm ontouchstart).
 const isTouch = matchMedia('(pointer: coarse)').matches;
+// Movimento reduzido (preferência do sistema): menos tremor de câmera e clarões.
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 if (isTouch) document.body.classList.add('touch');
 // Quem usar a tela de toque mesmo assim ganha o layout de toque.
 addEventListener('pointerdown', (e) => {
@@ -474,6 +476,39 @@ async function init() {
 
   bus.on('race:finish', ({ kart }) => {
     if (kart === world.player) resultsTimer = RESULTS_DELAY;
+  });
+
+  // ---------- sensação de impacto: tremor de câmera e vibração ----------
+  const shake = (i, d) => {
+    if (game.state !== 'race') return;
+    rig.shake(i * (reduceMotion.matches ? 0.25 : 1), d);
+  };
+  const vibrate = (ms) => {
+    if (!input.touchEnabled || audio.muted) return;
+    try {
+      navigator.vibrate?.(ms);
+    } catch {
+      /* sem vibração */
+    }
+  };
+  bus.on('kart:wall', ({ kart, strength }) => {
+    if (kart !== world.player) return;
+    shake(0.06 + 0.22 * strength, 0.25);
+    if (strength > 0.4) vibrate(25);
+  });
+  bus.on('kart:bump', ({ a, b, strength }) => {
+    if (a === world.player || b === world.player) shake(0.05 + 0.15 * strength, 0.2);
+  });
+  bus.on('kart:hit', ({ kart, type }) => {
+    if (kart !== world.player) return;
+    shake(type === 'tumble' ? 0.45 : 0.3, type === 'tumble' ? 0.6 : 0.4);
+    vibrate(type === 'tumble' ? 90 : 50);
+  });
+  bus.on('kart:land', ({ kart, airTime }) => {
+    if (kart === world.player && airTime > 0.45) shake(Math.min(0.25, airTime * 0.18), 0.25);
+  });
+  bus.on('item:lightning', ({ by }) => {
+    if (world.player && by !== world.player && !world.player.invincible) shake(0.3, 0.45);
   });
 
   // ---------- loop ----------

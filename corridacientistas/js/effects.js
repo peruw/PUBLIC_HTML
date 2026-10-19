@@ -1046,6 +1046,8 @@ export class Effects {
 
   flash(color = 0xffffff, duration = 0.3, strength = 0.6) {
     if (typeof document === 'undefined') return;
+    // movimento reduzido (preferência do sistema): clarão bem mais fraco
+    if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) strength *= 0.3;
     let el = this._flashEl || document.getElementById('flash');
     if (!el) {
       el = document.createElement('div');
