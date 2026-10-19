@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quanta — Passo a Passo Ativo</title>
+<title>Questões passo a passo — Quanta Aulas</title>
+<meta name="description" content="Resolva questões de Matemática, Física, Química e Biologia com resolução guiada passo a passo, ganhando XP a cada acerto.">
+<link rel="icon" type="image/png" href="/assets/logo-quanta.png">
+<link rel="apple-touch-icon" href="/assets/logo-quanta.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -348,6 +351,7 @@
   .q-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
   .q-card:hover::before { opacity: 1; }
   .q-card.completa { border-color: var(--accent); }
+  .q-card:focus-visible, .stats-bar:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
   .q-card.completa::after {
     content: '✓';
     position: absolute;
@@ -623,7 +627,7 @@
       </div>
     </a>
     <div class="topo-direita">
-      <div class="stats-bar" id="stats-bar" title="Ver suas estatísticas e conquistas">
+      <div class="stats-bar" id="stats-bar" role="button" tabindex="0" title="Ver suas estatísticas e conquistas" aria-label="Ver suas estatísticas e conquistas">
         <div class="stats-item"><span class="stats-icon">⚡</span><span id="ui-xp">0</span></div>
         <div class="stats-divider"></div>
         <div class="stats-item streak-flame"><span class="stats-icon">🔥</span><span class="num" id="ui-streak">0</span></div>
@@ -862,8 +866,8 @@ function abrirModalStats() {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
-    <div class="modal" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Suas estatísticas e conquistas" onclick="event.stopPropagation()">
+      <button class="modal-close" aria-label="Fechar" onclick="this.closest('.modal-overlay').remove()">✕</button>
       <div class="nivel-card">
         <div class="nivel-titulo">Nível atual</div>
         <div class="nivel-nome">${niv.atual.nome}</div>
@@ -891,6 +895,7 @@ function abrirModalStats() {
   `;
   overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
   document.body.appendChild(overlay);
+  overlay.querySelector('.modal-close').focus();
 }
 
 // ============================================================
@@ -1040,7 +1045,7 @@ function renderLista() {
       <p class="sub" style="margin:0 0 16px">${banco.length} questões no banco · ${stats.questoesIds.length} resolvidas</p>
       <div class="lista-q">
         ${disciplinas.map(d => `
-          <div class="q-card" onclick="renderAssuntos('${d.replace(/'/g, "\\'")}')">
+          <div class="q-card" role="button" tabindex="0" onclick="renderAssuntos('${d.replace(/'/g, "\\'")}')">
             <div class="q-tema">📚 Disciplina</div>
             <div class="q-titulo">${d}</div>
             <div class="q-meta">
@@ -1075,7 +1080,7 @@ function renderAssuntos(disciplina) {
       <p class="sub" style="margin:0 0 16px">Escolha um assunto</p>
       <div class="lista-q">
         ${assuntos.map(a => `
-          <div class="q-card" onclick="renderQuestoes('${disciplina.replace(/'/g, "\\'")}', '${a.replace(/'/g, "\\'")}')">
+          <div class="q-card" role="button" tabindex="0" onclick="renderQuestoes('${disciplina.replace(/'/g, "\\'")}', '${a.replace(/'/g, "\\'")}')">
             <div class="q-tema">📖 Assunto</div>
             <div class="q-titulo">${a}</div>
             <div class="q-meta">
@@ -1108,7 +1113,7 @@ function renderQuestoes(disciplina, assunto) {
           const completa = isCompleta(q);
           const difClass = q.dificuldade === 'Baixa' ? 'dif-baixa' : (q.dificuldade === 'Média' || q.dificuldade === 'Media') ? 'dif-media' : (q.dificuldade === 'Elevada' || q.dificuldade === 'Alta') ? 'dif-elevada' : '';
           return `
-          <div class="q-card ${completa ? 'completa' : ''}" onclick="abrir(${i})">
+          <div class="q-card ${completa ? 'completa' : ''}" role="button" tabindex="0" onclick="abrir(${i})">
             <div class="q-tema">${q.titulo ? '✦' : '?'} ${q.fonte || 'Questão'}</div>
             <div class="q-titulo">${q.titulo || ('Questão ' + (i+1))}</div>
             <div class="q-meta">
@@ -1207,7 +1212,7 @@ function abrir(idx) {
       <div class="opcoes">
         ${p.opcoes.map((o, i) => `<button class="opcao" data-i="${i}">${o.txt}</button>`).join('')}
       </div>
-      <div class="slot"></div>
+      <div class="slot" aria-live="polite"></div>
     `;
     passos.appendChild(div);
     div.querySelectorAll('.opcao').forEach(btn => {
@@ -1332,6 +1337,17 @@ function abrir(idx) {
 
   renderPasso();
 }
+
+// Acessibilidade: cartões e barra de estatísticas (role="button") respondem a Enter/Espaço; Esc fecha o modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const ov = document.querySelector('.modal-overlay');
+    if (ov) { ov.remove(); document.getElementById('stats-bar').focus(); }
+    return;
+  }
+  const alvo = e.target.closest && e.target.closest('[role="button"][tabindex="0"]');
+  if (alvo && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); alvo.click(); }
+});
 
 carregar();
 </script>
