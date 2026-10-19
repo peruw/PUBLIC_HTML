@@ -37,9 +37,10 @@
     --rare: #4fc3ff;
     --epic: #c07bff;
     --legend: #ffb238;
-    --pixel: 'Press Start 2P', ui-monospace, monospace;
-    --pixel-text: 'Pixelify Sans', 'Press Start 2P', ui-monospace, monospace;
-    --body: 'Plus Jakarta Sans', system-ui, sans-serif;
+    /* chinês e japonês: as fontes pixel não têm esses caracteres, então caem nas do sistema */
+    --pixel: 'Press Start 2P', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', ui-monospace, monospace;
+    --pixel-text: 'Pixelify Sans', 'Press Start 2P', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', ui-monospace, monospace;
+    --body: 'Plus Jakarta Sans', system-ui, 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', sans-serif;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -564,6 +565,8 @@
   .pause-stats { font-family: var(--pixel-text); font-weight: 700; color: var(--ink) !important; }
   #pauseScreen { background: rgba(4,16,11,0.86); }
   body.paused .question { visibility: hidden; }
+  /* explicação de um erro fica parada e escondida atrás da pausa, e continua ao voltar */
+  body.paused .explain { visibility: hidden; animation-play-state: paused; }
   .row-links { display: flex; justify-content: center; align-items: center; gap: 22px; flex-wrap: wrap; margin-top: 14px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; }
   .row-links > .link { margin: 0; min-height: 44px; display: inline-flex; align-items: center; vertical-align: middle; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -586,6 +589,32 @@
     .mode-desc { min-height: 0; }
   }
 
+  /* japonês: fontes japonesas antes das chinesas (kanji com o desenho certo) */
+  :root:lang(ja) {
+    --pixel: 'Press Start 2P', 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-monospace, monospace;
+    --pixel-text: 'Pixelify Sans', 'Press Start 2P', 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-monospace, monospace;
+    --body: 'Plus Jakarta Sans', system-ui, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+  /* ideogramas na fonte do sistema ficam finos ao lado da pixelada: um pouco de peso ajuda */
+  :root:lang(zh-CN) .tag, :root:lang(ja) .tag, :root:lang(zh-CN) .btn, :root:lang(ja) .btn { font-weight: 700; }
+
+  /* seletor de idioma (menu e pausa) */
+  .lang-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 0; font-size: 13px; color: var(--ink-dim); }
+  .lang-sel {
+    min-height: 44px; max-width: 100%; padding: 6px 10px; font: 600 15px var(--body);
+    color: var(--ink); background: #000; border: 2px solid var(--brand-deep); border-radius: 0; cursor: pointer;
+  }
+  .lang-sel:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .lang-sel option { background: #000; color: var(--ink); }
+  /* no menu o seletor fica no alto, à vista sem rolar: ocupa o lugar do logo (a marca já está no canto) */
+  #startScreen .lang-row { margin: 0 0 12px; }
+  @media (max-height: 900px) { #startScreen .logo { display: none; } }
+  @media (max-height: 520px) and (min-width: 600px) {
+    .lang-row { margin-top: 8px; } .lang-sel { min-height: 40px; }
+    #startScreen .lang-row { margin: 0 0 6px; }
+    #startScreen .card > .tag { display: none; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .blink, .question.bounce .q-inner, .cm-num.punch, .combo-meter.t5, .fever-edge.on, .score.pulse { animation-duration: 0s; }
     /* textos de acerto/erro: antes sumiam na hora (animação de 0 s terminava invisível); agora só aparecem e somem */
@@ -602,15 +631,15 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="fever-edge" id="feverEdge"></div>
 <div class="combo-meter" id="comboMeter" aria-live="off">
-  <div class="cm-label">COMBO</div>
+  <div class="cm-label" data-i18n="res.combo">COMBO</div>
   <div class="cm-num" id="cmNum">0</div>
   <div class="cm-mult" id="cmMult">x1</div>
   <div class="cm-bar"><i id="cmBar"></i></div>
 </div>
 
 <div class="hud">
-  <a class="brand" href="/" title="Voltar ao site Quanta Aulas">
-    <img src="/assets/logo-quanta.png" alt="Quanta Aulas">
+  <a class="brand" href="/" title="Voltar ao site Quanta Aulas" data-i18n-title="brand.title">
+    <img src="/assets/logo-quanta.png" alt="Quanta Aulas" data-i18n-alt="logo.alt">
     <span>QUANTA</span>
   </a>
   <div class="stats">
@@ -618,7 +647,7 @@
     <div class="box score" id="hudScore">0<b>PTS</b></div>
     <div class="box hearts" id="hudLives"></div>
     <button class="pbtn" id="btnSound" type="button" aria-label="Ligar ou desligar o som">♪</button>
-    <button class="pbtn" id="btnPause" type="button" aria-label="Pausar">II</button>
+    <button class="pbtn" id="btnPause" type="button" aria-label="Pausar" data-i18n-aria="hud.pause">II</button>
   </div>
 </div>
 
@@ -626,23 +655,23 @@
 <div class="count" id="count" aria-hidden="true"></div>
 <div class="count-sub" id="countSub" aria-hidden="true"></div>
 <div class="explain" id="explain" aria-hidden="true"></div>
-<div class="touch-hint" id="touchHint" aria-hidden="true"><div><b>◄</b>TOQUE AQUI<br>PARA A ESQUERDA</div><div><b>►</b>TOQUE AQUI<br>PARA A DIREITA</div></div>
+<div class="touch-hint" id="touchHint" aria-hidden="true"><div><b>◄</b><span data-i18n-html="touch.left">TOQUE AQUI<br>PARA A ESQUERDA</span></div><div><b>►</b><span data-i18n-html="touch.right">TOQUE AQUI<br>PARA A DIREITA</span></div></div>
 <div class="question" id="question">
   <div class="q-inner">
     <div class="q-level" id="qLevel">NÍVEL 1</div>
     <div class="q-row">
       <div class="q-text" id="qText">0 + 0 = ?</div>
-      <div class="q-opts" id="qOpts" aria-label="Respostas, da esquerda para a direita"><span>0</span><span>0</span></div>
+      <div class="q-opts" id="qOpts" aria-label="Respostas, da esquerda para a direita" data-i18n-aria="q.opts"><span>0</span><span>0</span></div>
     </div>
     <div class="q-bar"><i id="qBar"></i></div>
   </div>
 </div>
 
-<button class="dash-btn" id="btnDash" type="button" aria-label="Dash: acelerar">▲<small>DASH</small></button>
+<button class="dash-btn" id="btnDash" type="button" aria-label="Dash: acelerar" data-i18n-aria="hud.dash">▲<small data-i18n="hud.dashBtn">DASH</small></button>
 <div class="bottom">
   <div class="speed" id="speed">
-    <div class="lvl"><div class="lbl">NÍVEL <b id="lvlTxt">1</b></div><div class="pips" id="pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></div>
-    <div class="lbl">VEL <b id="speedTxt">x1.0</b></div>
+    <div class="lvl"><div class="lbl"><span data-i18n="hud.level">NÍVEL</span> <b id="lvlTxt">1</b></div><div class="pips" id="pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="lbl"><span data-i18n="hud.speed">VEL</span> <b id="speedTxt">x1.0</b></div>
     <div class="segs" id="segs"></div>
   </div>
 </div>
@@ -650,45 +679,47 @@
 <!-- Início -->
 <div class="overlay show" id="startScreen">
   <div class="card">
-    <img class="logo" src="/assets/logo-quanta.png" alt="Quanta Aulas">
-    <div class="tag">QUANTA AULAS · CÁLCULO MENTAL</div>
-    <h1 class="title">CORRIDA<br><span>QUANTA</span></h1>
-    <p>Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
+    <div class="lang-row"></div>
+    <img class="logo" src="/assets/logo-quanta.png" alt="Quanta Aulas" data-i18n-alt="logo.alt">
+    <div class="tag" data-i18n="start.tag">QUANTA AULAS · CÁLCULO MENTAL</div>
+    <h1 class="title" data-i18n-html="start.title">CORRIDA<br><span>QUANTA</span></h1>
+    <p data-i18n="start.intro">Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
     <div class="keys">
-      <div><span class="kc">◄ ►</span> Setas ou A/D. No celular, toque no lado da tela ou deslize.</div>
-      <div><span class="kc">▲</span> Já sabe? Seta pra cima ou W dá dash, confirma a resposta e vale bônus. No celular, toque em ▲ DASH ou deslize pra cima.</div>
-      <div><span class="kc">♥ x3</span> Portal errado tira uma vida e mostra como fazer a conta.</div>
+      <div><span class="kc">◄ ►</span> <span data-i18n="start.key1">Setas ou A/D. No celular, toque no lado da tela ou deslize.</span></div>
+      <div><span class="kc">▲</span> <span data-i18n="start.key2">Já sabe? Seta pra cima ou W dá dash, confirma a resposta e vale bônus. No celular, toque em ▲ DASH ou deslize pra cima.</span></div>
+      <div><span class="kc">♥ x3</span> <span data-i18n="start.key3">Portal errado tira uma vida e mostra como fazer a conta.</span></div>
     </div>
-    <div class="modes" id="modes" role="radiogroup" aria-label="Modo de jogo">
-      <button type="button" class="mode" role="radio" data-mode="corrida">CORRIDA<small>TUDO · RANKING</small></button>
-      <button type="button" class="mode" role="radio" data-mode="somasub" aria-label="Treino de adição e subtração">+ −<small>TREINO</small></button>
-      <button type="button" class="mode" role="radio" data-mode="tabuada" aria-label="Treino de tabuada">×<small>TABUADA</small></button>
-      <button type="button" class="mode" role="radio" data-mode="divisao" aria-label="Treino de divisão">÷<small>TREINO</small></button>
+    <div class="modes" id="modes" role="radiogroup" aria-label="Modo de jogo" data-i18n-aria="modes.aria">
+      <button type="button" class="mode" role="radio" data-mode="corrida" data-i18n-aria="mode.corrida.aria"><span data-i18n="mode.corrida.btn">CORRIDA</span><small data-i18n="mode.corrida.sub">TUDO · RANKING</small></button>
+      <button type="button" class="mode" role="radio" data-mode="somasub" aria-label="Treino de adição e subtração" data-i18n-aria="mode.somasub.aria">+ −<small data-i18n="mode.somasub.sub">TREINO</small></button>
+      <button type="button" class="mode" role="radio" data-mode="tabuada" aria-label="Treino de tabuada" data-i18n-aria="mode.tabuada.aria">×<small data-i18n="mode.tabuada.sub">TABUADA</small></button>
+      <button type="button" class="mode" role="radio" data-mode="divisao" aria-label="Treino de divisão" data-i18n-aria="mode.divisao.aria">÷<small data-i18n="mode.divisao.sub">TREINO</small></button>
     </div>
     <p class="mode-desc" id="modeDesc"></p>
     <div class="account-slot"></div>
-    <button class="btn" id="btnStart" type="button" disabled><span id="loading">CARREGANDO...</span></button>
+    <button class="btn" id="btnStart" type="button" disabled><span id="loading" data-i18n="loading">CARREGANDO...</span></button>
     <div class="row2">
-      <button class="btn alt" type="button" data-open="locker">SKINS</button>
-      <button class="btn alt" type="button" data-open="rank">RANKING</button>
+      <button class="btn alt" type="button" data-open="locker" data-i18n="btn.skins">SKINS</button>
+      <button class="btn alt" type="button" data-open="rank" data-i18n="btn.rank">RANKING</button>
     </div>
-    <div class="rec">RECORDE <b id="bestStart">0</b> · XP <b id="xpStart">0</b> · SKINS <b id="skinCount">1/10</b></div>
+    <div class="rec" id="recLine">RECORDE <b>0</b> · XP <b>0</b> · SKINS <b>1/10</b></div>
   </div>
 </div>
 
 <!-- Pausa -->
 <div class="overlay" id="pauseScreen">
   <div class="card">
-    <div class="tag">JOGO PAUSADO</div>
-    <h1 class="title">PAUSA</h1>
+    <div class="tag" data-i18n="pause.tag">JOGO PAUSADO</div>
+    <h1 class="title" data-i18n="pause.title">PAUSA</h1>
     <p class="pause-stats" id="pauseStats"></p>
-    <button class="btn" id="btnResume" type="button">► CONTINUAR</button>
+    <button class="btn" id="btnResume" type="button" data-i18n="btn.resume">► CONTINUAR</button>
     <div class="row2">
       <button class="btn alt" id="btnPauseSound" type="button" aria-pressed="true">SOM: LIGADO</button>
-      <button class="btn alt" id="btnQuit" type="button">ENCERRAR</button>
+      <button class="btn alt" id="btnQuit" type="button" data-i18n="btn.quit">ENCERRAR</button>
     </div>
-    <p style="margin:12px 0 0;font-size:13px">Atalhos: P ou Esc pausa · M liga e desliga o som</p>
-    <a class="link" href="/">Voltar ao site</a>
+    <p style="margin:12px 0 0;font-size:13px" data-i18n="pause.keys">Atalhos: P ou Esc pausa · M liga e desliga o som</p>
+    <div class="lang-row"></div>
+    <a class="link" href="/" data-i18n="link.back">Voltar ao site</a>
   </div>
 </div>
 
@@ -696,33 +727,33 @@
 <div class="overlay" id="overScreen">
   <div class="card">
    <div class="ov-a">
-    <div class="tag" id="overTag">FIM DE CORRIDA</div>
+    <div class="tag" id="overTag" data-i18n="over.tag">FIM DE CORRIDA</div>
     <h1 class="title" id="overTitle">GAME<br><span>OVER</span></h1>
     <div class="mode-chip" id="overMode">CORRIDA</div>
-    <div class="newrec blink" id="newRecord">★ NOVO RECORDE ★</div>
+    <div class="newrec blink" id="newRecord" data-i18n="over.record">★ NOVO RECORDE ★</div>
     <div class="results">
-      <div><b id="rScore">0</b><small>PONTOS</small></div>
-      <div><b id="rHits">0</b><small>ACERTOS</small></div>
-      <div><b id="rCombo">0</b><small>COMBO</small></div>
-      <div><b id="rLevel">1</b><small>NÍVEL</small></div>
+      <div><b id="rScore">0</b><small data-i18n="res.points">PONTOS</small></div>
+      <div><b id="rHits">0</b><small data-i18n="res.hits">ACERTOS</small></div>
+      <div><b id="rCombo">0</b><small data-i18n="res.combo">COMBO</small></div>
+      <div><b id="rLevel">1</b><small data-i18n="res.level">NÍVEL</small></div>
     </div>
     <div class="review" id="review"></div>
    </div>
    <div class="ov-b">
     <div class="unlocked" id="unlocked"></div>
     <div class="xp">
-      <div class="xp-line"><span>+<b id="xpGain">0</b> XP</span><span>TOTAL <b id="xpTotal">0</b></span></div>
+      <div class="xp-line"><span>+<b id="xpGain">0</b> XP</span><span><span data-i18n="xp.total">TOTAL</span> <b id="xpTotal">0</b></span></div>
       <div class="xp-bar"><i id="xpBar"></i></div>
       <div class="xp-next" id="xpNext"></div>
     </div>
     <div class="online-line" id="onlineLine"></div>
-    <button class="btn" id="btnRetry" type="button">► JOGAR DE NOVO</button>
+    <button class="btn" id="btnRetry" type="button" data-i18n="btn.retry">► JOGAR DE NOVO</button>
     <div class="row2">
-      <button class="btn alt" type="button" data-open="locker">SKINS</button>
-      <button class="btn alt" type="button" data-open="rank">RANKING</button>
+      <button class="btn alt" type="button" data-open="locker" data-i18n="btn.skins">SKINS</button>
+      <button class="btn alt" type="button" data-open="rank" data-i18n="btn.rank">RANKING</button>
     </div>
     <p class="tip" id="overTip" style="margin:16px 0 0"></p>
-    <div class="row-links"><button class="link" type="button" id="btnModes">Trocar modo</button><a class="link" href="/">Voltar ao site</a></div>
+    <div class="row-links"><button class="link" type="button" id="btnModes" data-i18n="btn.modes">Trocar modo</button><a class="link" href="/" data-i18n="link.back">Voltar ao site</a></div>
    </div>
   </div>
 </div>
@@ -731,8 +762,8 @@
 <div class="overlay locker" id="lockerScreen">
   <div class="panel">
     <div class="sheet-head">
-      <div class="tag">VESTIÁRIO · <span id="lockerCount">1/10</span></div>
-      <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
+      <div class="tag"><span data-i18n="locker.tag">VESTIÁRIO</span> · <span id="lockerCount">1/10</span></div>
+      <button class="pbtn" type="button" data-close aria-label="Fechar" data-i18n-aria="close">X</button>
     </div>
     <div class="lk-show" id="lkShow" aria-live="polite"></div>
     <div class="thumbs" id="skinGrid"></div>
@@ -743,12 +774,12 @@
 <div class="overlay" id="rankScreen">
   <div class="card">
     <div class="sheet-head">
-      <div class="tag">RANKING</div>
-      <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
+      <div class="tag" data-i18n="rank.tag">RANKING</div>
+      <button class="pbtn" type="button" data-close aria-label="Fechar" data-i18n-aria="close">X</button>
     </div>
     <div class="tabs" role="tablist">
-      <button class="tab on" type="button" role="tab" data-period="week" aria-selected="true">SEMANA</button>
-      <button class="tab" type="button" role="tab" data-period="all" aria-selected="false">GERAL</button>
+      <button class="tab on" type="button" role="tab" data-period="week" aria-selected="true" data-i18n="rank.week">SEMANA</button>
+      <button class="tab" type="button" role="tab" data-period="all" aria-selected="false" data-i18n="rank.all">GERAL</button>
     </div>
     <ol class="board" id="board"></ol>
     <div class="account-slot"></div>
@@ -758,20 +789,22 @@
 <!-- Apelido -->
 <div class="overlay" id="nickScreen">
   <div class="card">
-    <div class="tag">SEU NOME NO RANKING</div>
-    <p>Escolha um apelido. É ele que aparece para os outros jogadores, nunca seu nome ou e-mail.</p>
+    <div class="tag" data-i18n="nick.tag">SEU NOME NO RANKING</div>
+    <p data-i18n="nick.p">Escolha um apelido. É ele que aparece para os outros jogadores, nunca seu nome ou e-mail.</p>
     <form id="nickForm" autocomplete="off">
-      <label for="nickInput" class="tag" style="display:block;margin:0 0 4px;color:var(--ink-dim)">APELIDO (3 A 16 LETRAS)</label>
+      <label for="nickInput" class="tag" style="display:block;margin:0 0 4px;color:var(--ink-dim)" data-i18n="nick.label">APELIDO (3 A 16 LETRAS)</label>
       <input class="field" id="nickInput" name="nick" maxlength="16" minlength="3" required spellcheck="false">
       <div class="err" id="nickErr"></div>
-      <button class="btn" type="submit" id="nickSave">SALVAR</button>
+      <button class="btn" type="submit" id="nickSave" data-i18n="nick.save">SALVAR</button>
     </form>
-    <button class="link" type="button" data-close style="margin-top:14px">Agora não</button>
+    <button class="link" type="button" data-close style="margin-top:14px" data-i18n="nick.later">Agora não</button>
   </div>
 </div>
 
 <noscript><p style="position:fixed;inset:auto 16px 16px;z-index:9">Ative o JavaScript para jogar.</p></noscript>
 
+<script src="js/i18n.js"></script>
+<script>QC.I18N.apply();</script>
 <script src="js/themes.js"></script>
 <script src="js/skins.js"></script>
 <script src="js/creatures.js"></script>
@@ -785,8 +818,8 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   const $$ = (sel) => [...document.querySelectorAll(sel)];
-  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES || !QC.Questions) {
-    $('loading').textContent = 'ERRO AO CARREGAR. RECARREGUE A PÁGINA.';
+  if (!window.THREE || !window.QC || !QC.I18N || !QC.Skins || !QC.Progress || !QC.THEMES || !QC.Questions) {
+    $('loading').textContent = window.QC && QC.t ? QC.t('loadError') : 'ERRO AO CARREGAR. RECARREGUE A PÁGINA.';
     return;
   }
   const T = window.THREE;
@@ -811,7 +844,24 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const fmt = (n) => Math.round(n).toLocaleString('pt-BR');
+  // ================= Idioma (js/i18n.js) =================
+  const I18 = QC.I18N, t = I18.t;
+  const fmt = (n) => I18.num(Math.round(n));
+  // nomes e textos de skins e temas: o dicionário manda; sem chave, fica o do arquivo de dados
+  const tk = (k, fb) => { const v = t(k); return v === k ? fb : v; };
+  const skinName = (sk) => tk(`skin.${sk.id}.name`, sk.name);
+  const skinDesc = (sk) => tk(`skin.${sk.id}.desc`, sk.desc || '');
+  const themeName = (th) => tk(`theme.${th.id}`, th.name);
+  // leitor de tela: "7 × 8" vira "7 vezes 8" no idioma escolhido
+  const spoken = (s) => String(s).replace(/ × /g, ` ${t('sr.times')} `).replace(/ ÷ /g, ` ${t('sr.div')} `).replace(/ - /g, ` ${t('sr.minus')} `).replace(/ \+ /g, ` ${t('sr.plus')} `);
+  const rarityName = (r) => tk(`rarity.${r}`, String(r || '').toUpperCase());
+  function unlockText(u) {
+    if (!u) return '';
+    if (u.type === 'default') return t('unlock.default');
+    if (u.type === 'speed') return t('unlock.speed', { n: I18.num(u.value, 1) });
+    if (['xp', 'combo', 'level', 'best'].includes(u.type)) return t(`unlock.${u.type}`, { n: fmt(u.value) });
+    return u.label || '';
+  }
   // espaços das contas viram não separáveis: "23 - 8 = 15" não quebra no meio da linha
   const keepEq = (t) => String(t).replace(/ ([-+×÷=]) /g, '\u00a0$1\u00a0');
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1295,15 +1345,7 @@
   // pontuação: 10 por acerto (20 se respondeu rápido) x multiplicador do combo (até x10) x2 na febre
   const multFor = (combo) => Math.min(10, 1 + Math.floor(combo / 3));
   const FEVER_AT = 15;
-  const PRAISE = [
-    [1, ['BOA!', 'ISSO!', 'CERTO!']],
-    [3, ['ÓTIMO!', 'MANDOU BEM!', 'SHOW!']],
-    [5, ['INCRÍVEL!', 'QUE FERA!', 'VOANDO!']],
-    [10, ['IMPARÁVEL!', 'ARRASOU!', 'MONSTRO!']],
-    [15, ['EM CHAMAS!', 'FEBRE!', 'INSANO!']],
-    [20, ['GÊNIO!', 'SURREAL!', 'LENDA!']],
-    [30, ['LENDÁRIO!', 'DIVINO!', 'QUANTA MASTER!']],
-  ];
+  const PRAISE = [1, 3, 5, 10, 15, 20, 30];   // a partir de quantos acertos seguidos cada elogio aparece (textos em praise.N)
   const tierOf = (combo) => (combo >= 30 ? 5 : combo >= 20 ? 4 : combo >= 15 ? 3 : combo >= 10 ? 2 : combo >= 5 ? 1 : 0);
   const TIER_COLORS = ['#ffffff', '#7dffc0', '#ffd23f', '#ff9a2e', '#ff4d5e', '#ff4df0'];
 
@@ -1316,11 +1358,11 @@
     px.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'X') r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }));
     return `<svg viewBox="0 0 7 6" shape-rendering="crispEdges" fill="${filled ? '#ff4d5e' : '#2a3a33'}">${r}</svg>`;
   }
-  function paintScore() { $('hudScore').innerHTML = `${fmt(S.shown)}<b> PTS</b>`; }
+  function paintScore() { $('hudScore').innerHTML = `${fmt(S.shown)}<b> ${esc(t('hud.pts'))}</b>`; }
   function updateHud() {
     paintScore();
     let h = ''; for (let i = 0; i < CFG.lives; i++) h += heart(i < S.lives); $('hudLives').innerHTML = h;
-    $('speedTxt').textContent = 'x' + (S.speed / CFG.startSpeed).toFixed(1);
+    $('speedTxt').textContent = 'x' + I18.num(S.speed / CFG.startSpeed, 1);
     const on = Math.round((S.speed - CFG.startSpeed) / (speedMax() - CFG.startSpeed) * 11) + 1;
     $('lvlTxt').textContent = S.level;
     [...$('pips').children].forEach((el, i) => el.classList.toggle('on', i < S.hits % CFG.hitsPerLevel));
@@ -1354,15 +1396,16 @@
     return { x: (projTmp.x + 1) / 2 * W, y: (1 - projTmp.y) / 2 * H };
   }
   function praise(combo, quick, dashed) {
-    let words = PRAISE[0][1];
-    for (const [min, w] of PRAISE) if (combo >= min) words = w;
+    let tierMin = PRAISE[0];
+    for (const min of PRAISE) if (combo >= min) tierMin = min;
+    const words = I18.list(`praise.${tierMin}`);
     const el = document.createElement('div');
     el.className = 'praise';
     const tier = tierOf(combo);
     el.style.color = TIER_COLORS[tier];
     el.style.top = '36%';
     el.style.fontSize = `calc(${(1 + tier * 0.18).toFixed(2)} * clamp(26px, 7vmin, 46px))`;
-    const tags = [quick ? 'RESPOSTA RÁPIDA +10' : '', dashed ? 'DASH!' : ''].filter(Boolean).join(' · ');
+    const tags = [quick ? esc(t('praise.quick')) : '', dashed ? `${esc(t('hud.dashBtn'))}!` : ''].filter(Boolean).join(' · ');
     el.innerHTML = `${esc(pick(words))}${tags ? `<small>${tags}</small>` : ''}`;
     $('fx').appendChild(el);
     setTimeout(() => el.remove(), 950);
@@ -1422,7 +1465,7 @@
     if (k === 'arrowup' || k === 'w') S.dashHeld = false;
   });
   window.addEventListener('keydown', (e) => {
-    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
     const k = e.key.toLowerCase();
     const inMenu = S.mode === 'menu' && !openPanel && $('startScreen').classList.contains('show');
     if (inMenu && (k === 'arrowleft' || k === 'arrowright')) { stepMode(k === 'arrowleft' ? -1 : 1, false); e.preventDefault(); return; }
@@ -1519,9 +1562,7 @@
     startCountdown(3, 0.55);
     if (!store.get('quanta-corrida-dash-tip2', false)) {
       store.set('quanta-corrida-dash-tip2', true);
-      setTimeout(() => toast(touchUI
-        ? 'DICA: JÁ SABE A RESPOSTA?<small>Toque em ▲ DASH (ou deslize pra cima) para confirmar e ganhar bônus</small>'
-        : 'DICA: JÁ SABE A RESPOSTA?<small>Aperte ▲ ou W: o dash confirma a resposta e vale bônus</small>'), 2600);
+      setTimeout(() => toast(t(touchUI ? 'tip.dashTouch' : 'tip.dashKeys')), 2600);
     }
   }
 
@@ -1530,7 +1571,7 @@
   function startCountdown(n, step) { cdStep = step; S.count = n * step; showCount(n); }
   function showCount(k) {
     const el = $('count');
-    el.textContent = k > 0 ? String(k) : 'VAI!';
+    el.textContent = k > 0 ? String(k) : t('count.go');
     el.className = 'count' + (k > 0 ? '' : ' go');
     void el.offsetWidth; el.classList.add('tick');
     if (actx) tone(k > 0 ? 440 : 880, k > 0 ? 0.08 : 0.2, 'square', 0.045);
@@ -1544,17 +1585,17 @@
       let bestI = 0;
       S.lanes.forEach((x, i) => { if (Math.abs(x - S.x) < Math.abs(S.lanes[bestI] - S.x)) bestI = i; });
       S.lane = bestI;
-      setTimeout(() => popText(`AGORA SÃO ${n} PORTAIS!`, '#ffd23f', '64%', false, true), 400);
+      setTimeout(() => popText(esc(t('portals.more', { n })), '#ffd23f', '64%', false, true), 400);
     }
     const q = Qs.make(runMode.id, S.level, n, recentQ);
     const answers = shuffle([q.ans, ...q.wrong]);
     const correct = answers.indexOf(q.ans);
     // decidedFrac: em que ponto do caminho a pessoa escolheu (trocou de pista ou deu dash); null = não escolheu
     S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: null, obj: makeGate(q, answers, S.lanes) };
-    $('sr').textContent = `${q.text.replace(/×/g, 'vezes').replace(/÷/g, 'dividido por').replace(/ - /g, ' menos ')}. Opções, da esquerda para a direita: ${answers.join(', ')}.`;
+    $('sr').textContent = t('sr.question', { q: spoken(q.text), opts: answers.join(', ') });
     $('qText').innerHTML = `${esc(q.text)} = <span class="qm">?</span>`;
     $('qOpts').innerHTML = answers.map((a) => `<span>${a}</span>`).join('');
-    $('qLevel').textContent = `NÍVEL ${S.level}`;
+    $('qLevel').textContent = t('q.level', { n: S.level });
     paintOptions();
     const qe = $('question');
     qe.classList.remove('bounce'); void qe.offsetWidth; qe.classList.add('show', 'bounce');
@@ -1569,7 +1610,7 @@
   function announceUnlocks(ids) {
     ids.forEach((id) => {
       const sk = QC.Skins.get(id);
-      toast(`★ NOVA SKIN DESBLOQUEADA ★<small>${esc(sk.name)}: equipe no menu Skins</small>`);
+      toast(t('unlock.toast', { name: esc(skinName(sk)) }));
     });
     if (ids.length) stinger('unlock');
   }
@@ -1581,7 +1622,7 @@
     if (creatures) creatures.celebrate();
     if (music) { try { music.play(info.index); } catch (e) {} }
     stinger('levelup');
-    setTimeout(() => popText(`NÍVEL ${S.level}!<small>${esc(info.theme.name.toUpperCase())}</small>`, '#ffd23f', '44%', true), 150);
+    setTimeout(() => popText(`${esc(t('levelup', { n: S.level }))}<small>${esc(themeName(info.theme).toLocaleUpperCase(I18.lang))}</small>`, '#ffd23f', '44%', true), 150);
   }
 
   function resolveGate(g) {
@@ -1612,7 +1653,7 @@
       } else { sc.classList.remove('pulse'); void sc.offsetWidth; sc.classList.add('pulse'); }
       const sp = $('speed'); sp.classList.remove('bump'); void sp.offsetWidth; sp.classList.add('bump');
       sfx.good(S.combo);
-      $('sr').textContent = `Certo! ${g.q.text} = ${g.q.ans}.`;
+      $('sr').textContent = t('sr.right', { q: spoken(g.q.text), a: g.q.ans });
       if (S.combo % 5 === 0) {
         // marco de combo: fogos, onda de choque e carimbo gigante
         const cm = $('cmNum').getBoundingClientRect();
@@ -1622,10 +1663,10 @@
         sfx.milestone(S.combo);
         // se o nível sobe no mesmo acerto, o carimbo do combo desce para não ficar por cima do "NÍVEL X!"
         const comboTop = S.hits % CFG.hitsPerLevel === 0 ? '62%' : '50%';
-        if (!startFever) setTimeout(() => popText(`COMBO ${S.combo}!`, TIER_COLORS[tierOf(S.combo)], comboTop, true), 120);
+        if (!startFever) setTimeout(() => popText(esc(t('combo.pop', { n: S.combo })), TIER_COLORS[tierOf(S.combo)], comboTop, true), 120);
       }
       if (startFever) {
-        setTimeout(() => popText('MODO FEBRE!<small>PONTOS EM DOBRO ATÉ ERRAR</small>', '#ff9a2e', S.hits % CFG.hitsPerLevel === 0 ? '62%' : '50%', true), 120);
+        setTimeout(() => popText(t('fever'), '#ff9a2e', S.hits % CFG.hitsPerLevel === 0 ? '62%' : '50%', true), 120);
         stinger('record');
       }
       paintCombo(true);
@@ -1644,7 +1685,7 @@
         const el = document.createElement('div');
         el.className = 'pop broken'; el.style.color = '#ff4d5e'; el.style.top = '40%';
         el.style.fontSize = 'clamp(20px, 5.5vw, 34px)';
-        el.innerHTML = `COMBO PERDIDO<br><span style="color:#fff">x${lost}</span>`;
+        el.innerHTML = `${esc(t('combo.lost'))}<br><span style="color:#fff">x${lost}</span>`;
         $('fx').appendChild(el); setTimeout(() => el.remove(), 1250);
         const cm = $('cmNum').getBoundingClientRect();
         fxCall('shockwave', cm.left + cm.width / 2, cm.top + cm.height / 2, '#ff4d5e');
@@ -1668,10 +1709,10 @@
   let explainTimer = 0;
   function showExplain(q, chosen) {
     const el = $('explain');
-    el.innerHTML = `<div class="eq">${esc(q.text)} = <b>${q.ans}</b></div><div class="how">${esc(keepEq(Qs.explain(q)))}</div><div class="you">Você escolheu ${chosen}.</div>`;
+    el.innerHTML = `<div class="eq">${esc(q.text)} = <b>${q.ans}</b></div><div class="how">${esc(keepEq(Qs.explain(q)))}</div><div class="you">${esc(t('explain.you', { n: chosen }))}</div>`;
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     clearTimeout(explainTimer); explainTimer = setTimeout(() => el.classList.remove('show'), 2300);
-    $('sr').textContent = `Errado. ${q.text} = ${q.ans}. ${Qs.explain(q)}`;
+    $('sr').textContent = t('sr.wrong', { q: spoken(q.text), a: q.ans, how: spoken(Qs.explain(q)) });
   }
   function gameOver() {
     S.mode = 'over';
@@ -1696,15 +1737,18 @@
     S.fever = false; paintCombo(false);
     if (res.record) setTimeout(() => { fxCall('fireworks', 8); fxCall('confetti', 90); }, 400);
     $('newRecord').classList.toggle('show', res.record);
-    $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU <br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA <br><span>CORRIDA!</span>' : 'GAME <br><span>OVER</span>';
-    $('overMode').textContent = practice ? `${runMode.name} · NÃO VALE RANKING` : 'CORRIDA';
-    paintReview();
+    // a dica final é da operação em que a pessoa mais errou; o seed guarda a escolha para a troca de idioma
+    const cnt = {};
+    S.misses.forEach((m) => { cnt[m.q.type] = (cnt[m.q.type] || 0) + 1; });
+    const worst = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+    over = {
+      practice, mode: runMode, xpGained: res.xpGained,
+      newSkins: [...new Set(res.newSkins.concat(sessionUnlocks.splice(0)))],
+      tipType: worst || (runMode.ops ? pick(runMode.ops) : undefined), tipSeed: Math.random(),
+    };
+    paintOverText();
     countUp($('xpGain'), res.xpGained, 900);
     countUp($('xpTotal'), P.data.xp, 1100, P.data.xp - res.xpGained);
-    const un = $('unlocked');
-    const all = res.newSkins.concat(sessionUnlocks.splice(0));
-    un.classList.toggle('show', all.length > 0);
-    un.textContent = all.length ? `★ Skin nova: ${[...new Set(all)].map((id) => QC.Skins.get(id).name).join(', ')}!` : '';
     paintNextUnlock();
     $('overScreen').classList.add('show');
     setTimeout(() => { if (S.mode === 'over' && !openPanel) $('btnRetry').focus({ preventScroll: true }); }, 700);
@@ -1715,20 +1759,27 @@
     if (S.gate) { removeGate(S.gate); S.gate = null; }
   }
   const sessionUnlocks = [];
+  let over = null;   // o que a tela final mostra, para repintar ao trocar de idioma
+  // textos da tela final (título, modo, skins novas, revisão e dica)
+  function paintOverText() {
+    if (!over) return;
+    $('overTitle').innerHTML = t(S.hits >= 20 ? 'over.great' : S.hits >= 8 ? 'over.good' : 'over.end');
+    $('overMode').textContent = over.practice ? t('over.practice', { mode: over.mode.name }) : over.mode.name;
+    const un = $('unlocked');
+    un.classList.toggle('show', over.newSkins.length > 0);
+    un.textContent = over.newSkins.length ? t('unlocked.line', { n: over.newSkins.length, names: over.newSkins.map((id) => skinName(QC.Skins.get(id))).join(', ') }) : '';
+    paintReview();
+    $('overTip').textContent = keepEq(Qs.tipFor(over.tipType, over.tipSeed));
+  }
   // revisão: quantos acertou e as contas que errou, com a resposta certa
   function paintReview() {
     const total = S.hits + S.misses.length, el = $('review');
-    let html = total ? `<p class="acc">Você acertou <b>${S.hits}</b> de ${total} ${total === 1 ? 'conta' : 'contas'} (${Math.round(S.hits / total * 100)}%).</p>` : '';
+    let html = total ? `<p class="acc">${t('review.acc', { n: total, hits: S.hits, pct: Math.round(S.hits / total * 100) })}</p>` : '';
     if (S.misses.length) {
-      html += `<h3>REVEJA</h3><ul>${S.misses.map((m) => `<li><b>${esc(m.q.text)} = <i>${m.q.ans}</i></b> · você escolheu ${m.chosen}</li>`).join('')}</ul>`;
+      html += `<h3>${esc(t('review.title'))}</h3><ul>${S.misses.map((m) => `<li><b>${esc(m.q.text)} = <i>${m.q.ans}</i></b> · ${esc(t('review.chose', { n: m.chosen }))}</li>`).join('')}</ul>`;
     }
     el.innerHTML = html;
     el.classList.toggle('show', !!html);
-    // a dica final é da operação em que a pessoa mais errou
-    const cnt = {};
-    S.misses.forEach((m) => { cnt[m.q.type] = (cnt[m.q.type] || 0) + 1; });
-    const worst = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
-    $('overTip').textContent = keepEq(Qs.tipFor(worst || (runMode.ops ? pick(runMode.ops) : undefined)));
   }
   // números que sobem rolando
   function countUp(el, to, ms, from) {
@@ -1741,16 +1792,18 @@
     requestAnimationFrame(step);
   }
 
-  function paintNextUnlock() {
+  function paintNextUnlock(textOnly) {
     const nx = P.nextUnlock();
     const bar = $('xpBar'), txt = $('xpNext');
-    if (!nx) { bar.style.width = '100%'; txt.innerHTML = 'Você liberou <b>todas as skins</b>!'; return; }
-    bar.style.width = '0';
-    requestAnimationFrame(() => { bar.style.width = Math.round(nx.pct * 100) + '%'; });
+    if (!nx) { bar.style.width = '100%'; txt.innerHTML = t('xp.all'); return; }
+    if (!textOnly) {
+      bar.style.width = '0';
+      requestAnimationFrame(() => { bar.style.width = Math.round(nx.pct * 100) + '%'; });
+    }
     const u = nx.skin.unlock;
     txt.innerHTML = u.type === 'xp'
-      ? `Faltam <b>${fmt(u.value - nx.current)}</b> pontos para <b>${esc(nx.skin.name)}</b>`
-      : `Próxima: <b>${esc(nx.skin.name)}</b> · ${esc(u.label)}`;
+      ? t('xp.left', { n: fmt(u.value - nx.current), name: esc(skinName(nx.skin)) })
+      : t('xp.next', { name: esc(skinName(nx.skin)), label: esc(unlockText(u)) });
   }
 
   function togglePause() {
@@ -1758,7 +1811,7 @@
       S.mode = 'pause'; dashUp();
       // a pergunta some na pausa: pausar não vira tempo extra para pensar
       document.body.classList.add('paused');
-      $('pauseStats').textContent = `${runMode.name} · Nível ${S.level} · ${fmt(S.score)} pontos · ${S.lives} ${S.lives === 1 ? 'vida' : 'vidas'}`;
+      paintPauseStats();
       $('pauseScreen').classList.add('show');
       if (music) { try { music.pause(); } catch (e) {} }
       paintCombo(false);
@@ -1773,6 +1826,9 @@
       // volta com 3, 2, 1 curtinho se havia um portal vindo
       if (S.gate && S.gate.state === 'coming') startCountdown(3, 0.4);
     }
+  }
+  function paintPauseStats() {
+    $('pauseStats').textContent = t('pause.stats', { mode: runMode.name, level: S.level, score: fmt(S.score), lives: t('lives', { n: S.lives }) });
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') togglePause(); });
 
@@ -1855,18 +1911,20 @@
     $('lockerCount').textContent = `${P.data.skins.filter((id) => list.some((s) => s.id === id)).length}/${list.length}`;
     $('skinGrid').innerHTML = list.map((sk) => {
       const open = P.isUnlocked(sk.id), on = P.data.skin === sk.id;
-      return `<button type="button" class="thumb r-${RARITY[sk.rarity] || 'comum'}${open ? '' : ' locked'}${sk.id === selId ? ' sel' : ''}" data-skin="${esc(sk.id)}" aria-pressed="${on}" aria-label="${esc(sk.name)}${open ? '' : ' (bloqueada)'}">
-        ${th[sk.id] ? `<img src="${th[sk.id]}" alt="">` : ''}${open ? '' : LOCK_SVG}${on ? '<i class="eq">✓</i>' : ''}<span>${esc(sk.name)}</span></button>`;
+      const nm = skinName(sk);
+      return `<button type="button" class="thumb r-${RARITY[sk.rarity] || 'comum'}${open ? '' : ' locked'}${sk.id === selId ? ' sel' : ''}" data-skin="${esc(sk.id)}" aria-pressed="${on}" aria-label="${esc(open ? nm : t('lk.lockedAria', { name: nm }))}">
+        ${th[sk.id] ? `<img src="${th[sk.id]}" alt="">` : ''}${open ? '' : LOCK_SVG}${on ? '<i class="eq">✓</i>' : ''}<span>${esc(nm)}</span></button>`;
     }).join('');
     // cartão da skin em destaque
     const sk = QC.Skins.get(selId), u = sk.unlock || {};
     const open = P.isUnlocked(sk.id), on = P.data.skin === sk.id;
     const cur = P.metric(u.type), pct = open ? 1 : clamp(cur / (u.value || 1), 0, 1);
-    const left = u.type === 'xp' ? `Faltam ${fmt(Math.max(0, u.value - cur))} pontos` : u.type === 'speed' ? `Seu recorde: x${(+cur).toFixed(1)}` : `Seu recorde: ${fmt(cur)}`;
-    $('lkShow').innerHTML = `<h2>${esc(sk.name)}</h2><span class="lk-rar ${RARITY[sk.rarity] || ''}">${esc((sk.rarity || '').toUpperCase())}</span>
-      ${sk.desc ? `<p class="lk-desc">${esc(sk.desc)}</p>` : ''}
-      ${open ? `<div class="lk-status ok">${on ? '✓ VESTINDO AGORA' : 'LIBERADA'}</div>`
-        : `<div class="lk-status lock">BLOQUEADA<small>${esc(u.label || '')} · ${left}</small></div><div class="lk-prog"><i style="width:${Math.round(pct * 100)}%"></i></div>`}`;
+    const left = u.type === 'xp' ? t('lk.leftXp', { n: fmt(Math.max(0, u.value - cur)) }) : u.type === 'speed' ? t('lk.bestSpeed', { n: I18.num(+cur, 1) }) : t('lk.best', { n: fmt(cur) });
+    const desc = skinDesc(sk);
+    $('lkShow').innerHTML = `<h2>${esc(skinName(sk))}</h2><span class="lk-rar ${RARITY[sk.rarity] || ''}">${esc(rarityName(sk.rarity))}</span>
+      ${desc ? `<p class="lk-desc">${esc(desc)}</p>` : ''}
+      ${open ? `<div class="lk-status ok">${esc(t(on ? 'lk.wearing' : 'lk.free'))}</div>`
+        : `<div class="lk-status lock">${esc(t('lk.locked'))}<small>${esc(unlockText(u))} · ${esc(left)}</small></div><div class="lk-prog"><i style="width:${Math.round(pct * 100)}%"></i></div>`}`;
   }
 
   // troca de roupa: o corredor gira, solta brilho e aparece com a skin nova
@@ -1906,23 +1964,26 @@
     loadBoard(boardPeriod);
   }));
   let boardReq = 0;
+  let board = { msg: 'board.loading', rows: null };   // último estado, para repintar ao trocar de idioma
   async function loadBoard(period) {
-    const el = $('board');
     const req = ++boardReq;
-    if (!onlineReady) {
-      el.innerHTML = `<li class="board-msg">${embedded ? 'O ranking funciona no site: quantaaulas.com/corrida' : 'Sem conexão com o ranking agora. Tente de novo daqui a pouco.'}</li>`;
-      return;
-    }
-    el.innerHTML = '<li class="board-msg">Carregando...</li>';
+    if (!onlineReady) { paintBoard({ msg: embedded ? 'board.embedded' : 'board.offline' }); return; }
+    paintBoard({ msg: 'board.loading' });
     const rows = await QC.Online.leaderboard(period, 20);
     if (req !== boardReq) return;
-    if (!rows) { el.innerHTML = `<li class="board-msg">${embedded ? 'O ranking funciona no site: quantaaulas.com/corrida' : 'Não foi possível carregar o ranking. Tente de novo.'}</li>`; return; }
-    if (!rows.length) { el.innerHTML = `<li class="board-msg">Ninguém pontuou ${period === 'week' ? 'nesta semana' : 'ainda'}. O primeiro lugar pode ser seu!</li>`; return; }
+    if (!rows) paintBoard({ msg: embedded ? 'board.embedded' : 'board.fail' });
+    else if (!rows.length) paintBoard({ msg: period === 'week' ? 'board.emptyWeek' : 'board.emptyAll' });
+    else paintBoard({ rows });
+  }
+  function paintBoard(st) {
+    if (st) board = st;
+    const el = $('board');
+    if (!board.rows) { el.innerHTML = `<li class="board-msg">${esc(t(board.msg))}</li>`; return; }
     let html = '', prev = 0;
-    rows.forEach((r) => {
+    board.rows.forEach((r) => {
       if (prev && r.rank > prev + 1 && r.is_me) html += '<li class="gap">···</li>';
       const sk = QC.Skins.get(r.skin);
-      html += `<li class="${r.is_me ? 'me' : ''}"><span class="pos">#${r.rank}</span><span class="nm">${esc(r.nickname)}<small>${esc(sk.name)}</small></span><span class="sc">${fmt(r.score)}</span></li>`;
+      html += `<li class="${r.is_me ? 'me' : ''}"><span class="pos">#${r.rank}</span><span class="nm">${esc(r.nickname)}<small>${esc(skinName(sk))}</small></span><span class="sc">${fmt(r.score)}</span></li>`;
       prev = r.rank;
     });
     el.innerHTML = html;
@@ -1936,27 +1997,26 @@
   function accountHtml() {
     const u = onlineReady && QC.Online.user;
     if (u) {
-      return `<div class="account"><span>Jogando como<br><b>${esc(cloud.nickname || u.firstName || 'Jogador')}</b></span>
-        <span class="acts"><button class="link" type="button" data-act="nick">Apelido</button><button class="link" type="button" data-act="out">Sair</button></span></div>`;
+      return `<div class="account"><span>${esc(t('acc.playingAs'))}<br><b>${esc(cloud.nickname || u.firstName || t('acc.player'))}</b></span>
+        <span class="acts"><button class="link" type="button" data-act="nick">${esc(t('acc.nick'))}</button><button class="link" type="button" data-act="out">${esc(t('acc.out'))}</button></span></div>`;
     }
     if (embedded || !onlineReady) {
-      return `<div class="account"><span>Seu progresso fica salvo neste aparelho.${embedded ? ' Para entrar no ranking, jogue em <b style="font-size:13px">quantaaulas.com/corrida</b>.' : ''}</span></div>`;
+      return `<div class="account"><span>${esc(t('acc.local'))}${embedded ? t('acc.embedded') : ''}</span></div>`;
     }
-    return `<div class="login-box"><button class="btn alt google" type="button" data-act="in">${GOOGLE_SVG} Entrar com Google</button>
-      <small>Guarde suas skins em qualquer aparelho e apareça no ranking.</small></div>`;
+    return `<div class="login-box"><button class="btn alt google" type="button" data-act="in">${GOOGLE_SVG} ${esc(t('login.google'))}</button>
+      <small>${esc(t('login.small'))}</small></div>`;
   }
   function refreshMenus() {
     $$('.account-slot').forEach((el) => { el.innerHTML = accountHtml(); });
-    $('bestStart').textContent = fmt(P.data.bestScore);
-    $('xpStart').textContent = fmt(P.data.xp);
     const total = QC.Skins.list.length;
-    $('skinCount').textContent = `${P.data.skins.filter((id) => QC.Skins.list.some((s) => s.id === id)).length}/${total}`;
+    const have = P.data.skins.filter((id) => QC.Skins.list.some((s) => s.id === id)).length;
+    $('recLine').innerHTML = t('start.rec', { best: fmt(P.data.bestScore), xp: fmt(P.data.xp), skins: `${have}/${total}` });
   }
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
     const act = b.dataset.act;
-    if (act === 'in') { b.disabled = true; const r = await QC.Online.signIn(); if (r && r.error) { b.disabled = false; toast('Não foi possível abrir o login do Google.<small>Tente de novo.</small>'); } }
+    if (act === 'in') { b.disabled = true; const r = await QC.Online.signIn(); if (r && r.error) { b.disabled = false; toast(t('login.fail')); } }
     else if (act === 'out') { await QC.Online.signOut(); cloud.nickname = ''; cloud.revision = 0; cloud.synced = false; refreshMenus(); }
     else if (act === 'nick') openScreen('nickScreen');
   });
@@ -1965,20 +2025,17 @@
     e.preventDefault();
     const val = $('nickInput').value.trim();
     const err = $('nickErr');
-    if (val.length < 3) { err.textContent = 'Use pelo menos 3 letras.'; return; }
+    if (val.length < 3) { err.textContent = t('nick.short'); return; }
     $('nickSave').disabled = true; err.textContent = '';
     const r = await QC.Online.setNickname(val);
     $('nickSave').disabled = false;
     if (r && r.ok) {
       cloud.nickname = r.nickname; closePanel(); refreshMenus();
-      toast(`Apelido salvo: ${esc(r.nickname)}`);
+      toast(esc(t('nick.saved', { n: r.nickname })));
       if (pendingRun) { const run = pendingRun; pendingRun = null; submitOnline(run); }
     } else {
-      err.textContent = {
-        taken: 'Esse apelido já está em uso. Tente outro.',
-        blocked: 'Esse apelido não é permitido. Escolha outro.',
-        invalid: 'Use de 3 a 16 letras, números, espaço ou _.',
-      }[r && r.error] || 'Sem conexão. Tente de novo.';
+      const code = r && r.error;
+      err.textContent = t(['taken', 'blocked', 'invalid'].includes(code) ? `nick.${code}` : 'nick.offline');
     }
   });
 
@@ -2026,30 +2083,30 @@
 
   let pendingRun = null;
   let runId = null, runReq = 0;
+  // a linha do ranking na tela final guarda a chave do texto, para repintar ao trocar de idioma
+  let lineMsg = null;
+  function setLine(key, p) { lineMsg = key ? { key, p } : null; paintLine(); }
+  function paintLine() { $('onlineLine').innerHTML = lineMsg ? t(lineMsg.key, lineMsg.p) : ''; }
   async function submitOnline(run) {
-    const line = $('onlineLine');
-    if (!onlineReady || embedded) { line.textContent = ''; return; }
-    if (run.practice) { line.textContent = 'Treino não vale ranking. Para disputar, jogue no modo CORRIDA.'; await pushProgress(); return; }
-    if (!QC.Online.user) { line.innerHTML = 'Entre com Google no menu inicial para aparecer no ranking.'; return; }
+    if (!onlineReady || embedded) { setLine(null); return; }
+    if (run.practice) { setLine('online.practice'); await pushProgress(); return; }
+    if (!QC.Online.user) { setLine('online.signin'); return; }
     await pushProgress();
-    if (run.score <= 0) { line.textContent = ''; return; }
+    if (run.score <= 0) { setLine(null); return; }
     if (!cloud.nickname) {
       pendingRun = run;
-      line.innerHTML = '<button class="link" type="button" data-act="nick">Escolha um apelido</button> para aparecer no ranking.';
+      setLine('online.chooseNick');
       return;
     }
-    line.textContent = 'Enviando para o ranking...';
+    setLine('online.sending');
     const r = await QC.Online.submitRun(run);
     if (r && r.ok && r.rank_week) {
-      line.innerHTML = `Ranking da semana: <b>#${r.rank_week}</b> · Geral: <b>#${r.rank_all}</b>`;
+      setLine('online.rank', { w: +r.rank_week, a: +r.rank_all });
     } else if (r && r.ok) {
-      line.textContent = 'Corrida salva.';
+      setLine('online.saved');
     } else {
-      line.textContent = {
-        too_fast: 'Espere alguns segundos entre uma corrida e outra para contar no ranking.',
-        no_run: 'Esta corrida começou antes do login, então não conta no ranking.',
-        invalid: 'Esta corrida não pôde ser validada para o ranking.',
-      }[r && r.error] || 'Não deu para enviar ao ranking agora.';
+      const code = r && r.error;
+      setLine(['too_fast', 'no_run', 'invalid'].includes(code) ? `online.${code}` : 'online.fail');
     }
   }
 
@@ -2272,8 +2329,8 @@
   const sb = $('btnSound');
   const paintSound = () => {
     sb.textContent = soundOn ? '♪' : '×'; sb.setAttribute('aria-pressed', String(soundOn));
-    sb.setAttribute('aria-label', soundOn ? 'Som ligado. Desligar o som (M)' : 'Som desligado. Ligar o som (M)');
-    const pb = $('btnPauseSound'); pb.textContent = soundOn ? 'SOM: LIGADO' : 'SOM: DESLIGADO'; pb.setAttribute('aria-pressed', String(soundOn));
+    sb.setAttribute('aria-label', t(soundOn ? 'hud.soundOn' : 'hud.soundOff'));
+    const pb = $('btnPauseSound'); pb.textContent = t(soundOn ? 'sound.on' : 'sound.off'); pb.setAttribute('aria-pressed', String(soundOn));
   };
   function toggleSound() {
     soundOn = !soundOn; store.set('quanta-corrida-sound', soundOn);
@@ -2318,9 +2375,34 @@
   });
   paintModes();
 
+  // ================= Idioma: seletor no menu e na pausa, troca ao vivo =================
+  $$('.lang-row').forEach((row, i) => {
+    const id = `langSel${i}`;
+    row.innerHTML = `<label for="${id}" data-i18n="lang.label">${esc(t('lang.label'))}</label>
+      <select id="${id}" class="lang-sel">${I18.LANGS.map((l) => `<option value="${l.code}" lang="${l.code}">${esc(l.name)}</option>`).join('')}</select>`;
+    const sel = row.querySelector('select');
+    sel.value = I18.lang;
+    sel.addEventListener('change', () => I18.setLang(sel.value));
+  });
+  function paintStartBtn() { if (ready) $('btnStart').innerHTML = `<span class="blink">${esc(t('btn.play'))}</span>`; }
+  I18.onChange(() => {
+    $$('.lang-sel').forEach((s) => { s.value = I18.lang; });
+    paintStartBtn(); paintSound(); paintModes(); refreshMenus(); paintScore(); updateHud();
+    $('qLevel').textContent = t('q.level', { n: S.level });
+    if (S.mode === 'pause') paintPauseStats();
+    if (openPanel === 'lockerScreen') renderLocker();
+    if (openPanel === 'rankScreen') paintBoard();
+    if (over) {
+      paintOverText(); paintNextUnlock(true); paintLine();
+      [['rScore', S.score], ['rHits', S.hits], ['rCombo', S.maxCombo], ['xpGain', over.xpGained], ['xpTotal', P.data.xp]].forEach(([id, v]) => { $(id).textContent = fmt(v); });
+    }
+    measureQuestion();
+  });
+
   // diagnóstico para testes: /corrida/?debug
   if (/[?&]debug\b/.test(location.search)) window.__qc = { renderer, scene, S, get quality() { return quality; } };
 
+  $('qLevel').textContent = t('q.level', { n: 1 });
   resize();
   applyTheme(1, true);
   useSkin(P.data.skin);
@@ -2345,7 +2427,7 @@
   Promise.race([fontsReady, new Promise((r) => setTimeout(r, 2500))]).then(() => {
     ready = true;
     const b = $('btnStart'); b.disabled = false;
-    b.innerHTML = '<span class="blink">► JOGAR</span>';
+    paintStartBtn();
     measureQuestion();
   });
 })();
