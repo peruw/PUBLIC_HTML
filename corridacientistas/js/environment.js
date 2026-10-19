@@ -98,99 +98,133 @@ function canvasTex(c, aniso = 1) {
 }
 
 // Atlas do ambiente: elementos da tabela periódica, bandeiras, letreiro e janelas
+// (os nomes dos elementos vêm de ENV_LABELS.elements, na mesma ordem)
 const ELEMENTS = [
-  ['H', 1, 'Hidrogênio', '#ff6b6b'], ['He', 2, 'Hélio', '#b388ff'], ['C', 6, 'Carbono', '#5cd67a'], ['N', 7, 'Nitrogênio', '#5cd67a'],
-  ['O', 8, 'Oxigênio', '#5cd67a'], ['Na', 11, 'Sódio', '#ffb347'], ['Fe', 26, 'Ferro', '#6fb7ff'], ['Cu', 29, 'Cobre', '#6fb7ff'],
-  ['Ag', 47, 'Prata', '#6fb7ff'], ['Au', 79, 'Ouro', '#ffd23f'], ['Ra', 88, 'Rádio', '#ff8fd0'], ['Po', 84, 'Polônio', '#9be7ff'],
-  ['Md', 101, 'Mendelévio', '#ff8fd0'], ['Ne', 10, 'Neônio', '#b388ff'], ['Si', 14, 'Silício', '#9be7ff'], ['U', 92, 'Urânio', '#ff8fd0'],
+  ['H', 1, '#ff6b6b'], ['He', 2, '#b388ff'], ['C', 6, '#5cd67a'], ['N', 7, '#5cd67a'],
+  ['O', 8, '#5cd67a'], ['Na', 11, '#ffb347'], ['Fe', 26, '#6fb7ff'], ['Cu', 29, '#6fb7ff'],
+  ['Ag', 47, '#6fb7ff'], ['Au', 79, '#ffd23f'], ['Ra', 88, '#ff8fd0'], ['Po', 84, '#9be7ff'],
+  ['Md', 101, '#ff8fd0'], ['Ne', 10, '#b388ff'], ['Si', 14, '#9be7ff'], ['U', 92, '#ff8fd0'],
 ];
-function envAtlas(hi) {
+// Textos pintados no cenário (pt-BR); main.js passa os do idioma escolhido.
+// O "BRASIL" do foguete é a pintura do foguete brasileiro: não muda com o idioma.
+export const ENV_LABELS = {
+  elements: ['Hidrogênio', 'Hélio', 'Carbono', 'Nitrogênio', 'Oxigênio', 'Sódio', 'Ferro', 'Cobre', 'Prata', 'Ouro', 'Rádio', 'Polônio', 'Mendelévio', 'Neônio', 'Silício', 'Urânio'],
+  campus: 'CAMPUS DA CIÊNCIA', obs: 'OBSERVATÓRIO', lab: 'LABORATÓRIO',
+  font: '"Trebuchet MS", "Segoe UI", "DejaVu Sans", Arial, sans-serif',
+  serif: 'Georgia, "DejaVu Serif", serif',
+};
+// relabel() redesenha o mesmo canvas com os textos de outro idioma.
+function envAtlas(hi, labels) {
   const S = hi ? 1024 : 512;
   const c = makeCanvas(S, S);
   const g = c.getContext('2d');
-  g.scale(S / 1024, S / 1024);
+  let L = { ...ENV_LABELS, ...labels };
   const R = {};
   const put = (name, x, y, w, h, fn) => {
     g.save(); g.translate(x, y); g.beginPath(); g.rect(0, 0, w, h); g.clip(); fn(g, w, h); g.restore();
     R[name] = [(x + 2) / 1024, 1 - (y + h - 2) / 1024, (x + w - 2) / 1024, 1 - (y + 2) / 1024];
   };
-  const FONT = '"Trebuchet MS", "Segoe UI", "DejaVu Sans", Arial, sans-serif';
-  put('white', 0, 0, 32, 32, (gg, w, h) => { gg.fillStyle = '#fff'; gg.fillRect(0, 0, w, h); });
-  ELEMENTS.forEach(([sym, num, name, color], i) => {
-    put('el' + i, (i % 8) * 128, 40 + Math.floor(i / 8) * 128, 128, 128, (gg, w, h) => {
-      gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, w, h);
-      gg.fillStyle = color; gg.fillRect(6, 6, w - 12, h - 12);
-      gg.fillStyle = 'rgba(255,255,255,0.35)'; gg.fillRect(6, 6, w - 12, 18);
-      gg.fillStyle = '#1b1b2a';
-      gg.textAlign = 'left'; gg.textBaseline = 'top';
-      gg.font = `bold 20px ${FONT}`; gg.fillText(String(num), 14, 12);
-      gg.textAlign = 'center'; gg.textBaseline = 'middle';
-      gg.font = `900 ${sym.length > 1 ? 56 : 64}px ${FONT}`; gg.fillText(sym, w / 2, h * 0.52);
-      let fs = 16; gg.font = `bold ${fs}px ${FONT}`;
-      while (gg.measureText(name).width > w - 16 && fs > 8) { fs--; gg.font = `bold ${fs}px ${FONT}`; }
-      gg.fillText(name, w / 2, h - 18);
+  let FONT = L.font;
+  const draw = () => {
+    FONT = L.font;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, S, S);
+    g.scale(S / 1024, S / 1024);
+    put('white', 0, 0, 32, 32, (gg, w, h) => { gg.fillStyle = '#fff'; gg.fillRect(0, 0, w, h); });
+    ELEMENTS.forEach(([sym, num, color], i) => {
+      const name = L.elements[i] || '';
+      put('el' + i, (i % 8) * 128, 40 + Math.floor(i / 8) * 128, 128, 128, (gg, w, h) => {
+        gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, w, h);
+        gg.fillStyle = color; gg.fillRect(6, 6, w - 12, h - 12);
+        gg.fillStyle = 'rgba(255,255,255,0.35)'; gg.fillRect(6, 6, w - 12, 18);
+        gg.fillStyle = '#1b1b2a';
+        gg.textAlign = 'left'; gg.textBaseline = 'top';
+        gg.font = `bold 20px ${FONT}`; gg.fillText(String(num), 14, 12);
+        gg.textAlign = 'center'; gg.textBaseline = 'middle';
+        gg.font = `900 ${sym.length > 1 ? 56 : 64}px ${FONT}`; gg.fillText(sym, w / 2, h * 0.52);
+        let fs = 16; gg.font = `bold ${fs}px ${FONT}`;
+        while (gg.measureText(name).width > w - 16 && fs > 8) { fs--; gg.font = `bold ${fs}px ${FONT}`; }
+        gg.fillText(name, w / 2, h - 18);
+      });
     });
-  });
-  // bandeira do Brasil
-  put('flagBR', 0, 300, 220, 150, (gg, w, h) => {
-    gg.fillStyle = '#009c3b'; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#ffdf00'; gg.beginPath(); gg.moveTo(w / 2, 12); gg.lineTo(w - 16, h / 2); gg.lineTo(w / 2, h - 12); gg.lineTo(16, h / 2); gg.fill();
-    gg.fillStyle = '#002776'; gg.beginPath(); gg.arc(w / 2, h / 2, h * 0.24, 0, TAU); gg.fill();
-    gg.strokeStyle = '#ffffff'; gg.lineWidth = 6;
-    gg.beginPath(); gg.arc(w / 2 + 10, h / 2 + 40, h * 0.34, Math.PI * 1.18, Math.PI * 1.62); gg.stroke();
-    gg.fillStyle = '#fff';
-    for (let k = 0; k < 14; k++) { gg.beginPath(); gg.arc(w / 2 - 20 + (k * 37) % 44, h / 2 + 2 + (k * 17) % 22, 1.8, 0, TAU); gg.fill(); }
-  });
-  // bandeiras com átomo
-  const atomFlag = (bg) => (gg, w, h) => {
-    gg.fillStyle = bg; gg.fillRect(0, 0, w, h);
-    gg.strokeStyle = '#ffffff'; gg.lineWidth = 6;
-    for (let k = 0; k < 3; k++) { gg.beginPath(); gg.ellipse(w / 2, h / 2, w * 0.3, h * 0.12, (k * Math.PI) / 3, 0, TAU); gg.stroke(); }
-    gg.fillStyle = '#fff'; gg.beginPath(); gg.arc(w / 2, h / 2, 10, 0, TAU); gg.fill();
+    // bandeira do Brasil
+    put('flagBR', 0, 300, 220, 150, (gg, w, h) => {
+      gg.fillStyle = '#009c3b'; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#ffdf00'; gg.beginPath(); gg.moveTo(w / 2, 12); gg.lineTo(w - 16, h / 2); gg.lineTo(w / 2, h - 12); gg.lineTo(16, h / 2); gg.fill();
+      gg.fillStyle = '#002776'; gg.beginPath(); gg.arc(w / 2, h / 2, h * 0.24, 0, TAU); gg.fill();
+      gg.strokeStyle = '#ffffff'; gg.lineWidth = 6;
+      gg.beginPath(); gg.arc(w / 2 + 10, h / 2 + 40, h * 0.34, Math.PI * 1.18, Math.PI * 1.62); gg.stroke();
+      gg.fillStyle = '#fff';
+      for (let k = 0; k < 14; k++) { gg.beginPath(); gg.arc(w / 2 - 20 + (k * 37) % 44, h / 2 + 2 + (k * 17) % 22, 1.8, 0, TAU); gg.fill(); }
+    });
+    // bandeiras com átomo
+    const atomFlag = (bg) => (gg, w, h) => {
+      gg.fillStyle = bg; gg.fillRect(0, 0, w, h);
+      gg.strokeStyle = '#ffffff'; gg.lineWidth = 6;
+      for (let k = 0; k < 3; k++) { gg.beginPath(); gg.ellipse(w / 2, h / 2, w * 0.3, h * 0.12, (k * Math.PI) / 3, 0, TAU); gg.stroke(); }
+      gg.fillStyle = '#fff'; gg.beginPath(); gg.arc(w / 2, h / 2, 10, 0, TAU); gg.fill();
+    };
+    put('flagA', 230, 300, 220, 150, atomFlag('#8a3cff'));
+    put('flagB', 460, 300, 220, 150, atomFlag('#e3262f'));
+    // letreiro do prédio
+    put('campus', 0, 460, 1024, 110, (gg, w, h) => {
+      gg.fillStyle = '#f3ead7'; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#1f2f66';
+      gg.textAlign = 'center'; gg.textBaseline = 'middle';
+      const SERIF = /[\u3000-\u9fff]/.test(L.campus) ? FONT : L.serif;
+      let fs = 78; gg.font = `bold ${fs}px ${SERIF}`;
+      const text = L.campus;
+      while (gg.measureText(text).width > w - 60) { fs -= 2; gg.font = `bold ${fs}px ${SERIF}`; }
+      gg.fillText(text, w / 2, h / 2 + 4);
+      gg.fillStyle = '#c9a44a'; gg.fillRect(20, 8, w - 40, 5); gg.fillRect(20, h - 13, w - 40, 5);
+    });
+    // janela (vidro com caixilho)
+    put('window', 700, 300, 96, 150, (gg, w, h) => {
+      gg.fillStyle = '#f3ead7'; gg.fillRect(0, 0, w, h);
+      const gr = gg.createLinearGradient(0, 0, w, h);
+      gr.addColorStop(0, '#9fd3ff'); gr.addColorStop(0.5, '#3a6fb0'); gr.addColorStop(1, '#27497a');
+      gg.fillStyle = gr; gg.fillRect(10, 10, w - 20, h - 20);
+      gg.fillStyle = '#f3ead7'; gg.fillRect(w / 2 - 3, 10, 6, h - 20); gg.fillRect(10, h * 0.45, w - 20, 6);
+    });
+    put('obsSign', 0, 580, 512, 96, (gg, w, h) => {
+      gg.fillStyle = '#0b1433'; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#ffe36e'; gg.textAlign = 'center'; gg.textBaseline = 'middle';
+      fitText(gg, L.obs, w - 30, 54, '900', FONT); gg.fillText(L.obs, w / 2, h / 2 + 3);
+    });
+    put('labSign', 512, 580, 512, 96, (gg, w, h) => {
+      gg.fillStyle = '#5518b8'; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#ffffff'; gg.textAlign = 'center'; gg.textBaseline = 'middle';
+      fitText(gg, L.lab, w - 30, 50, '900', FONT); gg.fillText(L.lab, w / 2, h / 2 + 3);
+    });
+    put('rocket', 0, 690, 256, 64, (gg, w, h) => {
+      gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#1d4fd8'; gg.textAlign = 'center'; gg.textBaseline = 'middle';
+      gg.font = `900 40px ${FONT}`; gg.fillText('BRASIL', w / 2, h / 2 + 2);
+    });
   };
-  put('flagA', 230, 300, 220, 150, atomFlag('#8a3cff'));
-  put('flagB', 460, 300, 220, 150, atomFlag('#e3262f'));
-  // letreiro do prédio
-  put('campus', 0, 460, 1024, 110, (gg, w, h) => {
-    gg.fillStyle = '#f3ead7'; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#1f2f66';
-    gg.textAlign = 'center'; gg.textBaseline = 'middle';
-    let fs = 78; gg.font = `bold ${fs}px Georgia, "DejaVu Serif", serif`;
-    const text = 'CAMPUS DA CIÊNCIA';
-    while (gg.measureText(text).width > w - 60) { fs -= 2; gg.font = `bold ${fs}px Georgia, "DejaVu Serif", serif`; }
-    gg.fillText(text, w / 2, h / 2 + 4);
-    gg.fillStyle = '#c9a44a'; gg.fillRect(20, 8, w - 40, 5); gg.fillRect(20, h - 13, w - 40, 5);
-  });
-  // janela (vidro com caixilho)
-  put('window', 700, 300, 96, 150, (gg, w, h) => {
-    gg.fillStyle = '#f3ead7'; gg.fillRect(0, 0, w, h);
-    const gr = gg.createLinearGradient(0, 0, w, h);
-    gr.addColorStop(0, '#9fd3ff'); gr.addColorStop(0.5, '#3a6fb0'); gr.addColorStop(1, '#27497a');
-    gg.fillStyle = gr; gg.fillRect(10, 10, w - 20, h - 20);
-    gg.fillStyle = '#f3ead7'; gg.fillRect(w / 2 - 3, 10, 6, h - 20); gg.fillRect(10, h * 0.45, w - 20, 6);
-  });
-  put('obsSign', 0, 580, 512, 96, (gg, w, h) => {
-    gg.fillStyle = '#0b1433'; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#ffe36e'; gg.textAlign = 'center'; gg.textBaseline = 'middle';
-    gg.font = `900 54px ${FONT}`; gg.fillText('OBSERVATÓRIO', w / 2, h / 2 + 3);
-  });
-  put('labSign', 512, 580, 512, 96, (gg, w, h) => {
-    gg.fillStyle = '#5518b8'; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#ffffff'; gg.textAlign = 'center'; gg.textBaseline = 'middle';
-    gg.font = `900 50px ${FONT}`; gg.fillText('LABORATÓRIO', w / 2, h / 2 + 3);
-  });
-  put('rocket', 0, 690, 256, 64, (gg, w, h) => {
-    gg.fillStyle = '#ffffff'; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#1d4fd8'; gg.textAlign = 'center'; gg.textBaseline = 'middle';
-    gg.font = `900 40px ${FONT}`; gg.fillText('BRASIL', w / 2, h / 2 + 2);
-  });
+  draw();
   const tex = canvasTex(c, hi ? 4 : 1);
   const wr = R.white;
-  return { tex, R, white: [(wr[0] + wr[2]) / 2, (wr[1] + wr[3]) / 2] };
+  const relabel = (labels2) => {
+    L = { ...ENV_LABELS, ...labels2 };
+    draw();
+    tex.needsUpdate = true;
+  };
+  return { tex, R, white: [(wr[0] + wr[2]) / 2, (wr[1] + wr[3]) / 2], relabel };
+}
+
+// Fonte do maior tamanho (até `size`) em que o texto cabe na largura.
+function fitText(gg, text, maxW, size, weight, font) {
+  gg.font = `${weight} ${size}px ${font}`;
+  while (gg.measureText(text).width > maxW && size > 12) {
+    size -= 2;
+    gg.font = `${weight} ${size}px ${font}`;
+  }
 }
 
 // ---------------------------------------------------------------------------
-export function buildEnvironment(scene, track, quality = {}, renderer) {
+// labels: textos pintados no cenário no idioma do jogo (ver ENV_LABELS)
+export function buildEnvironment(scene, track, quality = {}, renderer, labels = {}) {
   const hi = quality.id !== 'baixa';
   const density = quality.scenery ?? (hi ? 1 : 0.45);
   const drawDist = quality.drawDistance || (hi ? 700 : 420);
@@ -695,7 +729,7 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
   }
 
   // ------------------------------------------------------------ atlas e malha estática dos marcos
-  const atlas = envAtlas(hi);
+  const atlas = envAtlas(hi, labels);
   keep(atlas.tex);
   const AR = atlas.R, AW = atlas.white;
   const matAtlas = keep(new THREE.MeshLambertMaterial({ map: atlas.tex, vertexColors: true }));
@@ -1747,6 +1781,8 @@ export function buildEnvironment(scene, track, quality = {}, renderer) {
     sun,
     hemi,
     groundAt,
+    // troca os textos do cenário (idioma)
+    setLabels: (l) => atlas.relabel(l),
     dispose() {
       scene.remove(group);
       scene.fog = null;

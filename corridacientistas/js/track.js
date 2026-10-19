@@ -435,13 +435,22 @@ function glowTexture() {
   return canvasTex(c);
 }
 
+// Textos das faixas e placas (pt-BR); main.js passa os do idioma escolhido.
+export const SIGN_LABELS = {
+  largada: 'LARGADA • CHEGADA', lab: 'LABORATÓRIO', obs: 'OBSERVATÓRIO', lagoa: 'LAGOA DE GALÁPAGOS',
+  tunel: 'TÚNEL ESPACIAL', tesla: 'RETA DE TESLA', campus: 'CAMPUS DA CIÊNCIA',
+  luz: 'c ≈ 300.000 km/s', grav: 'g = 9,8 m/s²',
+  font: '"Trebuchet MS", "Segoe UI", "DejaVu Sans", Arial, sans-serif',
+};
+
 // Atlas com placas, tabuleiro, setas e padrões. Região 'white' serve para geometria lisa.
-function buildAtlas(hi, aniso) {
+// relabel() redesenha o mesmo canvas com os textos de outro idioma (as regiões não mudam).
+function buildAtlas(hi, aniso, labels) {
   const W = hi ? 2048 : 1024, H = hi ? 1024 : 512;
   const k = W / 2048;
   const c = makeCanvas(W, H);
   const g = c.getContext('2d');
-  g.scale(k, k);
+  let L = { ...SIGN_LABELS, ...labels };
   const regions = {};
   const put = (name, x, y, w, h, draw) => {
     g.save(); g.translate(x, y);
@@ -451,7 +460,7 @@ function buildAtlas(hi, aniso) {
     // v invertido (flipY)
     regions[name] = [(x + 2) / 2048, 1 - (y + h - 2) / 1024, (x + w - 2) / 2048, 1 - (y + 2) / 1024];
   };
-  const FONT = '"Trebuchet MS", "Segoe UI", "DejaVu Sans", Arial, sans-serif';
+  let FONT = L.font;
   const banner = (text, bg1, bg2, fg, stroke, deco) => (gg, w, h) => {
     const gr = gg.createLinearGradient(0, 0, 0, h);
     gr.addColorStop(0, bg1); gr.addColorStop(1, bg2);
@@ -476,101 +485,113 @@ function buildAtlas(hi, aniso) {
       gg.beginPath(); gg.arc(r() * w, r() * h, 1 + r() * 2.5, 0, TAU); gg.fill();
     }
   };
-  // branco
-  put('white', 0, 0, 48, 48, (gg, w, h) => { gg.fillStyle = '#fff'; gg.fillRect(0, 0, w, h); });
-  // tabuleiro de chegada 16x2
-  put('checker', 64, 0, 1024, 128, (gg, w, h) => {
-    const s = w / 16;
-    for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) {
-      gg.fillStyle = (i + j) % 2 ? '#141414' : '#f7f7f7';
-      gg.fillRect(i * s, j * s, s, s);
-    }
-  });
-  put('checkerSmall', 1104, 0, 256, 128, (gg, w, h) => {
-    const s = 32;
-    for (let i = 0; i < w / s; i++) for (let j = 0; j < h / s; j++) {
-      gg.fillStyle = (i + j) % 2 ? '#141414' : '#f7f7f7';
-      gg.fillRect(i * s, j * s, s, s);
-    }
-  });
-  put('hazard', 1376, 0, 256, 64, (gg, w, h) => {
-    gg.fillStyle = '#ffd000'; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#1d1d1d';
-    for (let x = -h; x < w + h; x += 48) { gg.beginPath(); gg.moveTo(x, h); gg.lineTo(x + 24, h); gg.lineTo(x + 24 + h, 0); gg.lineTo(x + h, 0); gg.fill(); }
-  });
-  put('redwhite', 1376, 64, 256, 64, (gg, w, h) => {
-    for (let i = 0; i < 8; i++) { gg.fillStyle = i % 2 ? '#ffffff' : '#e3262f'; gg.fillRect(i * 32, 0, 32, h); }
-  });
-  put('ramp', 1912, 0, 128, 128, (gg, w, h) => {
-    const gr = gg.createLinearGradient(0, 0, 0, h);
-    gr.addColorStop(0, '#ffe14d'); gr.addColorStop(1, '#ff8a1f');
-    gg.fillStyle = gr; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#1b1b1b';
-    for (let j = 0; j < 2; j++) {
-      const y = 10 + j * 58;
-      gg.beginPath(); gg.moveTo(w / 2, y); gg.lineTo(w * 0.86, y + 30); gg.lineTo(w * 0.86, y + 44);
-      gg.lineTo(w / 2, y + 16); gg.lineTo(w * 0.14, y + 44); gg.lineTo(w * 0.14, y + 30); gg.fill();
-    }
-    gg.fillStyle = '#e3262f'; gg.fillRect(0, 0, 8, h); gg.fillRect(w - 8, 0, 8, h);
-  });
-  // seta de curva (aponta para a direita)
-  put('arrow', 1648, 0, 128, 128, (gg, w, h) => {
-    gg.fillStyle = '#e3262f'; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#ffffff';
-    for (let j = 0; j < 2; j++) {
-      const x = 14 + j * 52;
-      gg.beginPath(); gg.moveTo(x, 18); gg.lineTo(x + 30, 18); gg.lineTo(x + 62, 64); gg.lineTo(x + 30, 110);
-      gg.lineTo(x, 110); gg.lineTo(x + 32, 64); gg.fill();
-    }
-  });
-  put('arrowBlue', 1780, 0, 128, 128, (gg, w, h) => {
-    gg.fillStyle = '#1a55d6'; gg.fillRect(0, 0, w, h);
-    gg.fillStyle = '#ffffff';
-    for (let j = 0; j < 2; j++) {
-      const x = 14 + j * 52;
-      gg.beginPath(); gg.moveTo(x, 18); gg.lineTo(x + 30, 18); gg.lineTo(x + 62, 64); gg.lineTo(x + 30, 110);
-      gg.lineTo(x, 110); gg.lineTo(x + 32, 64); gg.fill();
-    }
-  });
-  // faixas com nomes dos setores
-  const row = [
-    ['largada', 'LARGADA • CHEGADA', '#e3262f', '#a3121b', '#ffffff', '#5a0a10'],
-    ['lab', 'LABORATÓRIO', '#8a3cff', '#5518b8', '#ffffff', '#2a0a60'],
-    ['obs', 'OBSERVATÓRIO', '#1b2f6b', '#0b1433', '#ffe36e', '#050a1e', stars(60, 3)],
-    ['lagoa', 'LAGOA DE GALÁPAGOS', '#19b5c9', '#0b7d98', '#ffffff', '#07435a'],
-    ['tunel', 'TÚNEL ESPACIAL', '#2a1060', '#0a0520', '#7ef9ff', '#12063a', stars(80, 5)],
-    ['tesla', 'RETA DE TESLA', '#ffcf1a', '#f09000', '#1b1b1b', '#fff4c0'],
-    ['campus', 'CAMPUS DA CIÊNCIA', '#f5ecd6', '#e2d3ae', '#2b3a6b', '#ffffff'],
-  ];
-  row.forEach(([name, text, a, b2, fg, st, deco], i) => {
-    put(name, (i % 2) * 1024, 136 + Math.floor(i / 2) * 136, 1024, 128, banner(text, a, b2, fg, st, deco));
-  });
-  // placas com fórmulas (512x256)
-  const boards = [
-    ['emc2', 'E = mc²', '#ffffff', '#1d4fd8'],
-    ['fma', 'F = m·a', '#fff3c4', '#d7263d'],
-    ['pvnrt', 'PV = nRT', '#e8fff1', '#138a4a'],
-    ['pitag', 'a² + b² = c²', '#ffffff', '#6a2bd9'],
-    ['h2o', 'H₂O', '#dff6ff', '#0a7abf'],
-    ['luz', 'c ≈ 300.000 km/s', '#1b1b2f', '#ffd23f'],
-    ['grav', 'g = 9,8 m/s²', '#ffe8e0', '#c2401a'],
-    ['dna', 'DNA', '#f0e6ff', '#7b2cbf'],
-  ];
-  boards.forEach(([name, text, bgc, fg], i) => {
-    put(name, (i % 4) * 512, 688 + Math.floor(i / 4) * 168, 512, 160, (gg, w, h) => {
-      gg.fillStyle = bgc; gg.fillRect(0, 0, w, h);
-      gg.strokeStyle = fg; gg.lineWidth = 12; gg.strokeRect(14, 14, w - 28, h - 28);
-      let size = h * 0.5;
-      gg.font = `bold ${size}px ${FONT}`;
-      while (gg.measureText(text).width > w - 70 && size > 20) { size -= 2; gg.font = `bold ${size}px ${FONT}`; }
-      gg.textAlign = 'center'; gg.textBaseline = 'middle';
-      gg.fillStyle = fg; gg.fillText(text, w / 2, h * 0.53);
+  const draw = () => {
+    FONT = L.font;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.scale(k, k);
+    // branco
+    put('white', 0, 0, 48, 48, (gg, w, h) => { gg.fillStyle = '#fff'; gg.fillRect(0, 0, w, h); });
+    // tabuleiro de chegada 16x2
+    put('checker', 64, 0, 1024, 128, (gg, w, h) => {
+      const s = w / 16;
+      for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) {
+        gg.fillStyle = (i + j) % 2 ? '#141414' : '#f7f7f7';
+        gg.fillRect(i * s, j * s, s, s);
+      }
     });
-  });
+    put('checkerSmall', 1104, 0, 256, 128, (gg, w, h) => {
+      const s = 32;
+      for (let i = 0; i < w / s; i++) for (let j = 0; j < h / s; j++) {
+        gg.fillStyle = (i + j) % 2 ? '#141414' : '#f7f7f7';
+        gg.fillRect(i * s, j * s, s, s);
+      }
+    });
+    put('hazard', 1376, 0, 256, 64, (gg, w, h) => {
+      gg.fillStyle = '#ffd000'; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#1d1d1d';
+      for (let x = -h; x < w + h; x += 48) { gg.beginPath(); gg.moveTo(x, h); gg.lineTo(x + 24, h); gg.lineTo(x + 24 + h, 0); gg.lineTo(x + h, 0); gg.fill(); }
+    });
+    put('redwhite', 1376, 64, 256, 64, (gg, w, h) => {
+      for (let i = 0; i < 8; i++) { gg.fillStyle = i % 2 ? '#ffffff' : '#e3262f'; gg.fillRect(i * 32, 0, 32, h); }
+    });
+    put('ramp', 1912, 0, 128, 128, (gg, w, h) => {
+      const gr = gg.createLinearGradient(0, 0, 0, h);
+      gr.addColorStop(0, '#ffe14d'); gr.addColorStop(1, '#ff8a1f');
+      gg.fillStyle = gr; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#1b1b1b';
+      for (let j = 0; j < 2; j++) {
+        const y = 10 + j * 58;
+        gg.beginPath(); gg.moveTo(w / 2, y); gg.lineTo(w * 0.86, y + 30); gg.lineTo(w * 0.86, y + 44);
+        gg.lineTo(w / 2, y + 16); gg.lineTo(w * 0.14, y + 44); gg.lineTo(w * 0.14, y + 30); gg.fill();
+      }
+      gg.fillStyle = '#e3262f'; gg.fillRect(0, 0, 8, h); gg.fillRect(w - 8, 0, 8, h);
+    });
+    // seta de curva (aponta para a direita)
+    put('arrow', 1648, 0, 128, 128, (gg, w, h) => {
+      gg.fillStyle = '#e3262f'; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#ffffff';
+      for (let j = 0; j < 2; j++) {
+        const x = 14 + j * 52;
+        gg.beginPath(); gg.moveTo(x, 18); gg.lineTo(x + 30, 18); gg.lineTo(x + 62, 64); gg.lineTo(x + 30, 110);
+        gg.lineTo(x, 110); gg.lineTo(x + 32, 64); gg.fill();
+      }
+    });
+    put('arrowBlue', 1780, 0, 128, 128, (gg, w, h) => {
+      gg.fillStyle = '#1a55d6'; gg.fillRect(0, 0, w, h);
+      gg.fillStyle = '#ffffff';
+      for (let j = 0; j < 2; j++) {
+        const x = 14 + j * 52;
+        gg.beginPath(); gg.moveTo(x, 18); gg.lineTo(x + 30, 18); gg.lineTo(x + 62, 64); gg.lineTo(x + 30, 110);
+        gg.lineTo(x, 110); gg.lineTo(x + 32, 64); gg.fill();
+      }
+    });
+    // faixas com nomes dos setores
+    const row = [
+      ['largada', L.largada, '#e3262f', '#a3121b', '#ffffff', '#5a0a10'],
+      ['lab', L.lab, '#8a3cff', '#5518b8', '#ffffff', '#2a0a60'],
+      ['obs', L.obs, '#1b2f6b', '#0b1433', '#ffe36e', '#050a1e', stars(60, 3)],
+      ['lagoa', L.lagoa, '#19b5c9', '#0b7d98', '#ffffff', '#07435a'],
+      ['tunel', L.tunel, '#2a1060', '#0a0520', '#7ef9ff', '#12063a', stars(80, 5)],
+      ['tesla', L.tesla, '#ffcf1a', '#f09000', '#1b1b1b', '#fff4c0'],
+      ['campus', L.campus, '#f5ecd6', '#e2d3ae', '#2b3a6b', '#ffffff'],
+    ];
+    row.forEach(([name, text, a, b2, fg, st, deco], i) => {
+      put(name, (i % 2) * 1024, 136 + Math.floor(i / 2) * 136, 1024, 128, banner(text, a, b2, fg, st, deco));
+    });
+    // placas com fórmulas (512x256)
+    const boards = [
+      ['emc2', 'E = mc²', '#ffffff', '#1d4fd8'],
+      ['fma', 'F = m·a', '#fff3c4', '#d7263d'],
+      ['pvnrt', 'PV = nRT', '#e8fff1', '#138a4a'],
+      ['pitag', 'a² + b² = c²', '#ffffff', '#6a2bd9'],
+      ['h2o', 'H₂O', '#dff6ff', '#0a7abf'],
+      ['luz', L.luz, '#1b1b2f', '#ffd23f'],
+      ['grav', L.grav, '#ffe8e0', '#c2401a'],
+      ['dna', 'DNA', '#f0e6ff', '#7b2cbf'],
+    ];
+    boards.forEach(([name, text, bgc, fg], i) => {
+      put(name, (i % 4) * 512, 688 + Math.floor(i / 4) * 168, 512, 160, (gg, w, h) => {
+        gg.fillStyle = bgc; gg.fillRect(0, 0, w, h);
+        gg.strokeStyle = fg; gg.lineWidth = 12; gg.strokeRect(14, 14, w - 28, h - 28);
+        let size = h * 0.5;
+        gg.font = `bold ${size}px ${FONT}`;
+        while (gg.measureText(text).width > w - 70 && size > 20) { size -= 2; gg.font = `bold ${size}px ${FONT}`; }
+        gg.textAlign = 'center'; gg.textBaseline = 'middle';
+        gg.fillStyle = fg; gg.fillText(text, w / 2, h * 0.53);
+      });
+    });
+  };
+  draw();
   const tex = canvasTex(c, { aniso });
   const wr = regions.white;
   const white = [(wr[0] + wr[2]) / 2, (wr[1] + wr[3]) / 2];
-  return { tex, regions, white };
+  const relabel = (labels2) => {
+    L = { ...SIGN_LABELS, ...labels2 };
+    draw();
+    tex.needsUpdate = true;
+  };
+  return { tex, regions, white, relabel };
 }
 
 // Atlas dos planetas (Júpiter, Terra, Lua, Marte, Saturno) e anel de Saturno separado
@@ -653,7 +674,8 @@ function planetTextures(hi) {
 }
 
 // ---------------------------------------------------------------------------
-export function buildTrack(scene, quality = {}) {
+// labels: textos das placas no idioma do jogo (ver SIGN_LABELS)
+export function buildTrack(scene, quality = {}, labels = {}) {
   const hi = quality.id !== 'baixa';
   const rand = mulberry(20260925);
   const group = new THREE.Group();
@@ -1025,7 +1047,7 @@ export function buildTrack(scene, quality = {}) {
   const aniso = hi ? maxAniso : 2;
   const asphalt = asphaltTexture(hi, aniso);
   const grass = grassTexture(hi, aniso);
-  const atlas = buildAtlas(hi, aniso);
+  const atlas = buildAtlas(hi, aniso, labels);
   const WHITE = atlas.white;
   const REG = atlas.regions;
   const matRoad = new THREE.MeshLambertMaterial({ map: asphalt, vertexColors: true });
@@ -2300,6 +2322,8 @@ export function buildTrack(scene, quality = {}) {
     minimapPoints,
     update,
     group,
+    // troca os textos das placas (idioma)
+    setLabels: (l) => atlas.relabel(l),
     // Extras (fora do contrato) usados por environment.js e testes
     meta: {
       N, ds, X, Y, Z, HW, WD, FL, ROOF, SPAN, HEAD, K,
