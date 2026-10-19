@@ -1314,7 +1314,6 @@
   <div id="banner" class="banner hidden" role="status" aria-live="polite"></div>
 
   <section id="welcomeScreen" class="screen">
-    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar música">♪</button>
     <div class="welcome-card">
       <div class="welcome-title">
         <h1>Aventura das Ilhas Voadoras</h1>
@@ -1340,10 +1339,11 @@
         <button id="enterSelectionButton" class="primary" type="button">Entrar na aventura</button>
       </div>
     </div>
+    <!-- Depois do cartão no HTML: no teclado, o Tab chega primeiro em "Entrar na aventura". -->
+    <button class="menu-music-toggle" type="button" aria-label="Desligar som">♪</button>
   </section>
 
   <section id="startScreen" class="screen hidden">
-    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar música">♪</button>
     <div class="menu-card">
       <div class="title-row">
         <h1>Aventura das Ilhas Voadoras</h1>
@@ -1356,6 +1356,7 @@
       <button id="startButton" class="primary" type="button">Começar aventura</button>
       <button id="resetButton" class="secondary" type="button">Reiniciar progresso</button>
     </div>
+    <button class="menu-music-toggle" type="button" aria-label="Desligar som">♪</button>
   </section>
 
   <div id="levelDialog" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="levelTitle">
@@ -1772,6 +1773,13 @@
     }
 
     function resize() {
+      // Guarda a posição relativa na ilha: ao girar o celular, o personagem
+      // continua no mesmo lugar da ilha (antes podia parar na beirada e cair).
+      let relative = null;
+      if (state.width && state.height && state.player.x) {
+        const old = islandShape();
+        relative = { u: (state.player.x - old.cx) / old.rx, v: (state.player.y - old.cy) / old.ry };
+      }
       state.dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
       state.width = Math.floor(window.innerWidth);
       state.height = Math.floor(window.innerHeight);
@@ -1780,7 +1788,12 @@
       canvas.style.width = `${state.width}px`;
       canvas.style.height = `${state.height}px`;
       ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
-      if (!state.player.x || !state.player.y) {
+      if (relative) {
+        const island = islandShape();
+        state.player.x = island.cx + relative.u * island.rx;
+        state.player.y = island.cy + relative.v * island.ry;
+        state.player.target = null;
+      } else if (!state.player.x || !state.player.y) {
         state.player.x = state.width / 2;
         state.player.y = state.height / 2 + 20;
       }
@@ -3846,7 +3859,11 @@
     function focusPrimary(dialog) {
       if (!usingKeyboard) return;
       const button = dialog.querySelector(".primary");
-      if (button) button.focus({ preventScroll: true });
+      // Espera um pouco: quem estava segurando Espaço para atacar não "aperta"
+      // o botão sem querer e pula a comemoração.
+      setTimeout(() => {
+        if (button && !dialog.classList.contains("hidden")) button.focus({ preventScroll: true });
+      }, 650);
     }
 
     function pauseGame() {
@@ -3897,6 +3914,15 @@
           if (state.mode === "paused") {
             event.preventDefault();
             resumeGame();
+            return;
+          }
+          if (state.mode === "locker" && key === "escape") {
+            lockerDialog.classList.add("hidden");
+            setMode("playing");
+            return;
+          }
+          if (state.mode === "howto" && key === "escape") {
+            closeHowto();
             return;
           }
         }
