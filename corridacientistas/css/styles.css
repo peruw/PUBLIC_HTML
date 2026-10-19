@@ -876,6 +876,16 @@ kbd {
   line-height: 1.3;
 }
 
+/* toast só de texto (sem ícone de item): ocupa as duas colunas */
+.toast .toast-full {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.toast .toast-full strong {
+  color: var(--yellow);
+}
+
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(-12px) scale(0.96); }
 }
