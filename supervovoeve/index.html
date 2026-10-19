@@ -37,7 +37,7 @@
       min-height: 100svh;
       background: #111827;
       color: var(--ink);
-      font-family: Arial, "Trebuchet MS", Verdana, sans-serif;
+      font-family: Arial, "Trebuchet MS", Verdana, "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       overflow: hidden;
       touch-action: manipulation;
     }
@@ -485,7 +485,7 @@
       display: inline-block;
       position: relative;
       color: #fff2ad;
-      font-family: Impact, "Arial Black", Arial, sans-serif;
+      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       font-size: clamp(2.15rem, 11vw, 5.4rem);
       line-height: .86;
       letter-spacing: 1px;
@@ -642,6 +642,70 @@
       background: linear-gradient(#8540b8, #4d216f);
       box-shadow: 0 6px 0 #2a113f, 0 11px 18px rgba(0,0,0,.35);
       padding-inline: 16px;
+    }
+
+    /* Seletor de idioma: no canto da tela inicial e dentro da pausa. */
+    .lang-picker {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      right: 12px;
+      z-index: 31;
+    }
+
+    .title-screen .version-badge {
+      top: auto;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      right: 10px;
+      font-size: .66rem;
+      opacity: .85;
+    }
+
+    .lang-select {
+      min-height: 44px;
+      max-width: 46vw;
+      border: 2px solid rgba(255, 242, 173, .9);
+      border-radius: 8px;
+      background: rgba(21, 28, 48, .92);
+      color: #fff2ad;
+      font: inherit;
+      font-size: .85rem;
+      font-weight: 900;
+      padding: 4px 8px;
+      box-shadow: 0 3px 0 rgba(0,0,0,.3);
+      cursor: pointer;
+    }
+
+    .lang-select option {
+      background: #1b2238;
+      color: #fff;
+    }
+
+    .lang-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin: 0 0 12px;
+      font-weight: 900;
+      color: #fff2ad;
+    }
+
+    .lang-row .lang-select {
+      max-width: 70vw;
+    }
+
+    /* Japonês com glifos japoneses (sem isso o navegador pode usar a fonte chinesa). */
+    :lang(ja) body,
+    body:lang(ja) {
+      font-family: Arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, "Noto Sans SC", sans-serif;
+    }
+
+    /* Palavras longas (alemão) quebram dentro do botão em vez de estourar. */
+    button,
+    .select-card strong,
+    .select-card span {
+      overflow-wrap: break-word;
+      hyphens: auto;
     }
 
     .panel {
@@ -2089,11 +2153,11 @@
 
     .finale-card::before,
     .finale-card::after {
-      content: "AMÉM";
+      content: attr(data-praise-left);
       position: absolute;
       top: 12px;
       color: rgba(255, 242, 173, .85);
-      font-family: Impact, "Arial Black", Arial, sans-serif;
+      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       font-size: .72rem;
       text-shadow: 2px 2px 0 #4c1635;
       animation: finalePraise 1.2s steps(3) infinite;
@@ -2105,14 +2169,14 @@
 
     .finale-card::after {
       right: 10px;
-      content: "OH GLÓRIA";
+      content: attr(data-praise-right);
       animation-delay: .3s;
     }
 
     .finale-card strong {
       display: block;
       color: #fff2ad;
-      font-family: Impact, "Arial Black", Arial, sans-serif;
+      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       font-size: clamp(1.2rem, 5vw, 1.75rem);
       text-shadow: 2px 2px 0 #62223a, 0 0 10px rgba(255, 212, 92, .65);
       letter-spacing: 0;
@@ -2534,7 +2598,7 @@
 <body>
   <main class="game" id="game">
     <button class="music-toggle" id="musicToggle" type="button" aria-pressed="false">Som ON</button>
-    <button class="pause-btn" id="pauseBtn" type="button" aria-label="Pausar (P)" title="Pausar (P)">II</button>
+    <button class="pause-btn" id="pauseBtn" type="button" aria-label="Pausar (P)" title="Pausar (P)" data-i18n-aria="pause.btn" data-i18n-title="pause.btn">II</button>
     <div class="mountains"></div>
     <div class="clouds"></div>
     <div class="village" aria-hidden="true">
@@ -2554,9 +2618,10 @@
     <div class="meteor m3"></div>
 
     <section class="screen title-screen active" id="startScreen">
-      <div class="version-badge">v1.1.0</div>
+      <div class="version-badge">v1.2.0</div>
+      <div class="lang-picker"><select class="lang-select" data-i18n-aria="lang.label" aria-label="Idioma"></select></div>
       <h1>Super Vovó Eve World</h1>
-      <p class="subtitle">Batalha bíblica</p>
+      <p class="subtitle" data-i18n="subtitle">Batalha bíblica</p>
       <div class="intro-fighters" aria-hidden="true">
         <div class="fighter eve" style="position:absolute;left:2%;bottom:0;">
           <div class="shadow"></div><div class="hair"></div><div class="head"></div><div class="glasses"></div><div class="smile"></div><div class="arm left"></div><div class="arm right"></div><div class="body"></div><div class="belt"></div><div class="pants"></div><div class="leg left"></div><div class="leg right"></div>
@@ -2566,7 +2631,7 @@
         </div>
       </div>
       <div class="title-actions">
-        <button class="primary-btn" id="startBtn">Start</button>
+        <button class="primary-btn" id="startBtn" data-i18n="start">Start</button>
         <button class="primary-btn skin-btn" id="skinBtn" type="button">Roupa: Clássica</button>
         <button class="primary-btn enemy-btn" id="enemyBtn" type="button">Inimigo: Diabinho</button>
       </div>
@@ -2574,44 +2639,44 @@
 
     <section class="screen setup-screen" id="setupScreen">
       <div class="panel">
-        <h2>Escolha a batalha</h2>
-        <p>Escolha o livro bíblico que você quer jogar.</p>
+        <h2 data-i18n="setup.title">Escolha a batalha</h2>
+        <p data-i18n="setup.text">Escolha o livro bíblico que você quer jogar.</p>
         <p class="small" id="campaignProgress"></p>
         <div class="world-scroll">
           <div class="select-grid" id="worldGrid"></div>
         </div>
         <div class="mode-section">
-          <p>Modo de jogo</p>
+          <p data-i18n="setup.mode">Modo de jogo</p>
           <div class="select-grid" id="modeGrid">
             <button class="select-card" data-mode="treino">
-              <strong>Treino</strong>
-              <span>Sem tempo. Bom para aprender com calma.</span>
+              <strong data-i18n="mode.treino">Treino</strong>
+              <span data-i18n="mode.treino.desc">Sem tempo. Bom para aprender com calma.</span>
             </button>
             <button class="select-card active" data-mode="batalha">
-              <strong>Batalha</strong>
-              <span>30 segundos por pergunta. Equilibrado.</span>
+              <strong data-i18n="mode.batalha">Batalha</strong>
+              <span data-i18n="mode.batalha.desc">30 segundos por pergunta. Equilibrado.</span>
             </button>
             <button class="select-card" data-mode="desafio">
-              <strong>Desafio</strong>
-              <span>10 segundos. Combo vale mais.</span>
+              <strong data-i18n="mode.desafio">Desafio</strong>
+              <span data-i18n="mode.desafio.desc">10 segundos. Combo vale mais.</span>
             </button>
           </div>
         </div>
-        <button class="primary-btn" id="setupNextBtn">Aperte aqui para começar</button>
+        <button class="primary-btn" id="setupNextBtn" data-i18n="setup.next">Aperte aqui para começar</button>
       </div>
     </section>
 
     <section class="screen" id="howScreen">
       <div class="panel">
-        <h2>Como jogar</h2>
+        <h2 data-i18n="how.title">Como jogar</h2>
         <p id="modeHelp">Responda perguntas sobre o livro de Tiago em menos de 30 segundos.</p>
-        <p>Quanto mais rápido você acertar, mais forte será o golpe da Super Vovó Eve.</p>
-        <p>Se errar, aquela resposta fica escura e você pode tentar outra. Cada erro deixa o contra-ataque do inimigo mais forte.</p>
+        <p data-i18n="how.speed">Quanto mais rápido você acertar, mais forte será o golpe da Super Vovó Eve.</p>
+        <p data-i18n="how.errors">Se errar, aquela resposta fica escura e você pode tentar outra. Cada erro deixa o contra-ataque do inimigo mais forte.</p>
         <p id="timeoutHelp">Se deixar o tempo acabar, o diabinho também ataca e a pergunta passa.</p>
-        <p id="questionCountHelp">A cada partida aparecem 10 perguntas sorteadas, começando mais fáceis e ficando mais difíceis.</p>
-        <p>Depois de cada pergunta aparece a resposta certa e o versículo para você aprender. No fim, a Vovó Eve mostra o que vale revisar.</p>
-        <p class="small key-help">No computador: teclas <kbd>1</kbd> a <kbd>4</kbd> (ou <kbd>A</kbd> a <kbd>D</kbd>) respondem, <kbd>Enter</kbd> passa para a próxima e <kbd>P</kbd> pausa.</p>
-        <button class="primary-btn" id="fightBtn">Aperte aqui para lutar</button>
+        <p id="questionCountHelp" data-i18n="how.count">A cada partida aparecem 10 perguntas sorteadas, começando mais fáceis e ficando mais difíceis.</p>
+        <p data-i18n="how.learn">Depois de cada pergunta aparece a resposta certa e o versículo para você aprender. No fim, a Vovó Eve mostra o que vale revisar.</p>
+        <p class="small key-help" data-i18n-html="how.keys">No computador: teclas <kbd>1</kbd> a <kbd>4</kbd> (ou <kbd>A</kbd> a <kbd>D</kbd>) respondem, <kbd>Enter</kbd> passa para a próxima e <kbd>P</kbd> pausa.</p>
+        <button class="primary-btn" id="fightBtn" data-i18n="how.fight">Aperte aqui para lutar</button>
       </div>
     </section>
 
@@ -2621,51 +2686,52 @@
         <div class="result-stars" id="resultStars" hidden></div>
         <p id="resultPhrase">A sabedoria venceu a tentação.</p>
         <div class="result-stats">
-          <div class="stat"><span>Tempo</span><strong id="finalTime">0s</strong></div>
-          <div class="stat"><span>Recorde</span><strong id="bestTime">--</strong></div>
-          <div class="stat"><span>Acertos</span><strong id="finalHits">0/10</strong></div>
-          <div class="stat"><span>Vida</span><strong id="finalLife">0%</strong></div>
-          <div class="stat"><span>Erros</span><strong id="finalMisses">0</strong></div>
-          <div class="stat"><span>Maior combo</span><strong id="finalCombo">0</strong></div>
+          <div class="stat"><span data-i18n="stat.time">Tempo</span><strong id="finalTime">0s</strong></div>
+          <div class="stat"><span data-i18n="stat.best">Recorde</span><strong id="bestTime">--</strong></div>
+          <div class="stat"><span data-i18n="stat.hits">Acertos</span><strong id="finalHits">0/10</strong></div>
+          <div class="stat"><span data-i18n="stat.life">Vida</span><strong id="finalLife">0%</strong></div>
+          <div class="stat"><span data-i18n="stat.misses">Erros</span><strong id="finalMisses">0</strong></div>
+          <div class="stat"><span data-i18n="stat.combo">Maior combo</span><strong id="finalCombo">0</strong></div>
         </div>
         <div class="review-box" id="reviewBox" hidden>
-          <h3>Para revisar</h3>
+          <h3 data-i18n="review.title">Para revisar</h3>
           <ol id="reviewList"></ol>
         </div>
         <p class="small" id="roundTheme"></p>
         <p class="small" id="recordNote"></p>
-        <div class="finale-card" id="finaleCard" hidden>
+        <div class="finale-card" id="finaleCard" data-praise-left="AMÉM" data-praise-right="OH GLÓRIA" hidden>
           <div class="fighter eve finale-eve" aria-hidden="true">
             <div class="shadow"></div><div class="hair"></div><div class="head"></div><div class="glasses"></div><div class="smile"></div><div class="arm left"></div><div class="arm right"></div><div class="body"></div><div class="belt"></div><div class="pants"></div><div class="leg left"></div><div class="leg right"></div><div class="weapon bible"></div>
           </div>
-          <strong>Parabéns por vencer o Inimigo!</strong>
-          <span>A Super Vovó Eve completou a campanha do Novo Testamento.</span>
+          <strong data-i18n="finale.title">Parabéns por vencer o Inimigo!</strong>
+          <span data-i18n="finale.text">A Super Vovó Eve completou a campanha do Novo Testamento.</span>
         </div>
         <div class="result-actions">
           <button class="primary-btn next-phase-btn" id="nextPhaseBtn" hidden>Próxima fase</button>
-          <button class="primary-btn" id="againBtn">Jogar novamente</button>
-          <button class="secondary-btn" id="chooseModeBtn">Escolher modo</button>
-          <button class="secondary-btn" id="homeBtn">Tela inicial</button>
-          <button class="secondary-btn" id="shareBtn">Compartilhar</button>
+          <button class="primary-btn" id="againBtn" data-i18n="btn.again">Jogar novamente</button>
+          <button class="secondary-btn" id="chooseModeBtn" data-i18n="btn.chooseMode">Escolher modo</button>
+          <button class="secondary-btn" id="homeBtn" data-i18n="btn.home">Tela inicial</button>
+          <button class="secondary-btn" id="shareBtn" data-i18n="btn.share">Compartilhar</button>
         </div>
       </div>
     </section>
 
     <section class="screen pause-screen" id="pauseScreen" aria-labelledby="pauseTitle">
       <div class="panel">
-        <h2 id="pauseTitle">Pausado</h2>
-        <p>A Vovó Eve está esperando. O tempo da pergunta parou.</p>
+        <h2 id="pauseTitle" data-i18n="pause.title">Pausado</h2>
+        <p data-i18n="pause.text">A Vovó Eve está esperando. O tempo da pergunta parou.</p>
+        <label class="lang-row"><span data-i18n="lang.label">Idioma</span><select class="lang-select" data-i18n-aria="lang.label" aria-label="Idioma"></select></label>
         <div class="result-actions">
-          <button class="primary-btn next-phase-btn" id="resumeBtn" type="button">Continuar</button>
-          <button class="primary-btn" id="restartBtn" type="button">Recomeçar a batalha</button>
-          <button class="secondary-btn" id="quitBtn" type="button">Sair para o menu</button>
+          <button class="primary-btn next-phase-btn" id="resumeBtn" type="button" data-i18n="pause.resume">Continuar</button>
+          <button class="primary-btn" id="restartBtn" type="button" data-i18n="pause.restart">Recomeçar a batalha</button>
+          <button class="secondary-btn" id="quitBtn" type="button" data-i18n="pause.quit">Sair para o menu</button>
         </div>
       </div>
     </section>
 
     <div class="hud">
       <div class="lifeBox">
-        <div class="name"><span>Vovó Eve</span><span id="playerLifeText">100%</span></div>
+        <div class="name"><span data-i18n="hud.player">Vovó Eve</span><span id="playerLifeText">100%</span></div>
         <div class="life" role="img" aria-label="Vida da Vovó Eve" id="playerLifeBar"><div class="lifeFill" id="playerLife"></div></div>
       </div>
       <div class="round-info">
@@ -2682,16 +2748,16 @@
       <div class="timer-line"><div class="timer-fill" id="timerFill"></div></div>
       <div class="question-meta"><span id="questionTag">Pergunta 1 de 10</span><span class="difficulty-tag" id="difficultyTag">Fácil</span></div>
       <div class="question-text" id="questionText" aria-live="polite"></div>
-      <div class="options" id="options" role="group" aria-label="Alternativas"></div>
+      <div class="options" id="options" role="group" aria-label="Alternativas" data-i18n-aria="q.options"></div>
       <div class="feedback-box" id="feedbackBox" role="status" aria-live="polite">
         <p class="feedback-title" id="feedbackTitle"></p>
         <p class="feedback-text" id="feedbackText"></p>
-        <button class="next-btn" id="nextBtn" type="button">Próxima <span aria-hidden="true">▶</span></button>
+        <button class="next-btn" id="nextBtn" type="button"><span id="nextLabel">Próxima</span> <span aria-hidden="true">▶</span></button>
       </div>
     </div>
 
     <div class="combo-badge" id="comboBadge">
-      <span>SEQUÊNCIA</span>
+      <span data-i18n="combo.label">SEQUÊNCIA</span>
       <strong>COMBO x0</strong>
     </div>
 
@@ -2711,6 +2777,812 @@
   </main>
 
   <script>
+    const GAME_VERSION = "1.2.0";
+
+    // ===== Idiomas =====
+    // Textos de interface em 7 idiomas. As perguntas, lições e temas traduzidos
+    // ficam em i18n/<idioma>.js (carregados sob demanda). O pt-BR é a base: se
+    // faltar uma chave ou uma pergunta em outro idioma, aparece o texto em pt-BR.
+    const LANGS = [
+      { code: "pt-BR", name: "Português (Brasil)" },
+      { code: "pt-PT", name: "Português (Portugal)" },
+      { code: "en", name: "English" },
+      { code: "es", name: "Español" },
+      { code: "zh-CN", name: "中文" },
+      { code: "ja", name: "日本語" },
+      { code: "de", name: "Deutsch" }
+    ];
+    const LANG_CODES = LANGS.map(item => item.code);
+    const BOOK_IDS = ["mateus", "marcos", "lucas", "joao", "atos", "romanos", "1corintios", "2corintios", "galatas", "efesios", "filipenses", "colossenses", "1tessalonicenses", "2tessalonicenses", "1timoteo", "2timoteo", "tito", "filemom", "hebreus", "tiago", "1pedro", "2pedro", "1joao", "2joao", "3joao", "judas", "apocalipse"];
+
+    function bookList(names) {
+      return Object.fromEntries(BOOK_IDS.map((id, index) => [id, names[index]]));
+    }
+
+    const UI = {
+      "pt-BR": {
+        "doc.title": "Super Vovó Eve World",
+        "subtitle": "Batalha bíblica",
+        "lang.label": "Idioma",
+        "sound.on": "Som ON",
+        "sound.off": "Som OFF",
+        "sound.onAria": "Som ligado. Toque para desligar música e efeitos.",
+        "sound.offAria": "Som desligado. Toque para ligar música e efeitos.",
+        "pause.btn": "Pausar (P)",
+        "start": "Start",
+        "skin": "Roupa: {name}",
+        "enemy": "Inimigo: {name}",
+        "skin.classic": "Clássica",
+        "skin.igreja": "Igreja",
+        "skin.sol": "Camisa Sol",
+        "enemy.diabinho": "Diabinho",
+        "enemy.fariseu": "Fariseu",
+        "enemy.anticristo": "Anticristo",
+        "setup.title": "Escolha a batalha",
+        "setup.text": "Escolha o livro bíblico que você quer jogar.",
+        "setup.progress": "Campanha do Novo Testamento: {n}/{total} mundos liberados. Último liberado: {book}.",
+        "setup.mode": "Modo de jogo",
+        "mode.treino": "Treino",
+        "mode.treino.desc": "Sem tempo. Bom para aprender com calma.",
+        "mode.batalha": "Batalha",
+        "mode.batalha.desc": "30 segundos por pergunta. Equilibrado.",
+        "mode.desafio": "Desafio",
+        "mode.desafio.desc": "10 segundos. Combo vale mais.",
+        "setup.next": "Aperte aqui para começar",
+        "world.card": "{n}. Mundo de {book}",
+        "world.locked": "Vença o Mundo de {book} para liberar.",
+        "stars.aria": "{n} de 3 estrelas",
+        "how.title": "Como jogar",
+        "how.mode": "Responda perguntas sobre o livro de {book} em menos de {s} segundos.",
+        "how.modeTraining": "Treino: responda perguntas sobre o livro de {book} sem limite de tempo.",
+        "how.speed": "Quanto mais rápido você acertar, mais forte será o golpe da Super Vovó Eve.",
+        "how.errors": "Se errar, aquela resposta fica escura e você pode tentar outra. Cada erro deixa o contra-ataque do inimigo mais forte.",
+        "how.timeout": "Se deixar o tempo acabar, {enemy} também ataca e a pergunta passa. O botão II pausa a batalha.",
+        "how.timeoutTraining": "No treino não existe tempo acabando: você pode ler com calma e aprender.",
+        "how.count": "A cada partida aparecem 10 perguntas sorteadas, começando mais fáceis e ficando mais difíceis.",
+        "how.learn": "Depois de cada pergunta aparece a resposta certa e o versículo para você aprender. No fim, a Vovó Eve mostra o que vale revisar.",
+        "how.keys": "No computador: teclas <kbd>1</kbd> a <kbd>4</kbd> (ou <kbd>A</kbd> a <kbd>D</kbd>) respondem, <kbd>Enter</kbd> passa para a próxima e <kbd>P</kbd> pausa.",
+        "how.fight": "Aperte aqui para lutar",
+        "result.win": "Vitória!",
+        "result.almost": "Quase lá!",
+        "result.lose": "Tente outra vez!",
+        "stat.time": "Tempo",
+        "stat.best": "Recorde",
+        "stat.hits": "Acertos",
+        "stat.life": "Vida",
+        "stat.misses": "Erros",
+        "stat.combo": "Maior combo",
+        "review.title": "Para revisar",
+        "review.answer": "Resposta: {answer} ({ref})",
+        "finale.title": "Parabéns por vencer o Inimigo!",
+        "finale.text": "A Super Vovó Eve completou a campanha do Novo Testamento.",
+        "btn.nextPhase": "Próxima fase: {book}",
+        "btn.again": "Jogar novamente",
+        "btn.chooseMode": "Escolher modo",
+        "btn.home": "Tela inicial",
+        "btn.share": "Compartilhar",
+        "share.copied": "Copiado!",
+        "share.manual": "Copie o resultado",
+        "pause.title": "Pausado",
+        "pause.text": "A Vovó Eve está esperando. O tempo da pergunta parou.",
+        "pause.resume": "Continuar",
+        "pause.restart": "Recomeçar a batalha",
+        "pause.quit": "Sair para o menu",
+        "hud.player": "Vovó Eve",
+        "hud.playerLife": "Vida da Vovó Eve: {p}%",
+        "hud.enemyLife": "Vida do inimigo: {p}%",
+        "q.counter": "Pergunta {n} de {total}",
+        "diff.easy": "Fácil",
+        "diff.medium": "Médio",
+        "diff.hard": "Difícil",
+        "q.options": "Alternativas",
+        "q.wrong": "(errada)",
+        "btn.next": "Próxima",
+        "btn.result": "Resultado",
+        "combo.label": "SEQUÊNCIA",
+        "combo.value": "COMBO x{n}",
+        "fb.perfect": "✓ Certo! {answer}",
+        "fb.late": "✓ Agora sim: {answer}",
+        "fb.timeout": "⏰ Tempo! A resposta certa era {answer}.",
+        "fb.read": "Leia em {ref}.",
+        "ref": "{book} {ch}",
+        "float.attack": "{name}! -{d}",
+        "float.timeout": "Tempo! -{d} na Vovó Eve",
+        "float.miss": "Errou! -{d} na Vovó Eve",
+        "result.bothStanding": "As perguntas acabaram e {enemy} ficou com {p}% de vida. Acertar de primeira dá golpes mais fortes!",
+        "result.worldWon": "Mundo de {book} vencido! Mais uma etapa da Palavra foi conquistada.",
+        "result.theme": "Tema da rodada: {text}",
+        "result.firstTry": "Acertos de primeira: {f} de {n}.",
+        "result.threeStars": "Acerte 9 de 10 de primeira para ganhar 3 estrelas.",
+        "result.records": "Recordes em {book} ({mode}): maior combo {c}, mais acertos {h}, melhor vida {l}%.",
+        "unlock.new": "Novo mundo desbloqueado: {book}!",
+        "unlock.done": "Campanha do Novo Testamento concluída!",
+        "share.won": "Eu venci {enemy} no Super Vovó Eve World ({book}, {mode})! Acertos: {h}/{n}, maior combo: x{c}, tempo: {t}.",
+        "share.lost": "Eu encarei {enemy} no Super Vovó Eve World ({book}, {mode})! Acertos: {h}/{n}, maior combo: x{c}, tempo: {t}.",
+        "victory.tiago": ["Tiago viu fé em prática nessa batalha!", "A paciência venceu a provação!", "A Palavra foi mais forte que a confusão!"],
+        "victory.mateus": ["O Reino brilhou nessa vitória!", "Mateus anunciaria: Jesus venceu mais uma!", "A Palavra do Mestre ficou de pé!"],
+        "victory.apocalipse": ["O Cordeiro venceu no fim da batalha!", "A esperança final brilhou no caos!", "Nem meteoro segurou essa vitória!"],
+        "defeat": ["A batalha foi dura, mas a sabedoria chama para outra rodada.", "Respire, ajuste a armadura e tente de novo.", "A prova da fé produz paciência. Bora mais uma!"],
+        "praise": ["OH GLÓRIA!", "AMÉM!", "ALELUIA!", "GLÓRIA A DEUS!", "TÁ REPREENDIDO!"],
+        "attacks": ["Bíblia de Luz", "Palavra Flamejante", "Livro da Sabedoria"],
+        "books": bookList(["Mateus", "Marcos", "Lucas", "João", "Atos", "Romanos", "1 Coríntios", "2 Coríntios", "Gálatas", "Efésios", "Filipenses", "Colossenses", "1 Tessalonicenses", "2 Tessalonicenses", "1 Timóteo", "2 Timóteo", "Tito", "Filemom", "Hebreus", "Tiago", "1 Pedro", "2 Pedro", "1 João", "2 João", "3 João", "Judas", "Apocalipse"]),
+        "descs": bookList(["Jesus, o Reino e os ensinos do Sermão do Monte.", "Ação, milagres e o serviço poderoso de Jesus.", "Boas novas, misericórdia e encontros transformadores.", "Jesus revelado como o Filho de Deus e a vida eterna.", "Pentecostes, missão e a igreja em movimento.", "Justificação, graça e vida no Espírito.", "Igreja, santidade, dons espirituais e amor.", "Consolo, fraqueza, generosidade e nova criação.", "Liberdade em Cristo e fruto do Espírito.", "Graça, unidade e armadura de Deus.", "Alegria, humildade e força em Cristo.", "Cristo acima de tudo e vida renovada.", "Esperança, santificação e volta do Senhor.", "Perseverança, firmeza e trabalho fiel.", "Doutrina, liderança e piedade com contentamento.", "Coragem, Escritura e perseverança até o fim.", "Boas obras, graça e ordem na igreja.", "Perdão, reconciliação e amor entre irmãos.", "Cristo superior, fé e perseverança.", "Fé em prática, sabedoria e perseverança.", "Esperança viva, santidade e firmeza na prova.", "Crescimento, discernimento e promessa da vinda.", "Luz, amor, verdade e certeza da vida eterna.", "Verdade, amor e cuidado contra o engano.", "Hospitalidade, verdade e bom testemunho.", "Batalhar pela fé e permanecer guardado em Deus.", "Visões, cartas, juízo e esperança final."])
+      },
+
+      "pt-PT": {
+        "subtitle": "Batalha bíblica",
+        "sound.onAria": "Som ligado. Toca para desligar a música e os efeitos.",
+        "sound.offAria": "Som desligado. Toca para ligar a música e os efeitos.",
+        "skin.sol": "Camisola Sol",
+        "setup.title": "Escolhe a batalha",
+        "setup.text": "Escolhe o livro bíblico que queres jogar.",
+        "setup.progress": "Campanha do Novo Testamento: {n}/{total} mundos desbloqueados. Último desbloqueado: {book}.",
+        "mode.desafio.desc": "10 segundos. O combo vale mais.",
+        "setup.next": "Carrega aqui para começar",
+        "world.locked": "Vence o Mundo de {book} para desbloquear.",
+        "how.mode": "Responde a perguntas sobre o livro de {book} em menos de {s} segundos.",
+        "how.modeTraining": "Treino: responde a perguntas sobre o livro de {book} sem limite de tempo.",
+        "how.speed": "Quanto mais depressa acertares, mais forte será o golpe da Super Vovó Eve.",
+        "how.errors": "Se errares, essa resposta fica escura e podes tentar outra. Cada erro torna o contra-ataque do inimigo mais forte.",
+        "how.timeout": "Se deixares o tempo acabar, {enemy} também ataca e a pergunta passa. O botão II põe a batalha em pausa.",
+        "how.timeoutTraining": "No treino o tempo não acaba: podes ler com calma e aprender.",
+        "how.count": "Em cada partida aparecem 10 perguntas sorteadas, a começar pelas mais fáceis e a ficar mais difíceis.",
+        "how.learn": "Depois de cada pergunta aparece a resposta certa e o versículo para aprenderes. No fim, a Vovó Eve mostra o que vale a pena rever.",
+        "how.keys": "No computador: as teclas <kbd>1</kbd> a <kbd>4</kbd> (ou <kbd>A</kbd> a <kbd>D</kbd>) respondem, <kbd>Enter</kbd> passa à seguinte e <kbd>P</kbd> põe em pausa.",
+        "how.fight": "Carrega aqui para lutar",
+        "result.lose": "Tenta outra vez!",
+        "review.title": "Para rever",
+        "btn.nextPhase": "Fase seguinte: {book}",
+        "btn.again": "Jogar outra vez",
+        "btn.home": "Ecrã inicial",
+        "btn.share": "Partilhar",
+        "share.manual": "Copia o resultado",
+        "pause.title": "Em pausa",
+        "pause.text": "A Vovó Eve está à espera. O tempo da pergunta parou.",
+        "btn.next": "Seguinte",
+        "fb.read": "Lê {ref}.",
+        "float.miss": "Erraste! -{d} na Vovó Eve",
+        "result.bothStanding": "As perguntas acabaram e {enemy} ficou com {p}% de vida. Acertar à primeira dá golpes mais fortes!",
+        "result.theme": "Tema da ronda: {text}",
+        "result.firstTry": "Acertos à primeira: {f} de {n}.",
+        "result.threeStars": "Acerta 9 em 10 à primeira para ganhar 3 estrelas.",
+        "share.won": "Venci {enemy} no Super Vovó Eve World ({book}, {mode})! Acertos: {h}/{n}, maior combo: x{c}, tempo: {t}.",
+        "share.lost": "Enfrentei {enemy} no Super Vovó Eve World ({book}, {mode})! Acertos: {h}/{n}, maior combo: x{c}, tempo: {t}.",
+        "victory.tiago": ["Tiago viu a fé em prática nesta batalha!", "A paciência venceu a provação!", "A Palavra foi mais forte do que a confusão!"],
+        "victory.mateus": ["O Reino brilhou nesta vitória!", "Mateus anunciaria: Jesus venceu mais uma!", "A Palavra do Mestre ficou de pé!"],
+        "victory.apocalipse": ["O Cordeiro venceu no fim da batalha!", "A esperança final brilhou no meio do caos!", "Nem um meteoro travou esta vitória!"],
+        "defeat": ["A batalha foi dura, mas a sabedoria chama-te para outra ronda.", "Respira fundo, ajusta a armadura e tenta de novo.", "A prova da fé produz paciência. Vamos a mais uma!"],
+        "praise": ["OH GLÓRIA!", "ÁMEN!", "ALELUIA!", "GLÓRIA A DEUS!", "ESTÁ REPREENDIDO!"],
+        "books": bookList(["Mateus", "Marcos", "Lucas", "João", "Atos", "Romanos", "1 Coríntios", "2 Coríntios", "Gálatas", "Efésios", "Filipenses", "Colossenses", "1 Tessalonicenses", "2 Tessalonicenses", "1 Timóteo", "2 Timóteo", "Tito", "Filémon", "Hebreus", "Tiago", "1 Pedro", "2 Pedro", "1 João", "2 João", "3 João", "Judas", "Apocalipse"]),
+        "descs": { "2timoteo": "Coragem, Escritura e perseverança até ao fim." }
+      },
+
+      "en": {
+        "doc.title": "Super Vovó Eve World – Bible Battle",
+        "subtitle": "Bible battle",
+        "lang.label": "Language",
+        "sound.on": "Sound ON",
+        "sound.off": "Sound OFF",
+        "sound.onAria": "Sound on. Tap to turn off music and effects.",
+        "sound.offAria": "Sound off. Tap to turn on music and effects.",
+        "pause.btn": "Pause (P)",
+        "start": "Start",
+        "skin": "Outfit: {name}",
+        "enemy": "Enemy: {name}",
+        "skin.classic": "Classic",
+        "skin.igreja": "Church",
+        "skin.sol": "Sun Shirt",
+        "enemy.diabinho": "Little Devil",
+        "enemy.fariseu": "Pharisee",
+        "enemy.anticristo": "Antichrist",
+        "setup.title": "Choose your battle",
+        "setup.text": "Pick the Bible book you want to play.",
+        "setup.progress": "New Testament campaign: {n}/{total} worlds unlocked. Latest unlocked: {book}.",
+        "setup.mode": "Game mode",
+        "mode.treino": "Practice",
+        "mode.treino.desc": "No timer. Great for learning at your own pace.",
+        "mode.batalha": "Battle",
+        "mode.batalha.desc": "30 seconds per question. Balanced.",
+        "mode.desafio": "Challenge",
+        "mode.desafio.desc": "10 seconds. Combos count for more.",
+        "setup.next": "Tap here to start",
+        "world.card": "{n}. World of {book}",
+        "world.locked": "Beat the World of {book} to unlock.",
+        "stars.aria": "{n} of 3 stars",
+        "how.title": "How to play",
+        "how.mode": "Answer questions about the book of {book} in under {s} seconds.",
+        "how.modeTraining": "Practice: answer questions about the book of {book} with no time limit.",
+        "how.speed": "The faster you get it right, the stronger Super Vovó Eve hits.",
+        "how.errors": "If you get it wrong, that answer goes dark and you can try another one. Every mistake makes the enemy's counterattack stronger.",
+        "how.timeout": "If time runs out, {enemy} attacks too and the question is skipped. The II button pauses the battle.",
+        "how.timeoutTraining": "In Practice the clock never runs out: read calmly and learn.",
+        "how.count": "Each match has 10 random questions, starting easy and getting harder.",
+        "how.learn": "After each question you'll see the right answer and the Bible passage to learn from. At the end, Vovó Eve shows you what to review.",
+        "how.keys": "On a computer: keys <kbd>1</kbd> to <kbd>4</kbd> (or <kbd>A</kbd> to <kbd>D</kbd>) answer, <kbd>Enter</kbd> goes to the next one and <kbd>P</kbd> pauses.",
+        "how.fight": "Tap here to fight",
+        "result.win": "Victory!",
+        "result.almost": "So close!",
+        "result.lose": "Try again!",
+        "stat.time": "Time",
+        "stat.best": "Best",
+        "stat.hits": "Correct",
+        "stat.life": "Life",
+        "stat.misses": "Mistakes",
+        "stat.combo": "Best combo",
+        "review.title": "To review",
+        "review.answer": "Answer: {answer} ({ref})",
+        "finale.title": "Congratulations on defeating the Enemy!",
+        "finale.text": "Super Vovó Eve completed the New Testament campaign.",
+        "btn.nextPhase": "Next stage: {book}",
+        "btn.again": "Play again",
+        "btn.chooseMode": "Choose mode",
+        "btn.home": "Home screen",
+        "btn.share": "Share",
+        "share.copied": "Copied!",
+        "share.manual": "Copy the result",
+        "pause.title": "Paused",
+        "pause.text": "Vovó Eve is waiting. The question timer has stopped.",
+        "pause.resume": "Resume",
+        "pause.restart": "Restart battle",
+        "pause.quit": "Back to menu",
+        "hud.playerLife": "Vovó Eve's life: {p}%",
+        "hud.enemyLife": "Enemy's life: {p}%",
+        "q.counter": "Question {n} of {total}",
+        "diff.easy": "Easy",
+        "diff.medium": "Medium",
+        "diff.hard": "Hard",
+        "q.options": "Answers",
+        "q.wrong": "(wrong)",
+        "btn.next": "Next",
+        "btn.result": "Results",
+        "combo.label": "STREAK",
+        "fb.perfect": "✓ Correct! {answer}",
+        "fb.late": "✓ Got it: {answer}",
+        "fb.timeout": "⏰ Time's up! The right answer was {answer}.",
+        "fb.read": "Read {ref}.",
+        "float.timeout": "Time! -{d} to Vovó Eve",
+        "float.miss": "Wrong! -{d} to Vovó Eve",
+        "result.bothStanding": "The questions ran out and {enemy} still has {p}% life. Getting it right on the first try hits harder!",
+        "result.worldWon": "World of {book} cleared! One more step through the Word.",
+        "result.theme": "This round's theme: {text}",
+        "result.firstTry": "Right on the first try: {f} of {n}.",
+        "result.threeStars": "Get 9 out of 10 right on the first try to earn 3 stars.",
+        "result.records": "Records in {book} ({mode}): best combo {c}, most correct {h}, best life {l}%.",
+        "unlock.new": "New world unlocked: {book}!",
+        "unlock.done": "New Testament campaign complete!",
+        "share.won": "I beat {enemy} in Super Vovó Eve World ({book}, {mode})! Correct: {h}/{n}, best combo: x{c}, time: {t}.",
+        "share.lost": "I took on {enemy} in Super Vovó Eve World ({book}, {mode})! Correct: {h}/{n}, best combo: x{c}, time: {t}.",
+        "victory.tiago": ["James saw faith in action in this battle!", "Patience won over the trial!", "The Word was stronger than the confusion!"],
+        "victory.mateus": ["The Kingdom shone in this victory!", "Matthew would announce it: Jesus won again!", "The Teacher's Word stood firm!"],
+        "victory.apocalipse": ["The Lamb won at the end of the battle!", "The final hope shone through the chaos!", "Not even a meteor could stop this victory!"],
+        "defeat": ["That was a tough battle, but wisdom is calling you to another round.", "Take a breath, adjust your armor and try again.", "The testing of faith produces patience. One more go!"],
+        "praise": ["OH, GLORY!", "AMEN!", "HALLELUJAH!", "GLORY TO GOD!", "REBUKED!"],
+        "attacks": ["Bible of Light", "Flaming Word", "Book of Wisdom"],
+        "books": bookList(["Matthew", "Mark", "Luke", "John", "Acts", "Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians", "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews", "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude", "Revelation"]),
+        "descs": bookList(["Jesus, the Kingdom and the Sermon on the Mount.", "Action, miracles and the powerful service of Jesus.", "Good news, mercy and life-changing encounters.", "Jesus revealed as the Son of God and eternal life.", "Pentecost, mission and the church on the move.", "Justification, grace and life in the Spirit.", "Church, holiness, spiritual gifts and love.", "Comfort, weakness, generosity and new creation.", "Freedom in Christ and the fruit of the Spirit.", "Grace, unity and the armor of God.", "Joy, humility and strength in Christ.", "Christ above all and a renewed life.", "Hope, holiness and the Lord's return.", "Perseverance, standing firm and faithful work.", "Sound teaching, leadership and godliness with contentment.", "Courage, Scripture and perseverance to the end.", "Good works, grace and order in the church.", "Forgiveness, reconciliation and love among believers.", "Christ is greater, faith and perseverance.", "Faith in action, wisdom and perseverance.", "Living hope, holiness and standing firm in trials.", "Growth, discernment and the promise of his coming.", "Light, love, truth and the assurance of eternal life.", "Truth, love and watching out for deception.", "Hospitality, truth and a good testimony.", "Contending for the faith and being kept by God.", "Visions, letters, judgment and final hope."])
+      },
+
+      "es": {
+        "doc.title": "Super Vovó Eve World – Batalla bíblica",
+        "subtitle": "Batalla bíblica",
+        "lang.label": "Idioma",
+        "sound.on": "Sonido ON",
+        "sound.off": "Sonido OFF",
+        "sound.onAria": "Sonido activado. Toca para apagar la música y los efectos.",
+        "sound.offAria": "Sonido apagado. Toca para activar la música y los efectos.",
+        "pause.btn": "Pausar (P)",
+        "start": "Empezar",
+        "skin": "Ropa: {name}",
+        "enemy": "Enemigo: {name}",
+        "skin.classic": "Clásica",
+        "skin.igreja": "Iglesia",
+        "skin.sol": "Camisa Sol",
+        "enemy.diabinho": "Diablillo",
+        "enemy.fariseu": "Fariseo",
+        "enemy.anticristo": "Anticristo",
+        "setup.title": "Elige la batalla",
+        "setup.text": "Elige el libro bíblico que quieres jugar.",
+        "setup.progress": "Campaña del Nuevo Testamento: {n}/{total} mundos desbloqueados. Último desbloqueado: {book}.",
+        "setup.mode": "Modo de juego",
+        "mode.treino": "Práctica",
+        "mode.treino.desc": "Sin tiempo. Ideal para aprender con calma.",
+        "mode.batalha": "Batalla",
+        "mode.batalha.desc": "30 segundos por pregunta. Equilibrado.",
+        "mode.desafio": "Desafío",
+        "mode.desafio.desc": "10 segundos. El combo vale más.",
+        "setup.next": "Toca aquí para empezar",
+        "world.card": "{n}. Mundo de {book}",
+        "world.locked": "Vence el Mundo de {book} para desbloquearlo.",
+        "stars.aria": "{n} de 3 estrellas",
+        "how.title": "Cómo jugar",
+        "how.mode": "Responde preguntas sobre el libro de {book} en menos de {s} segundos.",
+        "how.modeTraining": "Práctica: responde preguntas sobre el libro de {book} sin límite de tiempo.",
+        "how.speed": "Cuanto más rápido aciertes, más fuerte será el golpe de Super Vovó Eve.",
+        "how.errors": "Si fallas, esa respuesta se oscurece y puedes probar otra. Cada error hace más fuerte el contraataque del enemigo.",
+        "how.timeout": "Si se acaba el tiempo, {enemy} también ataca y la pregunta pasa. El botón II pausa la batalla.",
+        "how.timeoutTraining": "En la práctica el tiempo no se acaba: puedes leer con calma y aprender.",
+        "how.count": "En cada partida salen 10 preguntas al azar, de las más fáciles a las más difíciles.",
+        "how.learn": "Después de cada pregunta aparece la respuesta correcta y el pasaje bíblico para que aprendas. Al final, Vovó Eve te muestra qué repasar.",
+        "how.keys": "En la computadora: las teclas <kbd>1</kbd> a <kbd>4</kbd> (o <kbd>A</kbd> a <kbd>D</kbd>) responden, <kbd>Enter</kbd> pasa a la siguiente y <kbd>P</kbd> pausa.",
+        "how.fight": "Toca aquí para luchar",
+        "result.win": "¡Victoria!",
+        "result.almost": "¡Casi!",
+        "result.lose": "¡Inténtalo otra vez!",
+        "stat.time": "Tiempo",
+        "stat.best": "Récord",
+        "stat.hits": "Aciertos",
+        "stat.life": "Vida",
+        "stat.misses": "Errores",
+        "stat.combo": "Mejor combo",
+        "review.title": "Para repasar",
+        "review.answer": "Respuesta: {answer} ({ref})",
+        "finale.title": "¡Felicidades por vencer al Enemigo!",
+        "finale.text": "Super Vovó Eve completó la campaña del Nuevo Testamento.",
+        "btn.nextPhase": "Siguiente fase: {book}",
+        "btn.again": "Jugar de nuevo",
+        "btn.chooseMode": "Elegir modo",
+        "btn.home": "Pantalla inicial",
+        "btn.share": "Compartir",
+        "share.copied": "¡Copiado!",
+        "share.manual": "Copia el resultado",
+        "pause.title": "En pausa",
+        "pause.text": "Vovó Eve te está esperando. El tiempo de la pregunta se detuvo.",
+        "pause.resume": "Continuar",
+        "pause.restart": "Reiniciar la batalla",
+        "pause.quit": "Salir al menú",
+        "hud.playerLife": "Vida de Vovó Eve: {p}%",
+        "hud.enemyLife": "Vida del enemigo: {p}%",
+        "q.counter": "Pregunta {n} de {total}",
+        "diff.easy": "Fácil",
+        "diff.medium": "Media",
+        "diff.hard": "Difícil",
+        "q.options": "Opciones",
+        "q.wrong": "(incorrecta)",
+        "btn.next": "Siguiente",
+        "btn.result": "Resultado",
+        "combo.label": "RACHA",
+        "fb.perfect": "✓ ¡Correcto! {answer}",
+        "fb.late": "✓ ¡Ahora sí! {answer}",
+        "fb.timeout": "⏰ ¡Tiempo! La respuesta correcta era {answer}.",
+        "fb.read": "Lee {ref}.",
+        "float.timeout": "¡Tiempo! -{d} a Vovó Eve",
+        "float.miss": "¡Fallaste! -{d} a Vovó Eve",
+        "result.bothStanding": "Se acabaron las preguntas y {enemy} quedó con {p}% de vida. ¡Acertar a la primera da golpes más fuertes!",
+        "result.worldWon": "¡Mundo de {book} superado! Otra etapa de la Palabra conquistada.",
+        "result.theme": "Tema de la ronda: {text}",
+        "result.firstTry": "Aciertos a la primera: {f} de {n}.",
+        "result.threeStars": "Acierta 9 de 10 a la primera para ganar 3 estrellas.",
+        "result.records": "Récords en {book} ({mode}): mejor combo {c}, más aciertos {h}, mejor vida {l}%.",
+        "unlock.new": "¡Nuevo mundo desbloqueado: {book}!",
+        "unlock.done": "¡Campaña del Nuevo Testamento completada!",
+        "share.won": "¡Vencí a {enemy} en Super Vovó Eve World ({book}, {mode})! Aciertos: {h}/{n}, mejor combo: x{c}, tiempo: {t}.",
+        "share.lost": "¡Me enfrenté a {enemy} en Super Vovó Eve World ({book}, {mode})! Aciertos: {h}/{n}, mejor combo: x{c}, tiempo: {t}.",
+        "victory.tiago": ["¡Santiago vio la fe en acción en esta batalla!", "¡La paciencia venció a la prueba!", "¡La Palabra fue más fuerte que la confusión!"],
+        "victory.mateus": ["¡El Reino brilló en esta victoria!", "Mateo lo anunciaría: ¡Jesús ganó otra vez!", "¡La Palabra del Maestro quedó en pie!"],
+        "victory.apocalipse": ["¡El Cordero venció al final de la batalla!", "¡La esperanza final brilló en medio del caos!", "¡Ni un meteorito detuvo esta victoria!"],
+        "defeat": ["La batalla fue dura, pero la sabiduría te llama a otra ronda.", "Respira, ajusta la armadura e inténtalo de nuevo.", "La prueba de la fe produce paciencia. ¡Vamos otra vez!"],
+        "praise": ["¡OH, GLORIA!", "¡AMÉN!", "¡ALELUYA!", "¡GLORIA A DIOS!", "¡REPRENDIDO!"],
+        "attacks": ["Biblia de Luz", "Palabra Llameante", "Libro de la Sabiduría"],
+        "books": bookList(["Mateo", "Marcos", "Lucas", "Juan", "Hechos", "Romanos", "1 Corintios", "2 Corintios", "Gálatas", "Efesios", "Filipenses", "Colosenses", "1 Tesalonicenses", "2 Tesalonicenses", "1 Timoteo", "2 Timoteo", "Tito", "Filemón", "Hebreos", "Santiago", "1 Pedro", "2 Pedro", "1 Juan", "2 Juan", "3 Juan", "Judas", "Apocalipsis"]),
+        "descs": bookList(["Jesús, el Reino y el Sermón del Monte.", "Acción, milagros y el poderoso servicio de Jesús.", "Buenas nuevas, misericordia y encuentros que transforman.", "Jesús revelado como el Hijo de Dios y la vida eterna.", "Pentecostés, misión y la iglesia en movimiento.", "Justificación, gracia y vida en el Espíritu.", "Iglesia, santidad, dones espirituales y amor.", "Consuelo, debilidad, generosidad y nueva creación.", "Libertad en Cristo y fruto del Espíritu.", "Gracia, unidad y la armadura de Dios.", "Gozo, humildad y fuerza en Cristo.", "Cristo sobre todo y una vida renovada.", "Esperanza, santificación y la venida del Señor.", "Perseverancia, firmeza y trabajo fiel.", "Doctrina, liderazgo y piedad con contentamiento.", "Valentía, Escritura y perseverancia hasta el fin.", "Buenas obras, gracia y orden en la iglesia.", "Perdón, reconciliación y amor entre hermanos.", "Cristo es superior, fe y perseverancia.", "Fe en práctica, sabiduría y perseverancia.", "Esperanza viva, santidad y firmeza en la prueba.", "Crecimiento, discernimiento y la promesa de su venida.", "Luz, amor, verdad y certeza de la vida eterna.", "Verdad, amor y cuidado contra el engaño.", "Hospitalidad, verdad y buen testimonio.", "Contender por la fe y permanecer guardados en Dios.", "Visiones, cartas, juicio y esperanza final."])
+      },
+
+      "zh-CN": {
+        "doc.title": "Super Vovó Eve World – 圣经大作战",
+        "subtitle": "圣经大作战",
+        "lang.label": "语言",
+        "sound.on": "声音 开",
+        "sound.off": "声音 关",
+        "sound.onAria": "声音已开启。点击可关闭音乐和音效。",
+        "sound.offAria": "声音已关闭。点击可开启音乐和音效。",
+        "pause.btn": "暂停 (P)",
+        "start": "开始",
+        "skin": "服装：{name}",
+        "enemy": "敌人：{name}",
+        "skin.classic": "经典",
+        "skin.igreja": "教会",
+        "skin.sol": "太阳衫",
+        "enemy.diabinho": "小恶魔",
+        "enemy.fariseu": "法利赛人",
+        "enemy.anticristo": "敌基督",
+        "setup.title": "选择战斗",
+        "setup.text": "选择你想挑战的圣经书卷。",
+        "setup.progress": "新约征程：已解锁 {n}/{total} 个世界。最新解锁：{book}。",
+        "setup.mode": "游戏模式",
+        "mode.treino": "练习",
+        "mode.treino.desc": "不限时，适合慢慢学习。",
+        "mode.batalha": "对战",
+        "mode.batalha.desc": "每题 30 秒，难度适中。",
+        "mode.desafio": "挑战",
+        "mode.desafio.desc": "每题 10 秒，连击加成更高。",
+        "setup.next": "点这里开始",
+        "world.card": "{n}. {book}世界",
+        "world.locked": "通关{book}世界后解锁。",
+        "stars.aria": "{n} 颗星（满分 3 颗）",
+        "how.title": "玩法说明",
+        "how.mode": "在 {s} 秒内回答关于《{book}》的问题。",
+        "how.modeTraining": "练习：回答关于《{book}》的问题，不限时间。",
+        "how.speed": "答得越快，Super Vovó Eve 的攻击就越强。",
+        "how.errors": "答错时，那个选项会变暗，你可以再选别的。每答错一次，敌人的反击就更强。",
+        "how.timeout": "如果时间用完，{enemy}也会发动攻击，并跳到下一题。按 II 可以暂停战斗。",
+        "how.timeoutTraining": "练习模式没有时间限制：可以慢慢读，好好学。",
+        "how.count": "每局随机出 10 道题，从简单到困难。",
+        "how.learn": "每题之后会显示正确答案和相关经文，帮助你学习。最后，Vovó Eve 会告诉你哪些题值得复习。",
+        "how.keys": "电脑上：按 <kbd>1</kbd>–<kbd>4</kbd>（或 <kbd>A</kbd>–<kbd>D</kbd>）作答，<kbd>Enter</kbd> 进入下一题，<kbd>P</kbd> 暂停。",
+        "how.fight": "点这里开战",
+        "result.win": "胜利！",
+        "result.almost": "差一点！",
+        "result.lose": "再试一次！",
+        "stat.time": "用时",
+        "stat.best": "纪录",
+        "stat.hits": "答对",
+        "stat.life": "生命",
+        "stat.misses": "答错",
+        "stat.combo": "最高连击",
+        "review.title": "需要复习",
+        "review.answer": "答案：{answer}（{ref}）",
+        "finale.title": "恭喜你打败了敌人！",
+        "finale.text": "Super Vovó Eve 完成了新约征程。",
+        "btn.nextPhase": "下一关：{book}",
+        "btn.again": "再玩一次",
+        "btn.chooseMode": "选择模式",
+        "btn.home": "返回首页",
+        "btn.share": "分享",
+        "share.copied": "已复制！",
+        "share.manual": "请复制结果",
+        "pause.title": "已暂停",
+        "pause.text": "Vovó Eve 正在等你。答题计时已暂停。",
+        "pause.resume": "继续",
+        "pause.restart": "重新开始战斗",
+        "pause.quit": "返回菜单",
+        "hud.playerLife": "Vovó Eve 的生命：{p}%",
+        "hud.enemyLife": "敌人的生命：{p}%",
+        "q.counter": "第 {n} 题 / 共 {total} 题",
+        "diff.easy": "简单",
+        "diff.medium": "中等",
+        "diff.hard": "困难",
+        "q.options": "选项",
+        "q.wrong": "（错误）",
+        "btn.next": "下一题",
+        "btn.result": "看结果",
+        "combo.label": "连续答对",
+        "combo.value": "连击 x{n}",
+        "fb.perfect": "✓ 答对了！{answer}",
+        "fb.late": "✓ 这次对了：{answer}",
+        "fb.timeout": "⏰ 时间到！正确答案是：{answer}。",
+        "fb.read": "可阅读{ref}。",
+        "ref": "{book}第{ch}章",
+        "float.attack": "{name}！-{d}",
+        "float.timeout": "时间到！Vovó Eve -{d}",
+        "float.miss": "答错！Vovó Eve -{d}",
+        "result.bothStanding": "题目答完了，{enemy}还剩 {p}% 生命。第一次就答对，攻击更强！",
+        "result.worldWon": "{book}世界通关！在神的话语中又前进了一步。",
+        "result.theme": "本轮主题：{text}",
+        "result.firstTry": "第一次就答对：{f}/{n}。",
+        "result.threeStars": "10 题中第一次答对 9 题，就能获得 3 颗星。",
+        "result.records": "{book}（{mode}）纪录：最高连击 {c}，最多答对 {h}，最高生命 {l}%。",
+        "unlock.new": "新世界已解锁：{book}！",
+        "unlock.done": "新约征程全部完成！",
+        "share.won": "我在 Super Vovó Eve World 打败了{enemy}（{book}，{mode}）！答对：{h}/{n}，最高连击：x{c}，用时：{t}。",
+        "share.lost": "我在 Super Vovó Eve World 挑战了{enemy}（{book}，{mode}）！答对：{h}/{n}，最高连击：x{c}，用时：{t}。",
+        "victory.tiago": ["雅各在这场战斗中看到了活出来的信心！", "忍耐胜过了试炼！", "神的话语胜过了混乱！"],
+        "victory.mateus": ["天国在这场胜利中闪耀！", "马太会宣告：耶稣又赢了！", "夫子的话语屹立不倒！"],
+        "victory.apocalipse": ["羔羊在战斗的最后得胜！", "最终的盼望在混乱中闪耀！", "连流星都挡不住这场胜利！"],
+        "defeat": ["这场仗很艰难，但智慧在召唤你再来一局。", "深呼吸，整理好盔甲，再试一次。", "信心经过试验，就生忍耐。再来一局！"],
+        "praise": ["荣耀！", "阿们！", "哈利路亚！", "荣耀归神！", "奉主名斥责！"],
+        "attacks": ["光之圣经", "火焰之道", "智慧之书"],
+        "books": bookList(["马太福音", "马可福音", "路加福音", "约翰福音", "使徒行传", "罗马书", "哥林多前书", "哥林多后书", "加拉太书", "以弗所书", "腓立比书", "歌罗西书", "帖撒罗尼迦前书", "帖撒罗尼迦后书", "提摩太前书", "提摩太后书", "提多书", "腓利门书", "希伯来书", "雅各书", "彼得前书", "彼得后书", "约翰一书", "约翰二书", "约翰三书", "犹大书", "启示录"]),
+        "descs": bookList(["耶稣、天国与登山宝训。", "行动、神迹与耶稣大能的服事。", "好消息、怜悯与改变生命的相遇。", "耶稣是神的儿子，祂赐下永生。", "五旬节、宣教与不断前进的教会。", "称义、恩典与在圣灵里的生活。", "教会、圣洁、属灵恩赐与爱。", "安慰、软弱、慷慨与新造的人。", "在基督里的自由与圣灵的果子。", "恩典、合一与神所赐的全副军装。", "喜乐、谦卑与在基督里的力量。", "基督超乎万有，生命得着更新。", "盼望、成圣与主的再来。", "坚忍、站立得稳与忠心做工。", "纯正的教导、带领与知足的敬虔。", "勇气、圣经与坚持到底。", "善行、恩典与教会的秩序。", "饶恕、和好与弟兄姊妹之间的爱。", "基督超越一切、信心与坚忍。", "行出来的信心、智慧与忍耐。", "活泼的盼望、圣洁与在试炼中站稳。", "成长、分辨与主再来的应许。", "光、爱、真理与永生的确据。", "真理、爱心与提防迷惑。", "接待、真理与美好的见证。", "为真道竭力争辩，在神里蒙保守。", "异象、书信、审判与最终的盼望。"])
+      },
+
+      "ja": {
+        "doc.title": "Super Vovó Eve World – 聖書バトル",
+        "subtitle": "聖書バトル",
+        "lang.label": "言語",
+        "sound.on": "サウンド ON",
+        "sound.off": "サウンド OFF",
+        "sound.onAria": "サウンドON。タップすると音楽と効果音をオフにします。",
+        "sound.offAria": "サウンドOFF。タップすると音楽と効果音をオンにします。",
+        "pause.btn": "一時停止 (P)",
+        "start": "スタート",
+        "skin": "服：{name}",
+        "enemy": "敵：{name}",
+        "skin.classic": "クラシック",
+        "skin.igreja": "教会",
+        "skin.sol": "太陽シャツ",
+        "enemy.diabinho": "小悪魔",
+        "enemy.fariseu": "ファリサイ派",
+        "enemy.anticristo": "反キリスト",
+        "setup.title": "バトルをえらぼう",
+        "setup.text": "プレイしたい聖書の書をえらんでね。",
+        "setup.progress": "新約聖書キャンペーン：{n}/{total} ワールド解放。最新：{book}。",
+        "setup.mode": "ゲームモード",
+        "mode.treino": "練習",
+        "mode.treino.desc": "時間制限なし。ゆっくり学べます。",
+        "mode.batalha": "バトル",
+        "mode.batalha.desc": "1問30秒。バランス型。",
+        "mode.desafio": "チャレンジ",
+        "mode.desafio.desc": "1問10秒。コンボがもっと強力。",
+        "setup.next": "ここをタップしてスタート",
+        "world.card": "{n}. {book}のワールド",
+        "world.locked": "{book}のワールドをクリアすると解放されます。",
+        "stars.aria": "星 {n} / 3",
+        "how.title": "あそびかた",
+        "how.mode": "{book}についての問題に{s}秒以内に答えよう。",
+        "how.modeTraining": "練習：{book}についての問題に時間制限なしで答えよう。",
+        "how.speed": "早く正解するほど、Super Vovó Eve の攻撃が強くなるよ。",
+        "how.errors": "まちがえると、その答えは暗くなり、別の答えを選べます。まちがえるたびに敵の反撃が強くなります。",
+        "how.timeout": "時間切れになると{enemy}も攻撃して、次の問題に進みます。II ボタンでバトルを一時停止できます。",
+        "how.timeoutTraining": "練習モードは時間切れがありません。ゆっくり読んで学ぼう。",
+        "how.count": "1回のゲームで10問がランダムに出て、やさしい問題からだんだん難しくなります。",
+        "how.learn": "1問ごとに正解と聖書の箇所が表示されます。最後に Vovó Eve が復習したい問題を教えてくれます。",
+        "how.keys": "パソコンでは <kbd>1</kbd>〜<kbd>4</kbd>（または <kbd>A</kbd>〜<kbd>D</kbd>）で回答、<kbd>Enter</kbd> で次へ、<kbd>P</kbd> で一時停止。",
+        "how.fight": "ここをタップしてたたかう",
+        "result.win": "勝利！",
+        "result.almost": "あと少し！",
+        "result.lose": "もう一度チャレンジ！",
+        "stat.time": "タイム",
+        "stat.best": "記録",
+        "stat.hits": "正解",
+        "stat.life": "ライフ",
+        "stat.misses": "ミス",
+        "stat.combo": "最大コンボ",
+        "review.title": "復習しよう",
+        "review.answer": "答え：{answer}（{ref}）",
+        "finale.title": "敵をたおしたね、おめでとう！",
+        "finale.text": "Super Vovó Eve は新約聖書キャンペーンをクリアしました。",
+        "btn.nextPhase": "次のステージ：{book}",
+        "btn.again": "もう一度あそぶ",
+        "btn.chooseMode": "モードをえらぶ",
+        "btn.home": "タイトルへ",
+        "btn.share": "シェア",
+        "share.copied": "コピーしました！",
+        "share.manual": "結果をコピーしてね",
+        "pause.title": "一時停止中",
+        "pause.text": "Vovó Eve が待っています。問題の時間は止まっています。",
+        "pause.resume": "つづける",
+        "pause.restart": "バトルをやり直す",
+        "pause.quit": "メニューにもどる",
+        "hud.playerLife": "Vovó Eve のライフ：{p}%",
+        "hud.enemyLife": "敵のライフ：{p}%",
+        "q.counter": "第{n}問 / 全{total}問",
+        "diff.easy": "やさしい",
+        "diff.medium": "ふつう",
+        "diff.hard": "むずかしい",
+        "q.options": "選択肢",
+        "q.wrong": "（不正解）",
+        "btn.next": "次へ",
+        "btn.result": "結果へ",
+        "combo.label": "連続正解",
+        "combo.value": "コンボ x{n}",
+        "fb.perfect": "✓ 正解！{answer}",
+        "fb.late": "✓ 今度は正解：{answer}",
+        "fb.timeout": "⏰ 時間切れ！正解は「{answer}」でした。",
+        "fb.read": "{ref}を読んでみよう。",
+        "ref": "{book} {ch}章",
+        "float.attack": "{name}！-{d}",
+        "float.timeout": "時間切れ！Vovó Eve -{d}",
+        "float.miss": "ミス！Vovó Eve -{d}",
+        "result.bothStanding": "問題が終わって、{enemy}のライフは{p}%残りました。1回目で正解すると攻撃が強くなるよ！",
+        "result.worldWon": "{book}のワールドをクリア！みことばの旅がまた一歩進みました。",
+        "result.theme": "このラウンドのテーマ：{text}",
+        "result.firstTry": "1回目で正解：{n}問中{f}問。",
+        "result.threeStars": "10問中9問を1回目で正解すると星3つ！",
+        "result.records": "{book}（{mode}）の記録：最大コンボ {c}、最多正解 {h}、最高ライフ {l}%。",
+        "unlock.new": "新しいワールドが解放されました：{book}！",
+        "unlock.done": "新約聖書キャンペーンをクリア！",
+        "share.won": "Super Vovó Eve World で{enemy}に勝ったよ（{book}・{mode}）！正解：{h}/{n}、最大コンボ：x{c}、タイム：{t}。",
+        "share.lost": "Super Vovó Eve World で{enemy}と戦ったよ（{book}・{mode}）！正解：{h}/{n}、最大コンボ：x{c}、タイム：{t}。",
+        "victory.tiago": ["このバトルで、ヤコブは行いのある信仰を見た！", "忍耐が試練に勝った！", "みことばは混乱よりも強かった！"],
+        "victory.mateus": ["この勝利で神の国がかがやいた！", "マタイならこう言うはず：イエスさまがまた勝った！", "先生のことばはゆるがない！"],
+        "victory.apocalipse": ["バトルの最後に小羊が勝利した！", "最後の希望が混乱の中でかがやいた！", "いん石でもこの勝利は止められない！"],
+        "defeat": ["きびしい戦いだったけど、知恵がもう一度と呼んでいるよ。", "深呼吸して、よろいを整えて、もう一度！", "信仰がためされると忍耐が生まれる。もう一回いこう！"],
+        "praise": ["栄光あれ！", "アーメン！", "ハレルヤ！", "神に栄光！", "しりぞけ！"],
+        "attacks": ["光の聖書", "炎のみことば", "知恵の書"],
+        "books": bookList(["マタイ", "マルコ", "ルカ", "ヨハネ", "使徒言行録", "ローマ", "1コリント", "2コリント", "ガラテヤ", "エフェソ", "フィリピ", "コロサイ", "1テサロニケ", "2テサロニケ", "1テモテ", "2テモテ", "テトス", "フィレモン", "ヘブライ", "ヤコブ", "1ペトロ", "2ペトロ", "1ヨハネ", "2ヨハネ", "3ヨハネ", "ユダ", "黙示録"]),
+        "descs": bookList(["イエスさま、神の国、山上の説教。", "行動、奇跡、イエスさまの力強い働き。", "福音、あわれみ、人生を変える出会い。", "神の子イエスさまと永遠のいのち。", "ペンテコステ、宣教、前進する教会。", "義とされること、恵み、御霊による歩み。", "教会、聖さ、霊の賜物、そして愛。", "慰め、弱さ、気前のよさ、新しい創造。", "キリストにある自由と御霊の実。", "恵み、一致、神の武具。", "喜び、へりくだり、キリストにある力。", "すべてにまさるキリストと新しい生き方。", "希望、聖なる歩み、主の再臨。", "忍耐、堅く立つこと、忠実な働き。", "正しい教え、リーダーシップ、満ち足りる信心。", "勇気、聖書、最後まで耐え忍ぶこと。", "良い行い、恵み、教会の秩序。", "ゆるし、和解、兄弟姉妹の愛。", "まさるキリスト、信仰、忍耐。", "行いのある信仰、知恵、忍耐。", "生きた希望、聖さ、試練の中で堅く立つこと。", "成長、見分ける力、再臨の約束。", "光、愛、真理、永遠のいのちの確信。", "真理、愛、惑わしへの注意。", "もてなし、真理、良いあかし。", "信仰のために戦い、神に守られること。", "幻、手紙、さばき、そして最後の希望。"])
+      },
+
+      "de": {
+        "doc.title": "Super Vovó Eve World – Bibel-Duell",
+        "subtitle": "Bibel-Duell",
+        "lang.label": "Sprache",
+        "sound.on": "Ton AN",
+        "sound.off": "Ton AUS",
+        "sound.onAria": "Ton an. Tippen, um Musik und Effekte auszuschalten.",
+        "sound.offAria": "Ton aus. Tippen, um Musik und Effekte einzuschalten.",
+        "pause.btn": "Pause (P)",
+        "start": "Start",
+        "skin": "Outfit: {name}",
+        "enemy": "Gegner: {name}",
+        "skin.classic": "Klassisch",
+        "skin.igreja": "Kirche",
+        "skin.sol": "Sonnenhemd",
+        "enemy.diabinho": "Teufelchen",
+        "enemy.fariseu": "Pharisäer",
+        "enemy.anticristo": "Antichrist",
+        "setup.title": "Wähle deinen Kampf",
+        "setup.text": "Wähle das Bibelbuch, das du spielen möchtest.",
+        "setup.progress": "Kampagne Neues Testament: {n}/{total} Welten freigeschaltet. Zuletzt: {book}.",
+        "setup.mode": "Spielmodus",
+        "mode.treino": "Training",
+        "mode.treino.desc": "Ohne Zeitlimit. Gut zum Lernen in Ruhe.",
+        "mode.batalha": "Kampf",
+        "mode.batalha.desc": "30 Sekunden pro Frage. Ausgewogen.",
+        "mode.desafio": "Profi",
+        "mode.desafio.desc": "10 Sekunden. Combos zählen mehr.",
+        "setup.next": "Hier tippen und loslegen",
+        "world.card": "{n}. Welt: {book}",
+        "world.locked": "Gewinne die Welt {book}, um sie freizuschalten.",
+        "stars.aria": "{n} von 3 Sternen",
+        "how.title": "So wird gespielt",
+        "how.mode": "Beantworte Fragen zum Buch {book} in weniger als {s} Sekunden.",
+        "how.modeTraining": "Training: Beantworte Fragen zum Buch {book} ohne Zeitlimit.",
+        "how.speed": "Je schneller du richtig antwortest, desto stärker schlägt Super Vovó Eve zu.",
+        "how.errors": "Eine falsche Antwort wird dunkel und du kannst eine andere versuchen. Jeder Fehler macht den Gegenangriff stärker.",
+        "how.timeout": "Läuft die Zeit ab, greift {enemy} ebenfalls an und die Frage ist vorbei. Mit der Taste II pausierst du den Kampf.",
+        "how.timeoutTraining": "Im Training läuft keine Zeit ab: Lies in Ruhe und lerne.",
+        "how.count": "In jeder Runde kommen 10 zufällige Fragen – erst leichte, dann immer schwerere.",
+        "how.learn": "Nach jeder Frage siehst du die richtige Antwort und die Bibelstelle zum Lernen. Am Ende zeigt dir Vovó Eve, was du wiederholen solltest.",
+        "how.keys": "Am Computer: Tasten <kbd>1</kbd> bis <kbd>4</kbd> (oder <kbd>A</kbd> bis <kbd>D</kbd>) antworten, <kbd>Enter</kbd> geht weiter und <kbd>P</kbd> pausiert.",
+        "how.fight": "Hier tippen und kämpfen",
+        "result.win": "Sieg!",
+        "result.almost": "Fast geschafft!",
+        "result.lose": "Versuch es noch mal!",
+        "stat.time": "Zeit",
+        "stat.best": "Rekord",
+        "stat.hits": "Richtig",
+        "stat.life": "Leben",
+        "stat.misses": "Fehler",
+        "stat.combo": "Bestes Combo",
+        "review.title": "Zum Wiederholen",
+        "review.answer": "Antwort: {answer} ({ref})",
+        "finale.title": "Glückwunsch, du hast den Feind besiegt!",
+        "finale.text": "Super Vovó Eve hat die Kampagne des Neuen Testaments geschafft.",
+        "btn.nextPhase": "Nächste Welt: {book}",
+        "btn.again": "Nochmal spielen",
+        "btn.chooseMode": "Modus wählen",
+        "btn.home": "Startbildschirm",
+        "btn.share": "Teilen",
+        "share.copied": "Kopiert!",
+        "share.manual": "Ergebnis kopieren",
+        "pause.title": "Pause",
+        "pause.text": "Vovó Eve wartet. Die Zeit für die Frage ist angehalten.",
+        "pause.resume": "Weiter",
+        "pause.restart": "Kampf neu starten",
+        "pause.quit": "Zum Menü",
+        "hud.playerLife": "Leben von Vovó Eve: {p}%",
+        "hud.enemyLife": "Leben des Gegners: {p}%",
+        "q.counter": "Frage {n} von {total}",
+        "diff.easy": "Leicht",
+        "diff.medium": "Mittel",
+        "diff.hard": "Schwer",
+        "q.options": "Antworten",
+        "q.wrong": "(falsch)",
+        "btn.next": "Weiter",
+        "btn.result": "Ergebnis",
+        "combo.label": "SERIE",
+        "fb.perfect": "✓ Richtig! {answer}",
+        "fb.late": "✓ Jetzt stimmt’s: {answer}",
+        "fb.timeout": "⏰ Zeit um! Richtig war: {answer}.",
+        "fb.read": "Lies {ref}.",
+        "float.timeout": "Zeit! -{d} für Vovó Eve",
+        "float.miss": "Falsch! -{d} für Vovó Eve",
+        "result.bothStanding": "Die Fragen sind aus und {enemy} hat noch {p}% Leben. Wer beim ersten Versuch trifft, schlägt stärker zu!",
+        "result.worldWon": "Welt {book} geschafft! Wieder ein Stück weiter im Wort Gottes.",
+        "result.theme": "Thema der Runde: {text}",
+        "result.firstTry": "Beim ersten Versuch richtig: {f} von {n}.",
+        "result.threeStars": "9 von 10 beim ersten Versuch bringen 3 Sterne.",
+        "result.records": "Rekorde in {book} ({mode}): bestes Combo {c}, meiste richtige {h}, bestes Leben {l}%.",
+        "unlock.new": "Neue Welt freigeschaltet: {book}!",
+        "unlock.done": "Kampagne Neues Testament abgeschlossen!",
+        "share.won": "Ich habe {enemy} in Super Vovó Eve World besiegt ({book}, {mode})! Richtig: {h}/{n}, bestes Combo: x{c}, Zeit: {t}.",
+        "share.lost": "Ich habe mich {enemy} in Super Vovó Eve World gestellt ({book}, {mode})! Richtig: {h}/{n}, bestes Combo: x{c}, Zeit: {t}.",
+        "victory.tiago": ["Jakobus hat in diesem Kampf gelebten Glauben gesehen!", "Die Geduld hat die Prüfung besiegt!", "Das Wort war stärker als das Durcheinander!"],
+        "victory.mateus": ["Das Reich Gottes hat in diesem Sieg gestrahlt!", "Matthäus würde verkünden: Jesus hat wieder gewonnen!", "Das Wort des Meisters steht fest!"],
+        "victory.apocalipse": ["Das Lamm hat am Ende des Kampfes gesiegt!", "Die letzte Hoffnung hat im Chaos gestrahlt!", "Nicht mal ein Meteor hat diesen Sieg aufgehalten!"],
+        "defeat": ["Der Kampf war hart, aber die Weisheit ruft zur nächsten Runde.", "Tief durchatmen, Rüstung zurechtrücken und noch einmal versuchen.", "Die Prüfung des Glaubens bewirkt Geduld. Auf in die nächste Runde!"],
+        "praise": ["GLORIA!", "AMEN!", "HALLELUJA!", "EHRE SEI GOTT!", "WEICHE, SATAN!"],
+        "attacks": ["Bibel des Lichts", "Flammendes Wort", "Buch der Weisheit"],
+        "books": bookList(["Matthäus", "Markus", "Lukas", "Johannes", "Apostelgeschichte", "Römer", "1. Korinther", "2. Korinther", "Galater", "Epheser", "Philipper", "Kolosser", "1. Thessalonicher", "2. Thessalonicher", "1. Timotheus", "2. Timotheus", "Titus", "Philemon", "Hebräer", "Jakobus", "1. Petrus", "2. Petrus", "1. Johannes", "2. Johannes", "3. Johannes", "Judas", "Offenbarung"]),
+        "descs": bookList(["Jesus, das Reich Gottes und die Bergpredigt.", "Taten, Wunder und der kraftvolle Dienst Jesu.", "Gute Nachricht, Barmherzigkeit und Begegnungen, die verändern.", "Jesus als Sohn Gottes und das ewige Leben.", "Pfingsten, Mission und eine Gemeinde in Bewegung.", "Rechtfertigung, Gnade und Leben im Geist.", "Gemeinde, Heiligkeit, Geistesgaben und Liebe.", "Trost, Schwachheit, Großzügigkeit und neue Schöpfung.", "Freiheit in Christus und die Frucht des Geistes.", "Gnade, Einheit und die Waffenrüstung Gottes.", "Freude, Demut und Kraft in Christus.", "Christus über allem und ein erneuertes Leben.", "Hoffnung, Heiligung und die Wiederkunft des Herrn.", "Ausdauer, Standhaftigkeit und treue Arbeit.", "Gesunde Lehre, Leitung und Frömmigkeit mit Genügsamkeit.", "Mut, die Schrift und Ausdauer bis zum Ende.", "Gute Werke, Gnade und Ordnung in der Gemeinde.", "Vergebung, Versöhnung und Liebe unter Geschwistern.", "Christus ist größer, Glaube und Ausdauer.", "Gelebter Glaube, Weisheit und Ausdauer.", "Lebendige Hoffnung, Heiligkeit und Festigkeit in der Prüfung.", "Wachstum, Unterscheidung und die Verheißung seines Kommens.", "Licht, Liebe, Wahrheit und Gewissheit des ewigen Lebens.", "Wahrheit, Liebe und Vorsicht vor Verführung.", "Gastfreundschaft, Wahrheit und ein gutes Zeugnis.", "Für den Glauben kämpfen und in Gott bewahrt bleiben.", "Visionen, Briefe, Gericht und die letzte Hoffnung."])
+      }
+    };
+
+    const langKey = "superVovoEve:lang";
+    const CONTENT = (window.SVE_CONTENT = window.SVE_CONTENT || {});
+    const contentRequests = {};
+
+    function readStored(key) {
+      try { return localStorage.getItem(key); } catch (error) { return null; }
+    }
+
+    function writeStored(key, value) {
+      try { localStorage.setItem(key, value); } catch (error) { /* sem armazenamento (aba privada etc.) */ }
+    }
+
+    function removeStored(key) {
+      try { localStorage.removeItem(key); } catch (error) { /* sem armazenamento */ }
+    }
+
+    // pt-PT -> pt-PT; pt e pt-BR -> pt-BR; zh* -> zh-CN; demais pelo prefixo; senão inglês.
+    function detectLang() {
+      const saved = readStored(langKey);
+      if (LANG_CODES.includes(saved)) return saved;
+      const list = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""]);
+      for (const raw of list) {
+        const code = String(raw || "").toLowerCase();
+        if (!code) continue;
+        if (code === "pt-pt" || code.startsWith("pt-pt")) return "pt-PT";
+        if (code.startsWith("pt")) return "pt-BR";
+        if (code.startsWith("zh")) return "zh-CN";
+        const prefix = code.split("-")[0];
+        const match = LANG_CODES.find(item => item === prefix);
+        if (match) return match;
+      }
+      return "en";
+    }
+
+    let lang = detectLang();
+
+    function uiValue(key) {
+      const own = UI[lang] && UI[lang][key];
+      if (own !== undefined) return own;
+      if (lang === "pt-PT") return UI["pt-BR"][key];
+      return UI["pt-BR"][key];
+    }
+
+    function t(key, params) {
+      let value = uiValue(key);
+      if (value === undefined) return key;
+      if (typeof value !== "string") return value;
+      if (params) value = value.replace(/\{(\w+)\}/g, (all, name) => (params[name] !== undefined ? String(params[name]) : all));
+      return value;
+    }
+
+    function tList(key) {
+      const value = uiValue(key);
+      return Array.isArray(value) ? value : [];
+    }
+
+    function bookName(id) {
+      return (UI[lang].books && UI[lang].books[id]) || UI["pt-BR"].books[id] || id;
+    }
+
+    function worldDesc(id) {
+      return (UI[lang].descs && UI[lang].descs[id]) || UI["pt-BR"].descs[id] || "";
+    }
+
+    function isPortuguese() {
+      return lang === "pt-BR" || lang === "pt-PT";
+    }
+
+    function langContent() {
+      return CONTENT[lang] || null;
+    }
+
+    // Banco traduzido: i18n/<idioma>.js. O caminho é relativo à pasta do jogo,
+    // mesmo quando a página é aberta como /supervovoeve (sem barra no fim).
+    function contentUrl(code) {
+      let base = location.pathname;
+      if (!base.endsWith("/")) base = /\.[a-z0-9]+$/i.test(base) ? base.replace(/[^/]*$/, "") : `${base}/`;
+      return `${base}i18n/${code}.js?v=${GAME_VERSION}`;
+    }
+
+    function loadContent(code) {
+      if (code === "pt-BR" || CONTENT[code]) return Promise.resolve();
+      if (contentRequests[code]) return contentRequests[code];
+      contentRequests[code] = new Promise(resolve => {
+        const script = document.createElement("script");
+        script.src = contentUrl(code);
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => resolve();
+        document.head.appendChild(script);
+      });
+      return contentRequests[code];
+    }
+
     const questions = [
       { q: "Segundo Tiago 1, o que a prova da fé produz?", a: ["Paciência", "Riqueza", "Fama", "Vingança"], c: 0 },
       { q: "Em Tiago 1, o que deve pedir aquele que tem falta de sabedoria?", a: ["Sabedoria a Deus", "Sinais no céu", "Poder político", "Muitos bens"], c: 0 },
@@ -4052,42 +4924,12 @@
       ["Em Apocalipse 22, o Espírito e a esposa dizem qual convite?", ["Vem", "Espera", "Foge", "Compra"]]
     ]));
 
-    const victoryPhrases = {
-      tiago: [
-        "Tiago viu fé em prática nessa batalha!",
-        "A paciência venceu a provação!",
-        "A Palavra foi mais forte que a confusão!"
-      ],
-      mateus: [
-        "O Reino brilhou nessa vitória!",
-        "Mateus anunciaria: Jesus venceu mais uma!",
-        "A Palavra do Mestre ficou de pé!"
-      ],
-      apocalipse: [
-        "O Cordeiro venceu no fim da batalha!",
-        "A esperança final brilhou no caos!",
-        "Nem meteoro segurou essa vitória!"
-      ]
-    };
-
-    const defeatPhrases = [
-      "A batalha foi dura, mas a sabedoria chama para outra rodada.",
-      "Respire, ajuste a armadura e tente de novo.",
-      "A prova da fé produz paciência. Bora mais uma!"
-    ];
-
-    const praisePhrases = [
-      "OH GLÓRIA!",
-      "AMÉM!",
-      "ALELUIA!",
-      "GLÓRIA A DEUS!",
-      "TÁ REPREENDIDO!"
-    ];
-
+    // Frases de vitória/derrota, gritos e nomes dos golpes estão no dicionário
+    // de interface (victory.<mundo>, defeat, praise, attacks).
     const attacks = [
-      { name: "Bíblia de Luz", type: "magic", weapon: "bible" },
-      { name: "Palavra Flamejante", type: "magic", weapon: "bible" },
-      { name: "Livro da Sabedoria", type: "magic", weapon: "bible" }
+      { type: "magic", weapon: "bible" },
+      { type: "magic", weapon: "bible" },
+      { type: "magic", weapon: "bible" }
     ];
 
     const game = document.getElementById("game");
@@ -4142,6 +4984,8 @@
     const feedbackTitle = document.getElementById("feedbackTitle");
     const feedbackText = document.getElementById("feedbackText");
     const nextBtn = document.getElementById("nextBtn");
+    const nextLabel = document.getElementById("nextLabel");
+    const langSelects = [...document.querySelectorAll(".lang-select")];
     const questionTag = document.getElementById("questionTag");
     const difficultyTag = document.getElementById("difficultyTag");
     const pauseBtn = document.getElementById("pauseBtn");
@@ -4164,87 +5008,69 @@
     let selectedMode = "batalha";
     let lastShareText = "";
     const musicKey = "superVovoEve:musicMuted";
-    let musicMuted = localStorage.getItem(musicKey) === "1";
+    let musicMuted = readStored(musicKey) === "1";
     const skinKey = "superVovoEve:selectedSkin";
-    const skins = [
-      { id: "classic", label: "Clássica" },
-      { id: "igreja", label: "Igreja" },
-      { id: "sol", label: "Camisa Sol" }
-    ];
-    let selectedSkin = localStorage.getItem(skinKey) || "classic";
+    const skins = [{ id: "classic" }, { id: "igreja" }, { id: "sol" }];
+    let selectedSkin = readStored(skinKey) || "classic";
     const enemyKey = "superVovoEve:selectedEnemy";
-    const enemies = [
-      { id: "diabinho", label: "Diabinho" },
-      { id: "fariseu", label: "Fariseu" },
-      { id: "anticristo", label: "Anticristo" }
-    ];
-    let selectedEnemy = localStorage.getItem(enemyKey) || "diabinho";
+    const enemies = [{ id: "diabinho" }, { id: "fariseu" }, { id: "anticristo" }];
+    let selectedEnemy = readStored(enemyKey) || "diabinho";
     const maxPlayerHp = 100;
     const maxEnemyHp = 150;
     const modes = {
-      treino: { label: "Treino", seconds: null, enemyFactor: .45, comboFactor: 1 },
-      batalha: { label: "Batalha", seconds: 30, enemyFactor: 1, comboFactor: 1 },
-      desafio: { label: "Desafio", seconds: 10, enemyFactor: 1.25, comboFactor: 1.45 }
+      treino: { seconds: null, enemyFactor: .45, comboFactor: 1 },
+      batalha: { seconds: 30, enemyFactor: 1, comboFactor: 1 },
+      desafio: { seconds: 10, enemyFactor: 1.25, comboFactor: 1.45 }
     };
-    const themes = {
-      1: "Tema da rodada: perseverança, sabedoria e prática da Palavra em Tiago 1.",
-      2: "Tema da rodada: fé sem acepção de pessoas e obras vivas em Tiago 2.",
-      3: "Tema da rodada: domínio da língua e sabedoria do alto em Tiago 3.",
-      4: "Tema da rodada: humildade, resistência ao mal e dependência de Deus em Tiago 4.",
-      5: "Tema da rodada: paciência, oração e restauração em Tiago 5."
-    };
-    const worldData = {
+    // Tema mostrado no resultado, por capítulo. Sem o prefixo "Tema da rodada:",
+    // que vem do dicionário de interface (result.theme). Os outros mundos usam a
+    // descrição do mundo. Traduções: themes["<mundo>:<capítulo|default>"].
+    const roundThemes = {
       tiago: {
-        label: "Tiago",
-        questions,
-        theme(chapter) {
-          return themes[chapter] || themes[1];
-        }
+        1: "perseverança, sabedoria e prática da Palavra em Tiago 1.",
+        2: "fé sem acepção de pessoas e obras vivas em Tiago 2.",
+        3: "domínio da língua e sabedoria do alto em Tiago 3.",
+        4: "humildade, resistência ao mal e dependência de Deus em Tiago 4.",
+        5: "paciência, oração e restauração em Tiago 5.",
+        default: "perseverança, sabedoria e prática da Palavra em Tiago 1."
       },
       mateus: {
-        label: "Mateus",
-        questions: mateusQuestions,
-        theme(chapter) {
-          const mateusThemes = {
-            1: "Tema da rodada: o nascimento e a identidade de Jesus.",
-            2: "Tema da rodada: adoração, proteção e cumprimento das promessas.",
-            3: "Tema da rodada: arrependimento, batismo e obediência.",
-            4: "Tema da rodada: vencer tentações pela Palavra.",
-            5: "Tema da rodada: o caráter do Reino no Sermão do Monte.",
-            6: "Tema da rodada: oração, confiança e buscar o Reino primeiro.",
-            7: "Tema da rodada: praticar as palavras de Jesus.",
-            8: "Tema da rodada: fé, cura e autoridade de Jesus.",
-            9: "Tema da rodada: misericórdia e chamado para seguir Jesus.",
-            10: "Tema da rodada: envio e missão dos discípulos."
-          };
-          return mateusThemes[chapter] || "Tema da rodada: Jesus ensina, cura e chama discípulos.";
-        }
+        1: "o nascimento e a identidade de Jesus.",
+        2: "adoração, proteção e cumprimento das promessas.",
+        3: "arrependimento, batismo e obediência.",
+        4: "vencer tentações pela Palavra.",
+        5: "o caráter do Reino no Sermão do Monte.",
+        6: "oração, confiança e buscar o Reino primeiro.",
+        7: "praticar as palavras de Jesus.",
+        8: "fé, cura e autoridade de Jesus.",
+        9: "misericórdia e chamado para seguir Jesus.",
+        10: "envio e missão dos discípulos.",
+        default: "Jesus ensina, cura e chama discípulos."
       },
       apocalipse: {
-        label: "Apocalipse",
-        questions: apocalipseQuestions,
-        theme(chapter) {
-          const apocalipseThemes = {
-            1: "Tema da rodada: Jesus revelado como Senhor da história.",
-            2: "Tema da rodada: fidelidade, arrependimento e perseverança.",
-            3: "Tema da rodada: igreja desperta, porta aberta e zelo espiritual.",
-            4: "Tema da rodada: adoração diante do trono de Deus.",
-            5: "Tema da rodada: o Cordeiro digno de abrir o livro.",
-            6: "Tema da rodada: juízo, selos e tremor diante de Deus.",
-            7: "Tema da rodada: multidão redimida e vestes brancas.",
-            8: "Tema da rodada: oração, trombetas e sinais do juízo.",
-            11: "Tema da rodada: o Reino pertence a Cristo.",
-            12: "Tema da rodada: conflito espiritual e vitória de Deus.",
-            13: "Tema da rodada: perseverança contra a besta.",
-            14: "Tema da rodada: o Cordeiro, Sião e queda da Babilônia.",
-            19: "Tema da rodada: Cristo vence como Fiel e Verdadeiro.",
-            20: "Tema da rodada: julgamento final e derrota do mal.",
-            21: "Tema da rodada: novo céu, nova terra e consolo eterno.",
-            22: "Tema da rodada: rio da vida, árvore da vida e esperança final."
-          };
-          return apocalipseThemes[chapter] || "Tema da rodada: esperança, juízo e vitória do Cordeiro.";
-        }
+        1: "Jesus revelado como Senhor da história.",
+        2: "fidelidade, arrependimento e perseverança.",
+        3: "igreja desperta, porta aberta e zelo espiritual.",
+        4: "adoração diante do trono de Deus.",
+        5: "o Cordeiro digno de abrir o livro.",
+        6: "juízo, selos e tremor diante de Deus.",
+        7: "multidão redimida e vestes brancas.",
+        8: "oração, trombetas e sinais do juízo.",
+        11: "o Reino pertence a Cristo.",
+        12: "conflito espiritual e vitória de Deus.",
+        13: "perseverança contra a besta.",
+        14: "o Cordeiro, Sião e queda da Babilônia.",
+        19: "Cristo vence como Fiel e Verdadeiro.",
+        20: "julgamento final e derrota do mal.",
+        21: "novo céu, nova terra e consolo eterno.",
+        22: "rio da vida, árvore da vida e esperança final.",
+        default: "esperança, juízo e vitória do Cordeiro."
       }
+    };
+    const worldData = {
+      tiago: { label: "Tiago", questions },
+      mateus: { label: "Mateus", questions: mateusQuestions },
+      apocalipse: { label: "Apocalipse", questions: apocalipseQuestions }
     };
 
     const ntWorlds = [
@@ -4325,10 +5151,19 @@
         scene: world.scene,
         music: world.music,
         order: index,
-        questions: existing.questions || starterQuestionBanks[world.id],
-        theme: existing.theme || (() => `Tema da rodada: ${world.desc}`)
+        questions: existing.questions || starterQuestionBanks[world.id]
       };
     });
+
+    // Id estável de cada pergunta: "<mundo>:<posição no banco, 3 dígitos>".
+    // É a chave usada nas traduções (i18n/<idioma>.js) e na lista de recentes.
+    // Pergunta nova entra no FIM do banco do mundo para não mudar os ids.
+    ntWorlds.forEach(world => {
+      worldData[world.id].questions.forEach((item, index) => {
+        item.id = `${world.id}:${String(index + 1).padStart(3, "0")}`;
+      });
+    });
+    const bookIdByLabel = Object.fromEntries(ntWorlds.map(world => [world.label, world.id]));
 
     function showScreen(screen) {
       [startScreen, setupScreen, howScreen, resultScreen].forEach(el => el.classList.remove("active"));
@@ -4337,7 +5172,7 @@
     }
 
     function getUnlockedIndex() {
-      const saved = Number(localStorage.getItem(campaignKey) || 0);
+      const saved = Number(readStored(campaignKey) || 0);
       return Math.max(0, Math.min(worldOrder.length - 1, saved));
     }
 
@@ -4364,14 +5199,23 @@
         const previous = ntWorlds[index - 1];
         const stars = unlocked ? getStars(world.id) : 0;
         button.setAttribute("aria-pressed", String(selectedWorld === world.id));
-        button.innerHTML = `
-          <strong>${index + 1}. Mundo de ${world.label}${stars ? `<span class="world-stars" role="img" aria-label="${stars} de 3 estrelas">${starsMarkup(stars)}</span>` : ""}</strong>
-          <span>${unlocked ? world.desc : `Vença o Mundo de ${previous.label} para liberar.`}</span>
-        `;
+        const title = document.createElement("strong");
+        title.textContent = t("world.card", { n: index + 1, book: bookName(world.id) });
+        if (stars) {
+          const starsEl = document.createElement("span");
+          starsEl.className = "world-stars";
+          starsEl.setAttribute("role", "img");
+          starsEl.setAttribute("aria-label", t("stars.aria", { n: stars }));
+          starsEl.innerHTML = starsMarkup(stars);
+          title.appendChild(starsEl);
+        }
+        const desc = document.createElement("span");
+        desc.textContent = unlocked ? worldDesc(world.id) : t("world.locked", { book: bookName(previous.id) });
+        button.append(title, desc);
         worldGrid.appendChild(button);
       });
-      const label = ntWorlds[unlockedIndex]?.label || ntWorlds[0].label;
-      campaignProgress.textContent = `Campanha do Novo Testamento: ${unlockedIndex + 1}/${ntWorlds.length} mundos liberados. Último liberado: ${label}.`;
+      const latest = ntWorlds[unlockedIndex] || ntWorlds[0];
+      campaignProgress.textContent = t("setup.progress", { n: unlockedIndex + 1, total: ntWorlds.length, book: bookName(latest.id) });
     }
 
     function applyWorldTheme(id) {
@@ -4394,13 +5238,13 @@
       game.classList.remove(...skins.map(skin => `skin-${skin.id}`));
       game.classList.add(`skin-${selectedSkin}`);
       const current = skins.find(skin => skin.id === selectedSkin) || skins[0];
-      skinBtn.textContent = `Roupa: ${current.label}`;
+      skinBtn.textContent = t("skin", { name: t(`skin.${current.id}`) });
     }
 
     function nextSkin() {
       const currentIndex = Math.max(0, skins.findIndex(skin => skin.id === selectedSkin));
       selectedSkin = skins[(currentIndex + 1) % skins.length].id;
-      localStorage.setItem(skinKey, selectedSkin);
+      writeStored(skinKey, selectedSkin);
       applySkin();
     }
 
@@ -4413,25 +5257,33 @@
       const current = currentEnemy();
       game.classList.remove(...enemyClassNames);
       game.classList.add(`enemy-${current.id}`);
-      enemyBtn.textContent = `Inimigo: ${current.label}`;
-      enemyName.textContent = current.label;
+      enemyBtn.textContent = t("enemy", { name: enemyLabel() });
+      enemyName.textContent = enemyLabel();
+    }
+
+    function enemyLabel() {
+      return t(`enemy.${currentEnemy().id}`);
+    }
+
+    function modeLabel(mode) {
+      return t(`mode.${mode}`);
     }
 
     function nextEnemy() {
       const currentIndex = Math.max(0, enemies.findIndex(enemy => enemy.id === selectedEnemy));
       selectedEnemy = enemies[(currentIndex + 1) % enemies.length].id;
-      localStorage.setItem(enemyKey, selectedEnemy);
+      writeStored(enemyKey, selectedEnemy);
       applyEnemy();
     }
 
     function unlockNextWorld(worldId) {
       const index = worldOrder.indexOf(worldId);
       const current = getUnlockedIndex();
-      if (index < 0 || index < current) return "";
+      if (index < 0 || index < current) return null;
       const nextIndex = Math.min(worldOrder.length - 1, index + 1);
-      localStorage.setItem(campaignKey, String(nextIndex));
-      if (nextIndex > index) return `Novo mundo desbloqueado: ${ntWorlds[nextIndex].label}!`;
-      return "Campanha do Novo Testamento concluída!";
+      writeStored(campaignKey, String(nextIndex));
+      if (nextIndex > index) return { type: "new", world: ntWorlds[nextIndex].id };
+      return { type: "done" };
     }
 
     function nextWorldIdAfter(worldId) {
@@ -4450,7 +5302,7 @@
     }
 
     function questionSignature(item) {
-      return item.q;
+      return item.id || item.q;
     }
 
     function recentQuestionsKey(worldId) {
@@ -4459,7 +5311,7 @@
 
     function getRecentQuestionSet(worldId) {
       try {
-        return new Set(JSON.parse(localStorage.getItem(recentQuestionsKey(worldId)) || "[]"));
+        return new Set(JSON.parse(readStored(recentQuestionsKey(worldId)) || "[]"));
       } catch (error) {
         return new Set();
       }
@@ -4469,19 +5321,19 @@
       const maxRecent = Math.max(0, Math.min(sourceLength - 10, Math.ceil(sourceLength * .65)));
       const key = recentQuestionsKey(worldId);
       if (!maxRecent) {
-        localStorage.removeItem(key);
+        removeStored(key);
         return;
       }
       let previous = [];
       try {
-        previous = JSON.parse(localStorage.getItem(key) || "[]");
+        previous = JSON.parse(readStored(key) || "[]");
       } catch (error) {
         previous = [];
       }
       const pickedKeys = picked.map(questionSignature);
       const pickedSet = new Set(pickedKeys);
       const merged = [...previous.filter(item => !pickedSet.has(item)), ...pickedKeys].slice(-maxRecent);
-      localStorage.setItem(key, JSON.stringify(merged));
+      writeStored(key, JSON.stringify(merged));
     }
 
     function takeQuestions(pool, count, recent, selected, used) {
@@ -4497,36 +5349,79 @@
       });
     }
 
+    // A pergunta preparada guarda só índices; o texto é buscado no idioma atual
+    // na hora de mostrar (assim trocar de idioma no meio da partida funciona).
     function prepareQuestion(item) {
-      const correct = item.a[item.c];
-      const answers = shuffle(item.a).map(text => ({ text, correct: text === correct }));
+      const answers = shuffle(item.a.map((text, idx) => ({ idx, correct: idx === item.c })));
+      const lesson = lessonFor(item.q, selectedWorld);
       return {
-        q: item.q,
+        id: item.id,
+        item,
         answers,
-        correctText: correct,
         chapter: getChapter(item.q),
         reference: getReference(item.q),
-        difficulty: item.difficulty || "Médio",
-        lesson: item.explanation || lessonFor(item.q, selectedWorld)
+        difficulty: item.difficulty || "medium",
+        lessonId: lesson ? lesson.id : "",
+        lessonPt: lesson ? lesson.text : ""
       };
+    }
+
+    function translatedQuestion(question) {
+      const content = langContent();
+      return content && content.questions ? content.questions[question.id] : null;
+    }
+
+    function qText(question) {
+      const tr = translatedQuestion(question);
+      return tr && tr.q ? tr.q : pt(question.item.q);
+    }
+
+    function optText(question, idx) {
+      const tr = translatedQuestion(question);
+      return tr && tr.opts && tr.opts[idx] ? tr.opts[idx] : pt(question.item.a[idx]);
+    }
+
+    function correctText(question) {
+      return optText(question, question.item.c);
+    }
+
+    function lessonText(question) {
+      if (!question.lessonId) return "";
+      const content = langContent();
+      const tr = content && content.lessons ? content.lessons[question.lessonId] : "";
+      return tr || pt(question.lessonPt);
+    }
+
+    function refText(ref) {
+      return ref.ch ? t("ref", { book: bookName(ref.book), ch: ref.ch }) : bookName(ref.book);
+    }
+
+    function themeText(world, chapter) {
+      const table = roundThemes[world];
+      if (!table) return worldDesc(world);
+      const key = Object.prototype.hasOwnProperty.call(table, chapter) ? chapter : "default";
+      const content = langContent();
+      const tr = content && content.themes ? content.themes[`${world}:${key}`] : "";
+      if (tr) return tr;
+      return isPortuguese() ? table[key] : worldDesc(world);
     }
 
     const bookNamePattern = "(?:Mateus|Marcos|Lucas|João|Atos|Romanos|[12] Coríntios|Gálatas|Efésios|Filipenses|Colossenses|[12] Tessalonicenses|[12] Timóteo|Tito|Filemom|Hebreus|Tiago|[12] Pedro|[123] João|Judas|Apocalipse)";
     const chapterPattern = new RegExp(`(?:^|[^\\p{L}\\d])(${bookNamePattern})\\s+(\\d+)`, "u");
-    const bookPattern = new RegExp(`(?:^|[^\\p{L}\\d])(${bookNamePattern})(?![\\p{L}])`, "u");
 
     function getChapter(text) {
       const match = text.match(chapterPattern);
       return match ? Number(match[2]) : 1;
     }
 
-    // "Mateus 13", "2 João 1"... Sem capítulo, usa o livro citado ou o do mundo.
+    // { book: "mateus", ch: 13 } a partir de "Mateus 13", "2 João 1"... Sem
+    // capítulo, usa o livro do mundo. O nome do livro sai no idioma escolhido.
     function getReference(text) {
       const withChapter = text.match(chapterPattern);
-      if (withChapter) return `${withChapter[1]} ${withChapter[2]}`;
-      const label = worldData[selectedWorld]?.label || "";
-      const book = text.match(bookPattern);
-      return book && book[1] === label ? book[1] : label;
+      if (withChapter && bookIdByLabel[withChapter[1]]) {
+        return { book: bookIdByLabel[withChapter[1]], ch: Number(withChapter[2]) };
+      }
+      return { book: selectedWorld, ch: 0 };
     }
 
     // Lições curtas mostradas depois da resposta. Antes a busca era por pedaço de
@@ -4535,100 +5430,101 @@
     // os mundos indicados e casa palavra inteira (ou início de palavra com *).
     const gospelWorlds = ["mateus", "marcos", "lucas", "joao"];
     const lessonRules = [
-      [["apocalipse"], ["patmos"], "Mesmo exilado em Patmos, João recebeu a revelação de Jesus."],
-      [["apocalipse"], ["alfa", "ômega"], "Alfa e Ômega: Jesus é o princípio e o fim."],
-      [["apocalipse"], ["primeiro amor"], "Éfeso trabalhava muito, mas precisava voltar ao primeiro amor."],
-      [["apocalipse"], ["coroa da vida"], "Quem é fiel até o fim recebe a coroa da vida."],
-      [["apocalipse"], ["morna"], "Laodiceia era morna: Jesus quer um coração desperto."],
-      [["apocalipse"], ["porta e faz"], "Jesus chama para perto de si: quem abre a porta tem comunhão com ele."],
-      [["apocalipse"], ["igrejas", "igreja", "candeeiros", "estrelas"], "Jesus conhece cada igreja: corrige e encoraja."],
-      [["apocalipse"], ["santo, santo, santo", "anciãos", "coroas"], "Toda adoração pertence a Deus."],
-      [["apocalipse"], ["orações dos santos"], "As orações do povo de Deus sobem até ele."],
-      [["apocalipse"], ["cordeiro", "leão", "livro", "selo*"], "Só o Cordeiro, que venceu, é digno de abrir o livro."],
-      [["apocalipse"], ["multidão", "selados", "brancas"], "Deus guarda um povo de todas as nações."],
-      [["apocalipse"], ["trombeta"], "No fim, o reino do mundo pertence a Cristo."],
-      [["apocalipse"], ["dragão", "miguel", "besta", "666"], "O mal luta, mas quem vence é Deus."],
-      [["apocalipse"], ["babilônia"], "Babilônia cai: o mal não dura para sempre."],
-      [["apocalipse"], ["fiel e verdadeiro", "senhores", "cavalo", "bodas"], "Cristo volta como Rei dos reis e Senhor dos senhores."],
-      [["apocalipse"], ["mil anos", "satanás"], "O mal tem limite diante de Deus."],
-      [["apocalipse"], ["novo céu", "nova terra", "nova jerusalém"], "Deus faz novas todas as coisas."],
-      [["apocalipse"], ["lágrima", "dor", "pranto"], "Deus enxugará toda lágrima."],
-      [["apocalipse"], ["água da vida", "árvore", "rio", "sede"], "A vida verdadeira vem de Deus e do Cordeiro."],
-      [["apocalipse"], ["vem", "venho", "cedo", "ora vem"], "A esperança da igreja é a volta de Jesus."],
-      [["apocalipse"], ["trono"], "Deus reina acima de tudo."],
-      [gospelWorlds, ["magos"], "Os magos viajaram de longe para adorar Jesus."],
-      [gospelWorlds, ["arrependei-vos", "arrependimento"], "O arrependimento prepara o caminho para Jesus."],
-      [gospelWorlds, ["batizado", "batismo"], "No batismo de Jesus, o Pai disse: este é o meu Filho amado."],
-      [gospelWorlds, ["tentou", "tentador"], "Jesus venceu a tentação usando a Palavra de Deus."],
-      [gospelWorlds, ["pescadores"], "Jesus chama pessoas comuns para a sua missão."],
-      [gospelWorlds, ["bem-aventurados", "mansos"], "O Reino de Deus valoriza os humildes."],
-      [gospelWorlds, ["sal", "luz"], "Quem segue Jesus faz diferença no mundo."],
-      [gospelWorlds, ["buscar primeiro"], "Busque primeiro o Reino de Deus e a sua justiça."],
-      [gospelWorlds, ["orar", "pai nosso"], "Jesus ensinou a orar como filhos que falam com o Pai."],
-      [gospelWorlds, ["tesouro*"], "O tesouro guardado no céu vale mais que tudo."],
-      [gospelWorlds, ["ansiosos"], "Deus cuida de nós: não precisamos viver ansiosos."],
-      [gospelWorlds, ["julgueis"], "Quem julga os outros precisa olhar primeiro para si."],
-      [gospelWorlds, ["porta estreita"], "O caminho da vida pede uma escolha."],
-      [gospelWorlds, ["rocha"], "Quem ouve e pratica a Palavra fica firme."],
-      [gospelWorlds, ["tempestade", "vento e o mar"], "Jesus tem autoridade até sobre o vento e o mar."],
-      [gospelWorlds, ["cobrador", "publicano", "coletoria"], "Jesus chama até quem os outros desprezam."],
-      [gospelWorlds, ["cansados"], "Jesus oferece descanso para quem está cansado."],
-      [gospelWorlds, ["semeador", "semente", "espinhos"], "A Palavra precisa de um coração aberto para dar fruto."],
-      [gospelWorlds, ["mostarda"], "O Reino de Deus começa pequeno e cresce."],
-      [gospelWorlds, ["andou sobre", "águas"], "Pedro afundou quando tirou os olhos de Jesus."],
-      [gospelWorlds, ["o cristo"], "Jesus é o Cristo, o Filho do Deus vivo."],
-      [gospelWorlds, ["cruz"], "Seguir Jesus pede entrega."],
-      [gospelWorlds, ["transfigurado", "transfiguração"], "Os discípulos viram a glória de Jesus no monte."],
-      [gospelWorlds, ["perdoar", "setenta"], "Perdoe com generosidade, como Deus perdoa."],
-      [gospelWorlds, ["mandamento"], "Amar a Deus e ao próximo resume a lei."],
-      [gospelWorlds, ["virgens", "néscias"], "Esteja preparado para a volta de Jesus."],
-      [gospelWorlds, ["getsêmani"], "Jesus orou nos momentos mais difíceis."],
-      [gospelWorlds, ["barrabás"], "Jesus, inocente, tomou o lugar do culpado."],
-      [gospelWorlds, ["ressuscitado", "sepulcro", "ressurreição"], "Jesus venceu a morte: o túmulo ficou vazio."],
-      [gospelWorlds, ["samaritano"], "Amar o próximo inclui quem é diferente de nós."],
-      [gospelWorlds, ["pastor", "ovelhas"], "Jesus é o bom pastor que cuida das ovelhas."],
-      [gospelWorlds, ["pródigo", "perdidas", "noventa"], "Deus se alegra quando alguém volta para ele."],
-      [gospelWorlds, ["zaqueu"], "Encontrar Jesus mudou a vida de Zaqueu."],
-      [gospelWorlds, ["lázaro"], "Jesus é a ressurreição e a vida."],
-      [gospelWorlds, ["verbo"], "Jesus, o Verbo, é Deus e se fez homem."],
-      [gospelWorlds, ["nascer"], "É preciso nascer de novo para ver o Reino de Deus."],
-      [gospelWorlds, ["videira"], "Ligados a Jesus, damos fruto."],
-      [gospelWorlds, ["lavou"], "Jesus ensinou a servir lavando os pés dos discípulos."],
-      [gospelWorlds, ["pão", "pães"], "Jesus é o pão que sacia de verdade."],
-      [["tiago"], ["prova da fé"], "A prova fortalece a fé e produz paciência."],
-      [["tiago"], ["sabedoria do alto", "vem do alto"], "A sabedoria do alto é pura e pacífica."],
-      [["tiago"], ["sabedoria"], "Quem tem falta de sabedoria pode pedir a Deus."],
-      [["tiago"], ["duvida", "ânimo dobre", "duplo ânimo"], "Fé dividida deixa a pessoa instável."],
-      [["tiago"], ["tentação", "tentado", "concupiscência", "consumado", "concebido"], "O pecado começa no desejo; Deus não tenta ninguém."],
-      [["tiago"], ["dádiva", "luzes", "variação"], "Todo bem vem de Deus, que não muda."],
-      [["tiago"], ["ouvir", "falar", "irar-se", "ira"], "Ouça mais, fale com calma e demore a se irar."],
-      [["tiago"], ["cumpridor", "espelho", "cumpre"], "Ouvir a Palavra sem praticar não basta."],
-      [["tiago"], ["religião", "religioso", "necessitados"], "Fé verdadeira cuida dos frágeis e controla a língua."],
-      [["tiago"], ["acepção", "anel"], "Não trate as pessoas com favoritismo."],
-      [["tiago"], ["lei perfeita", "liberdade"], "Quem olha para a Palavra e pratica é feliz no que faz."],
-      [["tiago"], ["misericórdia"], "A misericórdia triunfa sobre o juízo."],
-      [["tiago"], ["lei"], "Toda a lei importa: quem tropeça num ponto precisa da graça."],
-      [["tiago"], ["demônios"], "Crer sem obedecer não basta."],
-      [["tiago"], ["abraão", "raabe", "isaque"], "A fé verdadeira age."],
-      [["tiago"], ["obras", "morta"], "Fé viva aparece em obras."],
-      [["tiago"], ["mestres"], "Ensinar a Palavra é uma grande responsabilidade."],
-      [["tiago"], ["língua", "freio", "leme", "fonte", "figueira", "tropeça"], "A língua é pequena, mas tem grande poder."],
-      [["tiago"], ["inveja", "facção", "faccioso", "terrena"], "Inveja e disputa geram confusão."],
-      [["tiago"], ["paz"], "Quem promove a paz colhe justiça."],
-      [["tiago"], ["guerras", "pedis", "pedir", "cobiçais"], "Desejos egoístas alimentam brigas."],
-      [["tiago"], ["mundo"], "Amizade com o mundo afasta de Deus."],
-      [["tiago"], ["diabo", "sujeitai-vos", "chegai-vos"], "Sujeite-se a Deus e resista ao diabo."],
-      [["tiago"], ["humildes", "humilhai-vos", "soberbos", "limpar", "purificar"], "Deus dá graça aos humildes."],
-      [["tiago"], ["falar mal", "julga", "legislador"], "Só Deus é juiz: não fale mal do irmão."],
-      [["tiago"], ["amanhã", "vapor", "quiser", "cidade"], "A vida depende da vontade de Deus."],
-      [["tiago"], ["salário", "trabalhadores", "ricos", "riquezas", "matança"], "Deus vê a injustiça contra quem trabalha."],
-      [["tiago"], ["rico", "pobres", "abatido"], "Deus valoriza a fé, não a posição social."],
-      [["tiago"], ["pacientes", "paciência", "lavrador", "jó", "profetas", "juiz", "corações", "queixar-se"], "Espere no Senhor com paciência."],
-      [["tiago"], ["jurar", "sim"], "Que o seu sim seja sim, e o seu não, não."],
-      [["tiago"], ["aflito", "contente", "enfermo", "oração", "elias", "presbíteros", "ungir", "chuva", "chovesse", "culpas"], "A oração do justo tem muito poder."],
-      [["tiago"], ["converte", "converter", "pecador"], "Ajudar alguém a voltar para Deus salva uma vida."],
-      [["tiago"], ["fazer o bem", "pecado"], "Saber o bem e não fazer também é pecado."]
-    ].map(([worlds, words, text]) => ({
+      [["apocalipse"], ["patmos"], "Mesmo exilado em Patmos, João recebeu a revelação de Jesus.", "L01"],
+      [["apocalipse"], ["alfa", "ômega"], "Alfa e Ômega: Jesus é o princípio e o fim.", "L02"],
+      [["apocalipse"], ["primeiro amor"], "Éfeso trabalhava muito, mas precisava voltar ao primeiro amor.", "L03"],
+      [["apocalipse"], ["coroa da vida"], "Quem é fiel até o fim recebe a coroa da vida.", "L04"],
+      [["apocalipse"], ["morna"], "Laodiceia era morna: Jesus quer um coração desperto.", "L05"],
+      [["apocalipse"], ["porta e faz"], "Jesus chama para perto de si: quem abre a porta tem comunhão com ele.", "L06"],
+      [["apocalipse"], ["igrejas", "igreja", "candeeiros", "estrelas"], "Jesus conhece cada igreja: corrige e encoraja.", "L07"],
+      [["apocalipse"], ["santo, santo, santo", "anciãos", "coroas"], "Toda adoração pertence a Deus.", "L08"],
+      [["apocalipse"], ["orações dos santos"], "As orações do povo de Deus sobem até ele.", "L09"],
+      [["apocalipse"], ["cordeiro", "leão", "livro", "selo*"], "Só o Cordeiro, que venceu, é digno de abrir o livro.", "L10"],
+      [["apocalipse"], ["multidão", "selados", "brancas"], "Deus guarda um povo de todas as nações.", "L11"],
+      [["apocalipse"], ["trombeta"], "No fim, o reino do mundo pertence a Cristo.", "L12"],
+      [["apocalipse"], ["dragão", "miguel", "besta", "666"], "O mal luta, mas quem vence é Deus.", "L13"],
+      [["apocalipse"], ["babilônia"], "Babilônia cai: o mal não dura para sempre.", "L14"],
+      [["apocalipse"], ["fiel e verdadeiro", "senhores", "cavalo", "bodas"], "Cristo volta como Rei dos reis e Senhor dos senhores.", "L15"],
+      [["apocalipse"], ["mil anos", "satanás"], "O mal tem limite diante de Deus.", "L16"],
+      [["apocalipse"], ["novo céu", "nova terra", "nova jerusalém"], "Deus faz novas todas as coisas.", "L17"],
+      [["apocalipse"], ["lágrima", "dor", "pranto"], "Deus enxugará toda lágrima.", "L18"],
+      [["apocalipse"], ["água da vida", "árvore", "rio", "sede"], "A vida verdadeira vem de Deus e do Cordeiro.", "L19"],
+      [["apocalipse"], ["vem", "venho", "cedo", "ora vem"], "A esperança da igreja é a volta de Jesus.", "L20"],
+      [["apocalipse"], ["trono"], "Deus reina acima de tudo.", "L21"],
+      [gospelWorlds, ["magos"], "Os magos viajaram de longe para adorar Jesus.", "L22"],
+      [gospelWorlds, ["arrependei-vos", "arrependimento"], "O arrependimento prepara o caminho para Jesus.", "L23"],
+      [gospelWorlds, ["batizado", "batismo"], "No batismo de Jesus, o Pai disse: este é o meu Filho amado.", "L24"],
+      [gospelWorlds, ["tentou", "tentador"], "Jesus venceu a tentação usando a Palavra de Deus.", "L25"],
+      [gospelWorlds, ["pescadores"], "Jesus chama pessoas comuns para a sua missão.", "L26"],
+      [gospelWorlds, ["bem-aventurados", "mansos"], "O Reino de Deus valoriza os humildes.", "L27"],
+      [gospelWorlds, ["sal", "luz"], "Quem segue Jesus faz diferença no mundo.", "L28"],
+      [gospelWorlds, ["buscar primeiro"], "Busque primeiro o Reino de Deus e a sua justiça.", "L29"],
+      [gospelWorlds, ["orar", "pai nosso"], "Jesus ensinou a orar como filhos que falam com o Pai.", "L30"],
+      [gospelWorlds, ["tesouro*"], "O tesouro guardado no céu vale mais que tudo.", "L31"],
+      [gospelWorlds, ["ansiosos"], "Deus cuida de nós: não precisamos viver ansiosos.", "L32"],
+      [gospelWorlds, ["julgueis"], "Quem julga os outros precisa olhar primeiro para si.", "L33"],
+      [gospelWorlds, ["porta estreita"], "O caminho da vida pede uma escolha.", "L34"],
+      [gospelWorlds, ["rocha"], "Quem ouve e pratica a Palavra fica firme.", "L35"],
+      [gospelWorlds, ["tempestade", "vento e o mar"], "Jesus tem autoridade até sobre o vento e o mar.", "L36"],
+      [gospelWorlds, ["cobrador", "publicano", "coletoria"], "Jesus chama até quem os outros desprezam.", "L37"],
+      [gospelWorlds, ["cansados"], "Jesus oferece descanso para quem está cansado.", "L38"],
+      [gospelWorlds, ["semeador", "semente", "espinhos"], "A Palavra precisa de um coração aberto para dar fruto.", "L39"],
+      [gospelWorlds, ["mostarda"], "O Reino de Deus começa pequeno e cresce.", "L40"],
+      [gospelWorlds, ["andou sobre", "águas"], "Pedro afundou quando tirou os olhos de Jesus.", "L41"],
+      [gospelWorlds, ["o cristo"], "Jesus é o Cristo, o Filho do Deus vivo.", "L42"],
+      [gospelWorlds, ["cruz"], "Seguir Jesus pede entrega.", "L43"],
+      [gospelWorlds, ["transfigurado", "transfiguração"], "Os discípulos viram a glória de Jesus no monte.", "L44"],
+      [gospelWorlds, ["perdoar", "setenta"], "Perdoe com generosidade, como Deus perdoa.", "L45"],
+      [gospelWorlds, ["mandamento"], "Amar a Deus e ao próximo resume a lei.", "L46"],
+      [gospelWorlds, ["virgens", "néscias"], "Esteja preparado para a volta de Jesus.", "L47"],
+      [gospelWorlds, ["getsêmani"], "Jesus orou nos momentos mais difíceis.", "L48"],
+      [gospelWorlds, ["barrabás"], "Jesus, inocente, tomou o lugar do culpado.", "L49"],
+      [gospelWorlds, ["ressuscitado", "sepulcro", "ressurreição"], "Jesus venceu a morte: o túmulo ficou vazio.", "L50"],
+      [gospelWorlds, ["samaritano"], "Amar o próximo inclui quem é diferente de nós.", "L51"],
+      [gospelWorlds, ["pastor", "ovelhas"], "Jesus é o bom pastor que cuida das ovelhas.", "L52"],
+      [gospelWorlds, ["pródigo", "perdidas", "noventa"], "Deus se alegra quando alguém volta para ele.", "L53"],
+      [gospelWorlds, ["zaqueu"], "Encontrar Jesus mudou a vida de Zaqueu.", "L54"],
+      [gospelWorlds, ["lázaro"], "Jesus é a ressurreição e a vida.", "L55"],
+      [gospelWorlds, ["verbo"], "Jesus, o Verbo, é Deus e se fez homem.", "L56"],
+      [gospelWorlds, ["nascer"], "É preciso nascer de novo para ver o Reino de Deus.", "L57"],
+      [gospelWorlds, ["videira"], "Ligados a Jesus, damos fruto.", "L58"],
+      [gospelWorlds, ["lavou"], "Jesus ensinou a servir lavando os pés dos discípulos.", "L59"],
+      [gospelWorlds, ["pão", "pães"], "Jesus é o pão que sacia de verdade.", "L60"],
+      [["tiago"], ["prova da fé"], "A prova fortalece a fé e produz paciência.", "L61"],
+      [["tiago"], ["sabedoria do alto", "vem do alto"], "A sabedoria do alto é pura e pacífica.", "L62"],
+      [["tiago"], ["sabedoria"], "Quem tem falta de sabedoria pode pedir a Deus.", "L63"],
+      [["tiago"], ["duvida", "ânimo dobre", "duplo ânimo"], "Fé dividida deixa a pessoa instável.", "L64"],
+      [["tiago"], ["tentação", "tentado", "concupiscência", "consumado", "concebido"], "O pecado começa no desejo; Deus não tenta ninguém.", "L65"],
+      [["tiago"], ["dádiva", "luzes", "variação"], "Todo bem vem de Deus, que não muda.", "L66"],
+      [["tiago"], ["ouvir", "falar", "irar-se", "ira"], "Ouça mais, fale com calma e demore a se irar.", "L67"],
+      [["tiago"], ["cumpridor", "espelho", "cumpre"], "Ouvir a Palavra sem praticar não basta.", "L68"],
+      [["tiago"], ["religião", "religioso", "necessitados"], "Fé verdadeira cuida dos frágeis e controla a língua.", "L69"],
+      [["tiago"], ["acepção", "anel"], "Não trate as pessoas com favoritismo.", "L70"],
+      [["tiago"], ["lei perfeita", "liberdade"], "Quem olha para a Palavra e pratica é feliz no que faz.", "L71"],
+      [["tiago"], ["misericórdia"], "A misericórdia triunfa sobre o juízo.", "L72"],
+      [["tiago"], ["lei"], "Toda a lei importa: quem tropeça num ponto precisa da graça.", "L73"],
+      [["tiago"], ["demônios"], "Crer sem obedecer não basta.", "L74"],
+      [["tiago"], ["abraão", "raabe", "isaque"], "A fé verdadeira age.", "L75"],
+      [["tiago"], ["obras", "morta"], "Fé viva aparece em obras.", "L76"],
+      [["tiago"], ["mestres"], "Ensinar a Palavra é uma grande responsabilidade.", "L77"],
+      [["tiago"], ["língua", "freio", "leme", "fonte", "figueira", "tropeça"], "A língua é pequena, mas tem grande poder.", "L78"],
+      [["tiago"], ["inveja", "facção", "faccioso", "terrena"], "Inveja e disputa geram confusão.", "L79"],
+      [["tiago"], ["paz"], "Quem promove a paz colhe justiça.", "L80"],
+      [["tiago"], ["guerras", "pedis", "pedir", "cobiçais"], "Desejos egoístas alimentam brigas.", "L81"],
+      [["tiago"], ["mundo"], "Amizade com o mundo afasta de Deus.", "L82"],
+      [["tiago"], ["diabo", "sujeitai-vos", "chegai-vos"], "Sujeite-se a Deus e resista ao diabo.", "L83"],
+      [["tiago"], ["humildes", "humilhai-vos", "soberbos", "limpar", "purificar"], "Deus dá graça aos humildes.", "L84"],
+      [["tiago"], ["falar mal", "julga", "legislador"], "Só Deus é juiz: não fale mal do irmão.", "L85"],
+      [["tiago"], ["amanhã", "vapor", "quiser", "cidade"], "A vida depende da vontade de Deus.", "L86"],
+      [["tiago"], ["salário", "trabalhadores", "ricos", "riquezas", "matança"], "Deus vê a injustiça contra quem trabalha.", "L87"],
+      [["tiago"], ["rico", "pobres", "abatido"], "Deus valoriza a fé, não a posição social.", "L88"],
+      [["tiago"], ["pacientes", "paciência", "lavrador", "jó", "profetas", "juiz", "corações", "queixar-se"], "Espere no Senhor com paciência.", "L89"],
+      [["tiago"], ["jurar", "sim"], "Que o seu sim seja sim, e o seu não, não.", "L90"],
+      [["tiago"], ["aflito", "contente", "enfermo", "oração", "elias", "presbíteros", "ungir", "chuva", "chovesse", "culpas"], "A oração do justo tem muito poder.", "L91"],
+      [["tiago"], ["converte", "converter", "pecador"], "Ajudar alguém a voltar para Deus salva uma vida.", "L92"],
+      [["tiago"], ["fazer o bem", "pecado"], "Saber o bem e não fazer também é pecado.", "L93"]
+    ].map(([worlds, words, text, id]) => ({
+      id,
       worlds,
       text,
       patterns: words.map(word => {
@@ -4638,10 +5534,12 @@
       })
     }));
 
+    const defaultLessons = { apocalipse: { id: "L94", text: "O Cordeiro vence no final." } };
+
     function lessonFor(text, worldId) {
       const rule = lessonRules.find(item => item.worlds.includes(worldId) && item.patterns.some(re => re.test(text)));
-      if (rule) return rule.text;
-      return worldId === "apocalipse" ? "O Cordeiro vence no final." : "";
+      if (rule) return rule;
+      return defaultLessons[worldId] || null;
     }
 
     function buildQuestionSet() {
@@ -4650,7 +5548,7 @@
       const mediumLimit = Math.ceil(source.length * .67);
       const withMeta = source.map((question, index) => ({
         ...question,
-        difficulty: index < easyLimit ? "Fácil" : index < mediumLimit ? "Médio" : "Difícil"
+        difficulty: index < easyLimit ? "easy" : index < mediumLimit ? "medium" : "hard"
       }));
       const recent = getRecentQuestionSet(selectedWorld);
       const selected = [];
@@ -4738,6 +5636,10 @@
         timeouts: [],
         tickSecond: null,
         review: [],
+        shownRound: 0,
+        feedback: null,
+        nextIsResult: false,
+        result: null,
         set: buildQuestionSet()
       };
       resultScreen.classList.remove("active");
@@ -4783,14 +5685,12 @@
       }
 
       const current = state.set[state.round];
+      state.shownRound = state.round;
       state.themeChapter = current.chapter;
       hideFeedback();
       const total = state.set.length;
       roundText.textContent = `${state.round + 1}/${total}`;
-      questionTag.textContent = `Pergunta ${state.round + 1} de ${total}`;
-      difficultyTag.textContent = current.difficulty;
-      difficultyTag.className = `difficulty-tag ${current.difficulty === "Fácil" ? "facil" : current.difficulty === "Médio" ? "medio" : "dificil"}`;
-      questionText.textContent = pt(current.q);
+      difficultyTag.className = `difficulty-tag ${{ easy: "facil", medium: "medio", hard: "dificil" }[current.difficulty] || "medio"}`;
       optionsEl.innerHTML = "";
       current.answers.forEach((answer, index) => {
         const letter = "ABCD"[index];
@@ -4798,22 +5698,38 @@
         btn.type = "button";
         btn.className = "option-btn";
         btn.dataset.correct = answer.correct ? "1" : "0";
+        btn.dataset.idx = String(answer.idx);
         const key = document.createElement("span");
         key.className = "opt-key";
         key.setAttribute("aria-hidden", "true");
         key.textContent = letter;
         const label = document.createElement("span");
-        label.textContent = pt(answer.text);
+        label.className = "opt-label";
         btn.append(key, label);
-        btn.setAttribute("aria-label", `${letter}: ${pt(answer.text)}`);
         btn.addEventListener("click", () => answerQuestion(answer.correct, false, btn));
         optionsEl.appendChild(btn);
       });
+      renderQuestionTexts();
 
       timerText.classList.remove("urgent");
       state.turnStart = performance.now();
       tickTimer();
       timerId = setInterval(tickTimer, 80);
+    }
+
+    // Textos da pergunta atual no idioma escolhido (também usada ao trocar de idioma).
+    function renderQuestionTexts() {
+      if (!state || !state.set[state.shownRound]) return;
+      const current = state.set[state.shownRound];
+      questionTag.textContent = t("q.counter", { n: state.shownRound + 1, total: state.set.length });
+      difficultyTag.textContent = t(`diff.${current.difficulty}`);
+      questionText.textContent = qText(current);
+      [...optionsEl.children].forEach((btn, index) => {
+        const text = optText(current, Number(btn.dataset.idx));
+        btn.querySelector(".opt-label").textContent = text;
+        const wrong = btn.classList.contains("wrong") ? ` ${t("q.wrong")}` : "";
+        btn.setAttribute("aria-label", `${"ABCD"[index]}: ${text}${wrong}`);
+      });
     }
 
     function tickTimer() {
@@ -4886,7 +5802,7 @@
         updateHud();
         addReview(current);
         showFeedback(current, "timeout");
-        playEnemyAttack(`Tempo! -${damage}`);
+        playEnemyAttack(t("float.timeout", { d: damage }));
         endTurn(5200);
         return;
       }
@@ -4894,12 +5810,12 @@
       if (eventTarget) {
         eventTarget.disabled = true;
         eventTarget.classList.add("wrong");
-        eventTarget.setAttribute("aria-label", `${eventTarget.getAttribute("aria-label")} (errada)`);
+        eventTarget.setAttribute("aria-label", `${eventTarget.getAttribute("aria-label")} ${t("q.wrong")}`);
       }
       const damage = Math.round((6 + state.misses * 5) * mode.enemyFactor);
       state.playerHp = Math.max(0, state.playerHp - damage);
       updateHud();
-      playEnemyAttack(`Errou! -${damage}`);
+      playEnemyAttack(t("float.miss", { d: damage }));
       later(() => {
         if (state.playerHp <= 0) {
           clearInterval(timerId);
@@ -4926,17 +5842,22 @@
     }
 
     function addReview(question) {
-      if (state.review.some(item => item.q === question.q)) return;
-      state.review.push({ q: question.q, answer: question.correctText, reference: question.reference });
+      if (state.review.includes(question)) return;
+      state.review.push(question);
     }
 
     function endTurn(ms) {
       state.round++;
       state.awaitingNext = true;
       const gameOver = state.enemyHp <= 0 || state.playerHp <= 0 || state.round >= state.set.length;
-      nextBtn.firstChild.textContent = gameOver ? "Resultado " : "Próxima ";
+      state.nextIsResult = gameOver;
+      renderNextLabel();
       armAdvance(modes[state.mode].seconds ? ms : 0);
       if (lastInputKeyboard) nextBtn.focus({ preventScroll: true });
+    }
+
+    function renderNextLabel() {
+      nextLabel.textContent = t(state && state.nextIsResult ? "btn.result" : "btn.next");
     }
 
     // No Treino a próxima pergunta espera o botão (para ler com calma).
@@ -5003,37 +5924,41 @@
       enemyLife.style.width = `${enemyPercent}%`;
       playerLifeText.textContent = `${playerPercent}%`;
       enemyLifeText.textContent = `${enemyPercent}%`;
-      playerLifeBar.setAttribute("aria-label", `Vida da Vovó Eve: ${playerPercent}%`);
-      enemyLifeBar.setAttribute("aria-label", `Vida do inimigo: ${enemyPercent}%`);
+      playerLifeBar.setAttribute("aria-label", t("hud.playerLife", { p: playerPercent }));
+      enemyLifeBar.setAttribute("aria-label", t("hud.enemyLife", { p: enemyPercent }));
       updateComboBadge();
     }
 
     function updateComboBadge() {
       const combo = state?.combo || 0;
       comboBadge.classList.toggle("visible", combo > 1);
-      comboBadge.querySelector("strong").textContent = `COMBO x${combo}`;
+      comboBadge.querySelector("strong").textContent = t("combo.value", { n: combo });
     }
 
     function showFeedback(question, kind) {
-      const answer = pt(question.correctText);
-      const strong = document.createElement("strong");
-      strong.textContent = answer;
-      feedbackTitle.textContent = "";
-      if (kind === "perfect") {
-        feedbackTitle.append("✓ Certo! ", strong);
-      } else if (kind === "late") {
-        feedbackTitle.append("✓ Agora sim: ", strong);
-      } else {
-        feedbackTitle.append("⏰ Tempo! A resposta certa era ", strong, ".");
-      }
-      const lesson = question.lesson ? `${pt(question.lesson)} ` : "";
-      feedbackText.textContent = `${lesson}Leia em ${question.reference}.`;
+      state.feedback = { question, kind };
+      renderFeedback();
       feedbackBox.classList.toggle("good", kind === "perfect");
       feedbackBox.classList.toggle("bad", kind !== "perfect");
       feedbackBox.classList.add("visible");
     }
 
+    // "{answer}" do dicionário vira <strong> com a resposta certa.
+    function renderFeedback() {
+      if (!state || !state.feedback) return;
+      const { question, kind } = state.feedback;
+      const template = t(kind === "perfect" ? "fb.perfect" : kind === "late" ? "fb.late" : "fb.timeout");
+      const [before, after = ""] = template.split("{answer}");
+      const strong = document.createElement("strong");
+      strong.textContent = correctText(question);
+      feedbackTitle.textContent = "";
+      feedbackTitle.append(before, strong, after);
+      const lesson = lessonText(question);
+      feedbackText.textContent = `${lesson ? `${lesson} ` : ""}${t("fb.read", { ref: refText(question.reference) })}`;
+    }
+
     function hideFeedback() {
+      if (state) state.feedback = null;
       feedbackBox.classList.remove("visible", "good", "bad");
       feedbackTitle.textContent = "";
       feedbackText.textContent = "";
@@ -5041,12 +5966,13 @@
     }
 
     function playAttack(damage, perfect = false, combo = 0) {
-      const attack = attacks[Math.floor(Math.random() * attacks.length)];
+      const attackIndex = Math.floor(Math.random() * attacks.length);
+      const attack = attacks[attackIndex];
       weapon.className = `weapon ${attack.weapon}`;
-      const praise = praisePhrases[Math.floor(Math.random() * praisePhrases.length)];
-      const label = perfect
-        ? `${praise}\n${attack.name}! -${damage}`
-        : `${attack.name}! -${damage}`;
+      const praiseList = tList("praise");
+      const praise = praiseList[Math.floor(Math.random() * praiseList.length)] || "";
+      const hit = t("float.attack", { name: tList("attacks")[attackIndex] || "", d: damage });
+      const label = perfect ? `${praise}\n${hit}` : hit;
       showFloat(label, "#fff7a1", perfect ? "praise" : "");
       eve.classList.add("eveAttack", "cast");
       if (perfect) game.classList.add("comboStrike");
@@ -5061,7 +5987,7 @@
     }
 
     function playEnemyAttack(label) {
-      showFloat(`${label} na Vovó Eve`, "#ffb1b1");
+      showFloat(label, "#ffb1b1");
       devil.classList.add("enemyAttack");
       later(() => eve.classList.add("hurt"), 250);
       soundEnemy();
@@ -5100,7 +6026,7 @@
     }
 
     function getStars(world) {
-      return Math.max(0, Math.min(3, Number(localStorage.getItem(starsKey(world)) || 0)));
+      return Math.max(0, Math.min(3, Number(readStored(starsKey(world)) || 0)));
     }
 
     function starsMarkup(count) {
@@ -5121,62 +6047,89 @@
       const answered = Math.min(state.round, state.set.length);
       const stars = starsFor(won, state.firstTry, answered);
       const previousStars = getStars(state.world);
-      if (stars > previousStars) localStorage.setItem(starsKey(state.world), String(stars));
+      if (stars > previousStars) writeStored(starsKey(state.world), String(stars));
       const nextWorldId = won ? nextWorldIdAfter(state.world) : "";
-      const unlockMessage = won ? unlockNextWorld(state.world) : "";
+      const unlock = won ? unlockNextWorld(state.world) : null;
       renderWorldGrid();
       nextPhaseBtn.hidden = !nextWorldId;
       nextPhaseBtn.dataset.world = nextWorldId;
-      if (nextWorldId) nextPhaseBtn.textContent = `Próxima fase: ${worldData[nextWorldId].label}`;
       resultScreen.classList.add("active");
-      const total = state.totalSeconds;
-      const currentBest = Number(localStorage.getItem(recordKey("bestTime")) || 0);
+      const currentBest = Number(readStored(recordKey("bestTime")) || 0);
       const finalCampaignWin = won && state.world === "apocalipse";
       const bothStanding = !won && state.playerHp > 0;
+      const victoryList = tList(`victory.${state.world}`);
+      state.result = {
+        won,
+        stars,
+        answered,
+        nextWorldId,
+        unlock,
+        currentBest,
+        finalCampaignWin,
+        bothStanding,
+        enemyPercent: Math.round((state.enemyHp / maxEnemyHp) * 100),
+        phraseIndex: Math.floor(Math.random() * Math.max(1, won ? victoryList.length : tList("defeat").length))
+      };
       finaleCard.hidden = !finalCampaignWin;
-      resultTitle.textContent = won ? "Vitória!" : bothStanding ? "Quase lá!" : "Tente outra vez!";
       resultStars.hidden = !won;
       resultStars.innerHTML = starsMarkup(stars);
-      resultStars.setAttribute("aria-label", `${stars} de 3 estrelas`);
       resultStars.setAttribute("role", "img");
-      resultPhrase.textContent = pt(won
-        ? (finalCampaignWin ? "Parabéns por vencer o Inimigo!" : getVictoryPhrase())
-        : bothStanding
-          ? `As perguntas acabaram e ${currentEnemy().label} ficou com ${Math.round((state.enemyHp / maxEnemyHp) * 100)}% de vida. Acertar de primeira dá golpes mais fortes!`
-          : defeatPhrases[Math.floor(Math.random() * defeatPhrases.length)]);
-      finalTime.textContent = formatTime(total);
+      finalTime.textContent = formatTime(state.totalSeconds);
       bestTime.textContent = currentBest ? formatTime(currentBest) : "--";
       finalHits.textContent = `${state.hits}/${answered}`;
       finalLife.textContent = `${state.playerHp}%`;
       finalMisses.textContent = state.missesTotal;
       finalCombo.textContent = state.bestCombo;
-      roundTheme.textContent = pt(worldData[state.world].theme(state.themeChapter));
-      const starNote = won ? `Acertos de primeira: ${state.firstTry} de ${answered}.${stars < 3 ? " Acerte 9 de 10 de primeira para ganhar 3 estrelas." : ""}` : "";
-      recordNote.textContent = pt([starNote, buildRecordNote(), unlockMessage].filter(Boolean).join(" "));
-      renderReview();
-      lastShareText = buildShareText(won);
+      renderResultTexts();
       soundFinish(won, stars);
       resultScreen.scrollTop = 0;
       resultScreen.querySelector(".panel").scrollTop = 0;
     }
 
+    // Textos da tela de resultado (refeitos ao trocar de idioma).
+    function renderResultTexts() {
+      const r = state && state.result;
+      if (!r) return;
+      resultTitle.textContent = t(r.won ? "result.win" : r.bothStanding ? "result.almost" : "result.lose");
+      resultStars.setAttribute("aria-label", t("stars.aria", { n: r.stars }));
+      if (r.nextWorldId) nextPhaseBtn.textContent = t("btn.nextPhase", { book: bookName(r.nextWorldId) });
+      let phrase;
+      if (r.won) {
+        phrase = r.finalCampaignWin ? t("finale.title") : getVictoryPhrase(r.phraseIndex);
+      } else if (r.bothStanding) {
+        phrase = t("result.bothStanding", { enemy: enemyLabel(), p: r.enemyPercent });
+      } else {
+        const list = tList("defeat");
+        phrase = list[r.phraseIndex % list.length] || "";
+      }
+      resultPhrase.textContent = phrase;
+      roundTheme.textContent = t("result.theme", { text: themeText(state.world, state.themeChapter) });
+      const starNote = r.won
+        ? [t("result.firstTry", { f: state.firstTry, n: r.answered }), r.stars < 3 ? t("result.threeStars") : ""].filter(Boolean).join(" ")
+        : "";
+      const unlockNote = !r.unlock ? "" : r.unlock.type === "new" ? t("unlock.new", { book: bookName(r.unlock.world) }) : t("unlock.done");
+      recordNote.textContent = [starNote, buildRecordNote(), unlockNote].filter(Boolean).join(" ");
+      shareBtn.textContent = t("btn.share");
+      renderReview();
+    }
+
     function renderReview() {
       reviewList.innerHTML = "";
-      state.review.forEach(item => {
+      state.review.forEach(question => {
         const li = document.createElement("li");
-        li.append(pt(item.q));
+        li.append(qText(question));
         const answer = document.createElement("span");
-        answer.textContent = `Resposta: ${pt(item.answer)} (${item.reference})`;
+        answer.textContent = t("review.answer", { answer: correctText(question), ref: refText(question.reference) });
         li.appendChild(answer);
         reviewList.appendChild(li);
       });
       reviewBox.hidden = state.review.length === 0;
     }
 
-    function getVictoryPhrase() {
-      const list = victoryPhrases[state.world];
-      if (list) return list[Math.floor(Math.random() * list.length)];
-      return `Mundo de ${worldData[state.world].label} vencido! Mais uma etapa da Palavra foi conquistada.`;
+    function getVictoryPhrase(index) {
+      const list = tList(`victory.${state.world}`);
+      if (list.length) return list[index % list.length];
+      return t("result.worldWon", { book: bookName(state.world) });
     }
 
     function recordKey(name) {
@@ -5188,27 +6141,35 @@
     }
 
     function updateRecords(won) {
-      const bestTime = Number(localStorage.getItem(recordKey("bestTime")) || 0);
-      const bestCombo = Number(localStorage.getItem(recordKey("bestCombo")) || 0);
-      const bestHits = Number(localStorage.getItem(recordKey("bestHits")) || 0);
-      const bestLife = Number(localStorage.getItem(recordKey("bestLife")) || 0);
-      if (won && (!bestTime || state.totalSeconds < bestTime)) localStorage.setItem(recordKey("bestTime"), String(state.totalSeconds));
-      if (state.bestCombo > bestCombo) localStorage.setItem(recordKey("bestCombo"), String(state.bestCombo));
-      if (state.hits > bestHits) localStorage.setItem(recordKey("bestHits"), String(state.hits));
-      if (state.playerHp > bestLife) localStorage.setItem(recordKey("bestLife"), String(state.playerHp));
+      const bestTime = Number(readStored(recordKey("bestTime")) || 0);
+      const bestCombo = Number(readStored(recordKey("bestCombo")) || 0);
+      const bestHits = Number(readStored(recordKey("bestHits")) || 0);
+      const bestLife = Number(readStored(recordKey("bestLife")) || 0);
+      if (won && (!bestTime || state.totalSeconds < bestTime)) writeStored(recordKey("bestTime"), String(state.totalSeconds));
+      if (state.bestCombo > bestCombo) writeStored(recordKey("bestCombo"), String(state.bestCombo));
+      if (state.hits > bestHits) writeStored(recordKey("bestHits"), String(state.hits));
+      if (state.playerHp > bestLife) writeStored(recordKey("bestLife"), String(state.playerHp));
     }
 
     function buildRecordNote() {
-      const bestCombo = localStorage.getItem(recordKey("bestCombo")) || "0";
-      const bestHits = localStorage.getItem(recordKey("bestHits")) || "0";
-      const bestLife = localStorage.getItem(recordKey("bestLife")) || "0";
-      return pt(`Recordes em ${worldData[state.world].label} (${modes[state.mode].label}): maior combo ${bestCombo}, mais acertos ${bestHits}, melhor vida ${bestLife}%.`);
+      const bestCombo = readStored(recordKey("bestCombo")) || "0";
+      const bestHits = readStored(recordKey("bestHits")) || "0";
+      const bestLife = readStored(recordKey("bestLife")) || "0";
+      return t("result.records", { book: bookName(state.world), mode: modeLabel(state.mode), c: bestCombo, h: bestHits, l: bestLife });
     }
 
-    function buildShareText(won) {
-      const result = won ? "venci" : "encarei";
+    function buildShareText() {
+      const won = Boolean(state.result && state.result.won);
       const answered = Math.min(state.round, state.set.length);
-      return `Eu ${result} ${currentEnemy().label} no Super Vovó Eve World (${worldData[state.world].label}, ${modes[state.mode].label})! Acertos: ${state.hits}/${answered}, maior combo: x${state.bestCombo}, tempo: ${formatTime(state.totalSeconds)}.`;
+      return t(won ? "share.won" : "share.lost", {
+        enemy: enemyLabel(),
+        book: bookName(state.world),
+        mode: modeLabel(state.mode),
+        h: state.hits,
+        n: answered,
+        c: state.bestCombo,
+        t: formatTime(state.totalSeconds)
+      });
     }
 
     function formatTime(seconds) {
@@ -5244,10 +6205,10 @@
     }
 
     function updateMusicToggle() {
-      musicToggle.textContent = musicMuted ? "Som OFF" : "Som ON";
+      musicToggle.textContent = t(musicMuted ? "sound.off" : "sound.on");
       musicToggle.classList.toggle("muted", musicMuted);
       musicToggle.setAttribute("aria-pressed", String(musicMuted));
-      musicToggle.setAttribute("aria-label", musicMuted ? "Som desligado. Toque para ligar música e efeitos." : "Som ligado. Toque para desligar música e efeitos.");
+      musicToggle.setAttribute("aria-label", t(musicMuted ? "sound.offAria" : "sound.onAria"));
     }
 
     function primeMusic() {
@@ -5438,17 +6399,16 @@
     function openHowScreen() {
       ensureAudio();
       startMenuMusic();
-      const seconds = modes[selectedMode].seconds;
-      const book = worldData[selectedWorld].label;
-      modeHelp.textContent = seconds
-        ? `Responda perguntas sobre o livro de ${book} em menos de ${seconds} segundos.`
-        : `Treino: responda perguntas sobre o livro de ${book} sem limite de tempo.`;
-      timeoutHelp.textContent = seconds
-        ? `Se deixar o tempo acabar, ${currentEnemy().label} também ataca e a pergunta passa. O botão II pausa a batalha.`
-        : "No treino não existe tempo acabando: você pode ler com calma e aprender.";
-      questionCountHelp.textContent = "A cada partida aparecem 10 perguntas sorteadas, começando mais fáceis e ficando mais difíceis.";
+      renderHowTexts();
       showScreen(howScreen);
       fightBtn.focus({ preventScroll: true });
+    }
+
+    function renderHowTexts() {
+      const seconds = modes[selectedMode].seconds;
+      const book = bookName(selectedWorld);
+      modeHelp.textContent = seconds ? t("how.mode", { book, s: seconds }) : t("how.modeTraining", { book });
+      timeoutHelp.textContent = seconds ? t("how.timeout", { enemy: enemyLabel() }) : t("how.timeoutTraining");
     }
 
     function openSetup() {
@@ -5518,7 +6478,7 @@
     });
     musicToggle.addEventListener("click", () => {
       musicMuted = !musicMuted;
-      try { localStorage.setItem(musicKey, musicMuted ? "1" : "0"); } catch (error) { /* sem armazenamento */ }
+      writeStored(musicKey, musicMuted ? "1" : "0");
       updateMusicToggle();
       if (musicMuted) {
         stopMusic();
@@ -5527,6 +6487,8 @@
       }
     });
     shareBtn.addEventListener("click", async () => {
+      if (!state || !state.result) return;
+      lastShareText = buildShareText();
       // No celular abre o menu de compartilhar; no computador copia o texto.
       if (navigator.share) {
         try {
@@ -5538,10 +6500,10 @@
       }
       try {
         await navigator.clipboard.writeText(lastShareText);
-        shareBtn.textContent = "Copiado!";
-        setTimeout(() => { shareBtn.textContent = "Compartilhar"; }, 1400);
+        shareBtn.textContent = t("share.copied");
+        setTimeout(() => { shareBtn.textContent = t("btn.share"); }, 1400);
       } catch (error) {
-        shareBtn.textContent = "Copie o resultado";
+        shareBtn.textContent = t("share.manual");
         recordNote.textContent = lastShareText;
       }
     });
@@ -5586,10 +6548,60 @@
       }
     });
 
-    updateMusicToggle();
-    applySkin();
-    applyEnemy();
-    renderWorldGrid();
+    // ===== Troca de idioma (ao vivo, em qualquer tela) =====
+    function applyStaticTexts() {
+      document.documentElement.lang = lang;
+      document.title = t("doc.title");
+      document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+      document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+      document.querySelectorAll("[data-i18n-title]").forEach(el => { el.setAttribute("title", t(el.dataset.i18nTitle)); });
+      const praise = tList("praise");
+      finaleCard.dataset.praiseLeft = praise[1] || "";
+      finaleCard.dataset.praiseRight = praise[0] || "";
+      langSelects.forEach(select => { select.value = lang; });
+    }
+
+    function renderAllTexts() {
+      applyStaticTexts();
+      updateMusicToggle();
+      applySkin();
+      applyEnemy();
+      renderWorldGrid();
+      renderHowTexts();
+      if (!state) return;
+      updateHud();
+      renderNextLabel();
+      if (game.classList.contains("battle")) {
+        renderQuestionTexts();
+        renderFeedback();
+      }
+      if (state.result) renderResultTexts();
+    }
+
+    function setLanguage(code) {
+      if (!LANG_CODES.includes(code)) return;
+      lang = code;
+      writeStored(langKey, code);
+      renderAllTexts();
+      loadContent(code).then(() => {
+        if (lang === code) renderAllTexts();
+      });
+    }
+
+    langSelects.forEach(select => {
+      LANGS.forEach(item => {
+        const option = document.createElement("option");
+        option.value = item.code;
+        option.lang = item.code;
+        option.textContent = item.name;
+        select.appendChild(option);
+      });
+      select.addEventListener("change", () => setLanguage(select.value));
+    });
+
+    renderAllTexts();
+    loadContent(lang).then(renderAllTexts);
     applyWorldTheme(selectedWorld);
     [...modeGrid.querySelectorAll("[data-mode]")].forEach(item => item.setAttribute("aria-pressed", String(item.dataset.mode === selectedMode)));
     startMenuMusic();
