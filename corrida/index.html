@@ -582,7 +582,6 @@
     .login-box small { display: none; }
     .mode { min-height: 44px; padding: 6px 4px 4px; }
     #overScreen .tip { display: none; }
-    #overScreen a.link { margin-top: 6px; }
     #startScreen .card > p:not(.mode-desc) { display: none; }
     .mode-desc { min-height: 0; }
   }
@@ -1697,7 +1696,7 @@
     S.fever = false; paintCombo(false);
     if (res.record) setTimeout(() => { fxCall('fireworks', 8); fxCall('confetti', 90); }, 400);
     $('newRecord').classList.toggle('show', res.record);
-    $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
+    $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU <br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA <br><span>CORRIDA!</span>' : 'GAME <br><span>OVER</span>';
     $('overMode').textContent = practice ? `${runMode.name} · NÃO VALE RANKING` : 'CORRIDA';
     paintReview();
     countUp($('xpGain'), res.xpGained, 900);

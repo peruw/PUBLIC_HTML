@@ -14,9 +14,9 @@
 
   const MODES = {
     corrida: { id: 'corrida', name: 'CORRIDA', short: 'TUDO', desc: 'As quatro operações, cada vez mais difíceis. Vale recorde e ranking.', ranked: true },
-    somasub: { id: 'somasub', name: 'TREINO + −', short: '+ −', desc: 'Treino de adição e subtração: começa nos amigos do 10 e chega às centenas.', ops: ['add', 'sub'] },
-    tabuada: { id: 'tabuada', name: 'TREINO ×', short: '×', desc: 'Treino de tabuada: começa no 2, 3, 4, 5 e 10 e termina nas difíceis, como 7 × 8.', ops: ['mul'] },
-    divisao: { id: 'divisao', name: 'TREINO ÷', short: '÷', desc: 'Treino de divisão exata, o caminho de volta da tabuada.', ops: ['div'] },
+    somasub: { id: 'somasub', name: 'TREINO + −', short: '+ −', desc: 'Treino de adição e subtração: começa nos amigos do 10 e chega às centenas. Soma XP, mas não vale recorde nem ranking.', ops: ['add', 'sub'] },
+    tabuada: { id: 'tabuada', name: 'TREINO ×', short: '×', desc: 'Treino de tabuada: começa no 2, 3, 4, 5 e 10 e termina nas difíceis, como 7 × 8. Soma XP, mas não vale recorde nem ranking.', ops: ['mul'] },
+    divisao: { id: 'divisao', name: 'TREINO ÷', short: '÷', desc: 'Treino de divisão exata, o caminho de volta da tabuada. Soma XP, mas não vale recorde nem ranking.', ops: ['div'] },
   };
 
   // ---------- modo CORRIDA (mesmas faixas da versão anterior) ----------
