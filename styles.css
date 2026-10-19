@@ -1302,3 +1302,20 @@ html.lang-en [data-lang-inline="pt"] {
     background: var(--bg);
   }
 }
+
+/* Marca (logo + nome + slogan): o slogan não quebra em duas linhas no celular */
+.nav-logo .tag { white-space: nowrap; }
+@media (max-width: 380px) {
+  .nav-logo .tag { letter-spacing: 0.08em; }
+}
+/* Rodapé: ".footer-col a" (display:block) desmontava o flex do logo */
+.footer-col a.nav-logo {
+  display: inline-flex;
+  padding: 0;
+}
+.footer-col a.nav-logo:hover { color: var(--ink); }
+@media (max-width: 720px) {
+  /* Coluna da marca ocupa a largura toda; as outras ficam 2 por linha */
+  .footer-grid > .footer-col:first-child { grid-column: 1 / -1; }
+  .footer-bottom { flex-wrap: wrap; gap: 8px 16px; }
+}
