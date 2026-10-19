@@ -579,15 +579,28 @@ async function init() {
     pixelRatio = r;
     renderer.setPixelRatio(r);
   }
+  // Sombras desligadas na hora (o que mais pesa na qualidade 'alta' sem borrar a imagem).
+  let shadowsOff = !quality.shadows;
+  function disableShadows() {
+    shadowsOff = true;
+    renderer.shadowMap.enabled = false;
+    scene.traverse((o) => {
+      if (o.isLight) o.castShadow = false;
+      if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.needsUpdate = true;
+    });
+    needsRender = true;
+  }
   function adaptResolution(dt) {
-    if (game.state !== 'race' || game.paused) {
+    // corrida e demonstração da tela inicial (assim a 1ª corrida já começa leve)
+    const active = (game.state === 'race' || menu.current === 'title') && !game.paused;
+    if (!active) {
       slowTime = fastTime = 0;
       return;
     }
     if (checkTime > 0) {
       // Reduziu e não melhorou pelo menos 8%: volta e para de reduzir.
       checkTime -= dt;
-      if (checkTime <= 0 && dtAvg > dtBefore * 0.92) {
+      if (checkTime <= 0 && dtAvg > dtBefore * 0.92 && pixelRatio !== prBefore) {
         setPR(prBefore);
         noLower = true;
       }
@@ -598,7 +611,14 @@ async function init() {
       slowTime += dt;
       if (slowTime > 2.5) {
         slowTime = 0;
-        if (!noLower && pixelRatio > PR_MIN) {
+        if (!shadowsOff) {
+          // 1º passo: sem sombras; a próxima visita já abre em 'baixa'
+          disableShadows();
+          store.set('quality', 'baixa');
+          checkTime = 1.5;
+          dtBefore = dtAvg;
+          prBefore = pixelRatio;
+        } else if (!noLower && pixelRatio > PR_MIN) {
           dtBefore = dtAvg;
           prBefore = pixelRatio;
           setPR(Math.max(PR_MIN, pixelRatio - 0.15));
