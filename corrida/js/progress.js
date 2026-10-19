@@ -109,10 +109,18 @@
       return fresh;
     },
 
-    // aplica uma corrida terminada
-    applyRun(run) {
+    // aplica uma corrida terminada. Treino (opts.practice) só soma XP e acertos: não mexe nos recordes.
+    applyRun(run, opts) {
       const d = this.data;
       const prevBest = d.bestScore;
+      if (opts && opts.practice) {
+        d.xp += run.score;
+        d.totalHits += run.hits;
+        d.runs += 1;
+        const fresh = this.checkUnlocks();
+        this.save();
+        return { xpGained: run.score, newSkins: fresh, record: false };
+      }
       d.xp += run.score;
       d.bestScore = Math.max(d.bestScore, run.score);
       d.maxLevel = Math.max(d.maxLevel, run.maxLevel);

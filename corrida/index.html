@@ -479,9 +479,120 @@
     .stats { gap: 4px; }
     .mult.show { display: none; }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .blink, .pop, .pop.big, .question.bounce .q-inner, .cm-num.punch, .combo-meter.t5, .fever-edge.on, .score.pulse { animation-duration: 0s; }
+  /* contagem regressiva 3, 2, 1, VAI! */
+  .count {
+    position: fixed; left: 50%; top: 44%; z-index: 6; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -50%);
+    font-family: var(--pixel); font-size: clamp(54px, 15vmin, 120px); line-height: 1; color: var(--gold);
+    text-shadow: 6px 6px 0 #000, -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000;
   }
+  .count.go { color: var(--brand-hi); font-size: clamp(40px, 11vmin, 90px); }
+  .count.tick { animation: cnt .55s steps(6) forwards; }
+  @keyframes cnt {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+    25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  }
+  .count-sub { position: fixed; left: 50%; top: calc(44% + clamp(48px, 11vmin, 90px)); z-index: 6; pointer-events: none;
+    transform: translateX(-50%); white-space: nowrap; display: none;
+    font-family: var(--pixel-text); font-weight: 700; font-size: clamp(14px, 3.6vw, 20px); color: #fff; text-shadow: 2px 2px 0 #000; }
+  .count-sub.show { display: block; }
+
+  /* dica de toque: as duas metades da tela */
+  .touch-hint { position: fixed; inset: 0; z-index: 4; pointer-events: none; display: none; gap: 10px; padding: 0 10px; }
+  .touch-hint.show { display: flex; }
+  .touch-hint div {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    margin: 58vh 0 14vh; background: rgba(31,214,133,0.12); border: 3px dashed rgba(125,255,192,0.55);
+    font-family: var(--pixel); font-size: 12px; line-height: 1.4; text-align: center; color: #fff; text-shadow: 2px 2px 0 #000;
+  }
+  .touch-hint b { font-size: 26px; font-weight: 400; color: var(--brand-hi); }
+  @media (orientation: landscape) { .touch-hint div { margin: 36vh 0 24vh; } }
+
+  /* explicação depois de um erro */
+  .explain {
+    position: fixed; left: 50%; top: 64%; z-index: 6; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -50%);
+    width: max-content; max-width: min(92vw, 540px); padding: 12px 16px 11px; text-align: center;
+    background: rgba(4,16,11,0.95); border: 3px solid var(--danger); box-shadow: 5px 5px 0 #000;
+  }
+  .explain.show { animation: expl 2.2s steps(14) forwards; }
+  .explain .eq { font-family: var(--pixel); font-size: clamp(16px, 4.6vw, 28px); line-height: 1.2; color: #fff; white-space: nowrap; text-shadow: 3px 3px 0 #000; }
+  .explain .eq b { color: var(--brand-hi); font-weight: 400; }
+  .explain .how { margin-top: 8px; font-weight: 700; font-size: clamp(14px, 3.6vw, 17px); color: var(--ink); line-height: 1.35; text-wrap: balance; }
+  .explain .you { margin-top: 4px; font-size: 13px; color: #ffb3bb; }
+  @keyframes expl {
+    0% { opacity: 0; transform: translate(-50%, -38%); }
+    7% { opacity: 1; transform: translate(-50%, -50%); }
+    88% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -50%); }
+  }
+  @media (max-height: 520px) { .explain { top: 70%; padding: 8px 12px 7px; } .explain .how { margin-top: 4px; font-size: 14px; } .explain .you { display: none; } }
+
+  /* nível: 5 acertos por nível */
+  .lvl { display: flex; align-items: center; gap: 6px; }
+  .lvl .lbl { min-width: 0; }
+  .pips { display: flex; gap: 3px; }
+  .pips i { width: 12px; height: 8px; background: rgba(0,0,0,0.6); border: 1px solid var(--gold); }
+  .pips i.on { background: var(--gold); }
+
+  /* modos */
+  .modes { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 6px; margin: 0 0 8px; }
+  .mode {
+    min-height: 48px; padding: 8px 4px 6px; cursor: pointer;
+    font-family: var(--pixel); font-size: 12px; line-height: 1.1; color: var(--ink-dim);
+    background: var(--panel-2); border: 2px solid var(--brand-dark); box-shadow: 0 3px 0 #000;
+  }
+  .mode small { display: block; margin-top: 5px; font-family: var(--pixel-text); font-weight: 700; font-size: 11px; letter-spacing: 0.5px; }
+  .mode[aria-checked="true"] { color: #03140c; background: var(--gold); border-color: #fff3b0; }
+  .mode:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .mode-desc { min-height: 2.9em; margin: 0 0 12px !important; font-size: 14px !important; }
+  .mode-chip { display: inline-block; margin: -4px 0 10px; padding: 4px 8px 3px; font-family: var(--pixel-text); font-weight: 700; font-size: 12px; letter-spacing: 1px; color: #03140c; background: var(--gold); }
+
+  /* revisão no fim da corrida */
+  .review { display: none; margin: 0 0 14px; padding: 10px 12px; text-align: left; background: var(--panel-2); border: 2px solid var(--brand-dark); }
+  .review.show { display: block; }
+  .review h3 { margin: 0 0 6px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; letter-spacing: 1px; color: var(--gold); }
+  .review ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .review li { font-size: 13px; line-height: 1.4; color: var(--ink-dim); }
+  .review li b { font-family: var(--pixel); font-weight: 400; font-size: 12px; color: var(--ink); }
+  .review li b i { font-style: normal; color: var(--brand-hi); }
+  .review .acc { margin: 0 0 8px; font-size: 14px; color: var(--ink); }
+  .review .acc b { color: var(--brand); }
+
+  .pause-stats { font-family: var(--pixel-text); font-weight: 700; color: var(--ink) !important; }
+  #pauseScreen { background: rgba(4,16,11,0.86); }
+  body.paused .question { visibility: hidden; }
+  .row-links { display: flex; justify-content: center; align-items: center; gap: 22px; flex-wrap: wrap; margin-top: 14px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; }
+  .row-links a.link { margin-top: 0; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* tela final em celular deitado: duas colunas para JOGAR DE NOVO caber sem rolar */
+  @media (max-height: 520px) and (min-width: 600px) {
+    #overScreen .card { max-width: 780px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; align-items: start; }
+    #overScreen .title { font-size: 18px; }
+    #overScreen .title br { display: none; }
+    #overScreen .results { grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 10px; }
+    #overScreen .results div { padding: 8px 2px 6px; }
+    #overScreen .results b { font-size: 13px; margin-bottom: 5px; }
+    #overScreen .results small { font-size: 10px; letter-spacing: 0; }
+    .review { padding: 8px 10px; }
+    .review ul { gap: 2px; }
+    .login-box small { display: none; }
+    .mode { min-height: 44px; padding: 6px 4px 4px; }
+    #overScreen .tip { display: none; }
+    #overScreen a.link { margin-top: 6px; }
+    #startScreen .card > p:not(.mode-desc) { display: none; }
+    .mode-desc { min-height: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blink, .question.bounce .q-inner, .cm-num.punch, .combo-meter.t5, .fever-edge.on, .score.pulse { animation-duration: 0s; }
+    /* textos de acerto/erro: antes sumiam na hora (animação de 0 s terminava invisível); agora só aparecem e somem */
+    .pop, .pop.big, .praise, .broken, .explain.show, .count.tick { animation-name: fadeonly; }
+  }
+  @keyframes fadeonly { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
 </style>
 </head>
 <body>
@@ -512,6 +623,11 @@
   </div>
 </div>
 
+<div class="sr" id="sr" aria-live="polite"></div>
+<div class="count" id="count" aria-hidden="true"></div>
+<div class="count-sub" id="countSub" aria-hidden="true"></div>
+<div class="explain" id="explain" aria-hidden="true"></div>
+<div class="touch-hint" id="touchHint" aria-hidden="true"><div><b>◄</b>TOQUE AQUI<br>PARA A ESQUERDA</div><div><b>►</b>TOQUE AQUI<br>PARA A DIREITA</div></div>
 <div class="question" id="question">
   <div class="q-inner">
     <div class="q-level" id="qLevel">NÍVEL 1</div>
@@ -526,6 +642,7 @@
 <button class="dash-btn" id="btnDash" type="button" aria-label="Dash: acelerar">▲<small>DASH</small></button>
 <div class="bottom">
   <div class="speed" id="speed">
+    <div class="lvl"><div class="lbl">NÍVEL <b id="lvlTxt">1</b></div><div class="pips" id="pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></div>
     <div class="lbl">VEL <b id="speedTxt">x1.0</b></div>
     <div class="segs" id="segs"></div>
   </div>
@@ -539,11 +656,17 @@
     <h1 class="title">CORRIDA<br><span>QUANTA</span></h1>
     <p>Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
     <div class="keys">
-      <div><span class="kc">◄ ►</span> Setas ou A/D. No celular, toque no lado ou deslize.</div>
-      <div><span class="kc">▲</span> Já sabe? Seta pra cima ou W dá dash e acelera. No celular, deslize pra cima ou segure ▲.</div>
-      <div><span class="kc">♥ x3</span> Portal errado tira uma vida.</div>
-      <div><span class="kc">★</span> Seus pontos somam XP e liberam skins novas.</div>
+      <div><span class="kc">◄ ►</span> Setas ou A/D. No celular, toque no lado da tela ou deslize.</div>
+      <div><span class="kc">▲</span> Já sabe? Seta pra cima ou W dá dash, confirma a resposta e vale bônus. No celular, toque em ▲ DASH ou deslize pra cima.</div>
+      <div><span class="kc">♥ x3</span> Portal errado tira uma vida e mostra como fazer a conta.</div>
     </div>
+    <div class="modes" id="modes" role="radiogroup" aria-label="Modo de jogo">
+      <button type="button" class="mode" role="radio" data-mode="corrida">CORRIDA<small>TUDO · RANKING</small></button>
+      <button type="button" class="mode" role="radio" data-mode="somasub" aria-label="Treino de adição e subtração">+ −<small>TREINO</small></button>
+      <button type="button" class="mode" role="radio" data-mode="tabuada" aria-label="Treino de tabuada">×<small>TABUADA</small></button>
+      <button type="button" class="mode" role="radio" data-mode="divisao" aria-label="Treino de divisão">÷<small>TREINO</small></button>
+    </div>
+    <p class="mode-desc" id="modeDesc"></p>
     <div class="account-slot"></div>
     <button class="btn" id="btnStart" type="button" disabled><span id="loading">CARREGANDO...</span></button>
     <div class="row2">
@@ -559,7 +682,13 @@
   <div class="card">
     <div class="tag">JOGO PAUSADO</div>
     <h1 class="title">PAUSA</h1>
+    <p class="pause-stats" id="pauseStats"></p>
     <button class="btn" id="btnResume" type="button">► CONTINUAR</button>
+    <div class="row2">
+      <button class="btn alt" id="btnPauseSound" type="button" aria-pressed="true">SOM: LIGADO</button>
+      <button class="btn alt" id="btnQuit" type="button">ENCERRAR</button>
+    </div>
+    <p style="margin:12px 0 0;font-size:13px">Atalhos: P ou Esc pausa · M liga e desliga o som</p>
     <a class="link" href="/">Voltar ao site</a>
   </div>
 </div>
@@ -567,8 +696,10 @@
 <!-- Fim -->
 <div class="overlay" id="overScreen">
   <div class="card">
+   <div class="ov-a">
     <div class="tag" id="overTag">FIM DE CORRIDA</div>
     <h1 class="title" id="overTitle">GAME<br><span>OVER</span></h1>
+    <div class="mode-chip" id="overMode">CORRIDA</div>
     <div class="newrec blink" id="newRecord">★ NOVO RECORDE ★</div>
     <div class="results">
       <div><b id="rScore">0</b><small>PONTOS</small></div>
@@ -576,6 +707,9 @@
       <div><b id="rCombo">0</b><small>COMBO</small></div>
       <div><b id="rLevel">1</b><small>NÍVEL</small></div>
     </div>
+    <div class="review" id="review"></div>
+   </div>
+   <div class="ov-b">
     <div class="unlocked" id="unlocked"></div>
     <div class="xp">
       <div class="xp-line"><span>+<b id="xpGain">0</b> XP</span><span>TOTAL <b id="xpTotal">0</b></span></div>
@@ -589,7 +723,8 @@
       <button class="btn alt" type="button" data-open="rank">RANKING</button>
     </div>
     <p class="tip" id="overTip" style="margin:16px 0 0"></p>
-    <a class="link" href="/">Voltar ao site</a>
+    <div class="row-links"><button class="link" type="button" id="btnModes">Trocar modo</button><a class="link" href="/">Voltar ao site</a></div>
+   </div>
   </div>
 </div>
 
@@ -644,13 +779,14 @@
 <script src="js/music.js"></script>
 <script src="js/fx2d.js"></script>
 <script src="js/progress.js"></script>
+<script src="js/questions.js"></script>
 <script src="js/online.js"></script>
 <script>
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
   const $$ = (sel) => [...document.querySelectorAll(sel)];
-  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES) {
+  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES || !QC.Questions) {
     $('loading').textContent = 'ERRO AO CARREGAR. RECARREGUE A PÁGINA.';
     return;
   }
@@ -677,6 +813,8 @@
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const fmt = (n) => Math.round(n).toLocaleString('pt-BR');
+  // espaços das contas viram não separáveis: "23 - 8 = 15" não quebra no meio da linha
+  const keepEq = (t) => String(t).replace(/ ([-+×÷=]) /g, '\u00a0$1\u00a0');
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -689,41 +827,16 @@
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const embedded = (() => { try { return window.top !== window.self; } catch (e) { return true; } })();
 
-  // ================= Contas =================
-  function makeQuestion(level, n) {
-    let a, b, c, text, ans;
-    const big = Math.max(0, level - 5);
-    const types = ['add'];
-    if (level >= 2) types.push('sub');
-    if (level >= 3) types.push('mul');
-    if (level >= 4) types.push('div');
-    if (level >= 6) types.push('mix');
-    const type = level <= 4 && Math.random() < 0.6 ? types[types.length - 1] : pick(types);
-    switch (type) {
-      case 'add': a = rand(2, 12 + big * 15); b = rand(2, 12 + big * 15); text = `${a} + ${b}`; ans = a + b; break;
-      case 'sub': a = rand(6, 20 + big * 15); b = rand(1, a - 1); text = `${a} - ${b}`; ans = a - b; break;
-      case 'mul': a = rand(2, 9 + Math.min(big, 3)); b = rand(2, 9); text = `${a} × ${b}`; ans = a * b; break;
-      case 'div': b = rand(2, 9); ans = rand(2, 9 + Math.min(big, 3)); a = b * ans; text = `${a} ÷ ${b}`; break;
-      case 'mix':
-        a = rand(2, 9); b = rand(2, 9);
-        if (Math.random() < 0.5) { c = rand(1, 15); text = `${a} × ${b} + ${c}`; ans = a * b + c; }
-        else { c = rand(1, a * b - 1); text = `${a} × ${b} - ${c}`; ans = a * b - c; }
-        break;
-    }
-    return { text, ans, wrong: makeDistractors(ans, type, a, b, n - 1) };
-  }
-  // respostas erradas plausíveis: vizinhas da certa ou erros típicos de conta
-  function makeDistractors(ans, type, a, b, count) {
-    const opts = [ans + 1, ans - 1, ans + 2, ans - 2, ans + 10, ans - 10, ans + 3, ans - 3];
-    if (type === 'mul') opts.push(a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b, a + b);
-    if (type === 'div') opts.push(b, ans * 2);
-    if (type === 'sub') opts.push(a + b);
-    if (type === 'add') opts.push(Math.abs(a - b));
-    const pool = shuffle([...new Set(opts)].filter((v) => v !== ans && v >= 0));
-    const out = pool.slice(0, count);
-    for (let k = 4; out.length < count; k++) if (!out.includes(ans + k)) out.push(ans + k);
-    return out;
-  }
+  // ================= Contas e modos (js/questions.js) =================
+  const Qs = QC.Questions;
+  const MODES = Qs.MODES;
+  let modeId = MODES[store.get('quanta-corrida-mode', 'corrida')] ? store.get('quanta-corrida-mode', 'corrida') : 'corrida';
+  let runMode = MODES[modeId];   // modo da corrida em andamento (não muda se a pessoa trocar no menu)
+  const recentQ = [];
+  // treino: acelera mais devagar e para antes. CORRIDA usa CFG (o servidor do ranking confere essas regras).
+  const speedStep = () => (runMode.ranked ? CFG.speedStep : 0.6);
+  const speedMax = () => (runMode.ranked ? CFG.maxSpeed : 34);
+  const touchUI = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
   function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
     return arr;
@@ -1146,6 +1259,7 @@
     speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, x: -2.1, horizon: 0,
     gate: null, gap: 0, t: 0, phase: 0, shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0,
     playMs: 0, locker: 0, lockerOn: false, preview: null, shown: 0, fever: false, dash: 0, dashCd: 0, dashHeld: false, lunge: 0, spin: 0,
+    count: 0, misses: [], overAt: 0,
   };
   // dash: cada toque soma até DASH_V unidades/s à corrida e cai em DASH_DECAY s (~18 u = 18% do caminho até o portal);
   // segurando, repete a cada DASH_CD s. O servidor do ranking conta com esse limite (velocidade + 80).
@@ -1179,7 +1293,9 @@
     paintScore();
     let h = ''; for (let i = 0; i < CFG.lives; i++) h += heart(i < S.lives); $('hudLives').innerHTML = h;
     $('speedTxt').textContent = 'x' + (S.speed / CFG.startSpeed).toFixed(1);
-    const on = Math.round((S.speed - CFG.startSpeed) / (CFG.maxSpeed - CFG.startSpeed) * 11) + 1;
+    const on = Math.round((S.speed - CFG.startSpeed) / (speedMax() - CFG.startSpeed) * 11) + 1;
+    $('lvlTxt').textContent = S.level;
+    [...$('pips').children].forEach((el, i) => el.classList.toggle('on', i < S.hits % CFG.hitsPerLevel));
     [...segsEl.children].forEach((el, i) => { el.className = i < on ? (i >= 10 ? 'on max' : i >= 7 ? 'on hot' : 'on') : ''; });
     const mult = multFor(S.combo) * (S.fever ? 2 : 1);
     const hm = $('hudMult');
@@ -1280,15 +1396,21 @@
   window.addEventListener('keydown', (e) => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     const k = e.key.toLowerCase();
+    const inMenu = S.mode === 'menu' && !openPanel && $('startScreen').classList.contains('show');
+    if (inMenu && (k === 'arrowleft' || k === 'arrowright')) { stepMode(k === 'arrowleft' ? -1 : 1, false); e.preventDefault(); return; }
     if (k === 'arrowleft' || k === 'a') { setLane(S.lane - 1); e.preventDefault(); }
     else if (k === 'arrowright' || k === 'd') { setLane(S.lane + 1); e.preventDefault(); }
+    else if (k === 'm' && !openPanel) toggleSound();
     else if (k === 'arrowup' || k === 'w') { if (!e.repeat) dash(); S.dashHeld = true; e.preventDefault(); }
     else if (k === 'p') togglePause();
     else if (k === 'escape') { if (openPanel) closePanel(); else togglePause(); }
     else if (k === 'enter' || k === ' ') {
       // com um botão ou link focado, deixa o próprio botão agir (antes Enter em SKINS começava a corrida)
-      if (e.target && e.target.closest && e.target.closest('button, a, [role="tab"]')) return;
-      if (!openPanel && (S.mode === 'menu' || S.mode === 'over') && ready) { startGame(); e.preventDefault(); }
+      const ctl = e.target && e.target.closest && e.target.closest('button, a, [role="tab"]');
+      if (ctl && ctl.classList.contains('mode') && k === 'enter' && ready) { setMode(ctl.dataset.mode); startGame(); e.preventDefault(); return; }
+      if (ctl) return;
+      // na tela final, espera um instante para o Enter não pular o resultado sem querer
+      if (!openPanel && (S.mode === 'menu' || (S.mode === 'over' && performance.now() - S.overAt > 700)) && ready) { startGame(); e.preventDefault(); }
     }
   });
   let tx0 = null, ty0 = null, swiped = false;
@@ -1310,7 +1432,9 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) dashUp(); });
 
   function dash() {
-    if (S.mode !== 'play' || S.stumble > 0 || S.dashCd > 0) return;
+    if (S.mode !== 'play' || S.stumble > 0 || S.dashCd > 0 || S.count > 0) return;
+    // dash conta como decisão: quem já está no portal certo confirma a resposta (vale o bônus de rapidez)
+    if (S.gate && S.gate.state === 'coming' && S.gate.decidedFrac == null) S.gate.decidedFrac = S.gate.frac;
     S.dash = 1;
     S.dashCd = DASH_CD;
     S.lunge = 1;
@@ -1334,18 +1458,24 @@
     audio();
     baseScreen = null;
     closePanel();
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if (S.gate) { removeGate(S.gate); S.gate = null; }
+    runMode = MODES[modeId];
     Object.assign(S, {
       mode: 'play', score: 0, lives: CFG.lives, hits: 0, combo: 0, maxCombo: 0, level: 1,
-      speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, gap: 0.8,
+      speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, gap: 0.3,
       shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0, playMs: 0, preview: null, shown: 0, fever: false,
-      dash: 0, dashCd: 0, dashHeld: false, lunge: 0,
+      dash: 0, dashCd: 0, dashHeld: false, lunge: 0, misses: [],
     });
+    recentQ.length = 0;
+    $('explain').classList.remove('show');
+    document.body.classList.remove('paused');
     fxCall('clear');
     useSkin(P.data.skin);
     setTrackLanes(2);
     runId = null;
-    if (onlineReady && !embedded && QC.Online.user) { const me = ++runReq; QC.Online.startRun().then((id) => { if (me === runReq) runId = id; }); }
+    // só o modo CORRIDA vale ranking: treino não pede bilhete ao servidor
+    if (runMode.ranked && onlineReady && !embedded && QC.Online.user) { const me = ++runReq; QC.Online.startRun().then((id) => { if (me === runReq) runId = id; }); }
     if (themeIdx !== 0) applyTheme(1, false);
     if (creatures) creatures.clear();
     if (music) { try { music.resume(); music.play(0); } catch (e) {} }
@@ -1354,13 +1484,28 @@
     document.body.classList.add('playing');
     updateHud();
     paintCombo(false);
-    if (!store.get('quanta-corrida-dash-tip', false)) {
-      store.set('quanta-corrida-dash-tip', true);
-      const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
-      setTimeout(() => toast(touch
-        ? 'DICA: JÁ SABE A RESPOSTA?<small>Toque em ▲ DASH (ou deslize pra cima) para chegar mais rápido</small>'
-        : 'DICA: JÁ SABE A RESPOSTA?<small>Aperte ▲ (ou W) para dar dash e chegar mais rápido</small>'), 1500);
+    // 3, 2, 1, VAI!: a primeira conta não aparece de surpresa
+    $('countSub').textContent = runMode.name;
+    $('countSub').classList.add('show');
+    if (touchUI && P.data.runs < 3) $('touchHint').classList.add('show');
+    startCountdown(3, 0.55);
+    if (!store.get('quanta-corrida-dash-tip2', false)) {
+      store.set('quanta-corrida-dash-tip2', true);
+      setTimeout(() => toast(touchUI
+        ? 'DICA: JÁ SABE A RESPOSTA?<small>Toque em ▲ DASH (ou deslize pra cima) para confirmar e ganhar bônus</small>'
+        : 'DICA: JÁ SABE A RESPOSTA?<small>Aperte ▲ ou W: o dash confirma a resposta e vale bônus</small>'), 2600);
     }
+  }
+
+  // contagem regressiva (no início e ao voltar da pausa)
+  let cdStep = 0.55;
+  function startCountdown(n, step) { cdStep = step; S.count = n * step; showCount(n); }
+  function showCount(k) {
+    const el = $('count');
+    el.textContent = k > 0 ? String(k) : 'VAI!';
+    el.className = 'count' + (k > 0 ? '' : ' go');
+    void el.offsetWidth; el.classList.add('tick');
+    if (actx) tone(k > 0 ? 440 : 880, k > 0 ? 0.08 : 0.2, 'square', 0.045);
   }
 
   function spawnGate() {
@@ -1373,10 +1518,12 @@
       S.lane = bestI;
       setTimeout(() => popText(`AGORA SÃO ${n} PORTAIS!`, '#ffd23f', '64%', false, true), 400);
     }
-    const q = makeQuestion(S.level, n);
+    const q = Qs.make(runMode.id, S.level, n, recentQ);
     const answers = shuffle([q.ans, ...q.wrong]);
     const correct = answers.indexOf(q.ans);
-    S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: 1, obj: makeGate(q, answers, S.lanes) };
+    // decidedFrac: em que ponto do caminho a pessoa escolheu (trocou de pista ou deu dash); null = não escolheu
+    S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: null, obj: makeGate(q, answers, S.lanes) };
+    $('sr').textContent = `${q.text.replace(/×/g, 'vezes').replace(/÷/g, 'dividido por').replace(/ - /g, ' menos ')}. Opções, da esquerda para a direita: ${answers.join(', ')}.`;
     $('qText').innerHTML = `${esc(q.text)} = <span class="qm">?</span>`;
     $('qOpts').innerHTML = answers.map((a) => `<span>${a}</span>`).join('');
     $('qLevel').textContent = `NÍVEL ${S.level}`;
@@ -1387,6 +1534,8 @@
   }
 
   function liveStats() {
+    // treino só soma XP e acertos (recordes de combo, nível e velocidade são do modo CORRIDA)
+    if (!runMode.ranked) return { score: S.score, hits: S.hits, maxCombo: 0, maxLevel: 1, maxSpeed: 1 };
     return { score: S.score, hits: S.hits, maxCombo: S.maxCombo, maxLevel: S.level, maxSpeed: S.maxSpeedSeen / CFG.startSpeed };
   }
   function announceUnlocks(ids) {
@@ -1415,13 +1564,13 @@
       g.obj.panels[S.lane].visible = false;
       burst(lx, 2.3, g.z, 'good', 34, 1.6);
       S.hits++; S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
-      const quick = g.decidedFrac >= 0.5;
+      const quick = g.decidedFrac != null && g.decidedFrac >= 0.5;
       const startFever = !S.fever && S.combo >= FEVER_AT;
       if (startFever) S.fever = true;
       const mult = multFor(S.combo) * (S.fever ? 2 : 1);
       const pts = (quick ? 20 : 10) * mult;
       S.score += pts;
-      S.speed = Math.min(CFG.maxSpeed, S.speed + CFG.speedStep);
+      S.speed = Math.min(speedMax(), S.speed + speedStep());
       S.maxSpeedSeen = Math.max(S.maxSpeedSeen, S.speed);
       S.fovKick = 7 + Math.min(8, S.combo * 0.4); S.jumpV = 7;
       flash(TIER_COLORS[tierOf(S.combo)], 0.14 + tierOf(S.combo) * 0.04);
@@ -1435,6 +1584,7 @@
       } else { sc.classList.remove('pulse'); void sc.offsetWidth; sc.classList.add('pulse'); }
       const sp = $('speed'); sp.classList.remove('bump'); void sp.offsetWidth; sp.classList.add('bump');
       sfx.good(S.combo);
+      $('sr').textContent = `Certo! ${g.q.text} = ${g.q.ans}.`;
       if (S.combo % 5 === 0) {
         // marco de combo: fogos, onda de choque e carimbo gigante
         const cm = $('cmNum').getBoundingClientRect();
@@ -1474,7 +1624,9 @@
       }
       paintCombo(false);
       flash('rgba(255,77,94,0.9)', 0.35);
-      popText(`ERA ${g.q.ans}`, '#ff4d5e', '52%');
+      const chosen = g.answers[S.lane];
+      S.misses.push({ q: g.q, chosen });
+      showExplain(g.q, chosen);
       sfx.bad();
       if (navigator.vibrate) { try { navigator.vibrate(140); } catch (e) {} }
     }
@@ -1484,25 +1636,31 @@
     updateHud();
   }
 
-  const TIPS = [
-    'Dica: na tabuada, confira o último algarismo. 7 × 8 termina em 6, então é 56.',
-    'Dica: para somar 9, some 10 e tire 1.',
-    'Dica: dividir é perguntar quantas vezes cabe. 42 ÷ 6? 6 × 7 = 42.',
-    'Dica: número par vezes qualquer número dá sempre par.',
-    'Dica: 25 - 8 é o mesmo que 25 - 10 + 2.',
-    'Dica: na tabuada do 9, os algarismos do resultado somam 9.',
-  ];
+  // depois de um erro: a conta certa e um jeito de pensar nela (fica na tela tempo de ler)
+  let explainTimer = 0;
+  function showExplain(q, chosen) {
+    const el = $('explain');
+    el.innerHTML = `<div class="eq">${esc(q.text)} = <b>${q.ans}</b></div><div class="how">${esc(keepEq(Qs.explain(q)))}</div><div class="you">Você escolheu ${chosen}.</div>`;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(explainTimer); explainTimer = setTimeout(() => el.classList.remove('show'), 2300);
+    $('sr').textContent = `Errado. ${q.text} = ${q.ans}. ${Qs.explain(q)}`;
+  }
   function gameOver() {
     S.mode = 'over';
     document.body.classList.remove('playing');
     dashUp();
     if (music) { try { music.stop(); } catch (e) {} }
+    S.overAt = performance.now();
+    document.body.classList.remove('paused');
+    $('pauseScreen').classList.remove('show');
+    $('count').className = 'count'; $('countSub').classList.remove('show'); $('touchHint').classList.remove('show');
+    const practice = !runMode.ranked;
     const run = {
       score: S.score, hits: S.hits, maxLevel: S.level, maxCombo: S.maxCombo,
-      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, runId,
+      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, runId, practice,
     };
     runId = null;
-    const res = P.applyRun(run);
+    const res = P.applyRun(run, { practice });
     stinger(res.record ? 'record' : 'gameover');
 
     countUp($('rScore'), S.score, 900); countUp($('rHits'), S.hits, 700); countUp($('rCombo'), S.maxCombo, 700);
@@ -1511,7 +1669,8 @@
     if (res.record) setTimeout(() => { fxCall('fireworks', 8); fxCall('confetti', 90); }, 400);
     $('newRecord').classList.toggle('show', res.record);
     $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
-    $('overTip').textContent = pick(TIPS);
+    $('overMode').textContent = practice ? `${runMode.name} · NÃO VALE RANKING` : 'CORRIDA';
+    paintReview();
     countUp($('xpGain'), res.xpGained, 900);
     countUp($('xpTotal'), P.data.xp, 1100, P.data.xp - res.xpGained);
     const un = $('unlocked');
@@ -1520,6 +1679,7 @@
     un.textContent = all.length ? `★ Skin nova: ${[...new Set(all)].map((id) => QC.Skins.get(id).name).join(', ')}!` : '';
     paintNextUnlock();
     $('overScreen').classList.add('show');
+    setTimeout(() => { if (S.mode === 'over' && !openPanel) $('btnRetry').focus({ preventScroll: true }); }, 700);
     $('question').classList.remove('show');
     $('hudMult').classList.remove('show');
     refreshMenus();
@@ -1527,6 +1687,21 @@
     if (S.gate) { removeGate(S.gate); S.gate = null; }
   }
   const sessionUnlocks = [];
+  // revisão: quantos acertou e as contas que errou, com a resposta certa
+  function paintReview() {
+    const total = S.hits + S.misses.length, el = $('review');
+    let html = total ? `<p class="acc">Você acertou <b>${S.hits}</b> de ${total} ${total === 1 ? 'conta' : 'contas'} (${Math.round(S.hits / total * 100)}%).</p>` : '';
+    if (S.misses.length) {
+      html += `<h3>REVEJA</h3><ul>${S.misses.map((m) => `<li><b>${esc(m.q.text)} = <i>${m.q.ans}</i></b> · você escolheu ${m.chosen}</li>`).join('')}</ul>`;
+    }
+    el.innerHTML = html;
+    el.classList.toggle('show', !!html);
+    // a dica final é da operação em que a pessoa mais errou
+    const cnt = {};
+    S.misses.forEach((m) => { cnt[m.q.type] = (cnt[m.q.type] || 0) + 1; });
+    const worst = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+    $('overTip').textContent = keepEq(Qs.tipFor(worst || (runMode.ops ? pick(runMode.ops) : undefined)));
+  }
   // números que sobem rolando
   function countUp(el, to, ms, from) {
     const a = from || 0, t0 = performance.now();
@@ -1552,13 +1727,23 @@
 
   function togglePause() {
     if (S.mode === 'play') {
-      S.mode = 'pause'; $('pauseScreen').classList.add('show');
+      S.mode = 'pause'; dashUp();
+      // a pergunta some na pausa: pausar não vira tempo extra para pensar
+      document.body.classList.add('paused');
+      $('pauseStats').textContent = `${runMode.name} · Nível ${S.level} · ${fmt(S.score)} pontos · ${S.lives} ${S.lives === 1 ? 'vida' : 'vidas'}`;
+      $('pauseScreen').classList.add('show');
       if (music) { try { music.pause(); } catch (e) {} }
       paintCombo(false);
+      setTimeout(() => { if (S.mode === 'pause') $('btnResume').focus({ preventScroll: true }); }, 30);
     } else if (S.mode === 'pause') {
-      S.mode = 'play'; $('pauseScreen').classList.remove('show');
+      S.mode = 'play';
+      document.body.classList.remove('paused');
+      $('pauseScreen').classList.remove('show');
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       if (music) { try { music.resume(); } catch (e) {} }
       paintCombo(false);
+      // volta com 3, 2, 1 curtinho se havia um portal vindo
+      if (S.gate && S.gate.state === 'coming') startCountdown(3, 0.4);
     }
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') togglePause(); });
@@ -1816,6 +2001,7 @@
   async function submitOnline(run) {
     const line = $('onlineLine');
     if (!onlineReady || embedded) { line.textContent = ''; return; }
+    if (run.practice) { line.textContent = 'Treino não vale ranking. Para disputar, jogue no modo CORRIDA.'; await pushProgress(); return; }
     if (!QC.Online.user) { line.innerHTML = 'Entre com Google no menu inicial para aparecer no ranking.'; return; }
     await pushProgress();
     if (run.score <= 0) { line.textContent = ''; return; }
@@ -1856,13 +2042,19 @@
     S.t += dt;
     const playing = S.mode === 'play';
     const frozen = S.mode === 'pause';
-    if (playing) S.playMs += dt * 1000;
+    if (playing && S.count > 0) {
+      const before = Math.ceil(S.count / cdStep - 1e-6);
+      S.count = Math.max(0, S.count - dt);
+      const after = Math.ceil(S.count / cdStep - 1e-6);
+      if (after !== before) showCount(after);
+      if (S.count === 0) { $('countSub').classList.remove('show'); $('touchHint').classList.remove('show'); }
+    } else if (playing) S.playMs += dt * 1000;
     if (!frozen) {
       S.dash = Math.max(0, S.dash - dt / DASH_DECAY); S.dashCd = Math.max(0, S.dashCd - dt);
       S.lunge = Math.max(0, (S.lunge || 0) - dt * 3);
       if (S.dashHeld && S.dashCd <= 0) dash();
     }
-    let v = playing ? S.speed + DASH_V * S.dash : frozen ? 0 : 11 * (1 - S.locker * 0.85);
+    let v = playing ? (S.count > 0 ? (S.gate ? 0 : 6) : S.speed + DASH_V * S.dash) : frozen ? 0 : 11 * (1 - S.locker * 0.85);
     if (S.stumble > 0) v *= 0.12;
     const dz = v * dt;
 
@@ -1888,7 +2080,7 @@
     }
 
     // linhas de velocidade: mais visíveis quanto mais rápido; arco-íris na febre
-    const sf = clamp((S.speed - CFG.startSpeed) / (CFG.maxSpeed - CFG.startSpeed), 0, 1);
+    const sf = clamp((S.speed - CFG.startSpeed) / (speedMax() - CFG.startSpeed), 0, 1);
     streakMat.opacity = playing ? Math.min(1, 0.12 + sf * 0.55 + (S.fever ? 0.25 : 0) + S.dash * 0.7) : 0.06;
     if (S.fever && playing) streakMat.color.setHSL((S.t * 1.5) % 1, 1, 0.6);
     else if (tintT >= 1 && themeIdx >= 0) streakMat.color.setHex(QC.THEMES[themeIdx].streak);
@@ -1987,7 +2179,7 @@
       } catch (e) {}
     }
 
-    if (!playing) return;
+    if (!playing || S.count > 0) return;
 
     const g = S.gate;
     if (!g) {
@@ -2008,7 +2200,7 @@
       if (g.z > 11) { removeGate(g); S.gate = null; S.gap = 0.25; }
     } else if (g.state === 'crash') {
       g.timer += dt;
-      if (g.timer > 0.95) {
+      if (g.timer > 1.5) {
         removeGate(g); S.gate = null; S.gap = 0.4;
         if (S.lives <= 0) gameOver();
       }
@@ -2030,14 +2222,53 @@
   $('btnResume').addEventListener('click', togglePause);
   $('btnPause').addEventListener('click', togglePause);
   const sb = $('btnSound');
-  const paintSound = () => { sb.textContent = soundOn ? '♪' : '×'; sb.setAttribute('aria-pressed', String(soundOn)); };
-  sb.addEventListener('click', () => {
+  const paintSound = () => {
+    sb.textContent = soundOn ? '♪' : '×'; sb.setAttribute('aria-pressed', String(soundOn));
+    sb.setAttribute('aria-label', soundOn ? 'Som ligado. Desligar o som (M)' : 'Som desligado. Ligar o som (M)');
+    const pb = $('btnPauseSound'); pb.textContent = soundOn ? 'SOM: LIGADO' : 'SOM: DESLIGADO'; pb.setAttribute('aria-pressed', String(soundOn));
+  };
+  function toggleSound() {
     soundOn = !soundOn; store.set('quanta-corrida-sound', soundOn);
     if (soundOn) audio();
     if (music) { try { music.setMuted(!soundOn); } catch (e) {} }
     paintSound();
-  });
+  }
+  sb.addEventListener('click', toggleSound);
+  $('btnPauseSound').addEventListener('click', toggleSound);
+  $('btnQuit').addEventListener('click', () => { if (S.mode === 'pause') gameOver(); });
   paintSound();
+
+  // modos: grupo de opções (setas trocam, Enter começa)
+  const modeIds = Object.keys(MODES);
+  function paintModes() {
+    $$('.mode').forEach((b) => { const on = b.dataset.mode === modeId; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
+    $('modeDesc').textContent = MODES[modeId].desc;
+  }
+  function setMode(id) {
+    if (!MODES[id]) return;
+    if (id !== modeId && actx) sfx.move();
+    modeId = id; store.set('quanta-corrida-mode', id); paintModes();
+  }
+  function stepMode(d, focus) {
+    setMode(modeIds[(modeIds.indexOf(modeId) + d + modeIds.length) % modeIds.length]);
+    if (focus) document.querySelector(`.mode[data-mode="${modeId}"]`).focus();
+  }
+  $$('.mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('modes').addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'ArrowRight' || k === 'ArrowDown') {
+      stepMode(k === 'ArrowLeft' || k === 'ArrowUp' ? -1 : 1, true);
+      e.preventDefault(); e.stopPropagation();
+    }
+  });
+  $('btnModes').addEventListener('click', () => {
+    S.mode = 'menu';
+    $('overScreen').classList.remove('show');
+    $('startScreen').classList.add('show');
+    paintModes();
+    document.querySelector(`.mode[data-mode="${modeId}"]`).focus({ preventScroll: true });
+  });
+  paintModes();
 
   resize();
   applyTheme(1, true);
