@@ -17,7 +17,9 @@
       html.setAttribute('lang', lang === 'en' ? 'en' : 'pt-BR');
 
       langButtons.forEach((btn) => {
-        btn.classList.toggle('active', btn.getAttribute('data-set-lang') === lang);
+        const on = btn.getAttribute('data-set-lang') === lang;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', String(on));
       });
 
       localStorage.setItem('quanta_lang', lang);
@@ -62,17 +64,41 @@
     onScroll();
   })();
 
+  // Torna um elemento não-<button> clicável também pelo teclado (Enter/Espaço)
+  function makeKeyboardButton(el) {
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        el.click();
+      }
+    });
+  }
+
   // ---------- 4. FAQ accordion ----------
   (function setupFAQ() {
     const items = document.querySelectorAll('.faq-item');
+    function sync() {
+      items.forEach((i) => {
+        const q = i.querySelector('.faq-q');
+        if (q) q.setAttribute('aria-expanded', String(i.classList.contains('open')));
+      });
+    }
     items.forEach((item) => {
-      item.addEventListener('click', function () {
+      const q = item.querySelector('.faq-q');
+      if (q) makeKeyboardButton(q);
+      item.addEventListener('click', function (e) {
+        // Clicar/selecionar texto dentro da resposta aberta não fecha o item
+        if (e.target.closest('.faq-a')) return;
         const wasOpen = item.classList.contains('open');
         items.forEach((i) => i.classList.remove('open'));
         if (!wasOpen) item.classList.add('open');
+        sync();
       });
     });
     if (items[0]) items[0].classList.add('open');
+    sync();
   })();
 
   // ---------- 5. Método (passos clicáveis) ----------
@@ -82,13 +108,17 @@
     if (!steps.length || !visuals.length) return;
 
     function activate(idx) {
-      steps.forEach((s, i) => s.classList.toggle('active', i === idx));
+      steps.forEach((s, i) => {
+        s.classList.toggle('active', i === idx);
+        s.setAttribute('aria-pressed', String(i === idx));
+      });
       visuals.forEach((v, i) => {
         v.style.display = i === idx ? 'flex' : 'none';
       });
     }
 
     steps.forEach((step, idx) => {
+      makeKeyboardButton(step);
       step.addEventListener('click', () => activate(idx));
     });
 
