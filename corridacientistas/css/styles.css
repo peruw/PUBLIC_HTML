@@ -1418,3 +1418,35 @@ body.touch .screen.dim {
 body.touch {
   --panel: rgba(13, 22, 56, 0.93);
 }
+
+/* resultado numa coluna em telas estreitas (celular em pé) */
+@media (max-width: 640px) {
+  .results-body { grid-template-columns: 1fr; }
+  .results-wrap { margin-right: 0; padding: 14px; }
+  .screen.dim-light { justify-content: center; }
+}
+
+/* ---------- Celular em pé ---------- */
+body.portrait #hud-minimap { width: 104px; height: 104px; }
+body.portrait #hud-toasts {
+  top: calc(max(12px, env(safe-area-inset-top)) + 118px);
+  left: auto;
+  right: max(10px, env(safe-area-inset-right));
+  transform: none;
+  width: calc(100% - 140px);
+}
+body.portrait .toast { grid-template-columns: 34px 1fr; padding: 6px 9px; }
+body.portrait .toast .item-ico { width: 34px; height: 34px; font-size: 19px; }
+body.portrait .toast p { font-size: 12.5px; }
+body.portrait .hud-pos { font-size: 52px; }
+body.portrait #hud-tip { top: 27%; font-size: 14px; }
+
+@media (max-width: 520px) {
+  .char-detail { grid-template-columns: 88px 1fr; gap: 10px; padding: 10px; }
+  #detail-portrait { width: 88px; height: 88px; }
+  .detail-text h3 { font-size: 20px; }
+  .detail-bio { font-size: 14px; }
+  .select-head h2 { font-size: 20px; }
+  .select-foot { gap: 10px 14px; }
+  .btn-go { margin-left: 0; width: 100%; }
+}

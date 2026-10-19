@@ -381,7 +381,14 @@ export class Input {
     const dx = W - sr - size.drift;
     pos.drift = [dx, sb];
     pos.brake = [dx - size.brake - gap * 1.2, sb];
-    if (this._autoAccelerate) {
+    const portrait = H > W;
+    if (portrait) {
+      // celular em pé: não há espaço ao lado do DRIFT (bateria em ◀ ▶); ITEM e FREIO sobem em coluna
+      const cx = (s) => W - sr - size.drift / 2 - s / 2;
+      pos.item = [cx(size.item), sb + size.drift + gap];
+      pos.brake = [cx(size.brake), sb + size.drift + size.item + gap * 2];
+      pos.gas = [W - sr - size.drift - gap - size.gas, sb + size.drift * 0.6 + gap];
+    } else if (this._autoAccelerate) {
       pos.item = [dx - size.item * 0.55, sb + size.drift + gap * 0.6];
       pos.gas = [W - sr - size.gas, sb + size.drift + gap * 0.7];
     } else {
@@ -416,7 +423,7 @@ export class Input {
     const rd = rect.drift;
     setZone(this._zones.drift, { x: rd.x, y: rd.y, w: W - rd.x, h: H - rd.y });
     const rb = rect.brake;
-    setZone(this._zones.brake, { x: rb.x, y: rb.y, w: rb.w, h: H - rb.y });
+    setZone(this._zones.brake, portrait ? rb : { x: rb.x, y: rb.y, w: rb.w, h: H - rb.y });
     setZone(this._zones.item, rect.item);
     setZone(this._zones.gas, rect.gas);
     this._zones.gas.style.display = this._autoAccelerate ? 'none' : '';

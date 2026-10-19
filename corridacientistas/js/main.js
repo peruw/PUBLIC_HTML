@@ -343,14 +343,24 @@ async function init() {
 
   // ---------- redimensionamento e orientação ----------
   const rotateHint = document.getElementById('rotate-hint');
+  // Quem não pode girar (rotação travada, iPhone sem tela cheia) joga em pé mesmo.
+  let portraitOK = store.get('portraitOK', false);
+  document.getElementById('btn-portrait').addEventListener('click', () => {
+    portraitOK = true;
+    store.set('portraitOK', true);
+    audio?.sfx('menuSelect');
+    onResize();
+  });
   function onResize() {
     renderer.setSize(innerWidth, innerHeight);
     needsRender = true; // setSize limpa o canvas
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     const portrait = isTouch && innerHeight > innerWidth && Math.min(screen.width, screen.height) < 600;
-    rotateHint.classList.toggle('hidden', !portrait);
-    if (portrait && game.state === 'race' && !game.paused) setPaused(true);
+    document.body.classList.toggle('portrait', isTouch && innerHeight > innerWidth);
+    const block = portrait && !portraitOK;
+    rotateHint.classList.toggle('hidden', !block);
+    if (block && game.state === 'race' && !game.paused) setPaused(true);
   }
   addEventListener('resize', onResize);
   onResize();
