@@ -818,28 +818,116 @@
     }
 
     .feedback-box {
-      position: absolute;
-      left: 10px;
-      right: 10px;
-      bottom: calc(39% + 8px);
-      z-index: 4;
       display: none;
-      border: 3px solid #fff2ad;
+      margin-top: 10px;
+      border: 3px solid #7ff7ff;
       border-radius: 8px;
-      background: rgba(21, 28, 48, .95);
+      background: rgba(12, 40, 52, .96);
       color: #fff;
-      padding: 10px 12px;
-      font-size: .92rem;
-      line-height: 1.25;
-      text-align: center;
+      padding: 8px 10px;
+      font-size: .95rem;
+      line-height: 1.3;
+      text-align: left;
       text-shadow: 1px 1px 0 #000;
-      box-shadow: 0 6px 0 rgba(0,0,0,.28);
+      box-shadow: 0 4px 0 rgba(0,0,0,.28);
+      grid-template-columns: 1fr auto;
+      gap: 2px 10px;
+      align-items: center;
     }
 
     .feedback-box.visible {
-      display: block;
+      display: grid;
       animation: feedbackPop .28s steps(2);
     }
+
+    .feedback-box.good {
+      border-color: #63d86b;
+      background: rgba(18, 56, 30, .96);
+    }
+
+    .feedback-box.bad {
+      border-color: #ffb34d;
+      background: rgba(62, 36, 14, .96);
+    }
+
+    .feedback-box p {
+      margin: 0;
+      grid-column: 1;
+    }
+
+    .feedback-title {
+      font-weight: 900;
+      color: #fff2ad;
+    }
+
+    .feedback-title strong {
+      color: #fff;
+    }
+
+    .feedback-text {
+      font-size: .88rem;
+      color: #e8f6ff;
+    }
+
+    .next-btn {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      min-height: 44px;
+      min-width: 44px;
+      border: 2px solid #fff2ad;
+      border-radius: 8px;
+      background: linear-gradient(#fff27a, #f0a22d);
+      color: #1b2238;
+      padding: 8px 14px;
+      font-weight: 900;
+      text-transform: uppercase;
+      box-shadow: 0 4px 0 #8a4a10;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .next-btn::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      height: 4px;
+      width: 100%;
+      background: rgba(27, 34, 56, .55);
+      transform-origin: left;
+      transform: scaleX(0);
+    }
+
+    .next-btn.counting::after {
+      animation: nextCountdown var(--advance-ms, 3200ms) linear forwards;
+    }
+
+    @keyframes nextCountdown {
+      from { transform: scaleX(1); }
+      to { transform: scaleX(0); }
+    }
+
+    .question-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin: -2px 0 4px;
+      font-size: .74rem;
+      font-weight: 900;
+      color: #bfe9ff;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+    }
+
+    .difficulty-tag {
+      padding: 1px 7px;
+      border-radius: 99px;
+      background: #2f71ce;
+      color: #fff;
+    }
+
+    .difficulty-tag.medio { background: #8a5a0c; }
+    .difficulty-tag.dificil { background: #b8323c; }
 
     @keyframes feedbackPop {
       from { transform: translateY(8px); opacity: 0; }
@@ -851,7 +939,7 @@
       top: max(8px, env(safe-area-inset-top));
       left: 8px;
       right: 8px;
-      z-index: 4;
+      z-index: 5;
       display: none;
       gap: 8px;
       align-items: center;
@@ -870,7 +958,7 @@
       display: flex;
       justify-content: space-between;
       gap: 8px;
-      font-size: .76rem;
+      font-size: .86rem;
       font-weight: 900;
       text-shadow: 2px 2px 0 #000;
       white-space: nowrap;
@@ -897,12 +985,47 @@
     }
 
     .round-info {
-      width: 70px;
+      width: 74px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
       text-align: center;
       color: var(--gold);
       font-weight: 900;
       text-shadow: 2px 2px 0 #000;
-      font-size: .8rem;
+      font-size: .82rem;
+      line-height: 1.1;
+    }
+
+    #timerText.urgent {
+      color: #ff8080;
+      animation: urgentBlink .5s steps(2) infinite;
+    }
+
+    @keyframes urgentBlink {
+      50% { opacity: .55; }
+    }
+
+    .battle .pause-btn {
+      display: block;
+    }
+
+    .pause-btn {
+      position: absolute;
+      left: 8px;
+      bottom: max(8px, env(safe-area-inset-bottom));
+      z-index: 30;
+      display: none;
+      width: 44px;
+      height: 44px;
+      border: 2px solid #fff2ad;
+      border-radius: 8px;
+      background: rgba(21, 28, 48, .9);
+      color: #fff2ad;
+      font-weight: 900;
+      letter-spacing: 1px;
+      box-shadow: 0 3px 0 rgba(0,0,0,.3);
     }
 
     .combo-badge {
@@ -1017,13 +1140,70 @@
       cursor: not-allowed;
     }
 
+    .option-btn {
+      justify-content: flex-start;
+      text-align: left;
+      gap: 10px;
+    }
+
+    .opt-key {
+      flex: 0 0 auto;
+      display: inline-grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: rgba(255, 242, 173, .92);
+      color: #1b2238;
+      font-size: .82rem;
+      text-shadow: none;
+    }
+
     .option-btn.wrong {
-      color: rgba(255, 255, 255, .45);
-      border-color: #5f6680;
-      background: linear-gradient(#31394d, #1b2133);
+      color: rgba(255, 255, 255, .6);
+      border-color: #c75a5f;
+      background: linear-gradient(#4a2a33, #2a1820);
       box-shadow: inset 0 0 0 2px rgba(0,0,0,.32), 0 4px 0 #111827;
       text-decoration: line-through;
-      filter: grayscale(.55);
+    }
+
+    .option-btn.wrong .opt-key {
+      background: #e84c4f;
+      color: #fff;
+    }
+
+    .option-btn.correct {
+      color: #fff;
+      border-color: #b9ffb0;
+      background: linear-gradient(#3fae4f, #1f7a33);
+      box-shadow: 0 4px 0 #134d21, 0 0 16px rgba(99, 216, 107, .65);
+    }
+
+    .option-btn.correct .opt-key {
+      background: #fff;
+      color: #1f7a33;
+    }
+
+    .option-btn.dim {
+      opacity: .55;
+    }
+
+    button:focus-visible,
+    .select-card:focus-visible {
+      outline: 3px solid #7ff7ff;
+      outline-offset: 3px;
+    }
+
+    kbd {
+      display: inline-block;
+      min-width: 1.5em;
+      padding: 0 4px;
+      border: 1px solid #fff2ad;
+      border-radius: 4px;
+      background: rgba(255,255,255,.1);
+      font: inherit;
+      font-weight: 900;
+      text-align: center;
     }
 
     .arena {
@@ -1638,7 +1818,7 @@
     .float-text {
       position: absolute;
       left: 50%;
-      top: 54%;
+      top: 66%;
       transform: translate(-50%, -50%);
       z-index: 8;
       color: #fff;
@@ -1652,7 +1832,7 @@
     }
 
     .float-text.praise {
-      top: 50%;
+      top: 64%;
       color: #fff2a6;
       font-size: clamp(1.35rem, 8vw, 3rem);
       text-transform: uppercase;
@@ -1776,6 +1956,90 @@
       12% { opacity: 1; }
       78% { opacity: 1; }
       100% { opacity: 0; transform: translate(-50%, -120%); }
+    }
+
+    .pause-screen {
+      z-index: 40;
+      justify-content: center;
+      background: rgba(10, 15, 29, .72);
+    }
+
+    .pause-screen .panel {
+      width: min(460px, 94vw);
+      text-align: center;
+    }
+
+    .pause-screen .result-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .result-stars {
+      margin: -4px 0 4px;
+      font-size: clamp(2rem, 9vw, 2.6rem);
+      line-height: 1;
+      letter-spacing: 6px;
+      color: #5a5f78;
+      text-shadow: 2px 2px 0 #000;
+    }
+
+    .result-stars .on {
+      color: #ffd45c;
+      text-shadow: 2px 2px 0 #7b2f2f, 0 0 14px rgba(255, 212, 92, .8);
+      display: inline-block;
+      animation: starPop .45s steps(3) backwards;
+    }
+
+    .result-stars .on:nth-child(2) { animation-delay: .25s; }
+    .result-stars .on:nth-child(3) { animation-delay: .5s; }
+
+    @keyframes starPop {
+      0% { transform: scale(.2); opacity: 0; }
+      70% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(1); }
+    }
+
+    .review-box {
+      margin: 12px 0;
+      padding: 10px 12px;
+      border: 2px solid rgba(255, 179, 77, .7);
+      border-radius: 8px;
+      background: rgba(62, 36, 14, .55);
+    }
+
+    .review-box[hidden] {
+      display: none;
+    }
+
+    .review-box h3 {
+      margin: 0 0 6px;
+      color: #ffd45c;
+      font-size: 1.05rem;
+    }
+
+    .review-box ol {
+      margin: 0;
+      padding-left: 22px;
+      display: grid;
+      gap: 6px;
+      font-size: .92rem;
+      line-height: 1.3;
+    }
+
+    .review-box li span {
+      display: block;
+      color: #b9ffb0;
+      font-weight: 900;
+    }
+
+    .world-stars {
+      float: right;
+      color: #ffd45c;
+      letter-spacing: 2px;
+      text-shadow: 1px 1px 0 #000;
+    }
+
+    .world-stars .off {
+      color: rgba(255, 255, 255, .28);
     }
 
     .result-stats {
@@ -2269,7 +2533,8 @@
 </head>
 <body>
   <main class="game" id="game">
-    <button class="music-toggle" id="musicToggle" type="button" aria-pressed="false">Música ON</button>
+    <button class="music-toggle" id="musicToggle" type="button" aria-pressed="false">Som ON</button>
+    <button class="pause-btn" id="pauseBtn" type="button" aria-label="Pausar (P)" title="Pausar (P)">II</button>
     <div class="mountains"></div>
     <div class="clouds"></div>
     <div class="village" aria-hidden="true">
@@ -2289,7 +2554,7 @@
     <div class="meteor m3"></div>
 
     <section class="screen title-screen active" id="startScreen">
-      <div class="version-badge">v1.0.1</div>
+      <div class="version-badge">v1.1.0</div>
       <h1>Super Vovó Eve World</h1>
       <p class="subtitle">Batalha bíblica</p>
       <div class="intro-fighters" aria-hidden="true">
@@ -2344,6 +2609,8 @@
         <p>Se errar, aquela resposta fica escura e você pode tentar outra. Cada erro deixa o contra-ataque do inimigo mais forte.</p>
         <p id="timeoutHelp">Se deixar o tempo acabar, o diabinho também ataca e a pergunta passa.</p>
         <p id="questionCountHelp">A cada partida aparecem 10 perguntas sorteadas, começando mais fáceis e ficando mais difíceis.</p>
+        <p>Depois de cada pergunta aparece a resposta certa e o versículo para você aprender. No fim, a Vovó Eve mostra o que vale revisar.</p>
+        <p class="small key-help">No computador: teclas <kbd>1</kbd> a <kbd>4</kbd> (ou <kbd>A</kbd> a <kbd>D</kbd>) respondem, <kbd>Enter</kbd> passa para a próxima e <kbd>P</kbd> pausa.</p>
         <button class="primary-btn" id="fightBtn">Aperte aqui para lutar</button>
       </div>
     </section>
@@ -2351,6 +2618,7 @@
     <section class="screen" id="resultScreen">
       <div class="panel">
         <h2 id="resultTitle">Vitória!</h2>
+        <div class="result-stars" id="resultStars" hidden></div>
         <p id="resultPhrase">A sabedoria venceu a tentação.</p>
         <div class="result-stats">
           <div class="stat"><span>Tempo</span><strong id="finalTime">0s</strong></div>
@@ -2359,6 +2627,10 @@
           <div class="stat"><span>Vida</span><strong id="finalLife">0%</strong></div>
           <div class="stat"><span>Erros</span><strong id="finalMisses">0</strong></div>
           <div class="stat"><span>Maior combo</span><strong id="finalCombo">0</strong></div>
+        </div>
+        <div class="review-box" id="reviewBox" hidden>
+          <h3>Para revisar</h3>
+          <ol id="reviewList"></ol>
         </div>
         <p class="small" id="roundTheme"></p>
         <p class="small" id="recordNote"></p>
@@ -2379,30 +2651,49 @@
       </div>
     </section>
 
+    <section class="screen pause-screen" id="pauseScreen" aria-labelledby="pauseTitle">
+      <div class="panel">
+        <h2 id="pauseTitle">Pausado</h2>
+        <p>A Vovó Eve está esperando. O tempo da pergunta parou.</p>
+        <div class="result-actions">
+          <button class="primary-btn next-phase-btn" id="resumeBtn" type="button">Continuar</button>
+          <button class="primary-btn" id="restartBtn" type="button">Recomeçar a batalha</button>
+          <button class="secondary-btn" id="quitBtn" type="button">Sair para o menu</button>
+        </div>
+      </div>
+    </section>
+
     <div class="hud">
       <div class="lifeBox">
         <div class="name"><span>Vovó Eve</span><span id="playerLifeText">100%</span></div>
-        <div class="life"><div class="lifeFill" id="playerLife"></div></div>
+        <div class="life" role="img" aria-label="Vida da Vovó Eve" id="playerLifeBar"><div class="lifeFill" id="playerLife"></div></div>
       </div>
-      <div class="round-info"><span id="roundText">1/10</span><br><span id="timerText">30.0</span></div>
+      <div class="round-info">
+        <span id="roundText">1/10</span>
+        <span id="timerText" aria-hidden="true">30.0</span>
+      </div>
       <div class="lifeBox">
         <div class="name"><span id="enemyName">Diabinho</span><span id="enemyLifeText">100%</span></div>
-        <div class="life"><div class="lifeFill enemyFill" id="enemyLife"></div></div>
+        <div class="life" role="img" aria-label="Vida do inimigo" id="enemyLifeBar"><div class="lifeFill enemyFill" id="enemyLife"></div></div>
       </div>
     </div>
 
     <div class="question-area">
       <div class="timer-line"><div class="timer-fill" id="timerFill"></div></div>
-      <div class="question-text" id="questionText"></div>
-      <div class="options" id="options"></div>
+      <div class="question-meta"><span id="questionTag">Pergunta 1 de 10</span><span class="difficulty-tag" id="difficultyTag">Fácil</span></div>
+      <div class="question-text" id="questionText" aria-live="polite"></div>
+      <div class="options" id="options" role="group" aria-label="Alternativas"></div>
+      <div class="feedback-box" id="feedbackBox" role="status" aria-live="polite">
+        <p class="feedback-title" id="feedbackTitle"></p>
+        <p class="feedback-text" id="feedbackText"></p>
+        <button class="next-btn" id="nextBtn" type="button">Próxima <span aria-hidden="true">▶</span></button>
+      </div>
     </div>
 
     <div class="combo-badge" id="comboBadge">
       <span>SEQUÊNCIA</span>
       <strong>COMBO x0</strong>
     </div>
-
-    <div class="feedback-box" id="feedbackBox"></div>
 
     <section class="arena" aria-hidden="true">
       <div class="fighter eve" id="eve">
@@ -3848,6 +4139,22 @@
     const roundTheme = document.getElementById("roundTheme");
     const recordNote = document.getElementById("recordNote");
     const finaleCard = document.getElementById("finaleCard");
+    const feedbackTitle = document.getElementById("feedbackTitle");
+    const feedbackText = document.getElementById("feedbackText");
+    const nextBtn = document.getElementById("nextBtn");
+    const questionTag = document.getElementById("questionTag");
+    const difficultyTag = document.getElementById("difficultyTag");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const pauseScreen = document.getElementById("pauseScreen");
+    const resumeBtn = document.getElementById("resumeBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const quitBtn = document.getElementById("quitBtn");
+    const resultStars = document.getElementById("resultStars");
+    const reviewBox = document.getElementById("reviewBox");
+    const reviewList = document.getElementById("reviewList");
+    const playerLifeBar = document.getElementById("playerLifeBar");
+    const enemyLifeBar = document.getElementById("enemyLifeBar");
+    let lastInputKeyboard = false;
 
     let audioContext;
     let musicTimer;
@@ -4055,8 +4362,10 @@
         button.dataset.world = world.id;
         button.disabled = !unlocked;
         const previous = ntWorlds[index - 1];
+        const stars = unlocked ? getStars(world.id) : 0;
+        button.setAttribute("aria-pressed", String(selectedWorld === world.id));
         button.innerHTML = `
-          <strong>${index + 1}. Mundo de ${world.label}</strong>
+          <strong>${index + 1}. Mundo de ${world.label}${stars ? `<span class="world-stars" role="img" aria-label="${stars} de 3 estrelas">${starsMarkup(stars)}</span>` : ""}</strong>
           <span>${unlocked ? world.desc : `Vença o Mundo de ${previous.label} para liberar.`}</span>
         `;
         worldGrid.appendChild(button);
@@ -4194,111 +4503,145 @@
       return {
         q: item.q,
         answers,
+        correctText: correct,
         chapter: getChapter(item.q),
+        reference: getReference(item.q),
         difficulty: item.difficulty || "Médio",
-        explanation: item.explanation || makeExplanation(item.q)
+        lesson: item.explanation || lessonFor(item.q, selectedWorld)
       };
     }
+
+    const bookNamePattern = "(?:Mateus|Marcos|Lucas|João|Atos|Romanos|[12] Coríntios|Gálatas|Efésios|Filipenses|Colossenses|[12] Tessalonicenses|[12] Timóteo|Tito|Filemom|Hebreus|Tiago|[12] Pedro|[123] João|Judas|Apocalipse)";
+    const chapterPattern = new RegExp(`(?:^|[^\\p{L}\\d])(${bookNamePattern})\\s+(\\d+)`, "u");
+    const bookPattern = new RegExp(`(?:^|[^\\p{L}\\d])(${bookNamePattern})(?![\\p{L}])`, "u");
 
     function getChapter(text) {
-      const match = text.match(/(?:Mateus|Marcos|Lucas|Joao|João|Atos|Romanos|1 Corintios|1 Coríntios|2 Corintios|2 Coríntios|Galatas|Gálatas|Efesios|Efésios|Filipenses|Colossenses|1 Tessalonicenses|2 Tessalonicenses|1 Timoteo|1 Timóteo|2 Timoteo|2 Timóteo|Tito|Filemom|Hebreus|Tiago|1 Pedro|2 Pedro|1 Joao|1 João|2 Joao|2 João|3 Joao|3 João|Judas|Apocalipse)\s+(\d+)/);
-      return match ? Number(match[1]) : 1;
+      const match = text.match(chapterPattern);
+      return match ? Number(match[2]) : 1;
     }
 
-    function makeExplanation(text) {
-      const t = text.toLowerCase();
-      if (t.includes("patmos")) return "Fidelidade permanece no exílio.";
-      if (t.includes("alfa")) return "Cristo reina do início ao fim.";
-      if (t.includes("sete igrejas")) return "Jesus corrige e fortalece sua igreja.";
-      if (t.includes("primeiro amor")) return "Volte ao primeiro amor.";
-      if (t.includes("coroa da vida")) return "Fidelidade recebe coroa.";
-      if (t.includes("morna")) return "Zelo espiritual precisa despertar.";
-      if (t.includes("porta e faz")) return "Jesus chama para comunhão.";
-      if (t.includes("trono")) return "Deus reina acima de tudo.";
-      if (t.includes("santo, santo, santo")) return "Toda adoração pertence a Deus.";
-      if (t.includes("cordeiro")) return "O Cordeiro é digno e vencedor.";
-      if (t.includes("orações dos santos")) return "As orações sobem diante de Deus.";
-      if (t.includes("selos")) return "O Cordeiro abre os selos.";
-      if (t.includes("grande multidão")) return "Deus guarda um povo redimido.";
-      if (t.includes("sétima trombeta")) return "Cristo reina para sempre.";
-      if (t.includes("dragão")) return "Deus vence o conflito espiritual.";
-      if (t.includes("666")) return "Discernimento protege a fé.";
-      if (t.includes("babilonia")) return "O mal cai diante de Deus.";
-      if (t.includes("fiel e verdadeiro")) return "Cristo julga com verdade.";
-      if (t.includes("mil anos")) return "O mal tem limite diante de Deus.";
-      if (t.includes("novo céu")) return "Deus renova todas as coisas.";
-      if (t.includes("nova jerusalém")) return "A cidade santa vem de Deus.";
-      if (t.includes("lágrima") || t.includes("dor")) return "Deus consola seu povo.";
-      if (t.includes("água da vida") || t.includes("árvore da vida")) return "A vida vem do trono de Deus.";
-      if (t.includes("ora vem")) return "A esperança da igreja é Jesus.";
-      if (t.includes("salvaria o seu povo")) return "Jesus salva do pecado.";
-      if (t.includes("magos")) return "Jesus é digno de adoração.";
-      if (t.includes("joão batista") || t.includes("arrependei")) return "Arrependimento prepara o caminho.";
-      if (t.includes("batizado")) return "Jesus se identificou com os obedientes.";
-      if (t.includes("tentou jesus")) return "A Palavra vence a tentação.";
-      if (t.includes("pescadores de homens")) return "Jesus chama para missão.";
-      if (t.includes("bem-aventurados")) return "O Reino valoriza os humildes.";
-      if (t.includes("sal de") || t.includes("luz de")) return "Discípulos influenciam o mundo.";
-      if (t.includes("pai nosso")) return "Ore como filho diante do Pai.";
-      if (t.includes("tesouros")) return "Tesouros eternos valem mais.";
-      if (t.includes("buscar primeiro")) return "Busque primeiro o Reino.";
-      if (t.includes("ansiosos")) return "Confie no cuidado de Deus.";
-      if (t.includes("não julgueis")) return "Julgue com humildade.";
-      if (t.includes("porta estreita")) return "O caminho da vida exige escolha.";
-      if (t.includes("rocha")) return "Pratique e fique firme.";
-      if (t.includes("tempestade")) return "Jesus tem autoridade sobre tudo.";
-      if (t.includes("cobrador de impostos")) return "Jesus chama improváveis.";
-      if (t.includes("cansados")) return "Jesus oferece descanso.";
-      if (t.includes("semeador")) return "A Palavra precisa de bom solo.";
-      if (t.includes("mostarda")) return "O Reino começa pequeno e cresce.";
-      if (t.includes("andou sobre")) return "Olhe para Jesus pela fé.";
-      if (t.includes("o cristo")) return "Jesus é o Filho de Deus.";
-      if (t.includes("sua cruz")) return "Seguir Jesus exige entrega.";
-      if (t.includes("transfigurado")) return "Jesus revela sua glória.";
-      if (t.includes("setenta vezes sete")) return "Perdoe com generosidade.";
-      if (t.includes("grande mandamento")) return "Ame a Deus acima de tudo.";
-      if (t.includes("próximo como")) return "Ame o próximo de verdade.";
-      if (t.includes("dez virgens")) return "Esteja preparado.";
-      if (t.includes("gets")) return "Ore em tempos difíceis.";
-      if (t.includes("barrabas")) return "Jesus tomou o lugar do culpado.";
-      if (t.includes("fazei discípulos")) return "A missão continua.";
-      if (t.includes("prova da fé")) return "A prova fortalece a fé.";
-      if (t.includes("sabedoria")) return "Peça sabedoria a Deus.";
-      if (t.includes("duvida") || t.includes("ânimo dobre")) return "Fé dividida enfraquece.";
-      if (t.includes("rico") || t.includes("pobres")) return "Deus valoriza a fé, não status.";
-      if (t.includes("tentado") || t.includes("concupiscência") || t.includes("pecado")) return "O pecado começa no desejo.";
-      if (t.includes("boa dádiva")) return "Toda boa dádiva vem de Deus.";
-      if (t.includes("ouvir") || t.includes("falar") || t.includes("irar")) return "Ouça mais, fale com calma.";
-      if (t.includes("cumpridor") || t.includes("espelho")) return "Ouvir sem praticar não basta.";
-      if (t.includes("religião pura") || t.includes("órfão") || t.includes("viúva")) return "Fé pura cuida dos frágeis.";
-      if (t.includes("acep") || t.includes("anel de ouro")) return "Não trate pessoas com favoritismo.";
-      if (t.includes("lei perfeita") || t.includes("lei da liberdade")) return "A liberdade de Deus guia a vida.";
-      if (t.includes("obras")) return "Fé viva aparece em obras.";
-      if (t.includes("demônios")) return "Crer sem obedecer não basta.";
-      if (t.includes("abraão") || t.includes("raabe")) return "A fé verdadeira age.";
-      if (t.includes("mestres")) return "Ensinar exige responsabilidade.";
-      if (t.includes("língua") || t.includes("fonte") || t.includes("figueira")) return "Cuidado com a língua.";
-      if (t.includes("sabedoria que vem do alto")) return "A sabedoria do alto gera paz.";
-      if (t.includes("guerras") || t.includes("pedis")) return "Desejos ruins alimentam brigas.";
-      if (t.includes("amizade do mundo")) return "Não troque Deus pelo mundo.";
-      if (t.includes("sujeitai") || t.includes("resisti")) return "Sujeite-se a Deus e resista.";
-      if (t.includes("humilhai")) return "Deus exalta os humildes.";
-      if (t.includes("amanhã") || t.includes("vapor")) return "A vida depende da vontade de Deus.";
-      if (t.includes("ricos") || t.includes("salário")) return "Deus vê a injustiça.";
-      if (t.includes("pacientes") || t.includes("lavrador") || t.includes("jo")) return "Espere no Senhor com paciência.";
-      if (t.includes("jurar")) return "Que seu sim seja sim.";
-      if (t.includes("aflito") || t.includes("enfermo") || t.includes("oração") || t.includes("elias")) return "A oração do justo tem poder.";
-      if (t.includes("converter")) return "Restaurar alguém salva vidas.";
-      const chapter = getChapter(text);
-      const explanations = {
-        1: "Pratique a Palavra.",
-        2: "A fé age em amor.",
-        3: "A língua precisa de freio.",
-        4: "Humilhe-se diante de Deus.",
-        5: "Ore e persevere."
-      };
-      if (selectedWorld === "apocalipse") return "O Cordeiro vence no final.";
-      return explanations[chapter] || explanations[1];
+    // "Mateus 13", "2 João 1"... Sem capítulo, usa o livro citado ou o do mundo.
+    function getReference(text) {
+      const withChapter = text.match(chapterPattern);
+      if (withChapter) return `${withChapter[1]} ${withChapter[2]}`;
+      const label = worldData[selectedWorld]?.label || "";
+      const book = text.match(bookPattern);
+      return book && book[1] === label ? book[1] : label;
+    }
+
+    // Lições curtas mostradas depois da resposta. Antes a busca era por pedaço de
+    // palavra em qualquer mundo ("dor" achava "adorar", "jo" achava "João") e
+    // aparecia lição de Tiago em pergunta de Mateus. Agora cada regra vale só para
+    // os mundos indicados e casa palavra inteira (ou início de palavra com *).
+    const gospelWorlds = ["mateus", "marcos", "lucas", "joao"];
+    const lessonRules = [
+      [["apocalipse"], ["patmos"], "Mesmo exilado em Patmos, João recebeu a revelação de Jesus."],
+      [["apocalipse"], ["alfa", "ômega"], "Alfa e Ômega: Jesus é o princípio e o fim."],
+      [["apocalipse"], ["primeiro amor"], "Éfeso trabalhava muito, mas precisava voltar ao primeiro amor."],
+      [["apocalipse"], ["coroa da vida"], "Quem é fiel até o fim recebe a coroa da vida."],
+      [["apocalipse"], ["morna"], "Laodiceia era morna: Jesus quer um coração desperto."],
+      [["apocalipse"], ["porta e faz"], "Jesus chama para perto de si: quem abre a porta tem comunhão com ele."],
+      [["apocalipse"], ["igrejas", "igreja", "candeeiros", "estrelas"], "Jesus conhece cada igreja: corrige e encoraja."],
+      [["apocalipse"], ["santo, santo, santo", "anciãos", "coroas"], "Toda adoração pertence a Deus."],
+      [["apocalipse"], ["orações dos santos"], "As orações do povo de Deus sobem até ele."],
+      [["apocalipse"], ["cordeiro", "leão", "livro", "selo*"], "Só o Cordeiro, que venceu, é digno de abrir o livro."],
+      [["apocalipse"], ["multidão", "selados", "brancas"], "Deus guarda um povo de todas as nações."],
+      [["apocalipse"], ["trombeta"], "No fim, o reino do mundo pertence a Cristo."],
+      [["apocalipse"], ["dragão", "miguel", "besta", "666"], "O mal luta, mas quem vence é Deus."],
+      [["apocalipse"], ["babilônia"], "Babilônia cai: o mal não dura para sempre."],
+      [["apocalipse"], ["fiel e verdadeiro", "senhores", "cavalo", "bodas"], "Cristo volta como Rei dos reis e Senhor dos senhores."],
+      [["apocalipse"], ["mil anos", "satanás"], "O mal tem limite diante de Deus."],
+      [["apocalipse"], ["novo céu", "nova terra", "nova jerusalém"], "Deus faz novas todas as coisas."],
+      [["apocalipse"], ["lágrima", "dor", "pranto"], "Deus enxugará toda lágrima."],
+      [["apocalipse"], ["água da vida", "árvore", "rio", "sede"], "A vida verdadeira vem de Deus e do Cordeiro."],
+      [["apocalipse"], ["vem", "venho", "cedo", "ora vem"], "A esperança da igreja é a volta de Jesus."],
+      [["apocalipse"], ["trono"], "Deus reina acima de tudo."],
+      [gospelWorlds, ["magos"], "Os magos viajaram de longe para adorar Jesus."],
+      [gospelWorlds, ["arrependei-vos", "arrependimento"], "O arrependimento prepara o caminho para Jesus."],
+      [gospelWorlds, ["batizado", "batismo"], "No batismo de Jesus, o Pai disse: este é o meu Filho amado."],
+      [gospelWorlds, ["tentou", "tentador"], "Jesus venceu a tentação usando a Palavra de Deus."],
+      [gospelWorlds, ["pescadores"], "Jesus chama pessoas comuns para a sua missão."],
+      [gospelWorlds, ["bem-aventurados", "mansos"], "O Reino de Deus valoriza os humildes."],
+      [gospelWorlds, ["sal", "luz"], "Quem segue Jesus faz diferença no mundo."],
+      [gospelWorlds, ["buscar primeiro"], "Busque primeiro o Reino de Deus e a sua justiça."],
+      [gospelWorlds, ["orar", "pai nosso"], "Jesus ensinou a orar como filhos que falam com o Pai."],
+      [gospelWorlds, ["tesouro*"], "O tesouro guardado no céu vale mais que tudo."],
+      [gospelWorlds, ["ansiosos"], "Deus cuida de nós: não precisamos viver ansiosos."],
+      [gospelWorlds, ["julgueis"], "Quem julga os outros precisa olhar primeiro para si."],
+      [gospelWorlds, ["porta estreita"], "O caminho da vida pede uma escolha."],
+      [gospelWorlds, ["rocha"], "Quem ouve e pratica a Palavra fica firme."],
+      [gospelWorlds, ["tempestade", "vento e o mar"], "Jesus tem autoridade até sobre o vento e o mar."],
+      [gospelWorlds, ["cobrador", "publicano", "coletoria"], "Jesus chama até quem os outros desprezam."],
+      [gospelWorlds, ["cansados"], "Jesus oferece descanso para quem está cansado."],
+      [gospelWorlds, ["semeador", "semente", "espinhos"], "A Palavra precisa de um coração aberto para dar fruto."],
+      [gospelWorlds, ["mostarda"], "O Reino de Deus começa pequeno e cresce."],
+      [gospelWorlds, ["andou sobre", "águas"], "Pedro afundou quando tirou os olhos de Jesus."],
+      [gospelWorlds, ["o cristo"], "Jesus é o Cristo, o Filho do Deus vivo."],
+      [gospelWorlds, ["cruz"], "Seguir Jesus pede entrega."],
+      [gospelWorlds, ["transfigurado", "transfiguração"], "Os discípulos viram a glória de Jesus no monte."],
+      [gospelWorlds, ["perdoar", "setenta"], "Perdoe com generosidade, como Deus perdoa."],
+      [gospelWorlds, ["mandamento"], "Amar a Deus e ao próximo resume a lei."],
+      [gospelWorlds, ["virgens", "néscias"], "Esteja preparado para a volta de Jesus."],
+      [gospelWorlds, ["getsêmani"], "Jesus orou nos momentos mais difíceis."],
+      [gospelWorlds, ["barrabás"], "Jesus, inocente, tomou o lugar do culpado."],
+      [gospelWorlds, ["ressuscitado", "sepulcro", "ressurreição"], "Jesus venceu a morte: o túmulo ficou vazio."],
+      [gospelWorlds, ["samaritano"], "Amar o próximo inclui quem é diferente de nós."],
+      [gospelWorlds, ["pastor", "ovelhas"], "Jesus é o bom pastor que cuida das ovelhas."],
+      [gospelWorlds, ["pródigo", "perdidas", "noventa"], "Deus se alegra quando alguém volta para ele."],
+      [gospelWorlds, ["zaqueu"], "Encontrar Jesus mudou a vida de Zaqueu."],
+      [gospelWorlds, ["lázaro"], "Jesus é a ressurreição e a vida."],
+      [gospelWorlds, ["verbo"], "Jesus, o Verbo, é Deus e se fez homem."],
+      [gospelWorlds, ["nascer"], "É preciso nascer de novo para ver o Reino de Deus."],
+      [gospelWorlds, ["videira"], "Ligados a Jesus, damos fruto."],
+      [gospelWorlds, ["lavou"], "Jesus ensinou a servir lavando os pés dos discípulos."],
+      [gospelWorlds, ["pão", "pães"], "Jesus é o pão que sacia de verdade."],
+      [["tiago"], ["prova da fé"], "A prova fortalece a fé e produz paciência."],
+      [["tiago"], ["sabedoria do alto", "vem do alto"], "A sabedoria do alto é pura e pacífica."],
+      [["tiago"], ["sabedoria"], "Quem tem falta de sabedoria pode pedir a Deus."],
+      [["tiago"], ["duvida", "ânimo dobre", "duplo ânimo"], "Fé dividida deixa a pessoa instável."],
+      [["tiago"], ["tentação", "tentado", "concupiscência", "consumado", "concebido"], "O pecado começa no desejo; Deus não tenta ninguém."],
+      [["tiago"], ["dádiva", "luzes", "variação"], "Todo bem vem de Deus, que não muda."],
+      [["tiago"], ["ouvir", "falar", "irar-se", "ira"], "Ouça mais, fale com calma e demore a se irar."],
+      [["tiago"], ["cumpridor", "espelho", "cumpre"], "Ouvir a Palavra sem praticar não basta."],
+      [["tiago"], ["religião", "religioso", "necessitados"], "Fé verdadeira cuida dos frágeis e controla a língua."],
+      [["tiago"], ["acepção", "anel"], "Não trate as pessoas com favoritismo."],
+      [["tiago"], ["lei perfeita", "liberdade"], "Quem olha para a Palavra e pratica é feliz no que faz."],
+      [["tiago"], ["misericórdia"], "A misericórdia triunfa sobre o juízo."],
+      [["tiago"], ["lei"], "Toda a lei importa: quem tropeça num ponto precisa da graça."],
+      [["tiago"], ["demônios"], "Crer sem obedecer não basta."],
+      [["tiago"], ["abraão", "raabe", "isaque"], "A fé verdadeira age."],
+      [["tiago"], ["obras", "morta"], "Fé viva aparece em obras."],
+      [["tiago"], ["mestres"], "Ensinar a Palavra é uma grande responsabilidade."],
+      [["tiago"], ["língua", "freio", "leme", "fonte", "figueira", "tropeça"], "A língua é pequena, mas tem grande poder."],
+      [["tiago"], ["inveja", "facção", "faccioso", "terrena"], "Inveja e disputa geram confusão."],
+      [["tiago"], ["paz"], "Quem promove a paz colhe justiça."],
+      [["tiago"], ["guerras", "pedis", "pedir", "cobiçais"], "Desejos egoístas alimentam brigas."],
+      [["tiago"], ["mundo"], "Amizade com o mundo afasta de Deus."],
+      [["tiago"], ["diabo", "sujeitai-vos", "chegai-vos"], "Sujeite-se a Deus e resista ao diabo."],
+      [["tiago"], ["humildes", "humilhai-vos", "soberbos", "limpar", "purificar"], "Deus dá graça aos humildes."],
+      [["tiago"], ["falar mal", "julga", "legislador"], "Só Deus é juiz: não fale mal do irmão."],
+      [["tiago"], ["amanhã", "vapor", "quiser", "cidade"], "A vida depende da vontade de Deus."],
+      [["tiago"], ["salário", "trabalhadores", "ricos", "riquezas", "matança"], "Deus vê a injustiça contra quem trabalha."],
+      [["tiago"], ["rico", "pobres", "abatido"], "Deus valoriza a fé, não a posição social."],
+      [["tiago"], ["pacientes", "paciência", "lavrador", "jó", "profetas", "juiz", "corações", "queixar-se"], "Espere no Senhor com paciência."],
+      [["tiago"], ["jurar", "sim"], "Que o seu sim seja sim, e o seu não, não."],
+      [["tiago"], ["aflito", "contente", "enfermo", "oração", "elias", "presbíteros", "ungir", "chuva", "chovesse", "culpas"], "A oração do justo tem muito poder."],
+      [["tiago"], ["converte", "converter", "pecador"], "Ajudar alguém a voltar para Deus salva uma vida."],
+      [["tiago"], ["fazer o bem", "pecado"], "Saber o bem e não fazer também é pecado."]
+    ].map(([worlds, words, text]) => ({
+      worlds,
+      text,
+      patterns: words.map(word => {
+        const prefix = word.endsWith("*");
+        const body = (prefix ? word.slice(0, -1) : word).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp(`(^|[^\\p{L}])${body}${prefix ? "" : "(?![\\p{L}])"}`, "iu");
+      })
+    }));
+
+    function lessonFor(text, worldId) {
+      const rule = lessonRules.find(item => item.worlds.includes(worldId) && item.patterns.some(re => re.test(text)));
+      if (rule) return rule.text;
+      return worldId === "apocalipse" ? "O Cordeiro vence no final." : "";
     }
 
     function buildQuestionSet() {
@@ -4319,7 +4662,9 @@
       takeQuestions(withMeta, 10 - selected.length, recent, selected, used);
 
       rememberQuestionSet(selectedWorld, selected, source.length);
-      return shuffle(selected).map(prepareQuestion);
+      // Antes a lista era embaralhada inteira aqui, e a promessa de "começar mais
+      // fácil e ficar mais difícil" não valia. Cada faixa já vem sorteada.
+      return selected.map(prepareQuestion);
     }
 
     function pt(text) {
@@ -4369,11 +4714,13 @@
       ensureAudio();
       startMusic();
       ensureSelectableWorld();
+      clearTurnTimers();
       state = {
         playerHp: 100,
         enemyHp: maxEnemyHp,
         round: 0,
         hits: 0,
+        firstTry: 0,
         missesTotal: 0,
         totalSeconds: 0,
         locked: false,
@@ -4384,14 +4731,23 @@
         mode: selectedMode,
         themeChapter: 1,
         turnStart: 0,
+        paused: false,
+        pausedAt: 0,
+        awaitingNext: false,
+        advanceTimer: null,
+        timeouts: [],
+        tickSecond: null,
+        review: [],
         set: buildQuestionSet()
       };
       resultScreen.classList.remove("active");
+      pauseScreen.classList.remove("active");
       finaleCard.hidden = true;
       startScreen.classList.remove("active");
       howScreen.classList.remove("active");
-      floatText.textContent = "";
-      floatText.style.animation = "none";
+      setupScreen.classList.remove("active");
+      clearFloat();
+      cleanAnimations();
       updateComboBadge();
       applyWorldTheme(selectedWorld);
       game.classList.add("battle");
@@ -4399,10 +4755,28 @@
       nextQuestion();
     }
 
+    // Timeouts da rodada ficam guardados para poder cancelar ao sair ou recomeçar.
+    function later(fn, ms) {
+      const id = setTimeout(fn, ms);
+      if (state) state.timeouts.push(id);
+      return id;
+    }
+
+    function clearTurnTimers() {
+      clearInterval(timerId);
+      if (!state) return;
+      clearTimeout(state.advanceTimer);
+      (state.timeouts || []).forEach(clearTimeout);
+      state.timeouts = [];
+    }
+
     function nextQuestion() {
       clearInterval(timerId);
+      clearTimeout(state.advanceTimer);
+      state.awaitingNext = false;
       state.locked = false;
       state.misses = 0;
+      state.tickSecond = null;
       if (state.round >= state.set.length || state.enemyHp <= 0 || state.playerHp <= 0) {
         finishGame(state.enemyHp <= 0);
         return;
@@ -4411,23 +4785,39 @@
       const current = state.set[state.round];
       state.themeChapter = current.chapter;
       hideFeedback();
-      roundText.textContent = `${state.round + 1}/10`;
+      const total = state.set.length;
+      roundText.textContent = `${state.round + 1}/${total}`;
+      questionTag.textContent = `Pergunta ${state.round + 1} de ${total}`;
+      difficultyTag.textContent = current.difficulty;
+      difficultyTag.className = `difficulty-tag ${current.difficulty === "Fácil" ? "facil" : current.difficulty === "Médio" ? "medio" : "dificil"}`;
       questionText.textContent = pt(current.q);
       optionsEl.innerHTML = "";
-      current.answers.forEach(answer => {
+      current.answers.forEach((answer, index) => {
+        const letter = "ABCD"[index];
         const btn = document.createElement("button");
+        btn.type = "button";
         btn.className = "option-btn";
-        btn.textContent = pt(answer.text);
+        btn.dataset.correct = answer.correct ? "1" : "0";
+        const key = document.createElement("span");
+        key.className = "opt-key";
+        key.setAttribute("aria-hidden", "true");
+        key.textContent = letter;
+        const label = document.createElement("span");
+        label.textContent = pt(answer.text);
+        btn.append(key, label);
+        btn.setAttribute("aria-label", `${letter}: ${pt(answer.text)}`);
         btn.addEventListener("click", () => answerQuestion(answer.correct, false, btn));
         optionsEl.appendChild(btn);
       });
 
+      timerText.classList.remove("urgent");
       state.turnStart = performance.now();
       tickTimer();
       timerId = setInterval(tickTimer, 80);
     }
 
     function tickTimer() {
+      if (!state || state.paused) return;
       const seconds = modes[state.mode].seconds;
       if (!seconds) {
         timerText.textContent = "∞";
@@ -4438,34 +4828,48 @@
       const left = Math.max(0, seconds - elapsed);
       timerText.textContent = left.toFixed(1);
       timerFill.style.transform = `scaleX(${left / seconds})`;
+      const urgent = left > 0 && left <= 3 && !state.awaitingNext;
+      timerText.classList.toggle("urgent", urgent);
+      if (urgent) {
+        const second = Math.ceil(left);
+        if (second !== state.tickSecond) {
+          state.tickSecond = second;
+          soundTick();
+        }
+      }
       if (left <= 0 && !state.locked) {
         answerQuestion(false, true);
       }
     }
 
     function answerQuestion(correct, timeout = false, eventTarget = null) {
-      if (state.locked) return;
+      if (!state || state.locked || state.paused || state.awaitingNext) return;
       state.locked = true;
-      const seconds = modes[state.mode].seconds || 999;
+      const mode = modes[state.mode];
+      const seconds = mode.seconds || 999;
       const elapsed = Math.min(seconds, (performance.now() - state.turnStart) / 1000);
+      const current = state.set[state.round];
 
       if (correct) {
         clearInterval(timerId);
         state.totalSeconds += elapsed;
-        [...optionsEl.children].forEach(btn => btn.disabled = true);
         state.hits++;
         const perfect = state.misses === 0;
+        if (perfect) state.firstTry++;
         state.combo = perfect ? state.combo + 1 : 0;
         state.bestCombo = Math.max(state.bestCombo, state.combo);
-        const speedBonus = modes[state.mode].seconds ? (seconds - elapsed) / seconds : .35;
-        const comboBonus = perfect ? Math.min(7, (1 + state.combo * 1.2) * modes[state.mode].comboFactor) : 0;
-        const damage = Math.max(9, Math.round(10 + speedBonus * 7 + comboBonus));
+        // Curva revista: acertar de primeira vale bem mais; quem acerta ~70%
+        // das perguntas de primeira costuma vencer no modo Batalha.
+        const speedBonus = mode.seconds ? (seconds - elapsed) / seconds : .3;
+        const comboBonus = perfect ? Math.min(6, state.combo * 1.5 * mode.comboFactor) : 0;
+        const damage = Math.round((perfect ? 15 : 8) + speedBonus * 5 + comboBonus);
         state.enemyHp = Math.max(0, state.enemyHp - damage);
+        revealAnswers(eventTarget);
         updateHud();
-        showFeedback(state.set[state.round]);
+        if (!perfect) addReview(current);
+        showFeedback(current, perfect ? "perfect" : "late");
         playAttack(damage, perfect, state.combo);
-        state.round++;
-        setTimeout(nextQuestion, 3200);
+        endTurn(perfect ? 3200 : 4600);
         return;
       }
 
@@ -4476,35 +4880,120 @@
       if (timeout) {
         clearInterval(timerId);
         state.totalSeconds += elapsed;
-        [...optionsEl.children].forEach(btn => btn.disabled = true);
-        const damage = Math.round((18 + state.misses * 5) * modes[state.mode].enemyFactor);
+        const damage = Math.round((15 + state.misses * 5) * mode.enemyFactor);
         state.playerHp = Math.max(0, state.playerHp - damage);
+        revealAnswers(null);
         updateHud();
-        showFeedback(state.set[state.round]);
+        addReview(current);
+        showFeedback(current, "timeout");
         playEnemyAttack(`Tempo! -${damage}`);
-        state.round++;
-        setTimeout(nextQuestion, 3200);
+        endTurn(5200);
         return;
-      } else {
-        if (eventTarget) {
-          eventTarget.disabled = true;
-          eventTarget.classList.add("wrong");
-        }
-        const damage = Math.round((8 + state.misses * 6) * modes[state.mode].enemyFactor);
-        state.playerHp = Math.max(0, state.playerHp - damage);
-        updateHud();
-        playEnemyAttack(`Errou! -${damage}`);
-        setTimeout(() => {
-          if (state.playerHp <= 0) {
-            nextQuestion();
-            return;
-          }
-          state.locked = false;
-          if (modes[state.mode].seconds && (performance.now() - state.turnStart) / 1000 >= modes[state.mode].seconds) {
-            answerQuestion(false, true);
-          }
-        }, 720);
       }
+
+      if (eventTarget) {
+        eventTarget.disabled = true;
+        eventTarget.classList.add("wrong");
+        eventTarget.setAttribute("aria-label", `${eventTarget.getAttribute("aria-label")} (errada)`);
+      }
+      const damage = Math.round((6 + state.misses * 5) * mode.enemyFactor);
+      state.playerHp = Math.max(0, state.playerHp - damage);
+      updateHud();
+      playEnemyAttack(`Errou! -${damage}`);
+      later(() => {
+        if (state.playerHp <= 0) {
+          clearInterval(timerId);
+          addReview(current);
+          state.round++;
+          nextQuestion();
+          return;
+        }
+        state.locked = false;
+        if (!state.paused && mode.seconds && (performance.now() - state.turnStart) / 1000 >= mode.seconds) {
+          answerQuestion(false, true);
+        }
+      }, 720);
+    }
+
+    // Mostra qual era a certa (verde) e apaga as que sobraram.
+    function revealAnswers(chosen) {
+      [...optionsEl.children].forEach(btn => {
+        btn.disabled = true;
+        if (btn.dataset.correct === "1") btn.classList.add("correct");
+        else if (!btn.classList.contains("wrong")) btn.classList.add("dim");
+      });
+      if (chosen) chosen.classList.add("correct");
+    }
+
+    function addReview(question) {
+      if (state.review.some(item => item.q === question.q)) return;
+      state.review.push({ q: question.q, answer: question.correctText, reference: question.reference });
+    }
+
+    function endTurn(ms) {
+      state.round++;
+      state.awaitingNext = true;
+      const gameOver = state.enemyHp <= 0 || state.playerHp <= 0 || state.round >= state.set.length;
+      nextBtn.firstChild.textContent = gameOver ? "Resultado " : "Próxima ";
+      armAdvance(modes[state.mode].seconds ? ms : 0);
+      if (lastInputKeyboard) nextBtn.focus({ preventScroll: true });
+    }
+
+    // No Treino a próxima pergunta espera o botão (para ler com calma).
+    // Na Batalha e no Desafio ela vem sozinha, mas dá para adiantar.
+    function armAdvance(ms) {
+      clearTimeout(state.advanceTimer);
+      nextBtn.classList.remove("counting");
+      if (!ms) return;
+      void nextBtn.offsetWidth;
+      nextBtn.style.setProperty("--advance-ms", `${ms}ms`);
+      nextBtn.classList.add("counting");
+      state.advanceTimer = setTimeout(goNext, ms);
+    }
+
+    function goNext() {
+      if (!state || !state.awaitingNext || state.paused) return;
+      clearTimeout(state.advanceTimer);
+      nextQuestion();
+    }
+
+    function pauseGame() {
+      if (!state || state.paused || !game.classList.contains("battle")) return;
+      state.paused = true;
+      state.pausedAt = performance.now();
+      clearInterval(timerId);
+      clearTimeout(state.advanceTimer);
+      nextBtn.classList.remove("counting");
+      stopMusic();
+      pauseScreen.classList.add("active");
+      resumeBtn.focus({ preventScroll: true });
+    }
+
+    function resumeGame() {
+      if (!state || !state.paused) return;
+      state.turnStart += performance.now() - state.pausedAt;
+      state.paused = false;
+      pauseScreen.classList.remove("active");
+      startMusic();
+      if (state.awaitingNext) {
+        armAdvance(modes[state.mode].seconds ? 2500 : 0);
+      } else {
+        clearInterval(timerId);
+        tickTimer();
+        timerId = setInterval(tickTimer, 80);
+      }
+      pauseBtn.focus({ preventScroll: true });
+    }
+
+    function leaveBattle() {
+      clearTurnTimers();
+      if (state) state.paused = false;
+      pauseScreen.classList.remove("active");
+      game.classList.remove("battle");
+      clearFloat();
+      cleanAnimations();
+      hideFeedback();
+      comboBadge.classList.remove("visible");
     }
 
     function updateHud() {
@@ -4514,23 +5003,41 @@
       enemyLife.style.width = `${enemyPercent}%`;
       playerLifeText.textContent = `${playerPercent}%`;
       enemyLifeText.textContent = `${enemyPercent}%`;
+      playerLifeBar.setAttribute("aria-label", `Vida da Vovó Eve: ${playerPercent}%`);
+      enemyLifeBar.setAttribute("aria-label", `Vida do inimigo: ${enemyPercent}%`);
       updateComboBadge();
     }
 
     function updateComboBadge() {
       const combo = state?.combo || 0;
-      comboBadge.classList.toggle("visible", combo > 0);
+      comboBadge.classList.toggle("visible", combo > 1);
       comboBadge.querySelector("strong").textContent = `COMBO x${combo}`;
     }
 
-    function showFeedback(question) {
-      feedbackBox.textContent = pt(question.explanation);
+    function showFeedback(question, kind) {
+      const answer = pt(question.correctText);
+      const strong = document.createElement("strong");
+      strong.textContent = answer;
+      feedbackTitle.textContent = "";
+      if (kind === "perfect") {
+        feedbackTitle.append("✓ Certo! ", strong);
+      } else if (kind === "late") {
+        feedbackTitle.append("✓ Agora sim: ", strong);
+      } else {
+        feedbackTitle.append("⏰ Tempo! A resposta certa era ", strong, ".");
+      }
+      const lesson = question.lesson ? `${pt(question.lesson)} ` : "";
+      feedbackText.textContent = `${lesson}Leia em ${question.reference}.`;
+      feedbackBox.classList.toggle("good", kind === "perfect");
+      feedbackBox.classList.toggle("bad", kind !== "perfect");
       feedbackBox.classList.add("visible");
     }
 
     function hideFeedback() {
-      feedbackBox.classList.remove("visible");
-      feedbackBox.textContent = "";
+      feedbackBox.classList.remove("visible", "good", "bad");
+      feedbackTitle.textContent = "";
+      feedbackText.textContent = "";
+      nextBtn.classList.remove("counting");
     }
 
     function playAttack(damage, perfect = false, combo = 0) {
@@ -4545,20 +5052,20 @@
       if (perfect) game.classList.add("comboStrike");
       if (attack.type === "magic") game.classList.add("shooting");
       if (attack.type === "slash") game.classList.add("slashing");
-      setTimeout(() => {
+      later(() => {
         devil.classList.add("hurt");
         game.classList.add("impact");
       }, 320);
-      soundAttack(attack.type);
-      setTimeout(cleanAnimations, 720);
+      soundAttack(attack.type, combo);
+      later(cleanAnimations, 720);
     }
 
     function playEnemyAttack(label) {
       showFloat(`${label} na Vovó Eve`, "#ffb1b1");
       devil.classList.add("enemyAttack");
-      setTimeout(() => eve.classList.add("hurt"), 250);
+      later(() => eve.classList.add("hurt"), 250);
       soundEnemy();
-      setTimeout(cleanAnimations, 720);
+      later(cleanAnimations, 720);
     }
 
     function cleanAnimations() {
@@ -4573,17 +5080,48 @@
       floatText.className = `float-text ${className}`.trim();
       floatText.style.animation = "none";
       floatText.offsetHeight;
-      floatText.style.animation = "floatHit 3.2s ease forwards";
+      floatText.style.animation = "floatHit 2.4s ease forwards";
+    }
+
+    // Antes o último "Errou! -33" ficava boiando por cima da tela de resultado.
+    function clearFloat() {
+      floatText.style.animation = "none";
+      floatText.textContent = "";
+    }
+
+    function starsFor(won, firstTry, answered) {
+      if (!won || !answered) return 0;
+      const ratio = firstTry / answered;
+      return ratio >= .9 ? 3 : ratio >= .7 ? 2 : 1;
+    }
+
+    function starsKey(world) {
+      return `superVovoEve:${world}:stars`;
+    }
+
+    function getStars(world) {
+      return Math.max(0, Math.min(3, Number(localStorage.getItem(starsKey(world)) || 0)));
+    }
+
+    function starsMarkup(count) {
+      return [0, 1, 2].map(i => `<span class="${i < count ? "on" : "off"}">★</span>`).join("");
     }
 
     function finishGame(won) {
-      clearInterval(timerId);
+      clearTurnTimers();
       stopMusic();
       game.classList.remove("battle");
+      pauseScreen.classList.remove("active");
       hideFeedback();
+      clearFloat();
+      cleanAnimations();
       state.combo = 0;
       updateComboBadge();
       updateRecords(won);
+      const answered = Math.min(state.round, state.set.length);
+      const stars = starsFor(won, state.firstTry, answered);
+      const previousStars = getStars(state.world);
+      if (stars > previousStars) localStorage.setItem(starsKey(state.world), String(stars));
       const nextWorldId = won ? nextWorldIdAfter(state.world) : "";
       const unlockMessage = won ? unlockNextWorld(state.world) : "";
       renderWorldGrid();
@@ -4594,21 +5132,45 @@
       const total = state.totalSeconds;
       const currentBest = Number(localStorage.getItem(recordKey("bestTime")) || 0);
       const finalCampaignWin = won && state.world === "apocalipse";
+      const bothStanding = !won && state.playerHp > 0;
       finaleCard.hidden = !finalCampaignWin;
-      resultTitle.textContent = won ? "Vitória!" : "Tente outra vez!";
+      resultTitle.textContent = won ? "Vitória!" : bothStanding ? "Quase lá!" : "Tente outra vez!";
+      resultStars.hidden = !won;
+      resultStars.innerHTML = starsMarkup(stars);
+      resultStars.setAttribute("aria-label", `${stars} de 3 estrelas`);
+      resultStars.setAttribute("role", "img");
       resultPhrase.textContent = pt(won
         ? (finalCampaignWin ? "Parabéns por vencer o Inimigo!" : getVictoryPhrase())
-        : defeatPhrases[Math.floor(Math.random() * defeatPhrases.length)]);
+        : bothStanding
+          ? `As perguntas acabaram e ${currentEnemy().label} ficou com ${Math.round((state.enemyHp / maxEnemyHp) * 100)}% de vida. Acertar de primeira dá golpes mais fortes!`
+          : defeatPhrases[Math.floor(Math.random() * defeatPhrases.length)]);
       finalTime.textContent = formatTime(total);
       bestTime.textContent = currentBest ? formatTime(currentBest) : "--";
-      finalHits.textContent = `${state.hits}/10`;
+      finalHits.textContent = `${state.hits}/${answered}`;
       finalLife.textContent = `${state.playerHp}%`;
       finalMisses.textContent = state.missesTotal;
       finalCombo.textContent = state.bestCombo;
       roundTheme.textContent = pt(worldData[state.world].theme(state.themeChapter));
-      recordNote.textContent = pt([buildRecordNote(), unlockMessage].filter(Boolean).join(" "));
+      const starNote = won ? `Acertos de primeira: ${state.firstTry} de ${answered}.${stars < 3 ? " Acerte 9 de 10 de primeira para ganhar 3 estrelas." : ""}` : "";
+      recordNote.textContent = pt([starNote, buildRecordNote(), unlockMessage].filter(Boolean).join(" "));
+      renderReview();
       lastShareText = buildShareText(won);
-      soundFinish(won);
+      soundFinish(won, stars);
+      resultScreen.scrollTop = 0;
+      resultScreen.querySelector(".panel").scrollTop = 0;
+    }
+
+    function renderReview() {
+      reviewList.innerHTML = "";
+      state.review.forEach(item => {
+        const li = document.createElement("li");
+        li.append(pt(item.q));
+        const answer = document.createElement("span");
+        answer.textContent = `Resposta: ${pt(item.answer)} (${item.reference})`;
+        li.appendChild(answer);
+        reviewList.appendChild(li);
+      });
+      reviewBox.hidden = state.review.length === 0;
     }
 
     function getVictoryPhrase() {
@@ -4618,7 +5180,7 @@
     }
 
     function recordKey(name) {
-      return recordKeyFor(selectedWorld, selectedMode, name);
+      return recordKeyFor(state?.world || selectedWorld, state?.mode || selectedMode, name);
     }
 
     function recordKeyFor(world, mode, name) {
@@ -4640,12 +5202,13 @@
       const bestCombo = localStorage.getItem(recordKey("bestCombo")) || "0";
       const bestHits = localStorage.getItem(recordKey("bestHits")) || "0";
       const bestLife = localStorage.getItem(recordKey("bestLife")) || "0";
-      return pt(`Recordes em ${worldData[selectedWorld].label} (${modes[selectedMode].label}): maior combo ${bestCombo}, mais acertos ${bestHits}/10, melhor vida ${bestLife}%.`);
+      return pt(`Recordes em ${worldData[state.world].label} (${modes[state.mode].label}): maior combo ${bestCombo}, mais acertos ${bestHits}, melhor vida ${bestLife}%.`);
     }
 
     function buildShareText(won) {
       const result = won ? "venci" : "encarei";
-      return `Eu ${result} ${currentEnemy().label} no Super Vovó Eve World (${worldData[selectedWorld].label}, ${modes[selectedMode].label})! Acertos: ${state.hits}/10, maior combo: x${state.bestCombo}, tempo: ${formatTime(state.totalSeconds)}.`;
+      const answered = Math.min(state.round, state.set.length);
+      return `Eu ${result} ${currentEnemy().label} no Super Vovó Eve World (${worldData[state.world].label}, ${modes[state.mode].label})! Acertos: ${state.hits}/${answered}, maior combo: x${state.bestCombo}, tempo: ${formatTime(state.totalSeconds)}.`;
     }
 
     function formatTime(seconds) {
@@ -4653,14 +5216,21 @@
     }
 
     function ensureAudio() {
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      try {
+        if (!audioContext) {
+          const AudioCtor = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtor) return;
+          audioContext = new AudioCtor();
+        }
+        if (audioContext.state === "suspended") audioContext.resume().catch(() => {});
+      } catch (error) {
+        audioContext = null;
       }
-      if (audioContext.state === "suspended") audioContext.resume();
     }
 
+    // O botão "Som" desliga tudo: música e efeitos (antes os efeitos tocavam mesmo com OFF).
     function tone(freq, duration, type = "square", volume = .04, when = 0) {
-      if (!audioContext) return;
+      if (!audioContext || musicMuted) return;
       const osc = audioContext.createOscillator();
       const gain = audioContext.createGain();
       osc.type = type;
@@ -4674,9 +5244,10 @@
     }
 
     function updateMusicToggle() {
-      musicToggle.textContent = musicMuted ? "Música OFF" : "Música ON";
+      musicToggle.textContent = musicMuted ? "Som OFF" : "Som ON";
       musicToggle.classList.toggle("muted", musicMuted);
       musicToggle.setAttribute("aria-pressed", String(musicMuted));
+      musicToggle.setAttribute("aria-label", musicMuted ? "Som desligado. Toque para ligar música e efeitos." : "Som ligado. Toque para desligar música e efeitos.");
     }
 
     function primeMusic() {
@@ -4695,8 +5266,9 @@
         return;
       }
       ensureAudio();
+      if (document.hidden) return;
       if (game.classList.contains("battle")) {
-        startMusic();
+        if (!state?.paused) startMusic();
       } else if (!resultScreen.classList.contains("active")) {
         startMenuMusic();
       }
@@ -4826,11 +5398,13 @@
       musicTimer = null;
     }
 
-    function soundAttack(type) {
+    function soundAttack(type, combo = 0) {
       if (type === "magic") {
-        tone(392, .08, "sine", .06);
-        tone(587, .11, "sine", .05, .07);
-        tone(880, .18, "triangle", .045, .15);
+        // Acerto: arpejo que sobe meio tom a cada combo.
+        const lift = Math.pow(2, Math.min(combo, 6) / 12);
+        tone(392 * lift, .08, "sine", .06);
+        tone(587 * lift, .11, "sine", .05, .07);
+        tone(880 * lift, .18, "triangle", .045, .15);
       } else {
         tone(220, .07, "sawtooth", .06);
         tone(740, .09, "square", .045, .08);
@@ -4843,13 +5417,19 @@
       game.classList.add("shake");
     }
 
-    function soundFinish(won) {
+    function soundTick() {
+      tone(1320, .04, "square", .018);
+    }
+
+    function soundFinish(won, stars = 0) {
       ensureAudio();
       if (won) {
         const fanfare = state?.world === "apocalipse"
           ? [392, 523, 659, 784, 1046, 1318, 1568]
           : [523, 659, 784, 1046];
         fanfare.forEach((f, i) => tone(f, .15, "triangle", .05, i * .12));
+        // Um "plim" por estrela, no ritmo da animação das estrelas.
+        for (let i = 0; i < stars; i++) tone(1568 + i * 220, .12, "sine", .04, .55 + i * .25);
       } else {
         [220, 185, 147].forEach((f, i) => tone(f, .2, "sawtooth", .04, i * .16));
       }
@@ -4864,20 +5444,25 @@
         ? `Responda perguntas sobre o livro de ${book} em menos de ${seconds} segundos.`
         : `Treino: responda perguntas sobre o livro de ${book} sem limite de tempo.`;
       timeoutHelp.textContent = seconds
-        ? `Se deixar o tempo acabar, ${currentEnemy().label} também ataca e a pergunta passa.`
+        ? `Se deixar o tempo acabar, ${currentEnemy().label} também ataca e a pergunta passa. O botão II pausa a batalha.`
         : "No treino não existe tempo acabando: você pode ler com calma e aprender.";
       questionCountHelp.textContent = "A cada partida aparecem 10 perguntas sorteadas, começando mais fáceis e ficando mais difíceis.";
       showScreen(howScreen);
+      fightBtn.focus({ preventScroll: true });
     }
 
-    startBtn.addEventListener("click", () => {
+    function openSetup() {
       ensureAudio();
       startMenuMusic();
       game.classList.remove("battle");
       renderWorldGrid();
       applyWorldTheme(selectedWorld);
       showScreen(setupScreen);
-    });
+      const active = worldGrid.querySelector(".select-card.active");
+      if (active) active.scrollIntoView({ block: "nearest" });
+    }
+
+    startBtn.addEventListener("click", openSetup);
     skinBtn.addEventListener("click", nextSkin);
     enemyBtn.addEventListener("click", nextEnemy);
 
@@ -4890,6 +5475,7 @@
       renderWorldGrid();
       applyWorldTheme(selectedWorld);
       startMenuMusic();
+      worldGrid.querySelector(`[data-world="${selectedWorld}"]`)?.focus({ preventScroll: true });
     });
 
     modeGrid.addEventListener("click", event => {
@@ -4898,10 +5484,22 @@
       selectedMode = button.dataset.mode;
       [...modeGrid.querySelectorAll("[data-mode]")].forEach(item => {
         item.classList.toggle("active", item === button);
+        item.setAttribute("aria-pressed", String(item === button));
       });
     });
 
     fightBtn.addEventListener("click", startGame);
+    nextBtn.addEventListener("click", goNext);
+    pauseBtn.addEventListener("click", pauseGame);
+    resumeBtn.addEventListener("click", resumeGame);
+    restartBtn.addEventListener("click", () => {
+      leaveBattle();
+      startGame();
+    });
+    quitBtn.addEventListener("click", () => {
+      leaveBattle();
+      openSetup();
+    });
     nextPhaseBtn.addEventListener("click", () => {
       const target = nextPhaseBtn.dataset.world;
       if (!target) return;
@@ -4911,13 +5509,7 @@
       openHowScreen();
     });
     againBtn.addEventListener("click", startGame);
-    chooseModeBtn.addEventListener("click", () => {
-      startMenuMusic();
-      game.classList.remove("battle");
-      renderWorldGrid();
-      applyWorldTheme(selectedWorld);
-      showScreen(setupScreen);
-    });
+    chooseModeBtn.addEventListener("click", openSetup);
     homeBtn.addEventListener("click", () => {
       startMenuMusic();
       game.classList.remove("battle");
@@ -4926,7 +5518,7 @@
     });
     musicToggle.addEventListener("click", () => {
       musicMuted = !musicMuted;
-      localStorage.setItem(musicKey, musicMuted ? "1" : "0");
+      try { localStorage.setItem(musicKey, musicMuted ? "1" : "0"); } catch (error) { /* sem armazenamento */ }
       updateMusicToggle();
       if (musicMuted) {
         stopMusic();
@@ -4935,6 +5527,15 @@
       }
     });
     shareBtn.addEventListener("click", async () => {
+      // No celular abre o menu de compartilhar; no computador copia o texto.
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: "Super Vovó Eve World", text: lastShareText, url: location.href });
+          return;
+        } catch (error) {
+          if (error && error.name === "AbortError") return;
+        }
+      }
       try {
         await navigator.clipboard.writeText(lastShareText);
         shareBtn.textContent = "Copiado!";
@@ -4945,15 +5546,57 @@
       }
     });
 
+    // Teclado: 1-4 ou A-D respondem, Enter/Espaço avançam, P ou Esc pausam.
+    document.addEventListener("keydown", event => {
+      lastInputKeyboard = true;
+      if (event.altKey || event.ctrlKey || event.metaKey || !state) return;
+      if (!game.classList.contains("battle")) return;
+      const key = event.key.toLowerCase();
+      if (key === "p" || key === "escape") {
+        event.preventDefault();
+        if (state.paused) resumeGame(); else pauseGame();
+        return;
+      }
+      if (state.paused) return;
+      if (state.awaitingNext && (key === "enter" || key === " ")) {
+        if (document.activeElement === nextBtn) return;
+        event.preventDefault();
+        goNext();
+        return;
+      }
+      const index = key.length === 1 ? "1234".indexOf(key) >= 0 ? "1234".indexOf(key) : "abcd".indexOf(key) : -1;
+      if (index >= 0) {
+        const btn = optionsEl.children[index];
+        if (btn && !btn.disabled) {
+          event.preventDefault();
+          btn.click();
+        }
+      }
+    });
+    document.addEventListener("pointerdown", () => { lastInputKeyboard = false; }, { passive: true });
+
+    // Trocar de aba ou de aplicativo pausa a batalha (antes o tempo seguia correndo
+    // e a música continuava tocando em segundo plano).
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if (game.classList.contains("battle")) pauseGame();
+        stopMusic();
+      } else {
+        resumeVisibleMusic();
+      }
+    });
+
     updateMusicToggle();
     applySkin();
     applyEnemy();
     renderWorldGrid();
     applyWorldTheme(selectedWorld);
+    [...modeGrid.querySelectorAll("[data-mode]")].forEach(item => item.setAttribute("aria-pressed", String(item.dataset.mode === selectedMode)));
     startMenuMusic();
     ["pointerdown", "touchstart", "keydown"].forEach(eventName => {
       window.addEventListener(eventName, primeMusic, { once: true, passive: true });
     });
   </script>
+
 </body>
 </html>
