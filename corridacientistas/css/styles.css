@@ -1330,6 +1330,8 @@ body.touch .touch-only {
   .results-stats .chip small { display: none; }
   .fact-card { font-size: 13px; padding: 8px 10px; }
   .quiz-card { padding: 8px 10px; gap: 5px; }
+  /* tela baixa: a pergunta vem antes da curiosidade, para as respostas aparecerem sem rolar */
+  .results-col > .quiz-card { order: -1; }
   .quiz-q { font-size: 13.5px; }
   .quiz-opt { font-size: 13px; min-height: 34px; padding: 5px 10px; }
   .quiz-fb { font-size: 12.5px; }
@@ -1433,6 +1435,7 @@ body.touch {
 @media (max-width: 640px) {
   .results-body { grid-template-columns: 1fr; }
   .results-wrap { margin-right: 0; padding: 14px; }
+  .results-col > .quiz-card { order: -1; }
   .screen.dim-light { justify-content: center; }
 }
 
