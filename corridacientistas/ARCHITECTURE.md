@@ -85,9 +85,10 @@ export class Kart {
   drifting, driftDir (-1|0|1), driftLevel (0..3), boostTime, starTime, shrinkTime, spinTime, tumbleTime
   frozen          // true durante a contagem (não se move)
   speedFactor     // multiplicador extra de velocidade (IA usa para rubber-band), padrão 1
+  assist          // ajuda na direção (só o jogador, opção do menu): perto da borda, puxa de volta para a pista
   get maxSpeed(); get invincible(); get stunned(); get recovering()   // recovering: atordoado + 1 s de proteção (hit() recusa)
   item, itemCount, roulette       // controlados por items.js: roulette = { time, showing, result } | null
-  lap, progress, place, finished, finishTime   // controlados por race.js
+  lap, progress, place, finished, finishTime, lapTimes   // controlados por race.js (lapTimes: s de cada volta completa)
   placeAt(slot)                   // reposiciona no grid, zera estados
   update(dt, world)
   applyBoost(duration, strength = 1, source = 'item')
@@ -109,7 +110,7 @@ export class AIDriver {
   update(dt, world)                     // escreve kart.controls (inclusive useItem)
 }
 ```
-Segue `racingLine`, faz drift nas curvas, desvia de itens no chão e usa itens com tática (maçã quando há alguém atrás, elétron quando há alguém à frente). Faz rubber-band leve via `kart.speedFactor`.
+Segue `racingLine`, faz drift nas curvas, desvia de itens no chão e usa itens com tática (maçã quando há alguém atrás, elétron quando há alguém à frente). Faz rubber-band leve via `kart.speedFactor`, com a força definida por classe em `CLASSES` (`aiSpeed`, `aiCatchUp`, `aiSlowDown`, `aiSlowFrom`, `aiSlowRange`): no 50cc a IA alivia bem mais quando o jogador fica para trás.
 
 ## Entrada: `js/input.js` (direção)
 ```js
@@ -123,7 +124,7 @@ export class Input {
   setAutoAccelerate(bool)
 }
 ```
-- **Teclado:** W/↑ acelera, S/↓ freia/ré, A/D ou ←/→ vira, Espaço = drift/pulo, E/X/Shift = item, C = olhar para trás, Esc/P = pausa, M = mudo, Enter = confirmar.
+- **Teclado:** W/↑ acelera, S/↓ freia/ré, A/D ou ←/→ vira, Espaço = drift/pulo, E/X/Shift = item, C = olhar para trás, Esc/P = pausa, M = mudo, Enter = confirmar. R reinicia (na pausa e no resultado, tratado no menu.js); 1–3 respondem a pergunta do resultado.
 - **Gamepad:** A/RT acelera, B/LT freia, analógico esquerdo vira, RB/X = drift, LB/Y = item, Start = pausa.
 - **Toque:** o próprio `input.js` cria o DOM e o CSS (injetado) dos botões dentro de `touchLayer`.
   - Esquerda: ◀ ▶ grandes.
@@ -211,13 +212,35 @@ export class AudioSystem {
 ## Jogo e interface (integração)
 `main.js` (loop, estados, renderer), `race.js` (contagem, voltas, posições, chegada, largada-foguete), `hud.js`, `menu.js`, `index.html`, `css/styles.css`.
 
+- **Qualidade automática (`main.js`):** abaixo de ~28 fps por 2,5 s (na corrida ou na demonstração da tela inicial), o 1º passo é desligar as sombras sem recarregar (no meio da corrida, espera a próxima pausa/tela, porque recompila os shaders); depois baixa a resolução até 0,75. A próxima visita abre em `baixa`.
+- **Celular em pé:** o aviso de girar tem o botão "Jogar com o celular em pé" (`localStorage corrida-portraitOK`). Com a tela em pé, `body.portrait` ajusta o HUD e o `input.js` empilha ITEM e FREIO acima do DRIFT.
+- **Tremor e vibração:** `main.js` chama `rig.shake` e `navigator.vibrate` nas batidas do jogador (muro, item, trombada, pouso alto). Com `prefers-reduced-motion`, o tremor cai para 25% e `effects.flash` para 30%.
+
+## Progresso e conteúdo educativo: `js/progress.js`
+```js
+export class Progress {
+  constructor({ bus, store })     // store = { get, set } do menu.js (localStorage 'corrida-progress')
+  startRace(player)               // zera as estatísticas da corrida (turbos de drift, itens, batidas, manobras)
+  finishRace(results, player, { cc, laps }) -> resumo  // atualiza recorde, melhor volta e troféu
+     // resumo: { place, time, bestLap, stats, newRecord, firstRecord, newBestLap, newMedal, ... }
+  record(cc, laps); bestLapOf(cc); bestPlace(charId, cc); medalCount()
+  nextFact(charId)                // alterna entre as curiosidades do cientista
+  randomFact()                    // { c, text } para a tela de carregamento
+  pickQuiz(charId) -> { id, q, options (embaralhadas), correct, explain }
+  answerQuiz(id, ok); quizScore() -> { right, total }
+}
+```
+- Cada cientista em `config.js` tem `facts` (3 curiosidades verificadas) e `quiz` (`{ q, options, answer, explain }`, `answer` = índice em `options`). Itens com pergunta têm `quiz` igual (a explicação é o `fact` do item).
+- A tela de resultado mostra classificação, números da corrida, uma curiosidade do cientista escolhido (e do vencedor) e a pergunta-relâmpago (teclas 1–3). Troféus aparecem na escolha do cientista e o placar na tela inicial.
+- Todo fato novo precisa ser conferido em fonte confiável antes de entrar no jogo.
+
 ## Eventos do bus
 | Evento | Dados |
 |---|---|
 | `race:countdown` | `{ n }` (3, 2, 1) |
 | `race:go` | `{}` |
 | `race:reset` | `{}` (volta ao menu ou nova corrida: apaga as luzes de largada) |
-| `race:lap` | `{ kart, lap }` |
+| `race:lap` | `{ kart, lap, lapTime }` (lapTime: s da volta que acabou) |
 | `race:finalLap` | `{ kart }` (só o jogador) |
 | `race:finish` | `{ kart, place, time }` |
 | `race:end` | `{ results }` |
