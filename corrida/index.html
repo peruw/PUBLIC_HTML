@@ -459,6 +459,13 @@
     .title { font-size: 22px; margin-bottom: 8px; }
     .locker .panel { padding-top: calc(max(8px, env(safe-area-inset-top)) + 44px); }
   }
+  /* Celular: o placar empurrava os botões de som e pausa para fora da tela.
+     O multiplicador continua visível no medidor de combo à direita. */
+  @media (max-width: 480px) {
+    .brand span { display: none; }
+    .stats { gap: 4px; }
+    .mult.show { display: none; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .blink, .pop, .pop.big, .question.bounce .q-inner, .cm-num.punch, .combo-meter.t5, .fever-edge.on, .score.pulse { animation-duration: 0s; }
   }
@@ -1415,10 +1422,12 @@
         fxCall('shockwave', cm.left + cm.width / 2, cm.top + cm.height / 2, TIER_COLORS[tierOf(S.combo)]);
         if (S.combo >= 20) fxCall('confetti', 60);
         sfx.milestone(S.combo);
-        if (!startFever) setTimeout(() => popText(`COMBO ${S.combo}!`, TIER_COLORS[tierOf(S.combo)], '50%', true), 120);
+        // se o nível sobe no mesmo acerto, o carimbo do combo desce para não ficar por cima do "NÍVEL X!"
+        const comboTop = S.hits % CFG.hitsPerLevel === 0 ? '62%' : '50%';
+        if (!startFever) setTimeout(() => popText(`COMBO ${S.combo}!`, TIER_COLORS[tierOf(S.combo)], comboTop, true), 120);
       }
       if (startFever) {
-        setTimeout(() => popText('MODO FEBRE!<small>PONTOS EM DOBRO ATÉ ERRAR</small>', '#ff9a2e', '50%', true), 120);
+        setTimeout(() => popText('MODO FEBRE!<small>PONTOS EM DOBRO ATÉ ERRAR</small>', '#ff9a2e', S.hits % CFG.hitsPerLevel === 0 ? '62%' : '50%', true), 120);
         stinger('record');
       }
       paintCombo(true);
