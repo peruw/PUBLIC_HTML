@@ -694,8 +694,27 @@
       box-shadow: 0 8px 22px rgba(29, 49, 58, 0.14);
       font-weight: 800;
       text-align: center;
-      z-index: 11;
+      z-index: 46;
+      pointer-events: none;
       transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    /* No menu a dica aparece em cima, longe dos botões de começar. */
+    .pause-keys {
+      margin-top: 12px;
+    }
+
+    #tip.on-menu {
+      top: max(14px, env(safe-area-inset-top));
+      bottom: auto;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      max-width: min(420px, calc(100vw - 140px));
+    }
+
+    #tip.on-menu.fade {
+      transform: translate(-50%, -8px);
     }
 
     #tip.fade {
@@ -1123,8 +1142,10 @@
       <p class="subtitle">A ilha fica esperando enquanto vocês respiram.</p>
       <div class="actions">
         <button id="resumeButton" class="primary" type="button">Continuar</button>
+        <button id="musicOnlyButton" class="secondary" type="button" aria-pressed="true">Música: ligada</button>
         <button id="menuButton" class="secondary" type="button">Voltar ao menu</button>
       </div>
+      <p class="small pause-keys">No teclado: Esc ou P pausa e continua.</p>
     </div>
   </div>
 
@@ -1165,7 +1186,13 @@
     const gameOverText = document.querySelector("#gameOverText");
 
     const STORAGE_KEY = "ilhas-voadoras-progresso-v1";
+    const SETTINGS_KEY = "ilhas-voadoras-config-v1";
     const BANANAS_TO_WIN = 10;
+    // A partir desta distância do centro (1 = borda desenhada) o chão esfarela.
+    const EDGE_LIMIT = 0.82;
+    // Toques e cliques nunca levam o personagem além deste ponto.
+    const SAFE_TAP_LIMIT = 0.76;
+    const EDGE_FALL_TIME = 0.8;
 
     const characters = [
       {
@@ -1326,6 +1353,8 @@
         radius: 20,
         hitCooldown: 0,
         fallCooldown: 0,
+        teeter: 0,
+        edgeWarned: false,
         target: null
       },
       keys: {
@@ -1334,6 +1363,8 @@
         left: false,
         right: false
       },
+      sound: true,
+      audioUnlocked: false,
       music: {
         context: null,
         master: null,
@@ -1380,7 +1411,29 @@
     }
 
     function saveProgress() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+      } catch (error) {
+        // Sem armazenamento (aba anônima): o jogo continua, só não lembra.
+      }
+    }
+
+    function loadSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+        if (typeof saved.sound === "boolean") state.sound = saved.sound;
+        if (typeof saved.music === "boolean") state.music.enabled = saved.music;
+      } catch (error) {
+        // usa o padrão
+      }
+    }
+
+    function saveSettings() {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sound: state.sound, music: state.music.enabled }));
+      } catch (error) {
+        // ignora
+      }
     }
 
     function characterById(id) {
@@ -1402,7 +1455,7 @@
       }
       clampPlayerToIsland();
       if (state.player.target) {
-        state.player.target = clampPointToIsland(state.player.target.x, state.player.target.y);
+        state.player.target = clampPointToIsland(state.player.target.x, state.player.target.y, SAFE_TAP_LIMIT);
       }
     }
 
@@ -1426,6 +1479,12 @@
       };
     }
 
+    // Escala do mundo: ilhas menores (celular) deixam bichos, chão vermelho e árvores menores.
+    function worldScale() {
+      const shape = islandShape();
+      return Math.max(0.6, Math.min(1, shape.rx / 400, shape.ry / 190));
+    }
+
     function pointOnIsland(u, v) {
       const island = islandShape();
       return {
@@ -1434,9 +1493,9 @@
       };
     }
 
-    function randomPointInIsland(random) {
+    function randomPointInIsland(random, maxRadius = 0.82) {
       const angle = random() * Math.PI * 2;
-      const radius = Math.sqrt(random()) * 0.82;
+      const radius = Math.sqrt(random()) * maxRadius;
       return {
         u: Math.cos(angle) * radius,
         v: Math.sin(angle) * radius
@@ -1456,14 +1515,15 @@
     }
 
     function newPackage(random = Math.random) {
-      let spot = randomPointInIsland(random);
+      // Pacotes ficam sempre na parte segura (longe da borda que esfarela).
+      let spot = randomPointInIsland(random, 0.72);
       let attempts = 0;
       while (attempts < 20) {
         const point = pointOnIsland(spot.u, spot.v);
         const dx = point.x - state.player.x;
         const dy = point.y - state.player.y;
         if (Math.hypot(dx, dy) > 95) break;
-        spot = randomPointInIsland(random);
+        spot = randomPointInIsland(random, 0.72);
         attempts += 1;
       }
       return {
@@ -1509,7 +1569,8 @@
       state.powers = [];
       state.playerShots = [];
       state.dangerZones = [];
-      state.dangerTimer = 2.4;
+      // Primeiros segundos sem chão caindo, para a criança se localizar.
+      state.dangerTimer = 4.5;
       state.rewards = [];
       state.decorations = Array.from({ length: 24 }, (_, index) => {
         const spot = randomPointInIsland(random);
@@ -1534,7 +1595,10 @@
         scale: 0.65 + random() * 1.1,
         id: index
       }));
+      for (const enemy of state.enemies) enemy.cooldown += 1.6;
       state.player.target = null;
+      state.player.teeter = 0;
+      state.player.edgeWarned = false;
       state.player.fallCooldown = 1;
     }
 
@@ -1598,6 +1662,11 @@
       hud.classList.toggle("hidden", !playing);
       controls.classList.toggle("hidden", !playing);
       tip.classList.toggle("hidden", !playing);
+      tip.classList.toggle("on-menu", mode === "menu" || mode === "welcome");
+      if (!playing) {
+        state.rapidAttackHeld = false;
+        clearKeys();
+      }
       welcomeScreen.classList.toggle("hidden", mode !== "welcome");
       startScreen.classList.toggle("hidden", mode !== "menu");
       if (playing) {
@@ -1610,7 +1679,7 @@
     function enterSelection() {
       renderCharacterCards(startCharacters, true);
       setMode("menu");
-      startMusic("menu");
+      startMusic();
     }
 
     function startGame() {
@@ -1622,7 +1691,7 @@
       state.packagesOpened = 0;
       setupIsland();
       setMode("playing");
-      startMusic("gameplay");
+      startMusic();
       updateHud();
       showTip("Abra pacotes. As bananas estão escondidas dentro deles.");
     }
@@ -1661,14 +1730,15 @@
       return true;
     }
 
-    function playNote(frequency, duration, volume = 0.16, type = "square") {
+    function playNote(frequency, duration, volume = 0.16, type = "square", delay = 0, slideTo = 0) {
       if (!state.music.context || !state.music.master || !frequency) return;
       const context = state.music.context;
-      const now = context.currentTime;
+      const now = context.currentTime + delay;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = type;
       oscillator.frequency.setValueAtTime(frequency, now);
+      if (slideTo) oscillator.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
       gain.gain.setValueAtTime(0.001, now);
       gain.gain.exponentialRampToValueAtTime(volume, now + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
@@ -1707,8 +1777,16 @@
     function updateMusicButton() {
       const buttons = document.querySelectorAll("#musicButton, .menu-music-toggle");
       for (const button of buttons) {
-      button.textContent = state.music.enabled ? "♪" : "×";
-      button.setAttribute("aria-label", state.music.enabled ? "Desligar música" : "Ligar música");
+        button.textContent = state.sound ? "♪" : "×";
+        button.setAttribute("aria-label", state.sound ? "Desligar som" : "Ligar som");
+        button.setAttribute("aria-pressed", String(state.sound));
+        button.title = state.sound ? "Som ligado (clique para desligar)" : "Som desligado (clique para ligar)";
+      }
+      const musicOnly = document.querySelector("#musicOnlyButton");
+      if (musicOnly) {
+        const on = state.sound && state.music.enabled;
+        musicOnly.textContent = on ? "Música: ligada" : "Música: desligada";
+        musicOnly.setAttribute("aria-pressed", String(on));
       }
     }
 
@@ -1716,10 +1794,14 @@
       return state.mode === "playing" || state.mode === "level" ? "gameplay" : "menu";
     }
 
+    function canPlayMusic() {
+      return state.sound && state.music.enabled && state.audioUnlocked;
+    }
+
     function startMusic() {
       const track = currentMusicTrack();
-      if (!state.music.enabled || !ensureAudio()) {
-        updateMusicButton();
+      if (!canPlayMusic() || !ensureAudio()) {
+        stopMusic();
         return;
       }
       if (state.music.track !== track) {
@@ -1740,32 +1822,116 @@
       updateMusicButton();
     }
 
-    function toggleMusic() {
-      state.music.enabled = !state.music.enabled;
-      if (state.music.enabled) {
-        startMusic();
-        if (state.mode === "playing") showTip("Musiquinha 8-bit ligada.");
-      } else {
-        stopMusic();
-        if (state.mode === "playing") showTip("Musiquinha desligada.");
+    // O navegador só deixa tocar som depois do primeiro toque/tecla.
+    function unlockAudio() {
+      if (state.audioUnlocked) return;
+      state.audioUnlocked = true;
+      if (state.sound) {
+        ensureAudio();
+        if (state.mode !== "paused" && state.mode !== "gameover") startMusic();
       }
     }
 
-    function playPackageSound(kind) {
-      if (!state.music.context && !ensureAudio()) return;
-      if (kind === "piece") {
-        playNote(784, 0.08, 0.18, "square");
-        window.setTimeout(() => playNote(988, 0.1, 0.16, "square"), 80);
+    // Botão ♪: liga ou desliga TODO o som (música e efeitos).
+    function toggleSound() {
+      if (state.sound && !state.audioUnlocked) {
+        // O ícone já dizia "ligado", mas nada tocava ainda: o primeiro clique só começa a tocar.
+        unlockAudio();
+        updateMusicButton();
         return;
       }
-      playNote(523, 0.06, 0.15, "square");
-      window.setTimeout(() => playNote(659, 0.06, 0.14, "square"), 65);
+      state.audioUnlocked = true;
+      state.sound = !state.sound;
+      saveSettings();
+      if (state.sound) {
+        ensureAudio();
+        if (state.mode !== "paused") startMusic();
+        sfx("click");
+      } else {
+        stopMusic();
+      }
+      updateMusicButton();
+      if (state.mode === "playing") showTip(state.sound ? "Som ligado." : "Som desligado.");
     }
 
-    function playHitSound() {
-      if (!state.music.context && !ensureAudio()) return;
-      playNote(196, 0.08, 0.16, "sawtooth");
-      window.setTimeout(() => playNote(147, 0.12, 0.12, "square"), 75);
+    // No menu de pausa: só a musiquinha, os efeitos continuam.
+    function toggleMusicOnly() {
+      state.audioUnlocked = true;
+      if (!state.sound) {
+        state.sound = true;
+        state.music.enabled = true;
+      } else {
+        state.music.enabled = !state.music.enabled;
+      }
+      saveSettings();
+      if (!state.music.enabled) stopMusic();
+      else if (state.mode !== "paused") startMusic();
+      updateMusicButton();
+    }
+
+    function sfx(name) {
+      if (!state.sound || !state.audioUnlocked || !ensureAudio()) return;
+      switch (name) {
+        case "banana":
+          playNote(523, 0.06, 0.15, "square");
+          playNote(659, 0.06, 0.14, "square", 0.065);
+          playNote(784, 0.09, 0.12, "square", 0.13);
+          break;
+        case "piece":
+          playNote(784, 0.08, 0.18, "square");
+          playNote(988, 0.1, 0.16, "square", 0.08);
+          break;
+        case "unlock":
+          [523, 659, 784, 1046].forEach((f, i) => playNote(f, 0.12, 0.16, "square", i * 0.09));
+          playNote(1318, 0.28, 0.12, "triangle", 0.36);
+          break;
+        case "hurt":
+          playNote(196, 0.08, 0.16, "sawtooth");
+          playNote(147, 0.12, 0.12, "square", 0.075);
+          break;
+        case "life":
+          playNote(392, 0.14, 0.18, "sawtooth", 0, 180);
+          playNote(165, 0.28, 0.14, "square", 0.13, 90);
+          break;
+        case "shoot":
+          playNote(880, 0.045, 0.06, "square", 0, 1180);
+          break;
+        case "enemyHit":
+          playNote(330, 0.06, 0.1, "square", 0, 210);
+          break;
+        case "enemyDown":
+          playNote(660, 0.06, 0.12, "square");
+          playNote(990, 0.08, 0.1, "square", 0.06);
+          playNote(1320, 0.12, 0.08, "triangle", 0.12);
+          break;
+        case "burst":
+          playNote(988, 0.08, 0.14, "square");
+          playNote(1318, 0.12, 0.1, "square", 0.08);
+          playNote(220, 0.32, 0.12, "triangle", 0, 80);
+          break;
+        case "warn":
+          playNote(740, 0.07, 0.08, "triangle");
+          playNote(740, 0.07, 0.08, "triangle", 0.14);
+          break;
+        case "edge":
+          playNote(300, 0.1, 0.12, "triangle", 0, 230);
+          break;
+        case "level":
+          [523, 659, 784, 659, 784, 1046].forEach((f, i) => playNote(f, 0.15, 0.15, "square", i * 0.11));
+          playNote(262, 0.6, 0.1, "triangle", 0.55);
+          break;
+        case "gameover":
+          [392, 330, 262, 196].forEach((f, i) => playNote(f, 0.24, 0.14, "triangle", i * 0.2));
+          break;
+        case "click":
+          playNote(660, 0.04, 0.08, "triangle");
+          break;
+        case "empty":
+          playNote(220, 0.06, 0.08, "triangle");
+          break;
+        default:
+          break;
+      }
     }
 
     function openPackage(packageItem) {
@@ -1782,7 +1948,7 @@
         const character = pieceCharacter;
         const progress = state.progress[character.id];
         progress.pieces = Math.min(5, progress.pieces + 1);
-        playPackageSound("piece");
+        sfx("piece");
         state.rewards.push({ type: "piece", x: packagePoint.x, y: packagePoint.y - 12, age: 0, label: character.name });
         if (progress.pieces >= 5) {
           progress.unlocked = true;
@@ -1795,7 +1961,7 @@
         }
       } else {
         state.bananas = Math.min(BANANAS_TO_WIN, state.bananas + 1);
-        playPackageSound("banana");
+        sfx("banana");
         state.rewards.push({ type: "banana", x: packagePoint.x, y: packagePoint.y - 12, age: 0 });
         showTip(`Você achou uma banana no pacote (${state.bananas}/${BANANAS_TO_WIN}).`);
       }
@@ -1863,7 +2029,7 @@
       for (const packageItem of state.packages) {
         const point = pointOnIsland(packageItem.u, packageItem.v);
         const distance = Math.hypot(point.x - state.player.x, point.y - state.player.y);
-        if (distance < state.player.radius + 19) {
+        if (distance < (state.player.radius + 19) * worldScale()) {
           openPackage(packageItem);
           break;
         }
@@ -1898,7 +2064,7 @@
         if (power.age > 3.2) return false;
         if (power.x < -40 || power.x > state.width + 40 || power.y < -40 || power.y > state.height + 40) return false;
         const distance = Math.hypot(power.x - state.player.x, power.y - state.player.y);
-        if (distance < state.player.radius + 11) {
+        if (distance < (state.player.radius + 11) * worldScale()) {
           handlePowerHit();
           return false;
         }
@@ -1932,7 +2098,7 @@
         if (shot.age > 1.7 || shot.x < -50 || shot.x > state.width + 50 || shot.y < -50 || shot.y > state.height + 50) return false;
         for (const enemy of state.enemies) {
           const point = enemyPoint(enemy);
-          if (Math.hypot(shot.x - point.x, shot.y - point.y) < 25) {
+          if (Math.hypot(shot.x - point.x, shot.y - point.y) < 25 * worldScale() + 4) {
             enemy.hp -= shot.power;
             state.rewards.push({ type: "piece", x: point.x, y: point.y - 20, age: 0, label: "POW!" });
             if (enemy.hp <= 0) enemy.defeated = true;
@@ -1955,30 +2121,60 @@
 
       for (const zone of state.dangerZones) {
         zone.age += dt;
-        const point = pointOnIsland(zone.u, zone.v);
         if (!zone.triggered && zone.age > 1.25 && zone.age < 2.8) {
-          const distance = Math.hypot(state.player.x - point.x, state.player.y - point.y);
-          if (distance < zone.radius) {
+          // Testa os pés do personagem contra a mesma elipse que aparece na tela.
+          if (insideDangerZone(zone, state.player.x, state.player.y + 16 * worldScale())) {
             zone.triggered = true;
-            loseLife("A parte vermelha da ilha caiu!");
+            loseLife("O chão vermelho desabou com você em cima!");
           }
         }
       }
       state.dangerZones = state.dangerZones.filter((zone) => zone.age < 3.1);
 
-      const island = islandShape();
-      const edgeDistance = Math.hypot((state.player.x - island.cx) / island.rx, (state.player.y - island.cy) / island.ry);
-      if (edgeDistance > 0.82) {
-        loseLife("Chegou muito perto da borda e caiu!");
+      // Borda: antes era morte instantânea numa faixa invisível. Agora o chão treme,
+      // aparece o aviso e só cai quem fica parado ali.
+      const edgeDistance = playerEdgeDistance();
+      const player = state.player;
+      if (edgeDistance > EDGE_LIMIT) {
+        if (!player.edgeWarned) {
+          player.edgeWarned = true;
+          showTip("Cuidado! A borda está esfarelando. Volte para o meio!");
+          sfx("edge");
+        }
+        player.teeter += dt;
+        if (player.teeter >= EDGE_FALL_TIME) {
+          player.teeter = 0;
+          loseLife("Ficou na beirada e caiu da ilha!");
+        }
+      } else {
+        player.teeter = Math.max(0, player.teeter - dt * 2);
+        if (player.teeter === 0) player.edgeWarned = false;
       }
+    }
+
+    function playerEdgeDistance() {
+      const island = islandShape();
+      return Math.hypot((state.player.x - island.cx) / island.rx, (state.player.y - island.cy) / island.ry);
+    }
+
+    function insideDangerZone(zone, x, y) {
+      const point = pointOnIsland(zone.u, zone.v);
+      const dx = x - point.x;
+      const dy = y - point.y;
+      const cos = Math.cos(-zone.crack);
+      const sin = Math.sin(-zone.crack);
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+      return (lx / (zone.radius * 1.1)) ** 2 + (ly / (zone.radius * 0.72)) ** 2 < 1;
     }
 
     function spawnDangerZone() {
       const spot = randomPointInIsland(Math.random);
+      sfx("warn");
       state.dangerZones.push({
         u: spot.u,
         v: spot.v,
-        radius: 48 + Math.random() * 28,
+        radius: (48 + Math.random() * 28) * worldScale(),
         age: 0,
         crack: Math.random() * Math.PI * 2,
         triggered: false
@@ -1989,7 +2185,7 @@
       state.attackCooldown = 0.16;
       const direction = attackDirection();
       spawnPlayerShot(direction.x, direction.y, 360, 1, "#66d9ff");
-      playNote(880, 0.045, 0.08, "square");
+      sfx("shoot");
     }
 
     function fireBurstAttack() {
@@ -2003,8 +2199,7 @@
         const angle = (Math.PI * 2 * i) / total;
         spawnPlayerShot(Math.cos(angle), Math.sin(angle), 310, 2, "#ffcf57");
       }
-      playNote(988, 0.08, 0.14, "square");
-      window.setTimeout(() => playNote(1318, 0.12, 0.1, "square"), 80);
+      sfx("burst");
       updateChargeButton();
       showTip("Explosão mágica!");
     }
@@ -2069,8 +2264,8 @@
     function handlePowerHit() {
       if (state.player.hitCooldown > 0) return;
       state.player.hitCooldown = 1.35;
-      state.hits += 1;
-      playHitSound();
+      state.hits = Math.min(7, state.hits + 1);
+      sfx("hurt");
       if (state.hits >= 7) {
         loseLife("Os bichinhos acertaram 7 poderes!");
       } else {
@@ -2081,6 +2276,7 @@
 
     function loseLife(reason) {
       if (state.player.fallCooldown > 0) return;
+      sfx("life");
       state.lives -= 1;
       state.hits = 0;
       state.player.hitCooldown = 1.4;
@@ -2101,6 +2297,11 @@
       state.player.x = island.cx;
       state.player.y = island.cy + island.ry * 0.12;
       state.player.target = null;
+      state.player.teeter = 0;
+      state.player.edgeWarned = false;
+      // Não renasce em cima de um chão que vai cair, e os bichinhos esperam um pouco.
+      state.dangerZones = state.dangerZones.filter((zone) => !insideDangerZone(zone, state.player.x, state.player.y));
+      for (const enemy of state.enemies) enemy.cooldown = Math.max(enemy.cooldown, 1.2);
     }
 
     function gameOver(reason) {
@@ -2119,15 +2320,15 @@
       state.player.y = point.y;
     }
 
-    function clampPointToIsland(x, y) {
+    function clampPointToIsland(x, y, limit = 0.88) {
       const island = islandShape();
       const nx = (x - island.cx) / island.rx;
       const ny = (y - island.cy) / island.ry;
       const length = Math.hypot(nx, ny);
-      if (length > 0.88) {
+      if (length > limit) {
         return {
-          x: island.cx + (nx / length) * island.rx * 0.88,
-          y: island.cy + (ny / length) * island.ry * 0.88
+          x: island.cx + (nx / length) * island.rx * limit,
+          y: island.cy + (ny / length) * island.ry * limit
         };
       }
       return { x, y };
@@ -2175,8 +2376,6 @@
     function drawClouds() {
       ctx.save();
       for (const cloud of state.clouds) {
-        cloud.x += cloud.speed * 0.016;
-        if (cloud.x > state.width + 90) cloud.x = -100;
         ctx.globalAlpha = 0.74;
         ctx.fillStyle = "#ffffff";
         const s = cloud.scale;
@@ -2264,11 +2463,25 @@
       ctx.ellipse(island.cx, island.cy, island.rx, island.ry, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = "rgba(255,255,255,0.45)";
-      ctx.lineWidth = 5;
+      // Faixa da borda (onde o chão esfarela) um pouco mais escura...
+      ctx.fillStyle = "rgba(118, 84, 52, 0.17)";
       ctx.beginPath();
-      ctx.ellipse(island.cx - 6, island.cy - 8, island.rx * 0.82, island.ry * 0.76, 0, 0, Math.PI * 2);
+      ctx.ellipse(island.cx, island.cy, island.rx, island.ry, 0, 0, Math.PI * 2);
+      ctx.ellipse(island.cx, island.cy, island.rx * EDGE_LIMIT, island.ry * EDGE_LIMIT, 0, 0, Math.PI * 2);
+      ctx.fill("evenodd");
+
+      // ...e uma linha tracejada que fica vermelha quando o personagem chega perto.
+      const near = state.mode === "playing"
+        ? Math.max(0, Math.min(1, (playerEdgeDistance() - 0.6) / (EDGE_LIMIT - 0.6)))
+        : 0;
+      ctx.setLineDash([14, 12]);
+      ctx.lineDashOffset = -state.time * 16;
+      ctx.strokeStyle = near > 0 ? `rgba(214, 64, 58, ${0.35 + near * 0.55})` : "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = near > 0 ? 4 + near * 2 : 4;
+      ctx.beginPath();
+      ctx.ellipse(island.cx, island.cy, island.rx * EDGE_LIMIT, island.ry * EDGE_LIMIT, 0, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.setLineDash([]);
       ctx.restore();
     }
 
@@ -2298,8 +2511,7 @@
     function drawDecorations(theme, frontLayer) {
       // Em ilhas pequenas (celular) as árvores ficavam enormes e escondiam pacotes e bichinhos.
       // No celular deitado a ilha é baixa: usa também a altura para as árvores não taparem tudo.
-      const shape = islandShape();
-      const sizeFactor = Math.max(0.55, Math.min(1, shape.rx / 400, shape.ry / 190));
+      const sizeFactor = worldScale();
       const sorted = [...state.decorations].sort((a, b) => pointOnIsland(a.u, a.v).y - pointOnIsland(b.u, b.v).y);
       for (const decoration of sorted) {
         const point = pointOnIsland(decoration.u, decoration.v);
@@ -2436,6 +2648,8 @@
     function drawGiftBox(x, y, hidden, content) {
       ctx.save();
       ctx.translate(x, y);
+      const scale = worldScale();
+      ctx.scale(scale, scale);
       ctx.fillStyle = "rgba(39, 58, 58, 0.18)";
       ctx.beginPath();
       ctx.ellipse(0, 19, 22, 7, 0, 0, Math.PI * 2);
@@ -2535,6 +2749,8 @@
     function drawEnemy(x, y, enemy) {
       ctx.save();
       ctx.translate(x, y);
+      const scale = worldScale();
+      ctx.scale(scale, scale);
       const bounce = Math.sin(state.time * 4 + enemy.phase) * 3;
       ctx.translate(0, bounce);
       ctx.fillStyle = "rgba(38, 36, 54, 0.22)";
@@ -2647,14 +2863,41 @@
 
     function drawPlayer() {
       const character = characterById(state.selectedId);
-      if (state.player.hitCooldown > 0 && Math.floor(state.time * 16) % 2 === 0) {
-        ctx.save();
-        ctx.globalAlpha = 0.45;
-        drawAvatar(state.player.x, state.player.y, character, 1, state.player.facing);
-        ctx.restore();
-        return;
+      const player = state.player;
+      const scale = worldScale();
+      ctx.save();
+      if (player.teeter > 0) {
+        // Balança na beirada e mostra um "!" para avisar.
+        const wobble = Math.sin(state.time * 28) * 0.18 * Math.min(1, player.teeter / 0.3);
+        ctx.translate(player.x, player.y + 24 * scale);
+        ctx.rotate(wobble);
+        ctx.translate(-player.x, -(player.y + 24 * scale));
       }
-      drawAvatar(state.player.x, state.player.y, character, 1, state.player.facing);
+      if (player.hitCooldown > 0 && Math.floor(state.time * 16) % 2 === 0) {
+        ctx.globalAlpha = 0.45;
+      }
+      drawAvatar(player.x, player.y, character, scale, player.facing);
+      ctx.restore();
+      if (player.teeter > 0 && state.mode === "playing") {
+        drawAlertBubble(player.x, player.y - 70 * scale);
+      }
+    }
+
+    function drawAlertBubble(x, y) {
+      ctx.save();
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#d6403a";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, 13, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#d6403a";
+      ctx.font = "900 18px Trebuchet MS, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("!", x, y + 1);
+      ctx.restore();
     }
 
     function drawAvatar(x, y, character, scale, facing) {
@@ -2804,11 +3047,19 @@
       ctx.fill();
     }
 
+    function updateClouds(dt) {
+      for (const cloud of state.clouds) {
+        cloud.x += cloud.speed * dt;
+        if (cloud.x > state.width + 90) cloud.x = -100;
+      }
+    }
+
     function loop(timestamp) {
       const seconds = timestamp / 1000;
       const dt = Math.min(0.033, seconds - (state.last || seconds));
       state.last = seconds;
       state.time = seconds;
+      updateClouds(dt);
       if (state.mode === "playing") {
         updatePlayer(dt);
         updateEnemies(dt);
@@ -2820,9 +3071,70 @@
       requestAnimationFrame(loop);
     }
 
+    function clearKeys() {
+      state.keys.up = false;
+      state.keys.down = false;
+      state.keys.left = false;
+      state.keys.right = false;
+    }
+
+    function focusPrimary(dialog) {
+      const button = dialog.querySelector(".primary");
+      if (button) button.focus({ preventScroll: true });
+    }
+
+    function pauseGame() {
+      if (state.mode !== "playing") return;
+      pauseDialog.classList.remove("hidden");
+      setMode("paused");
+      stopMusic();
+      updateMusicButton();
+      focusPrimary(pauseDialog);
+    }
+
+    function resumeGame() {
+      if (state.mode !== "paused") return;
+      pauseDialog.classList.add("hidden");
+      setMode("playing");
+      startMusic();
+    }
+
     function bindControls() {
+      const unlockOnce = (event) => {
+        if (event.target && event.target.closest && event.target.closest(".menu-music-toggle, #musicButton, #musicOnlyButton")) return;
+        unlockAudio();
+      };
+      window.addEventListener("pointerdown", unlockOnce, true);
+      window.addEventListener("keydown", unlockOnce, true);
+
+      window.addEventListener("blur", () => {
+        clearKeys();
+        state.rapidAttackHeld = false;
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          pauseGame();
+          if (state.music.context && state.music.context.state === "running") state.music.context.suspend();
+        } else if (state.music.context && state.sound) {
+          state.music.context.resume();
+        }
+      });
+
       window.addEventListener("keydown", (event) => {
         const key = event.key.toLowerCase();
+        if ((key === "escape" || key === "p") && !event.repeat) {
+          if (state.mode === "playing") {
+            event.preventDefault();
+            pauseGame();
+            return;
+          }
+          if (state.mode === "paused") {
+            event.preventDefault();
+            resumeGame();
+            return;
+          }
+        }
+        if (state.mode !== "playing") return;
         if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)) {
           state.player.target = null;
         }
@@ -2830,12 +3142,14 @@
         if (key === "arrowdown" || key === "s") state.keys.down = true;
         if (key === "arrowleft" || key === "a") state.keys.left = true;
         if (key === "arrowright" || key === "d") state.keys.right = true;
-        if (key === " " && state.mode === "playing") {
+        if (key === " ") {
           event.preventDefault();
-          state.rapidAttackHeld = true;
-          fireQuickAttack();
+          if (!event.repeat) {
+            state.rapidAttackHeld = true;
+            fireQuickAttack();
+          }
         }
-        if (key === "q" && state.mode === "playing") {
+        if (key === "q" && !event.repeat) {
           fireBurstAttack();
         }
       });
@@ -2845,7 +3159,11 @@
         if (key === "arrowdown" || key === "s") state.keys.down = false;
         if (key === "arrowleft" || key === "a") state.keys.left = false;
         if (key === "arrowright" || key === "d") state.keys.right = false;
-        if (key === " ") state.rapidAttackHeld = false;
+        if (key === " ") {
+          state.rapidAttackHeld = false;
+          // Evita que o espaço "aperte" um botão do HUD que ficou com foco.
+          if (state.mode === "playing") event.preventDefault();
+        }
       });
 
       if (quickAttackButton) {
@@ -2879,7 +3197,8 @@
         if (state.mode !== "playing") return;
         event.preventDefault();
         const rect = canvas.getBoundingClientRect();
-        const point = clampPointToIsland(event.clientX - rect.left, event.clientY - rect.top);
+        // Tocar perto da borda leva só até a parte segura da ilha.
+        const point = clampPointToIsland(event.clientX - rect.left, event.clientY - rect.top, SAFE_TAP_LIMIT);
         state.player.target = point;
       };
       canvas.addEventListener("pointerdown", (event) => {
@@ -2902,6 +3221,7 @@
 
     function init() {
       state.progress = loadProgress();
+      loadSettings();
       resize();
       setupIsland();
       renderCharacterCards(startCharacters, true);
@@ -2915,10 +3235,11 @@
       document.querySelector("#enterSelectionButton").addEventListener("click", enterSelection);
       document.querySelector("#startButton").addEventListener("click", startGame);
       document.querySelector("#nextIslandButton").addEventListener("click", nextIsland);
-      document.querySelector("#musicButton").addEventListener("click", toggleMusic);
+      document.querySelector("#musicButton").addEventListener("click", toggleSound);
       for (const button of document.querySelectorAll(".menu-music-toggle")) {
-        button.addEventListener("click", toggleMusic);
+        button.addEventListener("click", toggleSound);
       }
+      document.querySelector("#musicOnlyButton").addEventListener("click", toggleMusicOnly);
       document.querySelector("#charactersButton").addEventListener("click", () => {
         renderLocker();
         lockerDialog.classList.remove("hidden");
@@ -2928,14 +3249,8 @@
         lockerDialog.classList.add("hidden");
         setMode("playing");
       });
-      document.querySelector("#pauseButton").addEventListener("click", () => {
-        pauseDialog.classList.remove("hidden");
-        setMode("paused");
-      });
-      document.querySelector("#resumeButton").addEventListener("click", () => {
-        pauseDialog.classList.add("hidden");
-        setMode("playing");
-      });
+      document.querySelector("#pauseButton").addEventListener("click", pauseGame);
+      document.querySelector("#resumeButton").addEventListener("click", resumeGame);
       document.querySelector("#menuButton").addEventListener("click", () => {
         pauseDialog.classList.add("hidden");
         setMode("welcome");
