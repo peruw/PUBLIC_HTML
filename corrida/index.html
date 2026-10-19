@@ -37,9 +37,10 @@
     --rare: #4fc3ff;
     --epic: #c07bff;
     --legend: #ffb238;
-    --pixel: 'Press Start 2P', ui-monospace, monospace;
-    --pixel-text: 'Pixelify Sans', 'Press Start 2P', ui-monospace, monospace;
-    --body: 'Plus Jakarta Sans', system-ui, sans-serif;
+    /* chinês e japonês: as fontes pixel não têm esses caracteres, então caem nas do sistema */
+    --pixel: 'Press Start 2P', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', ui-monospace, monospace;
+    --pixel-text: 'Pixelify Sans', 'Press Start 2P', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', ui-monospace, monospace;
+    --body: 'Plus Jakarta Sans', system-ui, 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', sans-serif;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -156,7 +157,7 @@
     display: flex; justify-content: space-between; align-items: flex-end; padding: 0 12px;
   }
   .speed { display: flex; flex-direction: column; gap: 6px; }
-  .speed .lbl { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); text-shadow: 2px 2px 0 #000; }
+  .speed .lbl { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); text-shadow: 1px 1px 0 #000, 0 0 3px rgba(0,0,0,0.85);  /* sombra de 2 px em letra de 8 px parecia texto duplicado */ }
   .speed .lbl b { color: var(--brand); font-weight: 400; }
   .segs { display: flex; gap: 3px; }
   .segs i { width: 9px; height: 14px; background: rgba(0,0,0,0.6); border: 1px solid var(--brand-dark); }
@@ -240,6 +241,19 @@
   .dash-btn small { display: block; font-size: 7px; margin-top: 4px; }
   .dash-btn.on { transform: translateX(-50%) translateY(4px); box-shadow: inset -4px -4px 0 var(--brand-deep), inset 4px 4px 0 var(--brand-hi), 0 1px 0 #000; }
   @media (pointer: coarse) { body.playing .dash-btn { display: block; } }
+  /* celular deitado: no meio de baixo o botão cobria o corredor; vai para o canto, perto do polegar */
+  @media (pointer: coarse) and (orientation: landscape) {
+    .dash-btn { left: auto; transform: none; width: 72px; height: 72px;
+      right: max(16px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); }
+    .dash-btn.on { transform: translateY(4px); }
+  }
+  /* toque: alvos de pelo menos 44 px */
+  @media (pointer: coarse) {
+    .pbtn { width: 44px; height: 44px; font-size: 12px; }
+    .btn.alt, .tab { min-height: 44px; }
+    a.link, button.link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    .account .acts .link { min-width: 44px; }
+  }
 
   /* textos que saltam */
   #fx { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
@@ -466,9 +480,147 @@
     .stats { gap: 4px; }
     .mult.show { display: none; }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .blink, .pop, .pop.big, .question.bounce .q-inner, .cm-num.punch, .combo-meter.t5, .fever-edge.on, .score.pulse { animation-duration: 0s; }
+  /* contagem regressiva 3, 2, 1, VAI! */
+  .count {
+    position: fixed; left: 50%; top: 44%; z-index: 6; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -50%);
+    font-family: var(--pixel); font-size: clamp(54px, 15vmin, 120px); line-height: 1; color: var(--gold);
+    text-shadow: 6px 6px 0 #000, -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000;
   }
+  .count.go { color: var(--brand-hi); font-size: clamp(40px, 11vmin, 90px); }
+  .count.tick { animation: cnt .55s steps(6) forwards; }
+  @keyframes cnt {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+    25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  }
+  .count-sub { position: fixed; left: 50%; top: calc(44% + clamp(48px, 11vmin, 90px)); z-index: 6; pointer-events: none;
+    transform: translateX(-50%); white-space: nowrap; display: none;
+    font-family: var(--pixel-text); font-weight: 700; font-size: clamp(14px, 3.6vw, 20px); color: #fff; text-shadow: 2px 2px 0 #000; }
+  .count-sub.show { display: block; }
+
+  /* dica de toque: as duas metades da tela */
+  .touch-hint { position: fixed; inset: 0; z-index: 4; pointer-events: none; display: none; gap: 10px; padding: 0 10px; }
+  .touch-hint.show { display: flex; }
+  .touch-hint div {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    margin: 58vh 0 14vh; background: rgba(31,214,133,0.12); border: 3px dashed rgba(125,255,192,0.55);
+    font-family: var(--pixel); font-size: 12px; line-height: 1.4; text-align: center; color: #fff; text-shadow: 2px 2px 0 #000;
+  }
+  .touch-hint b { font-size: 26px; font-weight: 400; color: var(--brand-hi); }
+  @media (orientation: landscape) { .touch-hint div { margin: 36vh 0 24vh; } }
+
+  /* explicação depois de um erro */
+  .explain {
+    position: fixed; left: 50%; top: 64%; z-index: 6; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -50%);
+    width: max-content; max-width: min(92vw, 540px); padding: 12px 16px 11px; text-align: center;
+    background: rgba(4,16,11,0.95); border: 3px solid var(--danger); box-shadow: 5px 5px 0 #000;
+  }
+  .explain.show { animation: expl 2.2s steps(14) forwards; }
+  .explain .eq { font-family: var(--pixel); font-size: clamp(16px, 4.6vw, 28px); line-height: 1.2; color: #fff; white-space: nowrap; text-shadow: 3px 3px 0 #000; }
+  .explain .eq b { color: var(--brand-hi); font-weight: 400; }
+  .explain .how { margin-top: 8px; font-weight: 700; font-size: clamp(14px, 3.6vw, 17px); color: var(--ink); line-height: 1.35; text-wrap: balance; }
+  .explain .you { margin-top: 4px; font-size: 13px; color: #ffb3bb; }
+  @keyframes expl {
+    0% { opacity: 0; transform: translate(-50%, -38%); }
+    7% { opacity: 1; transform: translate(-50%, -50%); }
+    88% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -50%); }
+  }
+  @media (max-height: 520px) { .explain { top: 70%; padding: 8px 12px 7px; } .explain .how { margin-top: 4px; font-size: 14px; } .explain .you { display: none; } }
+
+  /* nível: 5 acertos por nível */
+  .lvl { display: flex; align-items: center; gap: 6px; }
+  .lvl .lbl { min-width: 0; }
+  .pips { display: flex; gap: 3px; }
+  .pips i { width: 12px; height: 8px; background: rgba(0,0,0,0.6); border: 1px solid var(--gold); }
+  .pips i.on { background: var(--gold); }
+
+  /* modos */
+  .modes { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 6px; margin: 0 0 8px; }
+  .mode {
+    min-height: 48px; padding: 8px 4px 6px; cursor: pointer;
+    font-family: var(--pixel); font-size: 12px; line-height: 1.1; color: var(--ink-dim);
+    background: var(--panel-2); border: 2px solid var(--brand-dark); box-shadow: 0 3px 0 #000;
+  }
+  .mode small { display: block; margin-top: 5px; font-family: var(--pixel-text); font-weight: 700; font-size: 11px; letter-spacing: 0.5px; }
+  .mode[aria-checked="true"] { color: #03140c; background: var(--gold); border-color: #fff3b0; }
+  .mode:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .mode-desc { min-height: 2.9em; margin: 0 0 12px !important; font-size: 14px !important; }
+  .mode-chip { display: inline-block; margin: -4px 0 10px; padding: 4px 8px 3px; font-family: var(--pixel-text); font-weight: 700; font-size: 12px; letter-spacing: 1px; color: #03140c; background: var(--gold); }
+
+  /* revisão no fim da corrida */
+  .review { display: none; margin: 0 0 14px; padding: 10px 12px; text-align: left; background: var(--panel-2); border: 2px solid var(--brand-dark); }
+  .review.show { display: block; }
+  .review h3 { margin: 0 0 6px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; letter-spacing: 1px; color: var(--gold); }
+  .review ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .review li { font-size: 13px; line-height: 1.4; color: var(--ink-dim); }
+  .review li b { font-family: var(--pixel); font-weight: 400; font-size: 12px; color: var(--ink); }
+  .review li b i { font-style: normal; color: var(--brand-hi); }
+  .review .acc { margin: 0 0 8px; font-size: 14px; color: var(--ink); }
+  .review .acc b { color: var(--brand); }
+
+  .pause-stats { font-family: var(--pixel-text); font-weight: 700; color: var(--ink) !important; }
+  #pauseScreen { background: rgba(4,16,11,0.86); }
+  body.paused .question { visibility: hidden; }
+  /* explicação de um erro fica parada e escondida atrás da pausa, e continua ao voltar */
+  body.paused .explain { visibility: hidden; animation-play-state: paused; }
+  .row-links { display: flex; justify-content: center; align-items: center; gap: 22px; flex-wrap: wrap; margin-top: 14px; font-family: var(--pixel-text); font-weight: 700; font-size: 14px; }
+  .row-links > .link { margin: 0; min-height: 44px; display: inline-flex; align-items: center; vertical-align: middle; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* tela final em celular deitado: duas colunas para JOGAR DE NOVO caber sem rolar */
+  @media (max-height: 520px) and (min-width: 600px) {
+    #overScreen .card { max-width: 780px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; align-items: start; }
+    #overScreen .title { font-size: 18px; }
+    #overScreen .title br { display: none; }
+    #overScreen .results { grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 10px; }
+    #overScreen .results div { padding: 8px 2px 6px; }
+    #overScreen .results b { font-size: 13px; margin-bottom: 5px; }
+    #overScreen .results small { font-size: 10px; letter-spacing: 0; }
+    .review { padding: 8px 10px; }
+    .review ul { gap: 2px; }
+    .login-box small { display: none; }
+    .mode { min-height: 44px; padding: 6px 4px 4px; }
+    #overScreen .tip { display: none; }
+    #startScreen .card > p:not(.mode-desc) { display: none; }
+    .mode-desc { min-height: 0; }
+  }
+
+  /* japonês: fontes japonesas antes das chinesas (kanji com o desenho certo) */
+  :root:lang(ja) {
+    --pixel: 'Press Start 2P', 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-monospace, monospace;
+    --pixel-text: 'Pixelify Sans', 'Press Start 2P', 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-monospace, monospace;
+    --body: 'Plus Jakarta Sans', system-ui, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+  /* ideogramas na fonte do sistema ficam finos ao lado da pixelada: um pouco de peso ajuda */
+  :root:lang(zh-CN) .tag, :root:lang(ja) .tag, :root:lang(zh-CN) .btn, :root:lang(ja) .btn { font-weight: 700; }
+
+  /* seletor de idioma (menu e pausa) */
+  .lang-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 0; font-size: 13px; color: var(--ink-dim); }
+  .lang-sel {
+    min-height: 44px; max-width: 100%; padding: 6px 10px; font: 600 15px var(--body);
+    color: var(--ink); background: #000; border: 2px solid var(--brand-deep); border-radius: 0; cursor: pointer;
+  }
+  .lang-sel:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .lang-sel option { background: #000; color: var(--ink); }
+  /* no menu o seletor fica no alto, à vista sem rolar: ocupa o lugar do logo (a marca já está no canto) */
+  #startScreen .lang-row { margin: 0 0 12px; }
+  @media (max-height: 900px) { #startScreen .logo { display: none; } }
+  @media (max-height: 520px) and (min-width: 600px) {
+    .lang-row { margin-top: 8px; } .lang-sel { min-height: 40px; }
+    #startScreen .lang-row { margin: 0 0 6px; }
+    #startScreen .card > .tag { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blink, .question.bounce .q-inner, .cm-num.punch, .combo-meter.t5, .fever-edge.on, .score.pulse { animation-duration: 0s; }
+    /* textos de acerto/erro: antes sumiam na hora (animação de 0 s terminava invisível); agora só aparecem e somem */
+    .pop, .pop.big, .praise, .broken, .explain.show, .count.tick { animation-name: fadeonly; }
+  }
+  @keyframes fadeonly { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
 </style>
 </head>
 <body>
@@ -479,15 +631,15 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="fever-edge" id="feverEdge"></div>
 <div class="combo-meter" id="comboMeter" aria-live="off">
-  <div class="cm-label">COMBO</div>
+  <div class="cm-label" data-i18n="res.combo">COMBO</div>
   <div class="cm-num" id="cmNum">0</div>
   <div class="cm-mult" id="cmMult">x1</div>
   <div class="cm-bar"><i id="cmBar"></i></div>
 </div>
 
 <div class="hud">
-  <a class="brand" href="/" title="Voltar ao site Quanta Aulas">
-    <img src="/assets/logo-quanta.png" alt="Quanta Aulas">
+  <a class="brand" href="/" title="Voltar ao site Quanta Aulas" data-i18n-title="brand.title">
+    <img src="/assets/logo-quanta.png" alt="Quanta Aulas" data-i18n-alt="logo.alt">
     <span>QUANTA</span>
   </a>
   <div class="stats">
@@ -495,25 +647,31 @@
     <div class="box score" id="hudScore">0<b>PTS</b></div>
     <div class="box hearts" id="hudLives"></div>
     <button class="pbtn" id="btnSound" type="button" aria-label="Ligar ou desligar o som">♪</button>
-    <button class="pbtn" id="btnPause" type="button" aria-label="Pausar">II</button>
+    <button class="pbtn" id="btnPause" type="button" aria-label="Pausar" data-i18n-aria="hud.pause">II</button>
   </div>
 </div>
 
+<div class="sr" id="sr" aria-live="polite"></div>
+<div class="count" id="count" aria-hidden="true"></div>
+<div class="count-sub" id="countSub" aria-hidden="true"></div>
+<div class="explain" id="explain" aria-hidden="true"></div>
+<div class="touch-hint" id="touchHint" aria-hidden="true"><div><b>◄</b><span data-i18n-html="touch.left">TOQUE AQUI<br>PARA A ESQUERDA</span></div><div><b>►</b><span data-i18n-html="touch.right">TOQUE AQUI<br>PARA A DIREITA</span></div></div>
 <div class="question" id="question">
   <div class="q-inner">
     <div class="q-level" id="qLevel">NÍVEL 1</div>
     <div class="q-row">
       <div class="q-text" id="qText">0 + 0 = ?</div>
-      <div class="q-opts" id="qOpts" aria-label="Respostas, da esquerda para a direita"><span>0</span><span>0</span></div>
+      <div class="q-opts" id="qOpts" aria-label="Respostas, da esquerda para a direita" data-i18n-aria="q.opts"><span>0</span><span>0</span></div>
     </div>
     <div class="q-bar"><i id="qBar"></i></div>
   </div>
 </div>
 
-<button class="dash-btn" id="btnDash" type="button" aria-label="Dash: acelerar">▲<small>DASH</small></button>
+<button class="dash-btn" id="btnDash" type="button" aria-label="Dash: acelerar" data-i18n-aria="hud.dash">▲<small data-i18n="hud.dashBtn">DASH</small></button>
 <div class="bottom">
   <div class="speed" id="speed">
-    <div class="lbl">VEL <b id="speedTxt">x1.0</b></div>
+    <div class="lvl"><div class="lbl"><span data-i18n="hud.level">NÍVEL</span> <b id="lvlTxt">1</b></div><div class="pips" id="pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="lbl"><span data-i18n="hud.speed">VEL</span> <b id="speedTxt">x1.0</b></div>
     <div class="segs" id="segs"></div>
   </div>
 </div>
@@ -521,62 +679,82 @@
 <!-- Início -->
 <div class="overlay show" id="startScreen">
   <div class="card">
-    <img class="logo" src="/assets/logo-quanta.png" alt="Quanta Aulas">
-    <div class="tag">QUANTA AULAS · CÁLCULO MENTAL</div>
-    <h1 class="title">CORRIDA<br><span>QUANTA</span></h1>
-    <p>Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
+    <div class="lang-row"></div>
+    <img class="logo" src="/assets/logo-quanta.png" alt="Quanta Aulas" data-i18n-alt="logo.alt">
+    <div class="tag" data-i18n="start.tag">QUANTA AULAS · CÁLCULO MENTAL</div>
+    <h1 class="title" data-i18n-html="start.title">CORRIDA<br><span>QUANTA</span></h1>
+    <p data-i18n="start.intro">Resolva a conta e atravesse o portal com a resposta certa. A cada acerto você corre mais rápido.</p>
     <div class="keys">
-      <div><span class="kc">◄ ►</span> Setas ou A/D. No celular, toque no lado ou deslize.</div>
-      <div><span class="kc">▲</span> Já sabe? Seta pra cima ou W dá dash e acelera. No celular, deslize pra cima ou segure ▲.</div>
-      <div><span class="kc">♥ x3</span> Portal errado tira uma vida.</div>
-      <div><span class="kc">★</span> Seus pontos somam XP e liberam skins novas.</div>
+      <div><span class="kc">◄ ►</span> <span data-i18n="start.key1">Setas ou A/D. No celular, toque no lado da tela ou deslize.</span></div>
+      <div><span class="kc">▲</span> <span data-i18n="start.key2">Já sabe? Seta pra cima ou W dá dash, confirma a resposta e vale bônus. No celular, toque em ▲ DASH ou deslize pra cima.</span></div>
+      <div><span class="kc">♥ x3</span> <span data-i18n="start.key3">Portal errado tira uma vida e mostra como fazer a conta.</span></div>
     </div>
+    <div class="modes" id="modes" role="radiogroup" aria-label="Modo de jogo" data-i18n-aria="modes.aria">
+      <button type="button" class="mode" role="radio" data-mode="corrida" data-i18n-aria="mode.corrida.aria"><span data-i18n="mode.corrida.btn">CORRIDA</span><small data-i18n="mode.corrida.sub">TUDO · RANKING</small></button>
+      <button type="button" class="mode" role="radio" data-mode="somasub" aria-label="Treino de adição e subtração" data-i18n-aria="mode.somasub.aria">+ −<small data-i18n="mode.somasub.sub">TREINO</small></button>
+      <button type="button" class="mode" role="radio" data-mode="tabuada" aria-label="Treino de tabuada" data-i18n-aria="mode.tabuada.aria">×<small data-i18n="mode.tabuada.sub">TABUADA</small></button>
+      <button type="button" class="mode" role="radio" data-mode="divisao" aria-label="Treino de divisão" data-i18n-aria="mode.divisao.aria">÷<small data-i18n="mode.divisao.sub">TREINO</small></button>
+    </div>
+    <p class="mode-desc" id="modeDesc"></p>
     <div class="account-slot"></div>
-    <button class="btn" id="btnStart" type="button" disabled><span id="loading">CARREGANDO...</span></button>
+    <button class="btn" id="btnStart" type="button" disabled><span id="loading" data-i18n="loading">CARREGANDO...</span></button>
     <div class="row2">
-      <button class="btn alt" type="button" data-open="locker">SKINS</button>
-      <button class="btn alt" type="button" data-open="rank">RANKING</button>
+      <button class="btn alt" type="button" data-open="locker" data-i18n="btn.skins">SKINS</button>
+      <button class="btn alt" type="button" data-open="rank" data-i18n="btn.rank">RANKING</button>
     </div>
-    <div class="rec">RECORDE <b id="bestStart">0</b> · XP <b id="xpStart">0</b> · SKINS <b id="skinCount">1/10</b></div>
+    <div class="rec" id="recLine">RECORDE <b>0</b> · XP <b>0</b> · SKINS <b>1/10</b></div>
   </div>
 </div>
 
 <!-- Pausa -->
 <div class="overlay" id="pauseScreen">
   <div class="card">
-    <div class="tag">JOGO PAUSADO</div>
-    <h1 class="title">PAUSA</h1>
-    <button class="btn" id="btnResume" type="button">► CONTINUAR</button>
-    <a class="link" href="/">Voltar ao site</a>
+    <div class="tag" data-i18n="pause.tag">JOGO PAUSADO</div>
+    <h1 class="title" data-i18n="pause.title">PAUSA</h1>
+    <p class="pause-stats" id="pauseStats"></p>
+    <button class="btn" id="btnResume" type="button" data-i18n="btn.resume">► CONTINUAR</button>
+    <div class="row2">
+      <button class="btn alt" id="btnPauseSound" type="button" aria-pressed="true">SOM: LIGADO</button>
+      <button class="btn alt" id="btnQuit" type="button" data-i18n="btn.quit">ENCERRAR</button>
+    </div>
+    <p style="margin:12px 0 0;font-size:13px" data-i18n="pause.keys">Atalhos: P ou Esc pausa · M liga e desliga o som</p>
+    <div class="lang-row"></div>
+    <a class="link" href="/" data-i18n="link.back">Voltar ao site</a>
   </div>
 </div>
 
 <!-- Fim -->
 <div class="overlay" id="overScreen">
   <div class="card">
-    <div class="tag" id="overTag">FIM DE CORRIDA</div>
+   <div class="ov-a">
+    <div class="tag" id="overTag" data-i18n="over.tag">FIM DE CORRIDA</div>
     <h1 class="title" id="overTitle">GAME<br><span>OVER</span></h1>
-    <div class="newrec blink" id="newRecord">★ NOVO RECORDE ★</div>
+    <div class="mode-chip" id="overMode">CORRIDA</div>
+    <div class="newrec blink" id="newRecord" data-i18n="over.record">★ NOVO RECORDE ★</div>
     <div class="results">
-      <div><b id="rScore">0</b><small>PONTOS</small></div>
-      <div><b id="rHits">0</b><small>ACERTOS</small></div>
-      <div><b id="rCombo">0</b><small>COMBO</small></div>
-      <div><b id="rLevel">1</b><small>NÍVEL</small></div>
+      <div><b id="rScore">0</b><small data-i18n="res.points">PONTOS</small></div>
+      <div><b id="rHits">0</b><small data-i18n="res.hits">ACERTOS</small></div>
+      <div><b id="rCombo">0</b><small data-i18n="res.combo">COMBO</small></div>
+      <div><b id="rLevel">1</b><small data-i18n="res.level">NÍVEL</small></div>
     </div>
+    <div class="review" id="review"></div>
+   </div>
+   <div class="ov-b">
     <div class="unlocked" id="unlocked"></div>
     <div class="xp">
-      <div class="xp-line"><span>+<b id="xpGain">0</b> XP</span><span>TOTAL <b id="xpTotal">0</b></span></div>
+      <div class="xp-line"><span>+<b id="xpGain">0</b> XP</span><span><span data-i18n="xp.total">TOTAL</span> <b id="xpTotal">0</b></span></div>
       <div class="xp-bar"><i id="xpBar"></i></div>
       <div class="xp-next" id="xpNext"></div>
     </div>
     <div class="online-line" id="onlineLine"></div>
-    <button class="btn" id="btnRetry" type="button">► JOGAR DE NOVO</button>
+    <button class="btn" id="btnRetry" type="button" data-i18n="btn.retry">► JOGAR DE NOVO</button>
     <div class="row2">
-      <button class="btn alt" type="button" data-open="locker">SKINS</button>
-      <button class="btn alt" type="button" data-open="rank">RANKING</button>
+      <button class="btn alt" type="button" data-open="locker" data-i18n="btn.skins">SKINS</button>
+      <button class="btn alt" type="button" data-open="rank" data-i18n="btn.rank">RANKING</button>
     </div>
     <p class="tip" id="overTip" style="margin:16px 0 0"></p>
-    <a class="link" href="/">Voltar ao site</a>
+    <div class="row-links"><button class="link" type="button" id="btnModes" data-i18n="btn.modes">Trocar modo</button><a class="link" href="/" data-i18n="link.back">Voltar ao site</a></div>
+   </div>
   </div>
 </div>
 
@@ -584,8 +762,8 @@
 <div class="overlay locker" id="lockerScreen">
   <div class="panel">
     <div class="sheet-head">
-      <div class="tag">VESTIÁRIO · <span id="lockerCount">1/10</span></div>
-      <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
+      <div class="tag"><span data-i18n="locker.tag">VESTIÁRIO</span> · <span id="lockerCount">1/10</span></div>
+      <button class="pbtn" type="button" data-close aria-label="Fechar" data-i18n-aria="close">X</button>
     </div>
     <div class="lk-show" id="lkShow" aria-live="polite"></div>
     <div class="thumbs" id="skinGrid"></div>
@@ -596,12 +774,12 @@
 <div class="overlay" id="rankScreen">
   <div class="card">
     <div class="sheet-head">
-      <div class="tag">RANKING</div>
-      <button class="pbtn" type="button" data-close aria-label="Fechar">X</button>
+      <div class="tag" data-i18n="rank.tag">RANKING</div>
+      <button class="pbtn" type="button" data-close aria-label="Fechar" data-i18n-aria="close">X</button>
     </div>
     <div class="tabs" role="tablist">
-      <button class="tab on" type="button" role="tab" data-period="week" aria-selected="true">SEMANA</button>
-      <button class="tab" type="button" role="tab" data-period="all" aria-selected="false">GERAL</button>
+      <button class="tab on" type="button" role="tab" data-period="week" aria-selected="true" data-i18n="rank.week">SEMANA</button>
+      <button class="tab" type="button" role="tab" data-period="all" aria-selected="false" data-i18n="rank.all">GERAL</button>
     </div>
     <ol class="board" id="board"></ol>
     <div class="account-slot"></div>
@@ -611,34 +789,37 @@
 <!-- Apelido -->
 <div class="overlay" id="nickScreen">
   <div class="card">
-    <div class="tag">SEU NOME NO RANKING</div>
-    <p>Escolha um apelido. É ele que aparece para os outros jogadores, nunca seu nome ou e-mail.</p>
+    <div class="tag" data-i18n="nick.tag">SEU NOME NO RANKING</div>
+    <p data-i18n="nick.p">Escolha um apelido. É ele que aparece para os outros jogadores, nunca seu nome ou e-mail.</p>
     <form id="nickForm" autocomplete="off">
-      <label for="nickInput" class="tag" style="display:block;margin:0 0 4px;color:var(--ink-dim)">APELIDO (3 A 16 LETRAS)</label>
+      <label for="nickInput" class="tag" style="display:block;margin:0 0 4px;color:var(--ink-dim)" data-i18n="nick.label">APELIDO (3 A 16 LETRAS)</label>
       <input class="field" id="nickInput" name="nick" maxlength="16" minlength="3" required spellcheck="false">
       <div class="err" id="nickErr"></div>
-      <button class="btn" type="submit" id="nickSave">SALVAR</button>
+      <button class="btn" type="submit" id="nickSave" data-i18n="nick.save">SALVAR</button>
     </form>
-    <button class="link" type="button" data-close style="margin-top:14px">Agora não</button>
+    <button class="link" type="button" data-close style="margin-top:14px" data-i18n="nick.later">Agora não</button>
   </div>
 </div>
 
 <noscript><p style="position:fixed;inset:auto 16px 16px;z-index:9">Ative o JavaScript para jogar.</p></noscript>
 
+<script src="js/i18n.js"></script>
+<script>QC.I18N.apply();</script>
 <script src="js/themes.js"></script>
 <script src="js/skins.js"></script>
 <script src="js/creatures.js"></script>
 <script src="js/music.js"></script>
 <script src="js/fx2d.js"></script>
 <script src="js/progress.js"></script>
+<script src="js/questions.js"></script>
 <script src="js/online.js"></script>
 <script>
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
   const $$ = (sel) => [...document.querySelectorAll(sel)];
-  if (!window.THREE || !window.QC || !QC.Skins || !QC.Progress || !QC.THEMES) {
-    $('loading').textContent = 'ERRO AO CARREGAR. RECARREGUE A PÁGINA.';
+  if (!window.THREE || !window.QC || !QC.I18N || !QC.Skins || !QC.Progress || !QC.THEMES || !QC.Questions) {
+    $('loading').textContent = window.QC && QC.t ? QC.t('loadError') : 'ERRO AO CARREGAR. RECARREGUE A PÁGINA.';
     return;
   }
   const T = window.THREE;
@@ -663,7 +844,26 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const fmt = (n) => Math.round(n).toLocaleString('pt-BR');
+  // ================= Idioma (js/i18n.js) =================
+  const I18 = QC.I18N, t = I18.t;
+  const fmt = (n) => I18.num(Math.round(n));
+  // nomes e textos de skins e temas: o dicionário manda; sem chave, fica o do arquivo de dados
+  const tk = (k, fb) => { const v = t(k); return v === k ? fb : v; };
+  const skinName = (sk) => tk(`skin.${sk.id}.name`, sk.name);
+  const skinDesc = (sk) => tk(`skin.${sk.id}.desc`, sk.desc || '');
+  const themeName = (th) => tk(`theme.${th.id}`, th.name);
+  // leitor de tela: "7 × 8" vira "7 vezes 8" no idioma escolhido
+  const spoken = (s) => String(s).replace(/ × /g, ` ${t('sr.times')} `).replace(/ ÷ /g, ` ${t('sr.div')} `).replace(/ - /g, ` ${t('sr.minus')} `).replace(/ \+ /g, ` ${t('sr.plus')} `);
+  const rarityName = (r) => tk(`rarity.${r}`, String(r || '').toUpperCase());
+  function unlockText(u) {
+    if (!u) return '';
+    if (u.type === 'default') return t('unlock.default');
+    if (u.type === 'speed') return t('unlock.speed', { n: I18.num(u.value, 1) });
+    if (['xp', 'combo', 'level', 'best'].includes(u.type)) return t(`unlock.${u.type}`, { n: fmt(u.value) });
+    return u.label || '';
+  }
+  // espaços das contas viram não separáveis: "23 - 8 = 15" não quebra no meio da linha
+  const keepEq = (t) => String(t).replace(/ ([-+×÷=]) /g, '\u00a0$1\u00a0');
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -676,41 +876,16 @@
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const embedded = (() => { try { return window.top !== window.self; } catch (e) { return true; } })();
 
-  // ================= Contas =================
-  function makeQuestion(level, n) {
-    let a, b, c, text, ans;
-    const big = Math.max(0, level - 5);
-    const types = ['add'];
-    if (level >= 2) types.push('sub');
-    if (level >= 3) types.push('mul');
-    if (level >= 4) types.push('div');
-    if (level >= 6) types.push('mix');
-    const type = level <= 4 && Math.random() < 0.6 ? types[types.length - 1] : pick(types);
-    switch (type) {
-      case 'add': a = rand(2, 12 + big * 15); b = rand(2, 12 + big * 15); text = `${a} + ${b}`; ans = a + b; break;
-      case 'sub': a = rand(6, 20 + big * 15); b = rand(1, a - 1); text = `${a} - ${b}`; ans = a - b; break;
-      case 'mul': a = rand(2, 9 + Math.min(big, 3)); b = rand(2, 9); text = `${a} × ${b}`; ans = a * b; break;
-      case 'div': b = rand(2, 9); ans = rand(2, 9 + Math.min(big, 3)); a = b * ans; text = `${a} ÷ ${b}`; break;
-      case 'mix':
-        a = rand(2, 9); b = rand(2, 9);
-        if (Math.random() < 0.5) { c = rand(1, 15); text = `${a} × ${b} + ${c}`; ans = a * b + c; }
-        else { c = rand(1, a * b - 1); text = `${a} × ${b} - ${c}`; ans = a * b - c; }
-        break;
-    }
-    return { text, ans, wrong: makeDistractors(ans, type, a, b, n - 1) };
-  }
-  // respostas erradas plausíveis: vizinhas da certa ou erros típicos de conta
-  function makeDistractors(ans, type, a, b, count) {
-    const opts = [ans + 1, ans - 1, ans + 2, ans - 2, ans + 10, ans - 10, ans + 3, ans - 3];
-    if (type === 'mul') opts.push(a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b, a + b);
-    if (type === 'div') opts.push(b, ans * 2);
-    if (type === 'sub') opts.push(a + b);
-    if (type === 'add') opts.push(Math.abs(a - b));
-    const pool = shuffle([...new Set(opts)].filter((v) => v !== ans && v >= 0));
-    const out = pool.slice(0, count);
-    for (let k = 4; out.length < count; k++) if (!out.includes(ans + k)) out.push(ans + k);
-    return out;
-  }
+  // ================= Contas e modos (js/questions.js) =================
+  const Qs = QC.Questions;
+  const MODES = Qs.MODES;
+  let modeId = MODES[store.get('quanta-corrida-mode', 'corrida')] ? store.get('quanta-corrida-mode', 'corrida') : 'corrida';
+  let runMode = MODES[modeId];   // modo da corrida em andamento (não muda se a pessoa trocar no menu)
+  const recentQ = [];
+  // treino: acelera mais devagar e para antes. CORRIDA usa CFG (o servidor do ranking confere essas regras).
+  const speedStep = () => (runMode.ranked ? CFG.speedStep : 0.6);
+  const speedMax = () => (runMode.ranked ? CFG.maxSpeed : 34);
+  const touchUI = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
   function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
     return arr;
@@ -844,10 +1019,14 @@
   const sun = new T.DirectionalLight(0xffffff, 0.75); sun.position.set(-6, 12, 8); scene.add(sun);
 
   let W = 0, H = 0, PX = 3, qBottom = 0;
+  // qualidade automática: num aparelho que não aguenta, a cena é desenhada com pixels maiores
+  // (0 = normal; 1 e 2 = mais leve). Fica guardada no aparelho e volta a subir se sobrar folga.
+  let quality = clamp(+store.get('quanta-corrida-q', 0) || 0, 0, 2);
+  const perf = { t: 0, n: 0, slow: 0 };
   const measureQuestion = () => { qBottom = $('question').getBoundingClientRect().bottom; };
   function resize() {
     W = window.innerWidth; H = window.innerHeight;
-    PX = clamp(Math.round(Math.min(H, W * 1.2) / 250), 2, 5);
+    PX = clamp(Math.round(Math.min(H, W * 1.2) / 250), 2, 5) + quality;
     renderer.setSize(Math.ceil(W / PX), Math.ceil(H / PX), false);
     const aspect = W / H;
     camera.aspect = aspect;
@@ -891,24 +1070,39 @@
   const postGeo = new T.BoxGeometry(0.4, 0.7, 0.4);
   const capGeo = new T.BoxGeometry(0.46, 0.16, 0.46);
   const capMat = new T.MeshBasicMaterial(); tint(capMat.color, 'rail');
-  const rowDashes = [];
+  // Desempenho: a pista era feita de ~290 peças separadas (cada bloco de 6 faces = 6 desenhos por quadro).
+  // Agora cada tipo de peça é um InstancedMesh (1 desenho para todas) e a pista inteira anda junta:
+  // o desenho se repete a cada 2 blocos (8 u), então basta deslocar o grupo em z módulo 8.
+  const track = new T.Group();
+  const TRACK_PERIOD = CFG.rowLen * 2;
+  const mtx = new T.Object3D();
+  const half = CFG.rows / 2;
+  const slabs = [0, 1].map((k) => { const m = new T.InstancedMesh(rowGeo, tileMats[k], half); track.add(m); return m; });
+  const posts = new T.InstancedMesh(postGeo, sideMat, CFG.rows * 2);
+  const caps = new T.InstancedMesh(capGeo, capMat, CFG.rows * 2);
+  const dashes = new T.InstancedMesh(dashGeo, dashMat, half * 3);
+  track.add(posts, caps, dashes);
+  const rowZ = (i) => 8 - i * CFG.rowLen;
   for (let i = 0; i < CFG.rows; i++) {
-    const row = new T.Group();
-    const slab = new T.Mesh(rowGeo, tileMats[i % 2]); slab.position.y = -0.4; row.add(slab);
-    if (i % 2 === 0) for (let k = 0; k < 3; k++) { const d = new T.Mesh(dashGeo, dashMat); d.position.y = 0.02; row.add(d); rowDashes.push(d); }
-    for (const sx of [-4.4, 4.4]) {
-      const p = new T.Mesh(postGeo, sideMat); p.position.set(sx, 0.35, 0); row.add(p);
-      const cp = new T.Mesh(capGeo, capMat); cp.position.set(sx, 0.76, 0); row.add(cp);
-    }
-    row.position.z = 12 - i * CFG.rowLen;
-    scene.add(row); moving.push({ obj: row, span: trackSpan, limit: 14 });
-  }
-  function setTrackLanes(n) {
-    rowDashes.forEach((d, j) => {
-      const k = j % 3;
-      d.visible = k < n - 1;
-      d.position.x = -ROAD / 2 + (ROAD / n) * (k + 1);
+    mtx.position.set(0, -0.4, rowZ(i)); mtx.scale.set(1, 1, 1); mtx.updateMatrix();
+    slabs[i % 2].setMatrixAt(i >> 1, mtx.matrix);
+    [-4.4, 4.4].forEach((sx, j) => {
+      mtx.position.set(sx, 0.35, rowZ(i)); mtx.updateMatrix(); posts.setMatrixAt(i * 2 + j, mtx.matrix);
+      mtx.position.set(sx, 0.76, rowZ(i)); mtx.updateMatrix(); caps.setMatrixAt(i * 2 + j, mtx.matrix);
     });
+  }
+  // o grupo inteiro se move; a caixa envolvente de cada malha não é recalculada, então não deixa o three.js descartá-las
+  [...slabs, posts, caps, dashes].forEach((m) => { m.frustumCulled = false; });
+  scene.add(track);
+  let trackOff = 0;
+  function setTrackLanes(n) {
+    for (let r = 0; r < half; r++) for (let k = 0; k < 3; k++) {
+      mtx.position.set(-ROAD / 2 + (ROAD / n) * (k + 1), 0.02, rowZ(r * 2));
+      mtx.scale.setScalar(k < n - 1 ? 1 : 0); mtx.updateMatrix();
+      dashes.setMatrixAt(r * 3 + k, mtx.matrix);
+    }
+    mtx.scale.setScalar(1);
+    dashes.instanceMatrix.needsUpdate = true;
   }
   setTrackLanes(2);
   const railGeo = new T.BoxGeometry(0.14, 0.12, trackSpan + 20);
@@ -917,7 +1111,16 @@
   }
 
   // prédios da cidade digital
-  const bldGeo = new T.BoxGeometry(1, 1, 1);
+  // caixa só com as faces que a câmera vê (laterais e frente com janelas, teto); as faces de baixo e de trás
+  // nunca aparecem. Com as faces de janela juntas, cada prédio custa 2 desenhos por quadro em vez de 6.
+  const bldGeo = (() => {
+    const g = new T.BoxGeometry(1, 1, 1);
+    const idx = g.index.array, out = [];
+    for (const f of [0, 1, 4, 2]) for (let k = 0; k < 6; k++) out.push(idx[f * 6 + k]); // +x, -x, +z | +y
+    g.setIndex(out);
+    g.clearGroups(); g.addGroup(0, 18, 0); g.addGroup(18, 6, 1);
+    return g;
+  })();
   const bldTexs = [windowsTex(), windowsTex(), windowsTex()];
   const roofMat = new T.MeshBasicMaterial(); tint(roofMat.color, 'roof');
   const cityZone = 170;
@@ -927,7 +1130,7 @@
     const tex = bldTexs[i % 3].clone(); tex.needsUpdate = true;
     tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(Math.round(w), Math.round(h / 2));
     const wm = new T.MeshLambertMaterial({ map: tex }); tint(wm.color, 'windows');
-    const m = new T.Mesh(bldGeo, [wm, wm, roofMat, sideMat, wm, sideMat]);
+    const m = new T.Mesh(bldGeo, [wm, roofMat]);
     m.scale.set(w, h, d);
     m.position.set(side * rnd(10, 28), -10 + h / 2 + rnd(0, 6), 14 - Math.random() * cityZone);
     scene.add(m); moving.push({ obj: m, span: cityZone, limit: 16 });
@@ -951,12 +1154,13 @@
   const streakGeo = new T.BoxGeometry(0.05, 0.05, 4);
   const streakMat = new T.MeshBasicMaterial({ transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false }); tint(streakMat.color, 'streak');
   const streaks = [];
+  const streakMesh = new T.InstancedMesh(streakGeo, streakMat, 40);
+  streakMesh.frustumCulled = false;
   for (let i = 0; i < 40; i++) {
-    const s = new T.Mesh(streakGeo, streakMat);
     let x, y; do { x = rnd(-11, 11); y = rnd(-0.5, 9); } while (Math.abs(x) < 4.8 && y < 5);
-    s.position.set(x, y, rnd(-60, 10));
-    scene.add(s); streaks.push(s);
+    streaks.push({ x, y, z: rnd(-60, 10) });
   }
+  scene.add(streakMesh);
 
   // criaturas malucas de cada fase (módulo opcional)
   const creatures = QC.Creatures ? QC.Creatures.create(T, scene) : null;
@@ -1133,6 +1337,7 @@
     speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, x: -2.1, horizon: 0,
     gate: null, gap: 0, t: 0, phase: 0, shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0,
     playMs: 0, locker: 0, lockerOn: false, preview: null, shown: 0, fever: false, dash: 0, dashCd: 0, dashHeld: false, lunge: 0, spin: 0,
+    count: 0, misses: [], overAt: 0,
   };
   // dash: cada toque soma até DASH_V unidades/s à corrida e cai em DASH_DECAY s (~18 u = 18% do caminho até o portal);
   // segurando, repete a cada DASH_CD s. O servidor do ranking conta com esse limite (velocidade + 80).
@@ -1140,15 +1345,7 @@
   // pontuação: 10 por acerto (20 se respondeu rápido) x multiplicador do combo (até x10) x2 na febre
   const multFor = (combo) => Math.min(10, 1 + Math.floor(combo / 3));
   const FEVER_AT = 15;
-  const PRAISE = [
-    [1, ['BOA!', 'ISSO!', 'CERTO!']],
-    [3, ['ÓTIMO!', 'MANDOU BEM!', 'SHOW!']],
-    [5, ['INCRÍVEL!', 'QUE FERA!', 'VOANDO!']],
-    [10, ['IMPARÁVEL!', 'ARRASOU!', 'MONSTRO!']],
-    [15, ['EM CHAMAS!', 'FEBRE!', 'INSANO!']],
-    [20, ['GÊNIO!', 'SURREAL!', 'LENDA!']],
-    [30, ['LENDÁRIO!', 'DIVINO!', 'QUANTA MASTER!']],
-  ];
+  const PRAISE = [1, 3, 5, 10, 15, 20, 30];   // a partir de quantos acertos seguidos cada elogio aparece (textos em praise.N)
   const tierOf = (combo) => (combo >= 30 ? 5 : combo >= 20 ? 4 : combo >= 15 ? 3 : combo >= 10 ? 2 : combo >= 5 ? 1 : 0);
   const TIER_COLORS = ['#ffffff', '#7dffc0', '#ffd23f', '#ff9a2e', '#ff4d5e', '#ff4df0'];
 
@@ -1161,12 +1358,14 @@
     px.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'X') r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }));
     return `<svg viewBox="0 0 7 6" shape-rendering="crispEdges" fill="${filled ? '#ff4d5e' : '#2a3a33'}">${r}</svg>`;
   }
-  function paintScore() { $('hudScore').innerHTML = `${fmt(S.shown)}<b> PTS</b>`; }
+  function paintScore() { $('hudScore').innerHTML = `${fmt(S.shown)}<b> ${esc(t('hud.pts'))}</b>`; }
   function updateHud() {
     paintScore();
     let h = ''; for (let i = 0; i < CFG.lives; i++) h += heart(i < S.lives); $('hudLives').innerHTML = h;
-    $('speedTxt').textContent = 'x' + (S.speed / CFG.startSpeed).toFixed(1);
-    const on = Math.round((S.speed - CFG.startSpeed) / (CFG.maxSpeed - CFG.startSpeed) * 11) + 1;
+    $('speedTxt').textContent = 'x' + I18.num(S.speed / CFG.startSpeed, 1);
+    const on = Math.round((S.speed - CFG.startSpeed) / (speedMax() - CFG.startSpeed) * 11) + 1;
+    $('lvlTxt').textContent = S.level;
+    [...$('pips').children].forEach((el, i) => el.classList.toggle('on', i < S.hits % CFG.hitsPerLevel));
     [...segsEl.children].forEach((el, i) => { el.className = i < on ? (i >= 10 ? 'on max' : i >= 7 ? 'on hot' : 'on') : ''; });
     const mult = multFor(S.combo) * (S.fever ? 2 : 1);
     const hm = $('hudMult');
@@ -1197,15 +1396,16 @@
     return { x: (projTmp.x + 1) / 2 * W, y: (1 - projTmp.y) / 2 * H };
   }
   function praise(combo, quick, dashed) {
-    let words = PRAISE[0][1];
-    for (const [min, w] of PRAISE) if (combo >= min) words = w;
+    let tierMin = PRAISE[0];
+    for (const min of PRAISE) if (combo >= min) tierMin = min;
+    const words = I18.list(`praise.${tierMin}`);
     const el = document.createElement('div');
     el.className = 'praise';
     const tier = tierOf(combo);
     el.style.color = TIER_COLORS[tier];
     el.style.top = '36%';
     el.style.fontSize = `calc(${(1 + tier * 0.18).toFixed(2)} * clamp(26px, 7vmin, 46px))`;
-    const tags = [quick ? 'RESPOSTA RÁPIDA +10' : '', dashed ? 'DASH!' : ''].filter(Boolean).join(' · ');
+    const tags = [quick ? esc(t('praise.quick')) : '', dashed ? `${esc(t('hud.dashBtn'))}!` : ''].filter(Boolean).join(' · ');
     el.innerHTML = `${esc(pick(words))}${tags ? `<small>${tags}</small>` : ''}`;
     $('fx').appendChild(el);
     setTimeout(() => el.remove(), 950);
@@ -1265,14 +1465,24 @@
     if (k === 'arrowup' || k === 'w') S.dashHeld = false;
   });
   window.addEventListener('keydown', (e) => {
-    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
     const k = e.key.toLowerCase();
+    const inMenu = S.mode === 'menu' && !openPanel && $('startScreen').classList.contains('show');
+    if (inMenu && (k === 'arrowleft' || k === 'arrowright')) { stepMode(k === 'arrowleft' ? -1 : 1, false); e.preventDefault(); return; }
     if (k === 'arrowleft' || k === 'a') { setLane(S.lane - 1); e.preventDefault(); }
     else if (k === 'arrowright' || k === 'd') { setLane(S.lane + 1); e.preventDefault(); }
+    else if (k === 'm' && !openPanel) toggleSound();
     else if (k === 'arrowup' || k === 'w') { if (!e.repeat) dash(); S.dashHeld = true; e.preventDefault(); }
     else if (k === 'p') togglePause();
     else if (k === 'escape') { if (openPanel) closePanel(); else togglePause(); }
-    else if ((k === 'enter' || k === ' ') && !openPanel && (S.mode === 'menu' || S.mode === 'over') && ready) { startGame(); e.preventDefault(); }
+    else if (k === 'enter' || k === ' ') {
+      // com um botão ou link focado, deixa o próprio botão agir (antes Enter em SKINS começava a corrida)
+      const ctl = e.target && e.target.closest && e.target.closest('button, a, [role="tab"]');
+      if (ctl && ctl.classList.contains('mode') && k === 'enter' && ready) { setMode(ctl.dataset.mode); startGame(); e.preventDefault(); return; }
+      if (ctl) return;
+      // na tela final, espera um instante para o Enter não pular o resultado sem querer
+      if (!openPanel && (S.mode === 'menu' || (S.mode === 'over' && performance.now() - S.overAt > 700)) && ready) { startGame(); e.preventDefault(); }
+    }
   });
   let tx0 = null, ty0 = null, swiped = false;
   const cv = renderer.domElement;
@@ -1293,7 +1503,9 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) dashUp(); });
 
   function dash() {
-    if (S.mode !== 'play' || S.stumble > 0 || S.dashCd > 0) return;
+    if (S.mode !== 'play' || S.stumble > 0 || S.dashCd > 0 || S.count > 0) return;
+    // dash conta como decisão: quem já está no portal certo confirma a resposta (vale o bônus de rapidez)
+    if (S.gate && S.gate.state === 'coming' && S.gate.decidedFrac == null) S.gate.decidedFrac = S.gate.frac;
     S.dash = 1;
     S.dashCd = DASH_CD;
     S.lunge = 1;
@@ -1317,18 +1529,24 @@
     audio();
     baseScreen = null;
     closePanel();
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if (S.gate) { removeGate(S.gate); S.gate = null; }
+    runMode = MODES[modeId];
     Object.assign(S, {
       mode: 'play', score: 0, lives: CFG.lives, hits: 0, combo: 0, maxCombo: 0, level: 1,
-      speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, gap: 0.8,
+      speed: CFG.startSpeed, maxSpeedSeen: CFG.startSpeed, lanes: laneXs(2), lane: 0, gap: 0.3,
       shake: 0, fovKick: 0, stumble: 0, jump: 0, jumpV: 0, playMs: 0, preview: null, shown: 0, fever: false,
-      dash: 0, dashCd: 0, dashHeld: false, lunge: 0,
+      dash: 0, dashCd: 0, dashHeld: false, lunge: 0, misses: [],
     });
+    recentQ.length = 0;
+    $('explain').classList.remove('show');
+    document.body.classList.remove('paused');
     fxCall('clear');
     useSkin(P.data.skin);
     setTrackLanes(2);
     runId = null;
-    if (onlineReady && !embedded && QC.Online.user) { const me = ++runReq; QC.Online.startRun().then((id) => { if (me === runReq) runId = id; }); }
+    // só o modo CORRIDA vale ranking: treino não pede bilhete ao servidor
+    if (runMode.ranked && onlineReady && !embedded && QC.Online.user) { const me = ++runReq; QC.Online.startRun().then((id) => { if (me === runReq) runId = id; }); }
     if (themeIdx !== 0) applyTheme(1, false);
     if (creatures) creatures.clear();
     if (music) { try { music.resume(); music.play(0); } catch (e) {} }
@@ -1337,10 +1555,26 @@
     document.body.classList.add('playing');
     updateHud();
     paintCombo(false);
-    if (!store.get('quanta-corrida-dash-tip', false)) {
-      store.set('quanta-corrida-dash-tip', true);
-      setTimeout(() => toast('DICA: JÁ SABE A RESPOSTA?<small>Aperte ▲ (ou W) para dar dash e chegar mais rápido</small>'), 1500);
+    // 3, 2, 1, VAI!: a primeira conta não aparece de surpresa
+    $('countSub').textContent = runMode.name;
+    $('countSub').classList.add('show');
+    if (touchUI && P.data.runs < 3) $('touchHint').classList.add('show');
+    startCountdown(3, 0.55);
+    if (!store.get('quanta-corrida-dash-tip2', false)) {
+      store.set('quanta-corrida-dash-tip2', true);
+      setTimeout(() => toast(t(touchUI ? 'tip.dashTouch' : 'tip.dashKeys')), 2600);
     }
+  }
+
+  // contagem regressiva (no início e ao voltar da pausa)
+  let cdStep = 0.55;
+  function startCountdown(n, step) { cdStep = step; S.count = n * step; showCount(n); }
+  function showCount(k) {
+    const el = $('count');
+    el.textContent = k > 0 ? String(k) : t('count.go');
+    el.className = 'count' + (k > 0 ? '' : ' go');
+    void el.offsetWidth; el.classList.add('tick');
+    if (actx) tone(k > 0 ? 440 : 880, k > 0 ? 0.08 : 0.2, 'square', 0.045);
   }
 
   function spawnGate() {
@@ -1351,15 +1585,17 @@
       let bestI = 0;
       S.lanes.forEach((x, i) => { if (Math.abs(x - S.x) < Math.abs(S.lanes[bestI] - S.x)) bestI = i; });
       S.lane = bestI;
-      setTimeout(() => popText(`AGORA SÃO ${n} PORTAIS!`, '#ffd23f', '64%', false, true), 400);
+      setTimeout(() => popText(esc(t('portals.more', { n })), '#ffd23f', '64%', false, true), 400);
     }
-    const q = makeQuestion(S.level, n);
+    const q = Qs.make(runMode.id, S.level, n, recentQ);
     const answers = shuffle([q.ans, ...q.wrong]);
     const correct = answers.indexOf(q.ans);
-    S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: 1, obj: makeGate(q, answers, S.lanes) };
+    // decidedFrac: em que ponto do caminho a pessoa escolheu (trocou de pista ou deu dash); null = não escolheu
+    S.gate = { q, answers, correct, chosen: -1, state: 'coming', timer: 0, z: CFG.spawnZ, frac: 1, decidedFrac: null, obj: makeGate(q, answers, S.lanes) };
+    $('sr').textContent = t('sr.question', { q: spoken(q.text), opts: answers.join(', ') });
     $('qText').innerHTML = `${esc(q.text)} = <span class="qm">?</span>`;
     $('qOpts').innerHTML = answers.map((a) => `<span>${a}</span>`).join('');
-    $('qLevel').textContent = `NÍVEL ${S.level}`;
+    $('qLevel').textContent = t('q.level', { n: S.level });
     paintOptions();
     const qe = $('question');
     qe.classList.remove('bounce'); void qe.offsetWidth; qe.classList.add('show', 'bounce');
@@ -1367,12 +1603,14 @@
   }
 
   function liveStats() {
+    // treino só soma XP e acertos (recordes de combo, nível e velocidade são do modo CORRIDA)
+    if (!runMode.ranked) return { score: S.score, hits: S.hits, maxCombo: 0, maxLevel: 1, maxSpeed: 1 };
     return { score: S.score, hits: S.hits, maxCombo: S.maxCombo, maxLevel: S.level, maxSpeed: S.maxSpeedSeen / CFG.startSpeed };
   }
   function announceUnlocks(ids) {
     ids.forEach((id) => {
       const sk = QC.Skins.get(id);
-      toast(`★ NOVA SKIN DESBLOQUEADA ★<small>${esc(sk.name)}: equipe no menu Skins</small>`);
+      toast(t('unlock.toast', { name: esc(skinName(sk)) }));
     });
     if (ids.length) stinger('unlock');
   }
@@ -1384,7 +1622,7 @@
     if (creatures) creatures.celebrate();
     if (music) { try { music.play(info.index); } catch (e) {} }
     stinger('levelup');
-    setTimeout(() => popText(`NÍVEL ${S.level}!<small>${esc(info.theme.name.toUpperCase())}</small>`, '#ffd23f', '44%', true), 150);
+    setTimeout(() => popText(`${esc(t('levelup', { n: S.level }))}<small>${esc(themeName(info.theme).toLocaleUpperCase(I18.lang))}</small>`, '#ffd23f', '44%', true), 150);
   }
 
   function resolveGate(g) {
@@ -1395,13 +1633,13 @@
       g.obj.panels[S.lane].visible = false;
       burst(lx, 2.3, g.z, 'good', 34, 1.6);
       S.hits++; S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
-      const quick = g.decidedFrac >= 0.5;
+      const quick = g.decidedFrac != null && g.decidedFrac >= 0.5;
       const startFever = !S.fever && S.combo >= FEVER_AT;
       if (startFever) S.fever = true;
       const mult = multFor(S.combo) * (S.fever ? 2 : 1);
       const pts = (quick ? 20 : 10) * mult;
       S.score += pts;
-      S.speed = Math.min(CFG.maxSpeed, S.speed + CFG.speedStep);
+      S.speed = Math.min(speedMax(), S.speed + speedStep());
       S.maxSpeedSeen = Math.max(S.maxSpeedSeen, S.speed);
       S.fovKick = 7 + Math.min(8, S.combo * 0.4); S.jumpV = 7;
       flash(TIER_COLORS[tierOf(S.combo)], 0.14 + tierOf(S.combo) * 0.04);
@@ -1415,6 +1653,7 @@
       } else { sc.classList.remove('pulse'); void sc.offsetWidth; sc.classList.add('pulse'); }
       const sp = $('speed'); sp.classList.remove('bump'); void sp.offsetWidth; sp.classList.add('bump');
       sfx.good(S.combo);
+      $('sr').textContent = t('sr.right', { q: spoken(g.q.text), a: g.q.ans });
       if (S.combo % 5 === 0) {
         // marco de combo: fogos, onda de choque e carimbo gigante
         const cm = $('cmNum').getBoundingClientRect();
@@ -1424,10 +1663,10 @@
         sfx.milestone(S.combo);
         // se o nível sobe no mesmo acerto, o carimbo do combo desce para não ficar por cima do "NÍVEL X!"
         const comboTop = S.hits % CFG.hitsPerLevel === 0 ? '62%' : '50%';
-        if (!startFever) setTimeout(() => popText(`COMBO ${S.combo}!`, TIER_COLORS[tierOf(S.combo)], comboTop, true), 120);
+        if (!startFever) setTimeout(() => popText(esc(t('combo.pop', { n: S.combo })), TIER_COLORS[tierOf(S.combo)], comboTop, true), 120);
       }
       if (startFever) {
-        setTimeout(() => popText('MODO FEBRE!<small>PONTOS EM DOBRO ATÉ ERRAR</small>', '#ff9a2e', S.hits % CFG.hitsPerLevel === 0 ? '62%' : '50%', true), 120);
+        setTimeout(() => popText(t('fever'), '#ff9a2e', S.hits % CFG.hitsPerLevel === 0 ? '62%' : '50%', true), 120);
         stinger('record');
       }
       paintCombo(true);
@@ -1446,7 +1685,7 @@
         const el = document.createElement('div');
         el.className = 'pop broken'; el.style.color = '#ff4d5e'; el.style.top = '40%';
         el.style.fontSize = 'clamp(20px, 5.5vw, 34px)';
-        el.innerHTML = `COMBO PERDIDO<br><span style="color:#fff">x${lost}</span>`;
+        el.innerHTML = `${esc(t('combo.lost'))}<br><span style="color:#fff">x${lost}</span>`;
         $('fx').appendChild(el); setTimeout(() => el.remove(), 1250);
         const cm = $('cmNum').getBoundingClientRect();
         fxCall('shockwave', cm.left + cm.width / 2, cm.top + cm.height / 2, '#ff4d5e');
@@ -1454,7 +1693,9 @@
       }
       paintCombo(false);
       flash('rgba(255,77,94,0.9)', 0.35);
-      popText(`ERA ${g.q.ans}`, '#ff4d5e', '52%');
+      const chosen = g.answers[S.lane];
+      S.misses.push({ q: g.q, chosen });
+      showExplain(g.q, chosen);
       sfx.bad();
       if (navigator.vibrate) { try { navigator.vibrate(140); } catch (e) {} }
     }
@@ -1464,25 +1705,31 @@
     updateHud();
   }
 
-  const TIPS = [
-    'Dica: na tabuada, confira o último algarismo. 7 × 8 termina em 6, então é 56.',
-    'Dica: para somar 9, some 10 e tire 1.',
-    'Dica: dividir é perguntar quantas vezes cabe. 42 ÷ 6? 6 × 7 = 42.',
-    'Dica: número par vezes qualquer número dá sempre par.',
-    'Dica: 25 - 8 é o mesmo que 25 - 10 + 2.',
-    'Dica: na tabuada do 9, os algarismos do resultado somam 9.',
-  ];
+  // depois de um erro: a conta certa e um jeito de pensar nela (fica na tela tempo de ler)
+  let explainTimer = 0;
+  function showExplain(q, chosen) {
+    const el = $('explain');
+    el.innerHTML = `<div class="eq">${esc(q.text)} = <b>${q.ans}</b></div><div class="how">${esc(keepEq(Qs.explain(q)))}</div><div class="you">${esc(t('explain.you', { n: chosen }))}</div>`;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(explainTimer); explainTimer = setTimeout(() => el.classList.remove('show'), 2300);
+    $('sr').textContent = t('sr.wrong', { q: spoken(q.text), a: q.ans, how: spoken(Qs.explain(q)) });
+  }
   function gameOver() {
     S.mode = 'over';
     document.body.classList.remove('playing');
     dashUp();
     if (music) { try { music.stop(); } catch (e) {} }
+    S.overAt = performance.now();
+    document.body.classList.remove('paused');
+    $('pauseScreen').classList.remove('show');
+    $('count').className = 'count'; $('countSub').classList.remove('show'); $('touchHint').classList.remove('show');
+    const practice = !runMode.ranked;
     const run = {
       score: S.score, hits: S.hits, maxLevel: S.level, maxCombo: S.maxCombo,
-      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, runId,
+      maxSpeed: S.maxSpeedSeen / CFG.startSpeed, durationMs: S.playMs, skin: P.data.skin, runId, practice,
     };
     runId = null;
-    const res = P.applyRun(run);
+    const res = P.applyRun(run, { practice });
     stinger(res.record ? 'record' : 'gameover');
 
     countUp($('rScore'), S.score, 900); countUp($('rHits'), S.hits, 700); countUp($('rCombo'), S.maxCombo, 700);
@@ -1490,16 +1737,21 @@
     S.fever = false; paintCombo(false);
     if (res.record) setTimeout(() => { fxCall('fireworks', 8); fxCall('confetti', 90); }, 400);
     $('newRecord').classList.toggle('show', res.record);
-    $('overTitle').innerHTML = S.hits >= 20 ? 'MANDOU<br><span>MUITO!</span>' : S.hits >= 8 ? 'BOA<br><span>CORRIDA!</span>' : 'GAME<br><span>OVER</span>';
-    $('overTip').textContent = pick(TIPS);
+    // a dica final é da operação em que a pessoa mais errou; o seed guarda a escolha para a troca de idioma
+    const cnt = {};
+    S.misses.forEach((m) => { cnt[m.q.type] = (cnt[m.q.type] || 0) + 1; });
+    const worst = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+    over = {
+      practice, mode: runMode, xpGained: res.xpGained,
+      newSkins: [...new Set(res.newSkins.concat(sessionUnlocks.splice(0)))],
+      tipType: worst || (runMode.ops ? pick(runMode.ops) : undefined), tipSeed: Math.random(),
+    };
+    paintOverText();
     countUp($('xpGain'), res.xpGained, 900);
     countUp($('xpTotal'), P.data.xp, 1100, P.data.xp - res.xpGained);
-    const un = $('unlocked');
-    const all = res.newSkins.concat(sessionUnlocks.splice(0));
-    un.classList.toggle('show', all.length > 0);
-    un.textContent = all.length ? `★ Skin nova: ${[...new Set(all)].map((id) => QC.Skins.get(id).name).join(', ')}!` : '';
     paintNextUnlock();
     $('overScreen').classList.add('show');
+    setTimeout(() => { if (S.mode === 'over' && !openPanel) $('btnRetry').focus({ preventScroll: true }); }, 700);
     $('question').classList.remove('show');
     $('hudMult').classList.remove('show');
     refreshMenus();
@@ -1507,6 +1759,28 @@
     if (S.gate) { removeGate(S.gate); S.gate = null; }
   }
   const sessionUnlocks = [];
+  let over = null;   // o que a tela final mostra, para repintar ao trocar de idioma
+  // textos da tela final (título, modo, skins novas, revisão e dica)
+  function paintOverText() {
+    if (!over) return;
+    $('overTitle').innerHTML = t(S.hits >= 20 ? 'over.great' : S.hits >= 8 ? 'over.good' : 'over.end');
+    $('overMode').textContent = over.practice ? t('over.practice', { mode: over.mode.name }) : over.mode.name;
+    const un = $('unlocked');
+    un.classList.toggle('show', over.newSkins.length > 0);
+    un.textContent = over.newSkins.length ? t('unlocked.line', { n: over.newSkins.length, names: over.newSkins.map((id) => skinName(QC.Skins.get(id))).join(', ') }) : '';
+    paintReview();
+    $('overTip').textContent = keepEq(Qs.tipFor(over.tipType, over.tipSeed));
+  }
+  // revisão: quantos acertou e as contas que errou, com a resposta certa
+  function paintReview() {
+    const total = S.hits + S.misses.length, el = $('review');
+    let html = total ? `<p class="acc">${t('review.acc', { n: total, hits: S.hits, pct: Math.round(S.hits / total * 100) })}</p>` : '';
+    if (S.misses.length) {
+      html += `<h3>${esc(t('review.title'))}</h3><ul>${S.misses.map((m) => `<li><b>${esc(m.q.text)} = <i>${m.q.ans}</i></b> · ${esc(t('review.chose', { n: m.chosen }))}</li>`).join('')}</ul>`;
+    }
+    el.innerHTML = html;
+    el.classList.toggle('show', !!html);
+  }
   // números que sobem rolando
   function countUp(el, to, ms, from) {
     const a = from || 0, t0 = performance.now();
@@ -1518,28 +1792,43 @@
     requestAnimationFrame(step);
   }
 
-  function paintNextUnlock() {
+  function paintNextUnlock(textOnly) {
     const nx = P.nextUnlock();
     const bar = $('xpBar'), txt = $('xpNext');
-    if (!nx) { bar.style.width = '100%'; txt.innerHTML = 'Você liberou <b>todas as skins</b>!'; return; }
-    bar.style.width = '0';
-    requestAnimationFrame(() => { bar.style.width = Math.round(nx.pct * 100) + '%'; });
+    if (!nx) { bar.style.width = '100%'; txt.innerHTML = t('xp.all'); return; }
+    if (!textOnly) {
+      bar.style.width = '0';
+      requestAnimationFrame(() => { bar.style.width = Math.round(nx.pct * 100) + '%'; });
+    }
     const u = nx.skin.unlock;
     txt.innerHTML = u.type === 'xp'
-      ? `Faltam <b>${fmt(u.value - nx.current)}</b> pontos para <b>${esc(nx.skin.name)}</b>`
-      : `Próxima: <b>${esc(nx.skin.name)}</b> · ${esc(u.label)}`;
+      ? t('xp.left', { n: fmt(u.value - nx.current), name: esc(skinName(nx.skin)) })
+      : t('xp.next', { name: esc(skinName(nx.skin)), label: esc(unlockText(u)) });
   }
 
   function togglePause() {
     if (S.mode === 'play') {
-      S.mode = 'pause'; $('pauseScreen').classList.add('show');
+      S.mode = 'pause'; dashUp();
+      // a pergunta some na pausa: pausar não vira tempo extra para pensar
+      document.body.classList.add('paused');
+      paintPauseStats();
+      $('pauseScreen').classList.add('show');
       if (music) { try { music.pause(); } catch (e) {} }
       paintCombo(false);
+      setTimeout(() => { if (S.mode === 'pause') $('btnResume').focus({ preventScroll: true }); }, 30);
     } else if (S.mode === 'pause') {
-      S.mode = 'play'; $('pauseScreen').classList.remove('show');
+      S.mode = 'play';
+      document.body.classList.remove('paused');
+      $('pauseScreen').classList.remove('show');
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       if (music) { try { music.resume(); } catch (e) {} }
       paintCombo(false);
+      // volta com 3, 2, 1 curtinho se havia um portal vindo
+      if (S.gate && S.gate.state === 'coming') startCountdown(3, 0.4);
     }
+  }
+  function paintPauseStats() {
+    $('pauseStats').textContent = t('pause.stats', { mode: runMode.name, level: S.level, score: fmt(S.score), lives: t('lives', { n: S.lives }) });
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') togglePause(); });
 
@@ -1622,18 +1911,20 @@
     $('lockerCount').textContent = `${P.data.skins.filter((id) => list.some((s) => s.id === id)).length}/${list.length}`;
     $('skinGrid').innerHTML = list.map((sk) => {
       const open = P.isUnlocked(sk.id), on = P.data.skin === sk.id;
-      return `<button type="button" class="thumb r-${RARITY[sk.rarity] || 'comum'}${open ? '' : ' locked'}${sk.id === selId ? ' sel' : ''}" data-skin="${esc(sk.id)}" aria-pressed="${on}" aria-label="${esc(sk.name)}${open ? '' : ' (bloqueada)'}">
-        ${th[sk.id] ? `<img src="${th[sk.id]}" alt="">` : ''}${open ? '' : LOCK_SVG}${on ? '<i class="eq">✓</i>' : ''}<span>${esc(sk.name)}</span></button>`;
+      const nm = skinName(sk);
+      return `<button type="button" class="thumb r-${RARITY[sk.rarity] || 'comum'}${open ? '' : ' locked'}${sk.id === selId ? ' sel' : ''}" data-skin="${esc(sk.id)}" aria-pressed="${on}" aria-label="${esc(open ? nm : t('lk.lockedAria', { name: nm }))}">
+        ${th[sk.id] ? `<img src="${th[sk.id]}" alt="">` : ''}${open ? '' : LOCK_SVG}${on ? '<i class="eq">✓</i>' : ''}<span>${esc(nm)}</span></button>`;
     }).join('');
     // cartão da skin em destaque
     const sk = QC.Skins.get(selId), u = sk.unlock || {};
     const open = P.isUnlocked(sk.id), on = P.data.skin === sk.id;
     const cur = P.metric(u.type), pct = open ? 1 : clamp(cur / (u.value || 1), 0, 1);
-    const left = u.type === 'xp' ? `Faltam ${fmt(Math.max(0, u.value - cur))} pontos` : u.type === 'speed' ? `Seu recorde: x${(+cur).toFixed(1)}` : `Seu recorde: ${fmt(cur)}`;
-    $('lkShow').innerHTML = `<h2>${esc(sk.name)}</h2><span class="lk-rar ${RARITY[sk.rarity] || ''}">${esc((sk.rarity || '').toUpperCase())}</span>
-      ${sk.desc ? `<p class="lk-desc">${esc(sk.desc)}</p>` : ''}
-      ${open ? `<div class="lk-status ok">${on ? '✓ VESTINDO AGORA' : 'LIBERADA'}</div>`
-        : `<div class="lk-status lock">BLOQUEADA<small>${esc(u.label || '')} · ${left}</small></div><div class="lk-prog"><i style="width:${Math.round(pct * 100)}%"></i></div>`}`;
+    const left = u.type === 'xp' ? t('lk.leftXp', { n: fmt(Math.max(0, u.value - cur)) }) : u.type === 'speed' ? t('lk.bestSpeed', { n: I18.num(+cur, 1) }) : t('lk.best', { n: fmt(cur) });
+    const desc = skinDesc(sk);
+    $('lkShow').innerHTML = `<h2>${esc(skinName(sk))}</h2><span class="lk-rar ${RARITY[sk.rarity] || ''}">${esc(rarityName(sk.rarity))}</span>
+      ${desc ? `<p class="lk-desc">${esc(desc)}</p>` : ''}
+      ${open ? `<div class="lk-status ok">${esc(t(on ? 'lk.wearing' : 'lk.free'))}</div>`
+        : `<div class="lk-status lock">${esc(t('lk.locked'))}<small>${esc(unlockText(u))} · ${esc(left)}</small></div><div class="lk-prog"><i style="width:${Math.round(pct * 100)}%"></i></div>`}`;
   }
 
   // troca de roupa: o corredor gira, solta brilho e aparece com a skin nova
@@ -1673,23 +1964,26 @@
     loadBoard(boardPeriod);
   }));
   let boardReq = 0;
+  let board = { msg: 'board.loading', rows: null };   // último estado, para repintar ao trocar de idioma
   async function loadBoard(period) {
-    const el = $('board');
     const req = ++boardReq;
-    if (!onlineReady) {
-      el.innerHTML = `<li class="board-msg">${embedded ? 'O ranking funciona no site: quantaaulas.com/corrida' : 'Sem conexão com o ranking agora. Tente de novo daqui a pouco.'}</li>`;
-      return;
-    }
-    el.innerHTML = '<li class="board-msg">Carregando...</li>';
+    if (!onlineReady) { paintBoard({ msg: embedded ? 'board.embedded' : 'board.offline' }); return; }
+    paintBoard({ msg: 'board.loading' });
     const rows = await QC.Online.leaderboard(period, 20);
     if (req !== boardReq) return;
-    if (!rows) { el.innerHTML = `<li class="board-msg">${embedded ? 'O ranking funciona no site: quantaaulas.com/corrida' : 'Não foi possível carregar o ranking. Tente de novo.'}</li>`; return; }
-    if (!rows.length) { el.innerHTML = `<li class="board-msg">Ninguém pontuou ${period === 'week' ? 'nesta semana' : 'ainda'}. O primeiro lugar pode ser seu!</li>`; return; }
+    if (!rows) paintBoard({ msg: embedded ? 'board.embedded' : 'board.fail' });
+    else if (!rows.length) paintBoard({ msg: period === 'week' ? 'board.emptyWeek' : 'board.emptyAll' });
+    else paintBoard({ rows });
+  }
+  function paintBoard(st) {
+    if (st) board = st;
+    const el = $('board');
+    if (!board.rows) { el.innerHTML = `<li class="board-msg">${esc(t(board.msg))}</li>`; return; }
     let html = '', prev = 0;
-    rows.forEach((r) => {
+    board.rows.forEach((r) => {
       if (prev && r.rank > prev + 1 && r.is_me) html += '<li class="gap">···</li>';
       const sk = QC.Skins.get(r.skin);
-      html += `<li class="${r.is_me ? 'me' : ''}"><span class="pos">#${r.rank}</span><span class="nm">${esc(r.nickname)}<small>${esc(sk.name)}</small></span><span class="sc">${fmt(r.score)}</span></li>`;
+      html += `<li class="${r.is_me ? 'me' : ''}"><span class="pos">#${r.rank}</span><span class="nm">${esc(r.nickname)}<small>${esc(skinName(sk))}</small></span><span class="sc">${fmt(r.score)}</span></li>`;
       prev = r.rank;
     });
     el.innerHTML = html;
@@ -1703,27 +1997,26 @@
   function accountHtml() {
     const u = onlineReady && QC.Online.user;
     if (u) {
-      return `<div class="account"><span>Jogando como<br><b>${esc(cloud.nickname || u.firstName || 'Jogador')}</b></span>
-        <span class="acts"><button class="link" type="button" data-act="nick">Apelido</button><button class="link" type="button" data-act="out">Sair</button></span></div>`;
+      return `<div class="account"><span>${esc(t('acc.playingAs'))}<br><b>${esc(cloud.nickname || u.firstName || t('acc.player'))}</b></span>
+        <span class="acts"><button class="link" type="button" data-act="nick">${esc(t('acc.nick'))}</button><button class="link" type="button" data-act="out">${esc(t('acc.out'))}</button></span></div>`;
     }
     if (embedded || !onlineReady) {
-      return `<div class="account"><span>Seu progresso fica salvo neste aparelho.${embedded ? ' Para entrar no ranking, jogue em <b style="font-size:13px">quantaaulas.com/corrida</b>.' : ''}</span></div>`;
+      return `<div class="account"><span>${esc(t('acc.local'))}${embedded ? t('acc.embedded') : ''}</span></div>`;
     }
-    return `<div class="login-box"><button class="btn alt google" type="button" data-act="in">${GOOGLE_SVG} Entrar com Google</button>
-      <small>Guarde suas skins em qualquer aparelho e apareça no ranking.</small></div>`;
+    return `<div class="login-box"><button class="btn alt google" type="button" data-act="in">${GOOGLE_SVG} ${esc(t('login.google'))}</button>
+      <small>${esc(t('login.small'))}</small></div>`;
   }
   function refreshMenus() {
     $$('.account-slot').forEach((el) => { el.innerHTML = accountHtml(); });
-    $('bestStart').textContent = fmt(P.data.bestScore);
-    $('xpStart').textContent = fmt(P.data.xp);
     const total = QC.Skins.list.length;
-    $('skinCount').textContent = `${P.data.skins.filter((id) => QC.Skins.list.some((s) => s.id === id)).length}/${total}`;
+    const have = P.data.skins.filter((id) => QC.Skins.list.some((s) => s.id === id)).length;
+    $('recLine').innerHTML = t('start.rec', { best: fmt(P.data.bestScore), xp: fmt(P.data.xp), skins: `${have}/${total}` });
   }
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
     const act = b.dataset.act;
-    if (act === 'in') { b.disabled = true; const r = await QC.Online.signIn(); if (r && r.error) { b.disabled = false; toast('Não foi possível abrir o login do Google.<small>Tente de novo.</small>'); } }
+    if (act === 'in') { b.disabled = true; const r = await QC.Online.signIn(); if (r && r.error) { b.disabled = false; toast(t('login.fail')); } }
     else if (act === 'out') { await QC.Online.signOut(); cloud.nickname = ''; cloud.revision = 0; cloud.synced = false; refreshMenus(); }
     else if (act === 'nick') openScreen('nickScreen');
   });
@@ -1732,20 +2025,17 @@
     e.preventDefault();
     const val = $('nickInput').value.trim();
     const err = $('nickErr');
-    if (val.length < 3) { err.textContent = 'Use pelo menos 3 letras.'; return; }
+    if (val.length < 3) { err.textContent = t('nick.short'); return; }
     $('nickSave').disabled = true; err.textContent = '';
     const r = await QC.Online.setNickname(val);
     $('nickSave').disabled = false;
     if (r && r.ok) {
       cloud.nickname = r.nickname; closePanel(); refreshMenus();
-      toast(`Apelido salvo: ${esc(r.nickname)}`);
+      toast(esc(t('nick.saved', { n: r.nickname })));
       if (pendingRun) { const run = pendingRun; pendingRun = null; submitOnline(run); }
     } else {
-      err.textContent = {
-        taken: 'Esse apelido já está em uso. Tente outro.',
-        blocked: 'Esse apelido não é permitido. Escolha outro.',
-        invalid: 'Use de 3 a 16 letras, números, espaço ou _.',
-      }[r && r.error] || 'Sem conexão. Tente de novo.';
+      const code = r && r.error;
+      err.textContent = t(['taken', 'blocked', 'invalid'].includes(code) ? `nick.${code}` : 'nick.offline');
     }
   });
 
@@ -1793,29 +2083,30 @@
 
   let pendingRun = null;
   let runId = null, runReq = 0;
+  // a linha do ranking na tela final guarda a chave do texto, para repintar ao trocar de idioma
+  let lineMsg = null;
+  function setLine(key, p) { lineMsg = key ? { key, p } : null; paintLine(); }
+  function paintLine() { $('onlineLine').innerHTML = lineMsg ? t(lineMsg.key, lineMsg.p) : ''; }
   async function submitOnline(run) {
-    const line = $('onlineLine');
-    if (!onlineReady || embedded) { line.textContent = ''; return; }
-    if (!QC.Online.user) { line.innerHTML = 'Entre com Google no menu inicial para aparecer no ranking.'; return; }
+    if (!onlineReady || embedded) { setLine(null); return; }
+    if (run.practice) { setLine('online.practice'); await pushProgress(); return; }
+    if (!QC.Online.user) { setLine('online.signin'); return; }
     await pushProgress();
-    if (run.score <= 0) { line.textContent = ''; return; }
+    if (run.score <= 0) { setLine(null); return; }
     if (!cloud.nickname) {
       pendingRun = run;
-      line.innerHTML = '<button class="link" type="button" data-act="nick">Escolha um apelido</button> para aparecer no ranking.';
+      setLine('online.chooseNick');
       return;
     }
-    line.textContent = 'Enviando para o ranking...';
+    setLine('online.sending');
     const r = await QC.Online.submitRun(run);
     if (r && r.ok && r.rank_week) {
-      line.innerHTML = `Ranking da semana: <b>#${r.rank_week}</b> · Geral: <b>#${r.rank_all}</b>`;
+      setLine('online.rank', { w: +r.rank_week, a: +r.rank_all });
     } else if (r && r.ok) {
-      line.textContent = 'Corrida salva.';
+      setLine('online.saved');
     } else {
-      line.textContent = {
-        too_fast: 'Espere alguns segundos entre uma corrida e outra para contar no ranking.',
-        no_run: 'Esta corrida começou antes do login, então não conta no ranking.',
-        invalid: 'Esta corrida não pôde ser validada para o ranking.',
-      }[r && r.error] || 'Não deu para enviar ao ranking agora.';
+      const code = r && r.error;
+      setLine(['too_fast', 'no_run', 'invalid'].includes(code) ? `online.${code}` : 'online.fail');
     }
   }
 
@@ -1836,13 +2127,19 @@
     S.t += dt;
     const playing = S.mode === 'play';
     const frozen = S.mode === 'pause';
-    if (playing) S.playMs += dt * 1000;
+    if (playing && S.count > 0) {
+      const before = Math.ceil(S.count / cdStep - 1e-6);
+      S.count = Math.max(0, S.count - dt);
+      const after = Math.ceil(S.count / cdStep - 1e-6);
+      if (after !== before) showCount(after);
+      if (S.count === 0) { $('countSub').classList.remove('show'); $('touchHint').classList.remove('show'); }
+    } else if (playing) S.playMs += dt * 1000;
     if (!frozen) {
       S.dash = Math.max(0, S.dash - dt / DASH_DECAY); S.dashCd = Math.max(0, S.dashCd - dt);
       S.lunge = Math.max(0, (S.lunge || 0) - dt * 3);
       if (S.dashHeld && S.dashCd <= 0) dash();
     }
-    let v = playing ? S.speed + DASH_V * S.dash : frozen ? 0 : 11 * (1 - S.locker * 0.85);
+    let v = playing ? (S.count > 0 ? (S.gate ? 0 : 6) : S.speed + DASH_V * S.dash) : frozen ? 0 : 11 * (1 - S.locker * 0.85);
     if (S.stumble > 0) v *= 0.12;
     const dz = v * dt;
 
@@ -1868,15 +2165,21 @@
     }
 
     // linhas de velocidade: mais visíveis quanto mais rápido; arco-íris na febre
-    const sf = clamp((S.speed - CFG.startSpeed) / (CFG.maxSpeed - CFG.startSpeed), 0, 1);
+    const sf = clamp((S.speed - CFG.startSpeed) / (speedMax() - CFG.startSpeed), 0, 1);
     streakMat.opacity = playing ? Math.min(1, 0.12 + sf * 0.55 + (S.fever ? 0.25 : 0) + S.dash * 0.7) : 0.06;
     if (S.fever && playing) streakMat.color.setHSL((S.t * 1.5) % 1, 1, 0.6);
     else if (tintT >= 1 && themeIdx >= 0) streakMat.color.setHex(QC.THEMES[themeIdx].streak);
-    for (const s of streaks) {
-      s.position.z += dz * 1.6;
-      s.scale.z = 1 + sf * 2.5 + S.dash * 3;
-      if (s.position.z > 12) s.position.z -= 72;
-    }
+    const sl = 1 + sf * 2.5 + S.dash * 3;
+    streaks.forEach((s, i) => {
+      s.z += dz * 1.6;
+      if (s.z > 12) s.z -= 72;
+      mtx.position.set(s.x, s.y, s.z); mtx.scale.set(1, 1, sl); mtx.updateMatrix();
+      streakMesh.setMatrixAt(i, mtx.matrix);
+    });
+    mtx.scale.set(1, 1, 1);
+    streakMesh.instanceMatrix.needsUpdate = true;
+    trackOff = (trackOff + dz) % TRACK_PERIOD;
+    track.position.z = trackOff;
 
     // corredor
     if (!frozen) S.phase += dt * (4 + v * 0.42) * (1 - S.locker * 0.8);
@@ -1967,7 +2270,7 @@
       } catch (e) {}
     }
 
-    if (!playing) return;
+    if (!playing || S.count > 0) return;
 
     const g = S.gate;
     if (!g) {
@@ -1988,7 +2291,7 @@
       if (g.z > 11) { removeGate(g); S.gate = null; S.gap = 0.25; }
     } else if (g.state === 'crash') {
       g.timer += dt;
-      if (g.timer > 0.95) {
+      if (g.timer > 1.5) {
         removeGate(g); S.gate = null; S.gap = 0.4;
         if (S.lives <= 0) gameOver();
       }
@@ -1996,8 +2299,22 @@
   }
 
   let last = performance.now();
+  function watchPerf(raw) {
+    if (S.mode !== 'play' || S.count > 0 || raw > 0.5) return;
+    perf.t += raw; perf.n++;
+    if (perf.t < 3) return;
+    const f = perf.n / perf.t;
+    perf.t = 0; perf.n = 0;
+    perf.slow = f < 42 ? perf.slow + 1 : 0;
+    let q = quality;
+    if (perf.slow >= 2 && q < 2) { q++; perf.slow = 0; perf.downed = true; }
+    else if (f > 58 && q > 0 && !perf.downed) q--;   // sobe de volta só se não precisou baixar nesta visita
+    if (q !== quality) { quality = q; store.set('quanta-corrida-q', q); resize(); }
+  }
   function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const raw = (now - last) / 1000;
+    const dt = Math.min(0.05, raw); last = now;
+    watchPerf(raw);
     update(dt);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
@@ -2010,15 +2327,82 @@
   $('btnResume').addEventListener('click', togglePause);
   $('btnPause').addEventListener('click', togglePause);
   const sb = $('btnSound');
-  const paintSound = () => { sb.textContent = soundOn ? '♪' : '×'; sb.setAttribute('aria-pressed', String(soundOn)); };
-  sb.addEventListener('click', () => {
+  const paintSound = () => {
+    sb.textContent = soundOn ? '♪' : '×'; sb.setAttribute('aria-pressed', String(soundOn));
+    sb.setAttribute('aria-label', t(soundOn ? 'hud.soundOn' : 'hud.soundOff'));
+    const pb = $('btnPauseSound'); pb.textContent = t(soundOn ? 'sound.on' : 'sound.off'); pb.setAttribute('aria-pressed', String(soundOn));
+  };
+  function toggleSound() {
     soundOn = !soundOn; store.set('quanta-corrida-sound', soundOn);
     if (soundOn) audio();
     if (music) { try { music.setMuted(!soundOn); } catch (e) {} }
     paintSound();
-  });
+  }
+  sb.addEventListener('click', toggleSound);
+  $('btnPauseSound').addEventListener('click', toggleSound);
+  $('btnQuit').addEventListener('click', () => { if (S.mode === 'pause') gameOver(); });
   paintSound();
 
+  // modos: grupo de opções (setas trocam, Enter começa)
+  const modeIds = Object.keys(MODES);
+  function paintModes() {
+    $$('.mode').forEach((b) => { const on = b.dataset.mode === modeId; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
+    $('modeDesc').textContent = MODES[modeId].desc;
+  }
+  function setMode(id) {
+    if (!MODES[id]) return;
+    if (id !== modeId && actx) sfx.move();
+    modeId = id; store.set('quanta-corrida-mode', id); paintModes();
+  }
+  function stepMode(d, focus) {
+    setMode(modeIds[(modeIds.indexOf(modeId) + d + modeIds.length) % modeIds.length]);
+    if (focus) document.querySelector(`.mode[data-mode="${modeId}"]`).focus();
+  }
+  $$('.mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('modes').addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'ArrowRight' || k === 'ArrowDown') {
+      stepMode(k === 'ArrowLeft' || k === 'ArrowUp' ? -1 : 1, true);
+      e.preventDefault(); e.stopPropagation();
+    }
+  });
+  $('btnModes').addEventListener('click', () => {
+    S.mode = 'menu';
+    $('overScreen').classList.remove('show');
+    $('startScreen').classList.add('show');
+    paintModes();
+    document.querySelector(`.mode[data-mode="${modeId}"]`).focus({ preventScroll: true });
+  });
+  paintModes();
+
+  // ================= Idioma: seletor no menu e na pausa, troca ao vivo =================
+  $$('.lang-row').forEach((row, i) => {
+    const id = `langSel${i}`;
+    row.innerHTML = `<label for="${id}" data-i18n="lang.label">${esc(t('lang.label'))}</label>
+      <select id="${id}" class="lang-sel">${I18.LANGS.map((l) => `<option value="${l.code}" lang="${l.code}">${esc(l.name)}</option>`).join('')}</select>`;
+    const sel = row.querySelector('select');
+    sel.value = I18.lang;
+    sel.addEventListener('change', () => I18.setLang(sel.value));
+  });
+  function paintStartBtn() { if (ready) $('btnStart').innerHTML = `<span class="blink">${esc(t('btn.play'))}</span>`; }
+  I18.onChange(() => {
+    $$('.lang-sel').forEach((s) => { s.value = I18.lang; });
+    paintStartBtn(); paintSound(); paintModes(); refreshMenus(); paintScore(); updateHud();
+    $('qLevel').textContent = t('q.level', { n: S.level });
+    if (S.mode === 'pause') paintPauseStats();
+    if (openPanel === 'lockerScreen') renderLocker();
+    if (openPanel === 'rankScreen') paintBoard();
+    if (over) {
+      paintOverText(); paintNextUnlock(true); paintLine();
+      [['rScore', S.score], ['rHits', S.hits], ['rCombo', S.maxCombo], ['xpGain', over.xpGained], ['xpTotal', P.data.xp]].forEach(([id, v]) => { $(id).textContent = fmt(v); });
+    }
+    measureQuestion();
+  });
+
+  // diagnóstico para testes: /corrida/?debug
+  if (/[?&]debug\b/.test(location.search)) window.__qc = { renderer, scene, S, get quality() { return quality; } };
+
+  $('qLevel').textContent = t('q.level', { n: 1 });
   resize();
   applyTheme(1, true);
   useSkin(P.data.skin);
@@ -2043,7 +2427,7 @@
   Promise.race([fontsReady, new Promise((r) => setTimeout(r, 2500))]).then(() => {
     ready = true;
     const b = $('btnStart'); b.disabled = false;
-    b.innerHTML = '<span class="blink">► JOGAR</span>';
+    paintStartBtn();
     measureQuestion();
   });
 })();
