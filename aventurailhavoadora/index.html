@@ -1401,7 +1401,7 @@
       <ul class="howto-list">
         <li>
           <span class="howto-icon gift" aria-hidden="true"></span>
-          <span><strong>Abra pacotes</strong> encostando neles. Junte <strong>10 bananas</strong> para voar até a próxima ilha. Pacotes raros trazem peças de novos personagens.</span>
+          <span><strong>Abra pacotes</strong> encostando neles. Junte <strong>10 bananas</strong> para voar até a próxima ilha. Arbusto balançando com brilho roxo esconde pacote: chegue perto! Pacotes raros trazem peças de novos personagens.</span>
         </li>
         <li>
           <span class="howto-icon move" aria-hidden="true">➜</span>
@@ -1480,6 +1480,9 @@
     const SETTINGS_KEY = "ilhas-voadoras-config-v1";
     const JOURNEY_KEY = "ilhas-voadoras-jornada-v1";
     const SHIELD_MAX = 7;
+    // Ritmo: menos pacotes de uma vez, e o próximo aparece longe, para explorar a ilha.
+    const PACKAGES_ON_ISLAND = 5;
+    const PACKAGE_RESPAWN_TIME = 2.2;
     const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const BANANAS_TO_WIN = 10;
     // A partir desta distância do centro (1 = borda desenhada) o chão esfarela.
@@ -1813,6 +1816,12 @@
       return Math.max(0.6, Math.min(1, shape.rx / 400, shape.ry / 190));
     }
 
+    // Velocidades acompanham o tamanho da ilha: na ilha pequena do celular,
+    // a mesma velocidade em pixels atravessava tudo num piscar.
+    function motionScale() {
+      return 0.4 + 0.6 * worldScale();
+    }
+
     function pointOnIsland(u, v) {
       const island = islandShape();
       return {
@@ -1842,7 +1851,7 @@
       return { type: "banana" };
     }
 
-    function newPackage(random = Math.random) {
+    function newPackage(random = Math.random, minDistance = 95) {
       // Pacotes ficam sempre na parte segura (longe da borda que esfarela).
       let spot = randomPointInIsland(random, 0.72);
       let attempts = 0;
@@ -1850,7 +1859,7 @@
         const point = pointOnIsland(spot.u, spot.v);
         const dx = point.x - state.player.x;
         const dy = point.y - state.player.y;
-        if (Math.hypot(dx, dy) > 95) break;
+        if (Math.hypot(dx, dy) > minDistance) break;
         spot = randomPointInIsland(random, 0.72);
         attempts += 1;
       }
@@ -1858,7 +1867,8 @@
         id: `${Date.now()}-${Math.floor(random() * 100000)}`,
         u: spot.u,
         v: spot.v,
-        hidden: random() < 0.55,
+        // Pacote escondido: fica num arbusto que balança até alguém chegar perto.
+        hidden: random() < 0.4,
         bob: random() * Math.PI * 2,
         content: choosePackageContent(random),
         opened: false
@@ -1909,7 +1919,8 @@
       const island = islandShape();
       state.player.x = island.cx;
       state.player.y = island.cy + island.ry * 0.15;
-      state.packages = Array.from({ length: 13 }, () => newPackage(random));
+      state.packages = Array.from({ length: PACKAGES_ON_ISLAND }, () => newPackage(random));
+      state.packageTimers = [];
       state.enemies = Array.from({ length: difficulty().enemies }, (_, index) => newEnemy(random, index));
       state.enemyRespawnTimer = 8;
       state.particles = [];
@@ -2353,6 +2364,10 @@
         case "gameover":
           [392, 330, 262, 196].forEach((f, i) => playNote(f, 0.24, 0.14, "triangle", i * 0.2));
           break;
+        case "reveal":
+          playNote(587, 0.05, 0.1, "triangle");
+          playNote(880, 0.07, 0.09, "triangle", 0.05);
+          break;
         case "click":
           playNote(660, 0.04, 0.08, "triangle");
           break;
@@ -2408,7 +2423,9 @@
       }
 
       state.packages = state.packages.filter((item) => item !== packageItem);
-      if (state.packages.length < 13) state.packages.push(newPackage());
+      if (state.packages.length + state.packageTimers.length < PACKAGES_ON_ISLAND) {
+        state.packageTimers.push(PACKAGE_RESPAWN_TIME);
+      }
       updateHud();
 
       if (state.bananas >= BANANAS_TO_WIN) {
@@ -2499,8 +2516,8 @@
         const length = Math.hypot(dx, dy);
         dx /= length;
         dy /= length;
-        state.player.x += dx * state.player.speed * dt;
-        state.player.y += dy * state.player.speed * dt;
+        state.player.x += dx * state.player.speed * motionScale() * dt;
+        state.player.y += dy * state.player.speed * motionScale() * dt;
         if (dx !== 0) state.player.facing = dx > 0 ? 1 : -1;
         clampPlayerToIsland();
       } else if (state.player.target) {
@@ -2510,7 +2527,7 @@
         if (distance < 7) {
           state.player.target = null;
         } else {
-          const step = Math.min(state.player.speed * 1.08 * dt, distance);
+          const step = Math.min(state.player.speed * motionScale() * 1.08 * dt, distance);
           state.player.x += (targetDx / distance) * step;
           state.player.y += (targetDy / distance) * step;
           if (Math.abs(targetDx) > 1) state.player.facing = targetDx > 0 ? 1 : -1;
@@ -2518,9 +2535,26 @@
         }
       }
 
+      // Pacotes novos chegam um pouco depois, do outro lado da ilha.
+      for (let i = state.packageTimers.length - 1; i >= 0; i -= 1) {
+        state.packageTimers[i] -= dt;
+        if (state.packageTimers[i] <= 0) {
+          state.packageTimers.splice(i, 1);
+          const fresh = newPackage(Math.random, islandShape().rx * 0.55);
+          if (!fresh.hidden) fresh.dropped = 0.01;
+          state.packages.push(fresh);
+        }
+      }
+
       for (const packageItem of state.packages) {
         const point = pointOnIsland(packageItem.u, packageItem.v);
         const distance = Math.hypot(point.x - state.player.x, point.y - state.player.y);
+        if (packageItem.hidden && distance < 125 * worldScale()) {
+          packageItem.hidden = false;
+          packageItem.dropped = 0.01;
+          sfx("reveal");
+          spawnParticles(point.x, point.y, 12, [islands[state.islandIndex].grass, "#a9ef86", "#fff2a8"], 140, 5);
+        }
         if (distance < (state.player.radius + 19) * worldScale()) {
           openPackage(packageItem);
           break;
@@ -2681,6 +2715,7 @@
       reward.v = enemy.v * factor;
       reward.hidden = false;
       reward.dropped = 0.01;
+      if (state.packageTimers.length > 0) state.packageTimers.pop();
       state.packages.push(reward);
       showTip("Bichinho derrotado! Ele deixou um pacote.");
     }
@@ -2756,9 +2791,9 @@
     }
 
     function fireQuickAttack() {
-      state.attackCooldown = 0.16;
+      state.attackCooldown = 0.22;
       const direction = attackDirection();
-      spawnPlayerShot(direction.x, direction.y, 360, 1, "#66d9ff");
+      spawnPlayerShot(direction.x, direction.y, 360 * motionScale(), 1, "#66d9ff");
       sfx("shoot");
     }
 
@@ -2771,7 +2806,7 @@
       const total = 18;
       for (let i = 0; i < total; i += 1) {
         const angle = (Math.PI * 2 * i) / total;
-        spawnPlayerShot(Math.cos(angle), Math.sin(angle), 310, 2, "#ffcf57");
+        spawnPlayerShot(Math.cos(angle), Math.sin(angle), 310 * motionScale(), 2, "#ffcf57");
       }
       sfx("burst");
       updateChargeButton();
@@ -2779,8 +2814,9 @@
     }
 
     function attackDirection() {
+      // A mira automática só alcança bichinhos por perto: é preciso chegar mais perto deles.
       let nearest = null;
-      let nearestDistance = Infinity;
+      let nearestDistance = 330 * worldScale();
       for (const enemy of state.enemies) {
         const point = enemyPoint(enemy);
         const distance = Math.hypot(point.x - state.player.x, point.y - state.player.y);
@@ -2823,7 +2859,7 @@
       const dx = state.player.x - point.x;
       const dy = state.player.y - point.y;
       const length = Math.max(1, Math.hypot(dx, dy));
-      const speed = difficulty().powerSpeed;
+      const speed = difficulty().powerSpeed * motionScale();
       state.powers.push({
         x: point.x,
         y: point.y - 18,
@@ -3282,7 +3318,8 @@
         const point = pointOnIsland(packageItem.u, packageItem.v);
         const bob = Math.sin(state.time * 3 + packageItem.bob) * 4;
         if (packageItem.hidden) {
-          drawHiddenLeaves(point.x, point.y + 7);
+          drawRustlingBush(point.x, point.y, packageItem.bob);
+          continue;
         }
         if (packageItem.dropped && packageItem.dropped < 1) {
           // Pacote deixado por um bichinho: cai do alto com um pulinho.
@@ -3298,14 +3335,37 @@
       }
     }
 
-    function drawHiddenLeaves(x, y) {
+    function drawRustlingBush(x, y, seed) {
+      const scale = worldScale();
+      const theme = islands[state.islandIndex];
+      const shakeNow = Math.sin(state.time * 2.2 + seed) > 0.55;
+      const wiggle = shakeNow ? Math.sin(state.time * 32 + seed) * 2.5 : 0;
       ctx.save();
-      ctx.fillStyle = "rgba(47, 128, 71, 0.9)";
-      for (let i = 0; i < 5; i += 1) {
-        ctx.beginPath();
-        ctx.ellipse(x - 20 + i * 10, y + Math.sin(i) * 3, 13, 8, i * 0.35, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.translate(x + wiggle, y + 10 * scale);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "rgba(39, 58, 58, 0.16)";
+      ctx.beginPath();
+      ctx.ellipse(0, 10, 26, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = theme.grass;
+      ctx.beginPath();
+      ctx.arc(-14, -2, 14, 0, Math.PI * 2);
+      ctx.arc(2, -10, 18, 0, Math.PI * 2);
+      ctx.arc(17, -2, 14, 0, Math.PI * 2);
+      ctx.rect(-27, -2, 54, 12);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.beginPath();
+      ctx.arc(-2, -16, 6, 0, Math.PI * 2);
+      ctx.fill();
+      // Brilho de "tem coisa aqui" (o laço roxo do pacote aparecendo entre as folhas).
+      ctx.globalAlpha = 0.55 + Math.sin(state.time * 4 + seed) * 0.35;
+      ctx.translate(0, -30);
+      ctx.rotate(Math.sin(state.time * 3 + seed) * 0.25);
+      ctx.fillStyle = "#9e69ff";
+      drawStar(0, 0, 5, 14, 5);
+      ctx.fillStyle = "#fff2a8";
+      drawStar(0, 0, 2.5, 7, 5);
       ctx.restore();
     }
 
