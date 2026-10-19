@@ -675,7 +675,9 @@
       flex-direction: column;
       gap: 8px;
       max-height: calc(100svh - 36px);
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     #howScreen .panel,
@@ -1966,6 +1968,28 @@
 
       .arena {
         height: 52%;
+      }
+    }
+
+    /* Em telas estreitas o botão de música ficava por cima do título dos painéis. */
+    @media (max-width: 899px) {
+      .setup-screen,
+      #howScreen,
+      #resultScreen {
+        padding-top: calc(max(12px, env(safe-area-inset-top)) + 46px);
+      }
+
+      .setup-screen .panel,
+      #howScreen .panel,
+      #resultScreen .panel {
+        max-height: calc(100svh - 64px - max(12px, env(safe-area-inset-top)));
+      }
+    }
+
+    /* No celular a asa do inimigo saía pela borda direita da tela. */
+    @media (max-width: 520px) {
+      .fighter.devil {
+        margin-right: 4vw;
       }
     }
   </style>
