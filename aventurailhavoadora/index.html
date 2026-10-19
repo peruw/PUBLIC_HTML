@@ -1441,7 +1441,10 @@
 
   <script>
     const canvas = document.querySelector("#game");
-    const ctx = canvas.getContext("2d");
+    const mainCtx = canvas.getContext("2d");
+    // As funções de desenho usam "ctx"; ele aponta para uma camada guardada quando ela é (re)montada.
+    let ctx = mainCtx;
+    const layers = { sky: document.createElement("canvas"), island: document.createElement("canvas"), key: "" };
     const hud = document.querySelector("#hud");
     const controls = document.querySelector("#controls");
     const welcomeScreen = document.querySelector("#welcomeScreen");
@@ -2936,8 +2939,8 @@
 
     function draw() {
       const theme = islands[state.islandIndex];
-      drawSkyGradient(theme);
-      drawDistantIslands(theme);
+      ensureLayers(theme);
+      ctx.drawImage(layers.sky, 0, 0, state.width, state.height);
       drawSkyDots();
       drawClouds();
       ctx.save();
@@ -2945,7 +2948,7 @@
         const power = state.shake * 16;
         ctx.translate((Math.random() - 0.5) * power, (Math.random() - 0.5) * power);
       }
-      drawIslandBody(theme);
+      ctx.drawImage(layers.island, 0, 0, state.width, state.height);
       drawEdgeLine();
       drawDangerZones();
       // Árvores ficam todas atrás: antes tapavam pacotes e bichinhos.
@@ -2972,6 +2975,31 @@
         ctx.fillRect(-particle.size / 2, -particle.size / 3, particle.size, particle.size * 0.66);
         ctx.restore();
       }
+    }
+
+    // Céu e corpo da ilha não mudam a cada quadro: são desenhados uma vez numa camada
+    // guardada (só refaz ao trocar de ilha ou de tamanho de tela). No celular isso
+    // economizava cerca de 8 ms por quadro.
+    function ensureLayers(theme) {
+      const key = `${canvas.width}x${canvas.height}:${state.dpr}:${state.islandIndex}`;
+      if (layers.key === key) return;
+      layers.key = key;
+      const paint = (layer, fn) => {
+        layer.width = canvas.width;
+        layer.height = canvas.height;
+        ctx = layer.getContext("2d");
+        ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+        try {
+          fn();
+        } finally {
+          ctx = mainCtx;
+        }
+      };
+      paint(layers.sky, () => {
+        drawSkyGradient(theme);
+        drawDistantIslands(theme);
+      });
+      paint(layers.island, () => drawIslandBody(theme));
     }
 
     function drawSkyGradient(theme) {
