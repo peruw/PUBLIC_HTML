@@ -1319,3 +1319,13 @@ html.lang-en [data-lang-inline="pt"] {
   .footer-grid > .footer-col:first-child { grid-column: 1 / -1; }
   .footer-bottom { flex-wrap: wrap; gap: 8px 16px; }
 }
+
+/* Foco visível no teclado para FAQ e passos do método (role="button" via script.js) */
+.faq-q:focus-visible,
+.method-step:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.method-step:focus-visible { border-radius: var(--radius); }
+.faq-item.open .faq-a { cursor: auto; }
