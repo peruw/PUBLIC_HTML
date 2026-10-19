@@ -557,7 +557,8 @@
       top: max(12px, env(safe-area-inset-top));
       left: 12px;
       z-index: 30;
-      min-height: 34px;
+      min-height: 44px;
+      min-width: 44px;
       border: 2px solid rgba(255, 242, 173, .9);
       border-radius: 7px;
       background: rgba(21, 28, 48, .86);
@@ -581,10 +582,10 @@
       left: auto;
       right: 8px;
       bottom: max(8px, env(safe-area-inset-bottom));
-      min-height: 30px;
-      padding: 4px 7px;
-      font-size: .62rem;
-      opacity: .82;
+      min-height: 44px;
+      padding: 4px 8px;
+      font-size: .66rem;
+      opacity: .9;
       box-shadow: 0 2px 0 rgba(0,0,0,.3);
     }
 
@@ -1975,12 +1976,157 @@
       }
 
       .option-btn {
-        min-height: 38px;
-        padding: 7px 8px;
+        min-height: 44px;
+        padding: 6px 8px;
       }
 
       .arena {
         height: 52%;
+      }
+    }
+
+    /* Celular deitado: antes a área do jogo tinha altura mínima de 500px e o
+       que passava da tela era cortado sem rolagem (HUD, pergunta e painéis). */
+    @media (max-height: 500px) {
+      .game {
+        min-height: 0;
+      }
+
+      .hud {
+        top: max(4px, env(safe-area-inset-top));
+      }
+
+      .life {
+        height: 13px;
+        border-width: 2px;
+      }
+
+      .name {
+        font-size: .76rem;
+      }
+
+      .round-info {
+        font-size: .74rem;
+      }
+
+      .question-area {
+        top: calc(max(4px, env(safe-area-inset-top)) + 38px);
+        padding: 6px 8px;
+      }
+
+      .timer-line {
+        height: 6px;
+        margin-bottom: 4px;
+      }
+
+      .question-meta {
+        margin: 0 0 2px;
+        font-size: .66rem;
+      }
+
+      .question-text {
+        min-height: 0;
+        font-size: .92rem;
+      }
+
+      .options {
+        grid-template-columns: 1fr 1fr;
+        margin-top: 6px;
+        gap: 6px;
+      }
+
+      .option-btn {
+        min-height: 44px;
+        padding: 4px 8px;
+        font-size: .88rem;
+      }
+
+      .feedback-box {
+        margin-top: 6px;
+        padding: 5px 8px;
+        font-size: .86rem;
+      }
+
+      .feedback-text {
+        font-size: .8rem;
+      }
+
+      .arena {
+        height: 46%;
+        padding-bottom: 6px;
+      }
+
+      .fighter {
+        width: 92px;
+        height: 132px;
+        --sprite-scale: 1.15;
+      }
+
+      .fighter.enemy,
+      .fighter.devil {
+        width: 88px;
+        height: 124px;
+      }
+
+      .float-text {
+        top: 74%;
+        font-size: 1.15rem;
+      }
+
+      .float-text.praise {
+        top: 72%;
+        font-size: 1.3rem;
+      }
+
+      .combo-badge {
+        bottom: 8px;
+        padding: 4px 10px;
+        min-width: 0;
+      }
+
+      .intro-fighters {
+        height: 150px;
+        margin: 8px 0 10px;
+      }
+
+      .intro-fighters .fighter {
+        --sprite-scale: 1.25;
+      }
+
+      .subtitle {
+        margin: 8px 0 6px;
+      }
+
+      h1 {
+        font-size: clamp(1.8rem, 8vh, 3rem);
+      }
+
+      .world-scroll {
+        min-height: 110px;
+        max-height: 40svh;
+      }
+
+      #modeGrid .select-card {
+        min-height: 56px;
+      }
+
+      #setupNextBtn {
+        min-height: 50px;
+      }
+
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+
+      .next-btn.counting::after {
+        animation-duration: var(--advance-ms, 3200ms) !important;
       }
     }
 
@@ -1999,10 +2145,124 @@
       }
     }
 
+    /* Celular em pé: o texto do golpe desce para cima dos lutadores (antes cobria
+       as alternativas) e o botão "Próxima" ocupa a largura toda. */
+    @media (max-width: 679px) and (min-height: 501px) {
+      .float-text {
+        top: 76%;
+        font-size: clamp(1.05rem, 5.6vw, 1.6rem);
+      }
+
+      .float-text.praise {
+        top: 74%;
+        font-size: clamp(1.15rem, 6.4vw, 1.9rem);
+      }
+
+      .feedback-box {
+        grid-template-columns: 1fr;
+      }
+
+      .next-btn {
+        grid-column: 1;
+        grid-row: auto;
+        width: 100%;
+        margin-top: 6px;
+      }
+    }
+
     /* No celular a asa do inimigo saía pela borda direita da tela. */
     @media (max-width: 520px) {
       .fighter.devil {
         margin-right: 4vw;
+      }
+    }
+
+    /* Celular deitado: os painéis ganham a tela toda e desviam do botão de som. */
+    @media (max-height: 500px) {
+      .setup-screen,
+      #howScreen,
+      #resultScreen {
+        padding-top: max(8px, env(safe-area-inset-top));
+      }
+
+      .setup-screen .panel,
+      #howScreen .panel,
+      #resultScreen .panel {
+        max-height: calc(100svh - 16px);
+        padding: 10px 14px;
+        margin-left: 56px;
+        width: min(760px, calc(100vw - 72px));
+      }
+
+      .panel h2 {
+        font-size: 1.35rem;
+        margin: 0 0 4px;
+      }
+
+      .panel p {
+        margin: 4px 0;
+        font-size: .9rem;
+        line-height: 1.3;
+      }
+
+      .setup-screen .panel {
+        gap: 4px;
+      }
+
+      .world-scroll {
+        min-height: 96px;
+        max-height: 34svh;
+        padding: 6px;
+      }
+
+      .select-card {
+        padding: 8px 10px;
+      }
+
+      .select-card span {
+        font-size: .8rem;
+      }
+
+      .mode-section {
+        padding-top: 4px;
+      }
+
+      .mode-section > p {
+        margin: 0 0 4px;
+      }
+
+      #modeGrid {
+        margin-bottom: 4px;
+      }
+
+      #modeGrid .select-card {
+        min-height: 48px;
+        padding: 6px 8px;
+      }
+
+      #setupNextBtn {
+        min-height: 46px;
+        margin-top: 2px;
+      }
+
+      .result-stats {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        margin: 8px 0;
+      }
+
+      .stat {
+        padding: 6px;
+      }
+
+      .primary-btn,
+      .secondary-btn {
+        min-height: 46px;
+        padding-block: 8px;
+      }
+
+      .next-phase-btn {
+        min-height: 50px;
       }
     }
   </style>
