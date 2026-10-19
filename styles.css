@@ -9,7 +9,7 @@
 
   --ink: #e8f5ee;
   --ink-dim: #9db0a6;
-  --ink-mute: #6b8076;
+  --ink-mute: #879d92; /* 5,5:1 em --bg-card (WCAG AA); antes #6b8076 = 3,8:1 */
 
   --brand: #1fd685;
   --brand-deep: #16a86a;
@@ -1262,8 +1262,10 @@ html.lang-en [data-lang-inline="pt"] {
   line-height: 1.04;
   letter-spacing: -0.025em;
 }
+/* Espaço entre palavras = o próprio espaço do texto (margem extra somada ao espaço
+   e repetida no <span class="grad-text"> interno deixava buracos em "Física  e  Química") */
 .hero-headline span {
-  margin-right: 0.18em;
+  margin-right: 0;
 }
 @media (max-width: 720px) {
   .hero-headline.h-display { font-size: clamp(34px, 9vw, 48px); }
