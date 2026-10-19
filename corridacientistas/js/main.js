@@ -570,6 +570,7 @@ async function init() {
     }
 
     // Resolução adaptativa: reduz se o aparelho não aguenta e volta a subir quando melhora.
+    if (shadowsPending && (game.paused || game.state !== 'race' || world.phase === 'countdown')) disableShadows();
     dtAvg += (dt - dtAvg) * 0.05;
     adaptResolution(dt);
   }
@@ -581,8 +582,10 @@ async function init() {
   }
   // Sombras desligadas na hora (o que mais pesa na qualidade 'alta' sem borrar a imagem).
   let shadowsOff = !quality.shadows;
+  let shadowsPending = false;
   function disableShadows() {
     shadowsOff = true;
+    shadowsPending = false;
     renderer.shadowMap.enabled = false;
     scene.traverse((o) => {
       if (o.isLight) o.castShadow = false;
@@ -611,13 +614,17 @@ async function init() {
       slowTime += dt;
       if (slowTime > 2.5) {
         slowTime = 0;
-        if (!shadowsOff) {
-          // 1º passo: sem sombras; a próxima visita já abre em 'baixa'
-          disableShadows();
+        if (!shadowsOff && !shadowsPending) {
+          // 1º passo: sem sombras; a próxima visita já abre em 'baixa'.
+          // Desligar recompila os shaders (travadinha): no meio da corrida, fica para a próxima pausa/tela.
           store.set('quality', 'baixa');
-          checkTime = 1.5;
-          dtBefore = dtAvg;
-          prBefore = pixelRatio;
+          if (game.state === 'race' && world.phase === 'racing') shadowsPending = true;
+          else {
+            disableShadows();
+            checkTime = 1.5;
+            dtBefore = dtAvg;
+            prBefore = pixelRatio;
+          }
         } else if (!noLower && pixelRatio > PR_MIN) {
           dtBefore = dtAvg;
           prBefore = pixelRatio;
