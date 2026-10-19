@@ -526,7 +526,7 @@ async function init() {
           // Ainda lento em 'alta' (reduzir não resolve mais): a próxima visita já começa em 'baixa'.
           slowWarned = true;
           store.set('quality', 'baixa');
-          hud.toast?.('Jogo lento? Da próxima vez o jogo abre em <b>Qualidade: baixa</b> (dá para trocar no menu inicial).', 6000);
+          hud.toast?.('<p class="toast-full">Jogo lento? Da próxima vez o jogo abre em <strong>Qualidade: baixa</strong> (dá para trocar no menu inicial).</p>', 6000);
         }
       }
     } else if (dtAvg < 1 / 50 && pixelRatio < maxPR) {
