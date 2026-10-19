@@ -1,17 +1,47 @@
 // Progresso do jogador (salvo no aparelho): recordes, troféus por cientista,
 // curiosidades já vistas e perguntas-relâmpago. Também conta as estatísticas
 // da corrida atual (turbos de drift, itens, batidas) a partir dos eventos do bus.
-import { CHARACTERS, CHARACTER_BY_ID, ITEMS, CLASSES } from './config.js';
+import { CHARACTERS, ITEMS, CLASSES } from './config.js';
+import { charText, itemText, getLang } from './i18n.js';
 
 export const MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' };
-const MEDAL_NAMES = { 1: 'ouro', 2: 'prata', 3: 'bronze' };
 
 // Banco de perguntas: uma por cientista e uma por item que tem pergunta.
+// O texto vem do idioma atual; a resposta certa (answer) fica em config.js, igual em todos os idiomas.
 const QUIZ = [
-  ...CHARACTERS.filter((c) => c.quiz).map((c) => ({ id: 'c-' + c.id, about: c.id, explain: c.facts?.[0], ...c.quiz })),
-  ...Object.values(ITEMS).filter((it) => it.quiz).map((it) => ({ id: 'i-' + it.id, about: null, explain: it.fact, ...it.quiz })),
+  ...CHARACTERS.filter((c) => c.quiz).map((c) => ({ id: 'c-' + c.id, about: c.id, kind: 'char', key: c.id, answer: c.quiz.answer })),
+  ...Object.values(ITEMS).filter((it) => it.quiz).map((it) => ({ id: 'i-' + it.id, about: null, kind: 'item', key: it.id, answer: it.quiz.answer })),
 ];
+const QUIZ_BY_ID = Object.fromEntries(QUIZ.map((q) => [q.id, q]));
 export const QUIZ_TOTAL = QUIZ.length;
+
+// Texto da pergunta no idioma atual, na ordem embaralhada `order`.
+// explain: explicação da pergunta do cientista, ou a curiosidade do item.
+export function quizText(id, order) {
+  const q = QUIZ_BY_ID[id];
+  if (!q) return null;
+  const src = q.kind === 'char' ? charText(q.key) : itemText(q.key);
+  const quiz = src.quiz || {};
+  const opts = quiz.options || [];
+  const ord = order || opts.map((_, i) => i);
+  const answerText = opts[q.answer] || '';
+  return {
+    q: quiz.q || '',
+    options: ord.map((i) => opts[i]),
+    correct: ord.indexOf(q.answer),
+    explain: q.kind === 'char' ? quiz.explain || '' : src.fact || '',
+    words: answerWords(answerText),
+  };
+}
+
+// Palavras da resposta certa (a curiosidade mostrada junto não pode entregá-la).
+// Em chinês/japonês não há espaços: usa a resposta inteira.
+function answerWords(text) {
+  const lc = text.toLowerCase();
+  const words = lc.split(/[^\p{L}\d-]+/u).filter((w) => w.length >= 5 || /\d/.test(w));
+  if (/^(zh|ja)/.test(getLang()) && lc) words.push(lc.replace(/[\s（(].*$/u, ''));
+  return words;
+}
 
 const shuffle = (a) => {
   for (let i = a.length - 1; i > 0; i--) {
@@ -122,45 +152,38 @@ export class Progress {
     return { n, total: CHARACTERS.length * Object.keys(CLASSES).length };
   }
 
-  static medalName(place) {
-    return MEDAL_NAMES[place] || '';
-  }
-
   // ---------- curiosidades ----------
-  // Alterna entre as curiosidades do cientista a cada chamada.
+  // Alterna entre as curiosidades do cientista a cada chamada e devolve o índice escolhido.
   // avoid: palavras que não podem aparecer (para a curiosidade não entregar a resposta da pergunta).
   nextFact(charId, avoid = []) {
-    const c = CHARACTER_BY_ID[charId];
-    const list = c?.facts || [];
-    if (!list.length) return '';
+    const list = charText(charId).facts || [];
+    if (!list.length) return 0;
     const start = (this.data.factIdx[charId] || 0) % list.length;
-    const bad = (f) => avoid.some((w) => f.toLowerCase().includes(w));
+    const bad = (f) => avoid.some((w) => w && f.toLowerCase().includes(w));
     let i = start;
     for (let n = 0; n < list.length && bad(list[i]); n++) i = (i + 1) % list.length;
     if (bad(list[i])) i = start;
     this.data.factIdx[charId] = (i + 1) % list.length;
     this._save();
-    return list[i];
+    return i;
   }
 
   randomFact() {
     const c = CHARACTERS[(Math.random() * CHARACTERS.length) | 0];
-    const f = c.facts[(Math.random() * c.facts.length) | 0];
-    return { c, text: f };
+    const n = (charText(c.id).facts || []).length || 1;
+    return { c, idx: (Math.random() * n) | 0 };
   }
 
   // ---------- perguntas ----------
   // Primeiro a do cientista escolhido; depois, uma ainda não acertada.
+  // Devolve só a ordem das alternativas; o texto sai de quizText() no idioma da tela.
   pickQuiz(charId) {
     const done = new Set(this.data.quiz);
     let pool = QUIZ.filter((q) => q.about === charId && !done.has(q.id));
     if (!pool.length) pool = QUIZ.filter((q) => !done.has(q.id));
     if (!pool.length) pool = QUIZ; // acertou todas: continua sorteando
     const q = pool[(Math.random() * pool.length) | 0];
-    const order = shuffle(q.options.map((_, i) => i));
-    // palavras da resposta certa (a curiosidade mostrada junto não pode entregá-la)
-    const words = q.options[q.answer].toLowerCase().split(/[^\p{L}\d-]+/u).filter((w) => w.length >= 5 || /\d/.test(w));
-    return { id: q.id, about: q.about, q: q.q, options: order.map((i) => q.options[i]), correct: order.indexOf(q.answer), explain: q.explain, words };
+    return { id: q.id, about: q.about, order: shuffle([0, 1, 2]) };
   }
 
   answerQuiz(id, ok) {

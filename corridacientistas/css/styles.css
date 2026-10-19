@@ -14,6 +14,22 @@
   --font: 'Fredoka', 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
 }
 
+/* Chinês e japonês: Fredoka para letras latinas e números; ideogramas das fontes do sistema
+   (Windows, Mac, Linux/Android), com as japonesas antes em japonês. */
+html:lang(zh-CN) {
+  --font: 'Fredoka', 'Noto Sans SC', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', 'Source Han Sans SC',
+    'WenQuanYi Zen Hei', 'Hiragino Sans', 'Noto Sans CJK JP', 'Trebuchet MS', system-ui, sans-serif;
+}
+html:lang(ja) {
+  --font: 'Fredoka', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Noto Sans CJK JP', 'Yu Gothic', 'Meiryo',
+    'Source Han Sans JP', 'Noto Sans SC', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', 'Trebuchet MS', system-ui, sans-serif;
+}
+/* ideogramas não ficam bem em itálico nem com espaçamento extra */
+html.cjk i,
+html.cjk em { font-style: normal; }
+html.cjk .btn,
+html.cjk .opt-label { letter-spacing: 0; }
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -275,6 +291,60 @@ h2 {
   text-shadow: 0 3px 0 #3a2a8a, 0 6px 16px rgba(0, 0, 0, 0.5);
 }
 
+.logo h1 .h1-main {
+  font: inherit;
+}
+
+/* palavra comprida no título (alemão) */
+.logo h1.long {
+  font-size: clamp(32px, 5.6vw, 64px);
+}
+
+/* Seletor de idioma (menu inicial e pausa) */
+.lang-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-line);
+  font-size: 15px;
+}
+
+.lang-pick select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 4px 28px 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink);
+  font: 600 15px var(--font);
+  cursor: pointer;
+  background: rgba(13, 22, 56, 0.6)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b9c3e6' stroke-width='2' fill='none'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+}
+
+.lang-pick select:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.lang-pick option {
+  color: #0b1330;
+  background: #fff;
+}
+
+.small-panel .lang-pick {
+  align-self: center;
+}
+
 .tagline {
   margin: 0;
   font-size: clamp(15px, 2vw, 19px);
@@ -368,7 +438,7 @@ h2 {
 }
 
 .char-card span {
-  font-size: clamp(11px, 1.6vw, 15px);
+  font-size: calc(clamp(11px, 1.6vw, 15px) * var(--nm, 1));
   font-weight: 600;
   /* nome longo (Oswaldo Cruz) quebra em duas linhas em vez de cortar */
   white-space: normal;
@@ -377,6 +447,11 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+.char-card span.nm-long {
+  --nm: 0.85;
+  letter-spacing: -0.3px;
 }
 
 .char-card .flag {
@@ -439,17 +514,17 @@ h2 {
   line-height: 1.35;
 }
 
+/* coluna dos nomes do tamanho do maior nome (muda com o idioma); barras alinhadas */
 .stats {
   display: grid;
-  gap: 5px;
+  grid-template-columns: max-content 1fr;
+  align-items: center;
+  gap: 5px 10px;
+  font-size: 14px;
 }
 
 .stat {
-  display: grid;
-  grid-template-columns: 92px 1fr;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  display: contents;
 }
 
 .stat-bar {
@@ -821,7 +896,12 @@ kbd {
 .results-list .p {
   font-weight: 700;
   font-size: 18px;
+  white-space: nowrap;
 }
+
+/* posição em chinês (第1名) e japonês (1位) é mais larga */
+html:lang(zh-CN) .results-list li { grid-template-columns: 56px 30px 1fr auto; }
+html:lang(ja) .results-list li { grid-template-columns: 40px 30px 1fr auto; }
 
 .results-list li:nth-child(1) .p { color: #ffd23f; }
 .results-list li:nth-child(2) .p { color: #d9e2ec; }
@@ -1288,7 +1368,7 @@ body.touch .touch-only {
   .select-body { grid-template-columns: 1fr 1fr; gap: 10px; padding: 4px 12px; }
   .char-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .char-card { padding: 3px 0 4px; }
-  .char-card span { font-size: clamp(10px, 1.5vw, 12px); letter-spacing: -0.2px; line-height: 1.05; }
+  .char-card span { font-size: calc(clamp(10px, 1.5vw, 12px) * var(--nm, 1)); letter-spacing: -0.2px; line-height: 1.05; }
   .char-card .flag { top: 3px; right: 4px; }
   .char-card .flag svg { width: 16px; height: 11px; }
   /* retrato limitado pela altura: as duas fileiras cabem na tela */
@@ -1300,7 +1380,7 @@ body.touch .touch-only {
   .detail-text h3 { font-size: 18px; }
   .detail-meta { font-size: 12px; margin: 0 0 4px; }
   .detail-bio { font-size: 12.5px; margin-bottom: 6px; }
-  .stat { grid-template-columns: 76px 1fr; font-size: 12px; }
+  .stats { font-size: 12px; gap: 4px 8px; }
   .stat-bar i { height: 7px; }
   .select-foot { padding: 6px 12px 10px; gap: 8px 12px; flex-wrap: nowrap; }
   .opt { gap: 6px; }
@@ -1388,6 +1468,14 @@ body.touch #hud-minimap {
   #hud-toasts {
     width: calc(100% - 200px);
   }
+}
+
+/* celular deitado: rodapé mais justo (rótulos em espanhol e japonês são mais longos) */
+@media (max-height: 520px) and (max-width: 900px) {
+  .select-foot { gap: 8px 10px; }
+  .opt-label { font-size: 14px; }
+  #opt-laps button { min-width: 34px; }
+  .btn-go { font-size: 17px; padding: 9px 14px; }
 }
 
 /* celular pequeno deitado: rodapé da escolha numa linha só */

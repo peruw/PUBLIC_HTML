@@ -1,6 +1,7 @@
 // HUD da corrida (DOM): item, posição, volta, tempo, minimapa, mensagens e curiosidades.
 import { ITEMS } from './config.js';
 import { formatTime } from './race.js';
+import { t, itemText, ordSuffix } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
@@ -27,6 +28,7 @@ export class Hud {
       posBox: this.root.querySelector('.hud-pos'),
       pos: $('hud-pos-num'),
       total: this.root.querySelector('.hud-pos-total'),
+      suf: this.root.querySelector('.hud-pos-suf'),
       lap: $('hud-lap'),
       time: $('hud-time'),
       center: $('hud-center'),
@@ -49,16 +51,16 @@ export class Hud {
       if (n === 3 && this.tipText) this.showTip(this.tipText);
     });
     bus.on('race:go', () => {
-      this.center('VAI!', 'pop', 900);
+      this.center(t('hud.go'), 'pop', 900);
       if (this.tipTimer > 0) this.tipTimer = Math.min(this.tipTimer, 1200);
     });
     // a mensagem de volta traz o tempo da volta que acabou (sem tirar a curiosidade da tela)
-    bus.on('race:finalLap', ({ kart }) => this.center(`ÚLTIMA VOLTA!${this.lapLine(kart)}`, 'msg pop', 2000));
+    bus.on('race:finalLap', ({ kart }) => this.center(`${t('hud.finalLap')}${this.lapLine(kart)}`, 'msg pop', 2000));
     bus.on('race:lap', ({ kart, lap }) => {
-      if (kart === this.player && lap < this.totalLaps) this.center(`Volta ${lap}${this.lapLine(kart)}`, 'msg pop', 1800);
+      if (kart === this.player && lap < this.totalLaps) this.center(`${t('hud.lapN', { n: lap })}${this.lapLine(kart)}`, 'msg pop', 1800);
     });
     bus.on('race:finish', ({ kart, place }) => {
-      if (kart === this.player) this.center(place === 1 ? 'VITÓRIA! 🏆' : 'CHEGADA!', 'msg pop', 3500);
+      if (kart === this.player) this.center(t(place === 1 ? 'hud.win' : 'hud.finish'), 'msg pop', 3500);
     });
     bus.on('item:got', ({ kart, item }) => {
       // só com o HUD visível e antes da chegada (senão a curiosidade se perde escondida)
@@ -66,11 +68,18 @@ export class Hud {
     });
     bus.on('kart:boost', ({ kart, source }) => {
       if (kart !== this.player) return;
-      if (source === 'rocket') this.center('Largada-foguete!', 'msg pop', 1200);
+      if (source === 'rocket') this.center(t('hud.rocket'), 'msg pop', 1200);
     });
     bus.on('kart:trick', ({ kart }) => {
-      if (kart === this.player) this.center('Manobra!', 'msg pop', 800);
+      if (kart === this.player) this.center(t('hud.trick'), 'msg pop', 800);
     });
+  }
+
+  // Idioma trocado (na pausa): redesenha o item e a posição no próximo quadro.
+  relocalize() {
+    this.last = {};
+    // dica na tela: redesenha no idioma novo
+    if (typeof this.tipSrc === 'function' && !this.el.tip?.classList.contains('hidden')) this.el.tip.innerHTML = this.tipSrc();
   }
 
   show(on) {
@@ -178,13 +187,13 @@ export class Hud {
       this.last.item = key;
       this.el.icon.innerHTML = showing ? itemIconHTML(showing) : '';
       this.el.slot.classList.toggle('rolling', !!p.roulette);
-      // itens de vários usos (Pilha ×3): contador 3/2/1 e nome sem o "×3"
+      // itens de vários usos (Pilha ×3): contador 3/2/1 e nome curto (sem o "×3")
       const multi = !!p.item && (ITEMS[p.item].uses || 1) > 1;
       const showCount = !p.roulette && multi;
       this.el.count.classList.toggle('hidden', !showCount);
       this.el.count.textContent = p.itemCount;
-      const name = p.item ? ITEMS[p.item].name : '';
-      this.el.name.textContent = !p.roulette && p.item ? (multi ? name.replace(/\s*×\d+$/, '') : name) : '';
+      const tx = p.item ? itemText(p.item) : {};
+      this.el.name.textContent = !p.roulette && p.item ? (multi ? tx.short || tx.name : tx.name) : '';
     }
 
     if (p.place !== this.last.place) {
@@ -192,6 +201,7 @@ export class Hud {
       const delta = this.last.place && race.phase === 'racing' ? this.last.place - p.place : 0;
       this.last.place = p.place;
       this.el.pos.textContent = p.place;
+      this.el.suf.textContent = ordSuffix(p.place);
       this.el.posBox.className = `hud-pos ${p.place <= 3 ? 'p' + p.place : 'px'}`;
       if (delta) {
         void this.el.posBox.offsetWidth; // reinicia a animação
@@ -213,7 +223,7 @@ export class Hud {
     // contramão
     const wrong = p.wrongWay > 45 && race.phase === 'racing';
     if (wrong && !this.centerSticky) {
-      this.center('CONTRAMÃO! ↩', 'msg', 0, true);
+      this.center(t('hud.wrongWay'), 'msg', 0, true);
     } else if (!wrong && this.centerSticky) {
       this.centerSticky = false;
       this.el.center.textContent = '';
@@ -243,15 +253,17 @@ export class Hud {
   lapLine(kart) {
     const times = kart?.lapTimes || [];
     if (!times.length) return '';
-    const t = times[times.length - 1];
-    const best = times.length > 1 && t <= Math.min(...times);
-    return `<small>volta ${times.length}: ${formatTime(t)}${best ? ' · a mais rápida! ⚡' : ''}</small>`;
+    const lt = times[times.length - 1];
+    const best = times.length > 1 && lt <= Math.min(...times);
+    return `<small>${t('hud.lapLine', { n: times.length, t: formatTime(lt) })}${best ? t('hud.fastest') : ''}</small>`;
   }
 
+  // html pode ser uma função (texto refeito se o idioma mudar com a dica na tela)
   showTip(html, ms = 6000) {
     const el = this.el.tip;
     if (!el) return;
-    el.innerHTML = html;
+    this.tipSrc = html;
+    el.innerHTML = typeof html === 'function' ? html() : html;
     el.classList.remove('hidden');
     this.tipTimer = ms;
   }
@@ -271,11 +283,11 @@ export class Hud {
 
   // Curiosidade do item: texto completo na primeira vez, curto nas outras.
   toastItem(id) {
-    const it = ITEMS[id];
-    if (!it) return;
+    if (!ITEMS[id]) return;
+    const it = itemText(id);
     const first = !this.seenFacts.has(id);
     this.seenFacts.add(id);
-    const body = first ? `<small>Você sabia?</small><b>${it.name}</b><p>${it.fact}</p>` : `<b>${it.name}</b><p>${it.effect}</p>`;
+    const body = first ? `<small>${t('common.didYouKnow')}</small><b>${it.name}</b><p>${it.fact}</p>` : `<b>${it.name}</b><p>${it.effect}</p>`;
     this.toast(`<div class="item-ico">${itemIconHTML(id)}</div><div>${body}</div>`, first ? 7000 : 2200);
   }
 

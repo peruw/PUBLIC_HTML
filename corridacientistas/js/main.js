@@ -16,6 +16,7 @@ import { RaceManager } from './race.js';
 import { Hud } from './hud.js';
 import { Menu, store } from './menu.js';
 import { Progress } from './progress.js';
+import { initI18n, setLang, onLangChange, t, tv, fmtNum, canvasFont } from './i18n.js';
 
 const STEP = 1 / 60; // passo fixo da simulação
 const PLAYER_SLOT = 5; // o jogador larga em 6º
@@ -39,7 +40,17 @@ const game = {
   opts: null,
 };
 
+// Textos pintados nas placas 3D, no idioma atual.
+const signLabels = () => ({
+  ...tv('signs'),
+  luz: `c ≈ ${fmtNum(300000)} km/s`,
+  grav: `g = ${fmtNum(9.8)} m/s²`,
+  font: canvasFont(),
+});
+const envLabels = () => ({ elements: tv('elements'), campus: t('signs.campus'), obs: t('signs.obs'), lab: t('signs.lab'), font: canvasFont() });
+
 async function init() {
+  await initI18n();
   let audio = null;
   let input = null;
   const progress = new Progress({ bus, store });
@@ -60,6 +71,7 @@ async function init() {
       if (game.opts) game.opts.assist = on;
       if (world.player) world.player.assist = on;
     },
+    onLang: (id) => setLang(id),
     onToggleAuto: () => {
       input.setAutoAccelerate(!input.autoAccelerate);
       store.set('auto', input.autoAccelerate);
@@ -67,15 +79,14 @@ async function init() {
     },
   }, progress);
   menu.show('loading');
-  menu.setLoading(0.1, 'Preparando o laboratório…');
+  menu.setLoading(0.1, 'loading.prep');
   {
     const f = progress.randomFact();
-    menu.setLoadingFact(f.c, f.text);
+    menu.setLoadingFact(f.c, f.idx);
   }
 
   if (!webglAvailable()) {
-    document.getElementById('error-text').textContent =
-      'Seu navegador não suporta gráficos 3D (WebGL). Tente outro navegador, como Chrome ou Firefox.';
+    document.getElementById('error-text').textContent = t('error.webgl');
     menu.show('error');
     window.__gameReady = true;
     return;
@@ -107,15 +118,15 @@ async function init() {
   const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, quality.drawDistance + 400);
 
   await nextFrame();
-  menu.setLoading(0.25, 'Asfaltando o Campus da Ciência…');
+  menu.setLoading(0.25, 'loading.track');
   await nextFrame();
-  const track = buildTrack(scene, quality);
+  const track = buildTrack(scene, quality, signLabels());
 
-  menu.setLoading(0.5, 'Montando o observatório…');
+  menu.setLoading(0.5, 'loading.env');
   await nextFrame();
-  const env = buildEnvironment(scene, track, quality, renderer);
+  const env = buildEnvironment(scene, track, quality, renderer, envLabels());
 
-  menu.setLoading(0.7, 'Chamando os cientistas…');
+  menu.setLoading(0.7, 'loading.chars');
   await nextFrame();
   const effects = new Effects({ scene, bus, quality });
   const items = new ItemSystem({ scene, track, bus, effects, quality });
@@ -126,7 +137,7 @@ async function init() {
     return kart;
   });
 
-  menu.setLoading(0.85, 'Tirando as fotos oficiais…');
+  menu.setLoading(0.85, 'loading.photos');
   await nextFrame();
   try {
     menu.setPortraits(await Promise.resolve(renderPortraits(renderer, 256, { ss: quality.id === 'baixa' ? 1 : 2 })));
@@ -147,6 +158,7 @@ async function init() {
   });
   pauseBtn.addEventListener('click', () => setPaused(true));
   input.showTouch(false);
+  input.setLabels(tv('touch'));
   input.setAutoAccelerate(store.get('auto', input.touchEnabled));
   menu.setAutoLabel(input.autoAccelerate);
   menu.setAssistLabel(menu.opts.assist);
@@ -244,7 +256,8 @@ async function init() {
     race.start(world.karts, { laps: opts.laps, player, track, cc });
     progress.startRace(player);
     world.phase = 'countdown';
-    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tip: countdownTip(progress.races) });
+    const tipN = progress.races;
+    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tip: () => countdownTip(tipN) });
     hud.show(true);
     input.showTouch(input.touchEnabled);
     rig.follow(player);
@@ -276,17 +289,11 @@ async function init() {
     const touch = input.touchEnabled;
     const auto = touch && input.autoAccelerate;
     const tips = [
-      touch
-        ? `Dica: segure ${auto ? '◀, ▶ ou <b>DRIFT</b>' : '<b>▲</b>'} logo depois do <b>2</b> para largar com turbo!`
-        : 'Dica: segure <kbd>W</kbd> ou <kbd>↑</kbd> logo depois do <b>2</b> para largar com turbo!',
-      touch
-        ? 'Dica: nas curvas, segure <b>DRIFT</b> e vire. Quando as faíscas ficarem laranja, solte para ganhar turbo!'
-        : 'Dica: nas curvas, segure <kbd>Espaço</kbd> e vire. Quando as faíscas ficarem laranja, solte para ganhar turbo!',
-      touch
-        ? 'Dica: passe pelas caixas de átomo e toque em <b>ITEM</b>. Cada item traz uma curiosidade da ciência!'
-        : 'Dica: passe pelas caixas de átomo e use o item com <kbd>E</kbd>. Cada item traz uma curiosidade da ciência!',
+      touch ? (auto ? 'tips.rocketTouchAuto' : 'tips.rocketTouch') : 'tips.rocketKeys',
+      touch ? 'tips.driftTouch' : 'tips.driftKeys',
+      touch ? 'tips.itemTouch' : 'tips.itemKeys',
     ];
-    return tips[n % tips.length];
+    return t(tips[n % tips.length]);
   }
 
   function setPaused(on, silent) {
@@ -314,7 +321,7 @@ async function init() {
   function toggleQuality() {
     const next = quality.id === 'alta' ? 'baixa' : 'alta';
     store.set('quality', next);
-    menu.setQualityLabel(next + ' (recarregando…)');
+    menu.setQualityLabel(next, true);
     setTimeout(() => location.reload(), 250);
   }
 
@@ -634,7 +641,7 @@ async function init() {
           // Ainda lento em 'alta' (reduzir não resolve mais): a próxima visita já começa em 'baixa'.
           slowWarned = true;
           store.set('quality', 'baixa');
-          hud.toast?.('<p class="toast-full">Jogo lento? Da próxima vez o jogo abre em <strong>Qualidade: baixa</strong> (dá para trocar no menu inicial).</p>', 6000);
+          hud.toast?.(`<p class="toast-full">${t('hud.slow')}</p>`, 6000);
         }
       }
     } else if (dtAvg < 1 / 50 && pixelRatio < maxPR) {
@@ -693,7 +700,17 @@ async function init() {
     },
   };
 
-  menu.setLoading(1, 'Pronto!');
+  // Troca de idioma (menu inicial ou pausa): textos da tela, HUD, botões de toque e placas 3D.
+  onLangChange(() => {
+    menu.relocalize();
+    hud.relocalize();
+    input.setLabels(tv('touch'));
+    track.setLabels(signLabels());
+    env.setLabels(envLabels());
+    needsRender = true;
+  });
+
+  menu.setLoading(1, 'loading.ready');
   await nextFrame();
   enterTitle();
   window.__gameReady = true;
@@ -720,6 +737,8 @@ init().catch((err) => {
   console.error(err);
   window.__gameReady = true;
   document.getElementById('screen-loading')?.classList.add('hidden');
-  document.getElementById('error-text').textContent = 'Algo deu errado ao iniciar o jogo. Recarregue a página.';
+  // sem dicionário carregado, fica o aviso de carregamento já traduzido pelo index.html
+  const msg = t('error.crash');
+  if (msg !== 'error.crash') document.getElementById('error-text').textContent = msg;
   document.getElementById('screen-error')?.classList.remove('hidden');
 });
