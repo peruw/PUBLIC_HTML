@@ -1174,6 +1174,16 @@ body.touch .desktop-only {
   animation: popIn 0.5s ease both;
 }
 
+#hud-center small {
+  display: block;
+  margin-top: 4px;
+  font-size: clamp(15px, 2.2vw, 22px);
+  color: #fff;
+  -webkit-text-stroke: 0;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 0, 0, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
 @keyframes popIn {
   0% { transform: scale(2.2); opacity: 0; }
   40% { transform: scale(0.95); opacity: 1; }

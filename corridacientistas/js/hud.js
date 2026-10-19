@@ -52,16 +52,10 @@ export class Hud {
       this.center('VAI!', 'pop', 900);
       if (this.tipTimer > 0) this.tipTimer = Math.min(this.tipTimer, 1200);
     });
-    bus.on('race:finalLap', () => this.center('ÚLTIMA VOLTA!', 'msg pop', 1800));
-    bus.on('race:lap', ({ kart, lap, lapTime }) => {
-      if (kart !== this.player) return;
-      if (lap < this.totalLaps) this.center(`Volta ${lap}`, 'msg pop', 1300);
-      // tempo da volta que acabou de terminar
-      if (lapTime > 0) {
-        const times = kart.lapTimes || [];
-        const best = times.length > 1 && lapTime <= Math.min(...times);
-        this.toast(`<p class="toast-full">Volta ${lap - 1}: <strong>${formatTime(lapTime)}</strong>${best ? ' · sua volta mais rápida! ⚡' : ''}</p>`, 2600);
-      }
+    // a mensagem de volta traz o tempo da volta que acabou (sem tirar a curiosidade da tela)
+    bus.on('race:finalLap', ({ kart }) => this.center(`ÚLTIMA VOLTA!${this.lapLine(kart)}`, 'msg pop', 2000));
+    bus.on('race:lap', ({ kart, lap }) => {
+      if (kart === this.player && lap < this.totalLaps) this.center(`Volta ${lap}${this.lapLine(kart)}`, 'msg pop', 1800);
     });
     bus.on('race:finish', ({ kart, place }) => {
       if (kart === this.player) this.center(place === 1 ? 'VITÓRIA! 🏆' : 'CHEGADA!', 'msg pop', 3500);
@@ -243,6 +237,15 @@ export class Hud {
     }
 
     this.drawMinimap();
+  }
+
+  // Linha pequena com o tempo da última volta completa do kart.
+  lapLine(kart) {
+    const times = kart?.lapTimes || [];
+    if (!times.length) return '';
+    const t = times[times.length - 1];
+    const best = times.length > 1 && t <= Math.min(...times);
+    return `<small>volta ${times.length}: ${formatTime(t)}${best ? ' · a mais rápida! ⚡' : ''}</small>`;
   }
 
   showTip(html, ms = 6000) {

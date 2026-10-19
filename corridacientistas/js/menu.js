@@ -368,17 +368,18 @@ export class Menu {
           .join('')
       : '';
 
+    // pergunta primeiro: a curiosidade mostrada ao lado não pode entregar a resposta
+    this.showQuiz(mine.id);
     // curiosidade do cientista escolhido (alterna a cada corrida) e do vencedor
     const winner = results[0].kart.character;
-    const fact = (c) => (this.progress ? this.progress.nextFact(c.id) : c.facts[0]);
+    const avoid = this.quiz?.words || [];
+    const fact = (c) => (this.progress ? this.progress.nextFact(c.id, avoid) : c.facts[0]);
     let html = `<b>Você sabia? Sobre ${mine.name}:</b> ${fact(mine)}`;
     if (winner.id !== mine.id) {
       const art = winner.gender === 'f' ? 'a vencedora' : 'o vencedor';
       html += `<br><b>E sobre ${winner.name}, ${art}:</b> ${fact(winner)}`;
     }
     $('results-fact').innerHTML = html;
-
-    this.showQuiz(mine.id);
     this.show('results');
   }
 

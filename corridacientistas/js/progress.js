@@ -128,11 +128,16 @@ export class Progress {
 
   // ---------- curiosidades ----------
   // Alterna entre as curiosidades do cientista a cada chamada.
-  nextFact(charId) {
+  // avoid: palavras que não podem aparecer (para a curiosidade não entregar a resposta da pergunta).
+  nextFact(charId, avoid = []) {
     const c = CHARACTER_BY_ID[charId];
     const list = c?.facts || [];
     if (!list.length) return '';
-    const i = (this.data.factIdx[charId] || 0) % list.length;
+    const start = (this.data.factIdx[charId] || 0) % list.length;
+    const bad = (f) => avoid.some((w) => f.toLowerCase().includes(w));
+    let i = start;
+    for (let n = 0; n < list.length && bad(list[i]); n++) i = (i + 1) % list.length;
+    if (bad(list[i])) i = start;
     this.data.factIdx[charId] = (i + 1) % list.length;
     this._save();
     return list[i];
@@ -153,7 +158,9 @@ export class Progress {
     if (!pool.length) pool = QUIZ; // acertou todas: continua sorteando
     const q = pool[(Math.random() * pool.length) | 0];
     const order = shuffle(q.options.map((_, i) => i));
-    return { id: q.id, q: q.q, options: order.map((i) => q.options[i]), correct: order.indexOf(q.answer), explain: q.explain };
+    // palavras da resposta certa (a curiosidade mostrada junto não pode entregá-la)
+    const words = q.options[q.answer].toLowerCase().split(/[^\p{L}\d-]+/u).filter((w) => w.length >= 5 || /\d/.test(w));
+    return { id: q.id, about: q.about, q: q.q, options: order.map((i) => q.options[i]), correct: order.indexOf(q.answer), explain: q.explain, words };
   }
 
   answerQuiz(id, ok) {
