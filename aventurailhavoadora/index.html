@@ -873,6 +873,156 @@
         opacity: 0.78;
       }
     }
+
+    /* Celular deitado e telas baixas: tudo precisa caber sem rolar a página. */
+    @media (max-height: 520px) {
+      #welcomeScreen {
+        padding: 10px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
+      }
+
+      .welcome-card {
+        min-height: 0;
+        height: calc(100dvh - 20px);
+        padding: 12px 18px;
+        gap: 6px;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+
+      .welcome-title h1 {
+        font-size: clamp(1.5rem, 8vh, 2.4rem);
+      }
+
+      .welcome-title .subtitle {
+        font-size: 0.9rem;
+      }
+
+      .welcome-scene {
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .cover-island {
+        width: 560px;
+        height: 330px;
+        min-height: 0;
+        bottom: 0;
+        transform: translateX(-50%) scale(0.5);
+        transform-origin: 50% 100%;
+      }
+
+      .rainbow-bridge {
+        bottom: 6%;
+        height: 60px;
+      }
+
+      .sun-badge {
+        width: 70px;
+        top: 4%;
+      }
+
+      .welcome-title,
+      .title-row {
+        padding-inline: 52px;
+      }
+
+      #startScreen {
+        padding: 8px max(12px, env(safe-area-inset-right)) 84px max(12px, env(safe-area-inset-left));
+      }
+
+      #startScreen .menu-card {
+        max-height: calc(100dvh - 92px);
+        padding: 12px 16px;
+      }
+
+      #startScreen h1 {
+        font-size: clamp(1.4rem, 7vh, 2rem);
+      }
+
+      .title-row {
+        margin-bottom: 6px;
+        gap: 4px;
+      }
+
+      .title-row .subtitle {
+        font-size: 0.88rem;
+      }
+
+      .character-grid {
+        grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+        margin: 8px 0;
+        gap: 8px;
+      }
+
+      .character-card {
+        min-height: 0;
+        padding: 8px;
+        gap: 4px;
+      }
+
+      .avatar-preview {
+        width: 56px;
+        height: 56px;
+      }
+
+      .avatar-preview .mini-person {
+        transform: scale(0.8);
+        transform-origin: 50% 100%;
+      }
+
+      .start-actions {
+        bottom: 8px;
+        padding: 6px;
+      }
+
+      .hud-pill {
+        min-height: 32px;
+        padding: 6px 9px;
+        font-size: 0.82rem;
+      }
+
+      #controls {
+        bottom: max(12px, env(safe-area-inset-bottom));
+        gap: 8px;
+      }
+
+      .attack-button {
+        width: 62px;
+        height: 62px;
+        font-size: 0.76rem;
+      }
+
+      #tip {
+        left: max(12px, env(safe-area-inset-left));
+        right: auto;
+        bottom: 8px;
+        transform: none;
+        max-width: min(320px, 38vw);
+        font-size: 0.8rem;
+        padding: 8px 10px;
+      }
+
+      #tip.fade {
+        transform: translateY(8px);
+      }
+
+      .dialog-card {
+        padding: 14px 18px;
+      }
+
+      .dialog h2 {
+        font-size: 1.5rem;
+        margin-bottom: 6px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -2147,7 +2297,9 @@
 
     function drawDecorations(theme, frontLayer) {
       // Em ilhas pequenas (celular) as árvores ficavam enormes e escondiam pacotes e bichinhos.
-      const sizeFactor = Math.max(0.62, Math.min(1, islandShape().rx / 400));
+      // No celular deitado a ilha é baixa: usa também a altura para as árvores não taparem tudo.
+      const shape = islandShape();
+      const sizeFactor = Math.max(0.55, Math.min(1, shape.rx / 400, shape.ry / 190));
       const sorted = [...state.decorations].sort((a, b) => pointOnIsland(a.u, a.v).y - pointOnIsland(b.u, b.v).y);
       for (const decoration of sorted) {
         const point = pointOnIsland(decoration.u, decoration.v);
