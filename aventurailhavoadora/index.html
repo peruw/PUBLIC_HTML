@@ -579,10 +579,32 @@
     }
 
     .tiny-action {
-      min-height: 34px;
+      min-height: 44px;
       padding: 0 12px;
       border-radius: 10px;
       font-size: 0.85rem;
+    }
+
+    .tiny-action:disabled {
+      cursor: default;
+      color: #5d6d72;
+      background: #eef3ef;
+      box-shadow: none;
+    }
+
+    button:focus-visible {
+      outline: 3px solid #1f5fbf;
+      outline-offset: 3px;
+    }
+
+    .primary:hover,
+    .secondary:hover {
+      filter: brightness(1.04);
+    }
+
+    .primary:active,
+    .secondary:active {
+      transform: translateY(1px);
     }
 
     #hud {
@@ -616,14 +638,216 @@
 
     .hud-button {
       pointer-events: auto;
-      min-width: 42px;
-      min-height: 42px;
+      min-width: 46px;
+      min-height: 46px;
       border-radius: 12px;
       display: grid;
       place-items: center;
       background: rgba(255, 255, 255, 0.9);
       box-shadow: 0 8px 20px rgba(29, 49, 58, 0.14);
       font-weight: 900;
+    }
+
+    .hud-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .banana-icon {
+      display: inline-block;
+      width: 18px;
+      height: 11px;
+      border: solid #f2b705;
+      border-width: 0 0 5px 0;
+      border-radius: 0 0 18px 18px;
+      transform: rotate(-12deg) translateY(-3px);
+    }
+
+    .mini-bar {
+      display: inline-block;
+      width: 46px;
+      height: 8px;
+      border-radius: 999px;
+      background: #e1ebe2;
+      overflow: hidden;
+    }
+
+    .mini-bar span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #ffca4d, #f29d12);
+      transition: width 0.25s ease;
+    }
+
+    .hearts {
+      letter-spacing: 1px;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .heart {
+      color: #e8435a;
+    }
+
+    .heart.lost {
+      color: #c9d2d6;
+    }
+
+    .shield {
+      display: inline-flex;
+      gap: 3px;
+    }
+
+    .pip {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3e8edb;
+    }
+
+    .pip.lost {
+      background: transparent;
+      box-shadow: inset 0 0 0 1.5px #9fb3c4;
+    }
+
+    .bump {
+      animation: bump 0.32s ease;
+    }
+
+    @keyframes bump {
+      40% { transform: scale(1.14); }
+    }
+
+    .banner {
+      position: fixed;
+      left: 50%;
+      top: 22%;
+      z-index: 24;
+      transform: translateX(-50%);
+      padding: 14px 24px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow);
+      text-align: center;
+      pointer-events: none;
+      display: grid;
+      gap: 4px;
+      max-width: calc(100vw - 32px);
+    }
+
+    .banner strong {
+      font-size: clamp(1.3rem, 4.5vw, 2rem);
+      color: #243b58;
+    }
+
+    .banner span {
+      color: #46636a;
+      font-weight: 700;
+    }
+
+    .banner.show {
+      animation: banner-in 2.6s ease forwards;
+    }
+
+    @keyframes banner-in {
+      0% { opacity: 0; transform: translate(-50%, -14px) scale(0.92); }
+      12% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      80% { opacity: 1; }
+      100% { opacity: 0; transform: translate(-50%, -8px); }
+    }
+
+    .stars {
+      font-size: 2.4rem;
+      line-height: 1.1;
+      color: #f2a900;
+      letter-spacing: 6px;
+      margin: 2px 0 8px;
+      text-shadow: 0 2px 0 rgba(150, 90, 0, 0.18);
+    }
+
+    .stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px 14px;
+      margin: 12px 0 4px;
+      font-size: 0.92rem;
+      color: #3c5560;
+    }
+
+    .stats-row:empty {
+      display: none;
+    }
+
+    .hint-box {
+      margin: 12px auto 2px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #fff6d6;
+      color: #5a4300;
+      font-weight: 700;
+      max-width: 440px;
+    }
+
+    .journey-info {
+      font-weight: 800;
+      color: #2f6a3b;
+    }
+
+    .card-bar {
+      width: 80%;
+      height: 8px;
+    }
+
+    .dialog-card.howto-card {
+      text-align: left;
+    }
+
+    .dialog-card.howto-card h2 {
+      text-align: center;
+    }
+
+    .howto-list {
+      list-style: none;
+      margin: 8px 0 4px;
+      padding: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .howto-list li {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 10px;
+      align-items: center;
+      line-height: 1.3;
+    }
+
+    .howto-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 1.2rem;
+      color: #ffffff;
+    }
+
+    .howto-icon.gift {
+      background: linear-gradient(90deg, #ffd66b 0 42%, #8d62d7 42% 58%, #ffd66b 58%);
+      box-shadow: inset 0 9px 0 #ff9f2f;
+    }
+
+    .howto-icon.move { background: #3e8edb; }
+    .howto-icon.attack { background: #f2a900; }
+    .howto-icon.danger { background: #d6403a; }
+    .howto-icon.heart { background: #e8435a; }
+
+    .touch .for-keys,
+    body:not(.touch) .for-touch {
+      display: none;
     }
 
     #controls {
@@ -859,6 +1083,10 @@
         font-size: 0.84rem;
       }
 
+      .mini-bar {
+        width: 34px;
+      }
+
       #controls {
         gap: 10px;
       }
@@ -1034,6 +1262,17 @@
       }
     }
 
+    @media (max-width: 480px) {
+      /* No celular em pé, o nome do personagem já aparece no próprio boneco. */
+      #hudCharacter {
+        display: none;
+      }
+
+      .howto-list li {
+        font-size: 0.92rem;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *,
       *::before,
@@ -1051,13 +1290,15 @@
     <div class="hud-left">
       <div class="hud-pill" id="hudCharacter">Davi</div>
       <div class="hud-pill" id="hudIsland">Ilha das Bananas</div>
-      <div class="hud-pill" id="hudBananas">Bananas 0/10</div>
-      <div class="hud-pill" id="hudShield">Vidas 3 | Acertos 0/7</div>
+      <div class="hud-pill hud-bananas" id="hudBananas" role="img" aria-label="Bananas">0/10</div>
+      <div class="hud-pill hud-lives" id="hudShield" role="img" aria-label="Corações e escudo"></div>
     </div>
     <div class="hud-right">
-      <button class="hud-button" id="charactersButton" type="button" aria-label="Personagens">P</button>
-      <button class="hud-button" id="musicButton" type="button" aria-label="Ligar ou desligar música">♪</button>
-      <button class="hud-button" id="pauseButton" type="button" aria-label="Pausar">II</button>
+      <button class="hud-button" id="charactersButton" type="button" aria-label="Personagens" title="Personagens">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="9" cy="8" r="3.4" fill="currentColor"/><path d="M2.8 20c.4-4 3-6.3 6.2-6.3s5.8 2.3 6.2 6.3z" fill="currentColor"/><circle cx="17" cy="9" r="2.6" fill="currentColor" opacity=".6"/><path d="M14.6 14.2c.8-.4 1.6-.6 2.4-.6 2.5 0 4.4 1.9 4.7 5.2h-4.8" fill="currentColor" opacity=".6"/></svg>
+      </button>
+      <button class="hud-button" id="musicButton" type="button" aria-label="Desligar som">♪</button>
+      <button class="hud-button" id="pauseButton" type="button" aria-label="Pausar" title="Pausar (Esc)">II</button>
     </div>
   </div>
 
@@ -1069,7 +1310,8 @@
     </button>
   </div>
 
-  <div id="tip" class="hidden">Pegue pacotes para achar bananas e surpresas.</div>
+  <div id="tip" class="hidden" role="status" aria-live="polite">Pegue pacotes para achar bananas e surpresas.</div>
+  <div id="banner" class="banner hidden" role="status" aria-live="polite"></div>
 
   <section id="welcomeScreen" class="screen">
     <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar música">♪</button>
@@ -1106,6 +1348,7 @@
       <div class="title-row">
         <h1>Aventura das Ilhas Voadoras</h1>
         <p class="subtitle">Escolha um personagem, abra pacotes e junte 10 bananas para viajar para outra ilha.</p>
+        <p id="journeyInfo" class="journey-info">Primeira parada: Ilha das Bananas.</p>
       </div>
       <div id="startCharacters" class="character-grid"></div>
     </div>
@@ -1115,10 +1358,12 @@
     </div>
   </section>
 
-  <div id="levelDialog" class="dialog hidden" role="dialog" aria-modal="true">
+  <div id="levelDialog" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="levelTitle">
     <div class="dialog-card">
-      <h2>Fase completa!</h2>
+      <h2 id="levelTitle">Fase completa!</h2>
+      <p id="levelStars" class="stars" role="img" aria-label="3 de 3 estrelas">★★★</p>
       <p id="levelText" class="subtitle">Você juntou 10 bananas.</p>
+      <p id="levelStats" class="stats-row"></p>
       <div class="actions">
         <button id="nextIslandButton" class="primary" type="button">Ir para a próxima ilha</button>
       </div>
@@ -1128,7 +1373,7 @@
   <div id="lockerDialog" class="dialog hidden" role="dialog" aria-modal="true">
     <div class="dialog-card">
       <h2>Personagens</h2>
-      <p class="subtitle">Ache 5 pacotes do mesmo personagem para desbloquear.</p>
+      <p class="subtitle">Junte 5 peças do mesmo personagem (elas vêm em pacotes raros) para liberar.</p>
       <div id="lockerList" class="progress-list"></div>
       <div class="actions">
         <button id="closeLockerButton" class="primary" type="button">Voltar ao jogo</button>
@@ -1142,6 +1387,7 @@
       <p class="subtitle">A ilha fica esperando enquanto vocês respiram.</p>
       <div class="actions">
         <button id="resumeButton" class="primary" type="button">Continuar</button>
+        <button id="howtoButton" class="secondary" type="button">Como jogar</button>
         <button id="musicOnlyButton" class="secondary" type="button" aria-pressed="true">Música: ligada</button>
         <button id="menuButton" class="secondary" type="button">Voltar ao menu</button>
       </div>
@@ -1149,10 +1395,43 @@
     </div>
   </div>
 
+  <div id="howtoDialog" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="howtoTitle">
+    <div class="dialog-card howto-card">
+      <h2 id="howtoTitle">Como jogar</h2>
+      <ul class="howto-list">
+        <li>
+          <span class="howto-icon gift" aria-hidden="true"></span>
+          <span><strong>Abra pacotes</strong> encostando neles. Junte <strong>10 bananas</strong> para voar até a próxima ilha. Pacotes raros trazem peças de novos personagens.</span>
+        </li>
+        <li>
+          <span class="howto-icon move" aria-hidden="true">➜</span>
+          <span><strong>Para andar:</strong> <span class="for-touch">toque ou arraste o dedo na ilha.</span><span class="for-keys">setas ou W A S D (ou clique na ilha).</span></span>
+        </li>
+        <li>
+          <span class="howto-icon attack" aria-hidden="true">★</span>
+          <span><strong>Ataque</strong> (<span class="for-keys">Espaço</span><span class="for-touch">botão amarelo</span>) mira sozinho no bichinho mais perto. A <strong>explosão</strong> (<span class="for-keys">tecla Q</span><span class="for-touch">botão roxo</span>) acerta tudo em volta quando chega a 100%.</span>
+        </li>
+        <li>
+          <span class="howto-icon danger" aria-hidden="true">!</span>
+          <span><strong>Fuja do chão vermelho</strong> que pisca e <strong>não fique na beirada</strong>, depois da linha tracejada. Quando a varinha de um bichinho brilha, ele vai atirar.</span>
+        </li>
+        <li>
+          <span class="howto-icon heart" aria-hidden="true">♥</span>
+          <span>Você tem <strong>3 corações</strong>. O escudo aguenta <strong>7 poderes</strong>; no 7º, vai um coração.<span class="for-keys"> Esc ou P pausa.</span></span>
+        </li>
+      </ul>
+      <div class="actions">
+        <button id="howtoStartButton" class="primary" type="button">Vamos lá!</button>
+      </div>
+    </div>
+  </div>
+
   <div id="gameOverDialog" class="dialog hidden" role="dialog" aria-modal="true">
     <div class="dialog-card">
       <h2>Fim de jogo!</h2>
       <p id="gameOverText" class="subtitle">As ilhas ainda esperam por vocês.</p>
+      <p id="gameOverStats" class="stats-row"></p>
+      <p id="gameOverHint" class="hint-box hidden"></p>
       <div class="actions">
         <button id="retryButton" class="primary" type="button">Tentar de novo</button>
         <button id="gameOverMenuButton" class="secondary" type="button">Voltar ao início</button>
@@ -1184,9 +1463,21 @@
     const chargeLabel = document.querySelector("#chargeLabel");
     const levelText = document.querySelector("#levelText");
     const gameOverText = document.querySelector("#gameOverText");
+    const gameOverStats = document.querySelector("#gameOverStats");
+    const gameOverHint = document.querySelector("#gameOverHint");
+    const levelTitle = document.querySelector("#levelTitle");
+    const levelStars = document.querySelector("#levelStars");
+    const levelStats = document.querySelector("#levelStats");
+    const nextIslandButton = document.querySelector("#nextIslandButton");
+    const howtoDialog = document.querySelector("#howtoDialog");
+    const banner = document.querySelector("#banner");
+    const journeyInfo = document.querySelector("#journeyInfo");
 
     const STORAGE_KEY = "ilhas-voadoras-progresso-v1";
     const SETTINGS_KEY = "ilhas-voadoras-config-v1";
+    const JOURNEY_KEY = "ilhas-voadoras-jornada-v1";
+    const SHIELD_MAX = 7;
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const BANANAS_TO_WIN = 10;
     // A partir desta distância do centro (1 = borda desenhada) o chão esfarela.
     const EDGE_LIMIT = 0.82;
@@ -1237,7 +1528,7 @@
       {
         id: "vo",
         name: "Vó",
-        note: "pacotes 0/5",
+        note: "liberada nos pacotes raros",
         skin: "#f0c39a",
         hair: "#d8d8dd",
         shirt: "#b889d8",
@@ -1249,7 +1540,7 @@
       {
         id: "tio",
         name: "Tio Nuno",
-        note: "pacotes 0/5",
+        note: "liberado nos pacotes raros",
         skin: "#e7b180",
         hair: "#33231b",
         shirt: "#3e8edb",
@@ -1261,7 +1552,7 @@
       {
         id: "mamae",
         name: "Mamãe",
-        note: "pacotes 0/5",
+        note: "liberada nos pacotes raros",
         skin: "#edb98a",
         hair: "#593222",
         shirt: "#ef6f73",
@@ -1273,7 +1564,7 @@
       {
         id: "papai",
         name: "Papai",
-        note: "pacotes 0/5",
+        note: "liberado nos pacotes raros",
         skin: "#eab385",
         hair: "#233347",
         shirt: "#f19b45",
@@ -1329,6 +1620,13 @@
       time: 0,
       selectedId: "davi",
       islandIndex: 0,
+      lap: 0,
+      journey: { islandIndex: 0, lap: 0, stars: {}, bestLevel: 0, howtoSeen: false },
+      run: { livesLost: 0, hitsTaken: 0, enemiesDefeated: 0, totalBananas: 0 },
+      particles: [],
+      shake: 0,
+      enemyRespawnTimer: 0,
+      howtoReturn: "playing",
       bananas: 0,
       lives: 3,
       hits: 0,
@@ -1415,6 +1713,33 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
       } catch (error) {
         // Sem armazenamento (aba anônima): o jogo continua, só não lembra.
+      }
+    }
+
+    function loadJourney() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(JOURNEY_KEY));
+        if (saved && typeof saved === "object") {
+          const index = Number(saved.islandIndex);
+          state.journey.islandIndex = Number.isInteger(index) && index >= 0 && index < islands.length ? index : 0;
+          state.journey.lap = Math.max(0, Math.min(20, Number(saved.lap) || 0));
+          state.journey.stars = saved.stars && typeof saved.stars === "object" ? saved.stars : {};
+          state.journey.bestLevel = Math.max(0, Number(saved.bestLevel) || 0);
+          state.journey.howtoSeen = Boolean(saved.howtoSeen);
+          if (typeof saved.selectedId === "string") state.selectedId = saved.selectedId;
+        }
+      } catch (error) {
+        // começa do zero
+      }
+      state.islandIndex = state.journey.islandIndex;
+      state.lap = state.journey.lap;
+    }
+
+    function saveJourney() {
+      try {
+        localStorage.setItem(JOURNEY_KEY, JSON.stringify({ ...state.journey, selectedId: state.selectedId }));
+      } catch (error) {
+        // ignora
       }
     }
 
@@ -1537,6 +1862,20 @@
       };
     }
 
+    // Curva de dificuldade: cada ilha (e cada volta completa) deixa os bichinhos
+    // um pouco mais numerosos e rápidos. A primeira ilha é a mais calma.
+    function difficulty() {
+      const level = state.islandIndex + state.lap * islands.length;
+      return {
+        level,
+        enemies: Math.min(5, 2 + level),
+        fireBase: Math.max(1.35, 2.5 - level * 0.22),
+        powerSpeed: Math.min(205, 105 + level * 17),
+        dangerBase: Math.max(2.8, 5.4 - level * 0.45),
+        enemyHp: level >= 4 ? 4 : 3
+      };
+    }
+
     function newEnemy(random, index) {
       let spot = randomPointInIsland(random);
       let attempts = 0;
@@ -1551,9 +1890,12 @@
         u: spot.u,
         v: spot.v,
         phase: random() * Math.PI * 2,
-        cooldown: 0.7 + random() * 1.3,
-        fireEvery: 1.75 + random() * 0.65,
-        hp: 3,
+        cooldown: 0.9 + random() * 1.4,
+        fireEvery: difficulty().fireBase + random() * 0.7,
+        hp: difficulty().enemyHp,
+        maxHp: difficulty().enemyHp,
+        flash: 0,
+        appear: 0,
         color: index % 2 === 0 ? "#6d49b8" : "#d64d7f"
       };
     }
@@ -1565,12 +1907,15 @@
       state.player.x = island.cx;
       state.player.y = island.cy + island.ry * 0.15;
       state.packages = Array.from({ length: 13 }, () => newPackage(random));
-      state.enemies = Array.from({ length: Math.min(4, 2 + state.islandIndex) }, (_, index) => newEnemy(random, index));
+      state.enemies = Array.from({ length: difficulty().enemies }, (_, index) => newEnemy(random, index));
+      state.enemyRespawnTimer = 8;
+      state.particles = [];
       state.powers = [];
       state.playerShots = [];
       state.dangerZones = [];
       // Primeiros segundos sem chão caindo, para a criança se localizar.
       state.dangerTimer = 4.5;
+      state.islandStats = { livesLost: 0, hitsTaken: 0, enemiesDefeated: 0, startedAt: performance.now() };
       state.rewards = [];
       state.decorations = Array.from({ length: 24 }, (_, index) => {
         const spot = randomPointInIsland(random);
@@ -1587,7 +1932,7 @@
           scale: 0.72 + random() * 0.68,
           sway: random() * Math.PI * 2
         };
-      });
+      }).sort((a, b) => a.v - b.v);
       state.clouds = Array.from({ length: 9 }, (_, index) => ({
         x: random() * state.width,
         y: state.height * (0.08 + random() * 0.34),
@@ -1609,22 +1954,29 @@
         const card = document.createElement("button");
         card.type = "button";
         card.className = `character-card${state.selectedId === character.id ? " selected" : ""}${progress.unlocked ? "" : " locked"}`;
-        const status = progress.unlocked ? "Liberado" : `${progress.pieces}/5 pacotes`;
+        const status = progress.unlocked ? "Liberado" : `Trancado: ${progress.pieces}/5 peças`;
         card.innerHTML = `
           <div class="avatar-preview">
             <div class="mini-person ${character.className}" style="--skin:${character.skin};--hair:${character.hair};--shirt:${character.shirt};--pants:${character.pants}"></div>
           </div>
           <div class="name">${character.name}</div>
           <div class="small">${progress.unlocked ? character.note : status}</div>
+          ${progress.unlocked ? "" : `<div class="bar card-bar" aria-hidden="true"><span style="width:${progress.pieces * 20}%"></span></div>`}
         `;
+        card.setAttribute("aria-pressed", String(state.selectedId === character.id));
+        if (!progress.unlocked) card.setAttribute("aria-label", `${character.name}, trancado, ${progress.pieces} de 5 peças`);
         card.addEventListener("click", () => {
           if (progress.unlocked) {
             state.selectedId = character.id;
+            saveJourney();
+            sfx("click");
             renderCharacterCards(container, selectingFromMenu);
             updateHud();
             showTip(`${character.name} entrou na aventura.`);
           } else if (selectingFromMenu) {
-            showTip(`Ainda faltam ${5 - progress.pieces} pacotes para liberar ${character.name}.`);
+            const left = 5 - progress.pieces;
+            showTip(`Faltam ${left} ${left === 1 ? "peça" : "peças"} para liberar ${character.name}. Elas vêm em pacotes raros.`);
+            sfx("empty");
           }
         });
         container.appendChild(card);
@@ -1637,16 +1989,17 @@
         const progress = state.progress[character.id];
         const row = document.createElement("div");
         row.className = "progress-row";
-        const count = progress.unlocked ? "Liberado" : `${progress.pieces}/5`;
+        const count = progress.unlocked ? "Liberado" : `${progress.pieces}/5 peças`;
         row.innerHTML = `
           <strong>${character.name}</strong>
           <div class="bar"><span style="width:${Math.min(100, progress.pieces * 20)}%"></span></div>
-          <button class="tiny-action" type="button">${progress.unlocked ? "Jogar" : count}</button>
+          <button class="tiny-action" type="button">${progress.unlocked ? (state.selectedId === character.id ? "Jogando" : "Jogar") : count}</button>
         `;
         const button = row.querySelector("button");
         button.disabled = !progress.unlocked;
         button.addEventListener("click", () => {
           state.selectedId = character.id;
+          saveJourney();
           lockerDialog.classList.add("hidden");
           setMode("playing");
           updateHud();
@@ -1676,7 +2029,20 @@
       }
     }
 
+    function updateJourneyInfo() {
+      const index = state.journey.islandIndex;
+      const lap = state.journey.lap;
+      const starsWon = Object.values(state.journey.stars).reduce((sum, value) => sum + (Number(value) || 0), 0);
+      const where = index === 0 && lap === 0
+        ? "Primeira parada: Ilha das Bananas."
+        : `Vocês continuam na ${islands[index].name}${lapLabel(lap)}.`;
+      journeyInfo.textContent = starsWon > 0 ? `${where} Estrelas ganhas: ${starsWon} ★` : where;
+    }
+
     function enterSelection() {
+      state.islandIndex = state.journey.islandIndex;
+      state.lap = state.journey.lap;
+      updateJourneyInfo();
       renderCharacterCards(startCharacters, true);
       setMode("menu");
       startMusic();
@@ -1689,19 +2055,80 @@
       state.burstCharge = 0;
       state.rapidAttackHeld = false;
       state.packagesOpened = 0;
+      state.run = { livesLost: 0, hitsTaken: 0, enemiesDefeated: 0, totalBananas: 0 };
       setupIsland();
+      saveJourney();
+      setMode("playing");
+      updateHud();
+      if (!state.journey.howtoSeen) {
+        openHowto("playing");
+        return;
+      }
+      startMusic();
+      showTip(`${islands[state.islandIndex].name}: abra pacotes e junte ${BANANAS_TO_WIN} bananas.`);
+    }
+
+    function openHowto(returnTo) {
+      state.howtoReturn = returnTo;
+      pauseDialog.classList.add("hidden");
+      howtoDialog.classList.remove("hidden");
+      setMode("howto");
+      stopMusic();
+      focusPrimary(howtoDialog);
+    }
+
+    function closeHowto() {
+      howtoDialog.classList.add("hidden");
+      state.journey.howtoSeen = true;
+      saveJourney();
+      if (state.howtoReturn === "paused") {
+        pauseDialog.classList.remove("hidden");
+        setMode("paused");
+        focusPrimary(pauseDialog);
+        return;
+      }
       setMode("playing");
       startMusic();
-      updateHud();
-      showTip("Abra pacotes. As bananas estão escondidas dentro deles.");
+      showTip(`${islands[state.islandIndex].name}: abra pacotes e junte ${BANANAS_TO_WIN} bananas.`);
+    }
+
+    function lapLabel(lap) {
+      return lap > 0 ? ` (volta ${lap + 1})` : "";
     }
 
     function updateHud() {
       const character = characterById(state.selectedId);
       hudCharacter.textContent = character.name;
-      hudIsland.textContent = islands[state.islandIndex].name;
-      hudBananas.textContent = `Bananas ${state.bananas}/${BANANAS_TO_WIN}`;
-      hudShield.textContent = `Vidas ${state.lives} | Acertos ${state.hits}/7`;
+      hudIsland.textContent = `${islands[state.islandIndex].name}${lapLabel(state.lap)}`;
+      const percent = Math.round((state.bananas / BANANAS_TO_WIN) * 100);
+      hudBananas.innerHTML = `<span class="banana-icon" aria-hidden="true"></span><span>${state.bananas}/${BANANAS_TO_WIN}</span><span class="mini-bar" aria-hidden="true"><span style="width:${percent}%"></span></span>`;
+      hudBananas.setAttribute("aria-label", `Bananas: ${state.bananas} de ${BANANAS_TO_WIN}`);
+      let hearts = "";
+      for (let i = 0; i < 3; i += 1) {
+        hearts += `<span class="heart${i < state.lives ? "" : " lost"}" aria-hidden="true">♥</span>`;
+      }
+      let pips = "";
+      for (let i = 0; i < SHIELD_MAX; i += 1) {
+        pips += `<span class="pip${i < SHIELD_MAX - state.hits ? "" : " lost"}"></span>`;
+      }
+      hudShield.innerHTML = `<span class="hearts">${hearts}</span><span class="shield" aria-hidden="true">${pips}</span>`;
+      hudShield.setAttribute("aria-label", `Corações: ${Math.max(0, state.lives)}. Escudo: ${SHIELD_MAX - state.hits} de ${SHIELD_MAX}`);
+    }
+
+    function bumpHud(element) {
+      element.classList.remove("bump");
+      void element.offsetWidth;
+      element.classList.add("bump");
+    }
+
+    let bannerTimer = 0;
+    function showBanner(title, text) {
+      banner.innerHTML = `<strong>${title}</strong>${text ? `<span>${text}</span>` : ""}`;
+      banner.classList.remove("hidden", "show");
+      void banner.offsetWidth;
+      banner.classList.add("show");
+      clearTimeout(bannerTimer);
+      bannerTimer = setTimeout(() => banner.classList.add("hidden"), 2600);
     }
 
     let tipTimer = 0;
@@ -1948,26 +2375,37 @@
         const character = pieceCharacter;
         const progress = state.progress[character.id];
         progress.pieces = Math.min(5, progress.pieces + 1);
-        sfx("piece");
         state.rewards.push({ type: "piece", x: packagePoint.x, y: packagePoint.y - 12, age: 0, label: character.name });
+        spawnParticles(packagePoint.x, packagePoint.y - 10, 18, ["#9e69ff", "#fff2a8", character.shirt], 170, 4);
         if (progress.pieces >= 5) {
           progress.unlocked = true;
           saveProgress();
           renderCharacterCards(startCharacters, true);
-          showTip(`Pacote raro: ${character.name} foi desbloqueado!`);
+          sfx("unlock");
+          spawnParticles(state.width / 2, state.height * 0.35, 40, ["#ffd862", "#f0709d", "#4fa95d", "#3e8edb"], 260, 5);
+          showBanner(`${character.name} foi liberad${character.id === "vo" || character.id === "mamae" ? "a" : "o"}!`, "Escolha no botão de personagens.");
+          showTip(`Pacote raro: ${character.name} entrou para o time!`);
         } else {
           saveProgress();
-          showTip(`Pacote raro: peça de ${character.name} (${progress.pieces}/5).`);
+          sfx("piece");
+          showTip(`Pacote raro: peça de ${character.name} (${progress.pieces}/5). Não conta como banana.`);
         }
       } else {
         state.bananas = Math.min(BANANAS_TO_WIN, state.bananas + 1);
+        state.run.totalBananas += 1;
         sfx("banana");
         state.rewards.push({ type: "banana", x: packagePoint.x, y: packagePoint.y - 12, age: 0 });
-        showTip(`Você achou uma banana no pacote (${state.bananas}/${BANANAS_TO_WIN}).`);
+        state.rewards.push({ type: "text", x: packagePoint.x + 22, y: packagePoint.y - 30, age: 0, label: "+1" });
+        spawnParticles(packagePoint.x, packagePoint.y - 6, 12, ["#ffd66b", "#ff9f2f", "#8d62d7"], 150, 4);
+        bumpHud(hudBananas);
+        const left = BANANAS_TO_WIN - state.bananas;
+        showTip(left > 0
+          ? `Banana! ${state.bananas}/${BANANAS_TO_WIN}. ${left === 1 ? "Falta só 1!" : `Faltam ${left}.`}`
+          : `Banana! ${state.bananas}/${BANANAS_TO_WIN}.`);
       }
 
       state.packages = state.packages.filter((item) => item !== packageItem);
-      state.packages.push(newPackage());
+      if (state.packages.length < 13) state.packages.push(newPackage());
       updateHud();
 
       if (state.bananas >= BANANAS_TO_WIN) {
@@ -1975,23 +2413,74 @@
       }
     }
 
+    function starsFor(stats) {
+      if (stats.livesLost === 0 && stats.hitsTaken <= 3) return 3;
+      if (stats.livesLost <= 1) return 2;
+      return 1;
+    }
+
+    function starText(count) {
+      return "★".repeat(count) + "☆".repeat(3 - count);
+    }
+
     function completeLevel() {
       setMode("level");
+      state.rapidAttackHeld = false;
+      sfx("level");
+      spawnParticles(state.width / 2, state.height * 0.4, 60, ["#ffd862", "#f0709d", "#4fa95d", "#3e8edb", "#ffffff"], 300, 5);
+
+      const stats = state.islandStats;
+      const stars = starsFor(stats);
+      const key = `${state.lap}-${state.islandIndex}`;
+      const previous = Number(state.journey.stars[key]) || 0;
+      state.journey.stars[key] = Math.max(previous, stars);
+
+      const isLast = state.islandIndex === islands.length - 1;
+      const nextIndex = (state.islandIndex + 1) % islands.length;
+      const nextLap = isLast ? state.lap + 1 : state.lap;
+      // Salva já a próxima ilha: se a criança fechar o jogo aqui, continua de lá.
+      state.journey.islandIndex = nextIndex;
+      state.journey.lap = nextLap;
+      state.journey.bestLevel = Math.max(state.journey.bestLevel, nextLap * islands.length + nextIndex);
+      saveJourney();
+
+      const seconds = Math.round((performance.now() - stats.startedAt) / 1000);
       const current = islands[state.islandIndex].name;
-      const next = islands[(state.islandIndex + 1) % islands.length].name;
-      levelText.textContent = `${current} completa. Próxima parada: ${next}.`;
+      levelStars.textContent = starText(stars);
+      levelStars.setAttribute("aria-label", `${stars} de 3 estrelas`);
+      levelStats.innerHTML = `
+        <span><strong>${seconds}s</strong> de viagem</span>
+        <span><strong>${stats.enemiesDefeated}</strong> ${stats.enemiesDefeated === 1 ? "bichinho derrotado" : "bichinhos derrotados"}</span>
+        <span><strong>${stats.hitsTaken}</strong> ${stats.hitsTaken === 1 ? "poder levado" : "poderes levados"}</span>
+      `;
+      const starHint = stars < 3
+        ? "Para 3 estrelas: termine sem perder coração e levando no máximo 3 poderes."
+        : (previous === 3 ? "Três estrelas de novo!" : "Três estrelas! Perfeito!");
+      if (isLast) {
+        levelTitle.textContent = "As 3 ilhas foram salvas!";
+        levelText.textContent = `${current} completa. Vocês visitaram todas as ilhas voadoras! A próxima volta tem mais bichinhos e poderes mais rápidos. ${starHint}`;
+        nextIslandButton.textContent = `Começar a volta ${nextLap + 1}`;
+      } else {
+        levelTitle.textContent = "Fase completa!";
+        levelText.textContent = `${current} completa. Próxima parada: ${islands[nextIndex].name}. ${starHint}`;
+        nextIslandButton.textContent = "Ir para a próxima ilha";
+      }
       levelDialog.classList.remove("hidden");
+      focusPrimary(levelDialog);
     }
 
     function nextIsland() {
-      state.islandIndex = (state.islandIndex + 1) % islands.length;
+      state.islandIndex = state.journey.islandIndex;
+      state.lap = state.journey.lap;
       state.bananas = 0;
       state.hits = 0;
       state.burstCharge = 0;
       setupIsland();
       updateHud();
       setMode("playing");
-      showTip(`Bem-vindos à ${islands[state.islandIndex].name}.`);
+      startMusic();
+      showBanner(islands[state.islandIndex].name, state.lap > 0 ? `Volta ${state.lap + 1}` : "Junte 10 bananas");
+      showTip(`Bem-vindos à ${islands[state.islandIndex].name}!`);
     }
 
     function updatePlayer(dt) {
@@ -2046,10 +2535,23 @@
       for (const enemy of state.enemies) {
         enemy.u = enemy.homeU + Math.cos(state.time * 0.75 + enemy.phase) * 0.07;
         enemy.v = enemy.homeV + Math.sin(state.time * 0.9 + enemy.phase) * 0.07;
+        enemy.flash = Math.max(0, enemy.flash - dt);
+        enemy.appear = Math.min(1, enemy.appear + dt * 2.5);
         enemy.cooldown -= dt;
+        // Meio segundo antes de atirar, a varinha brilha: dá tempo de desviar.
+        enemy.charge = enemy.cooldown < 0.55 ? 1 - Math.max(0, enemy.cooldown) / 0.55 : 0;
         if (enemy.cooldown <= 0) {
           firePower(enemy);
           enemy.cooldown = enemy.fireEvery;
+        }
+      }
+
+      // Bichinhos derrotados voltam depois de um tempo, longe de quem está jogando.
+      if (state.enemies.length < difficulty().enemies) {
+        state.enemyRespawnTimer -= dt;
+        if (state.enemyRespawnTimer <= 0) {
+          spawnReturningEnemy();
+          state.enemyRespawnTimer = 9;
         }
       }
 
@@ -2070,6 +2572,51 @@
         }
         return true;
       });
+    }
+
+    function spawnReturningEnemy() {
+      const random = Math.random;
+      let enemy = newEnemy(random, state.enemies.length + Math.floor(random() * 10));
+      for (let i = 0; i < 12; i += 1) {
+        const point = pointOnIsland(enemy.homeU, enemy.homeV);
+        if (Math.hypot(point.x - state.player.x, point.y - state.player.y) > 180 * worldScale()) break;
+        enemy = newEnemy(random, state.enemies.length);
+      }
+      enemy.cooldown = 2;
+      state.enemies.push(enemy);
+      const point = enemyPoint(enemy);
+      spawnParticles(point.x, point.y - 10, 14, ["#ffffff", "#d9c8ff"], 110, 4);
+    }
+
+    function spawnParticles(x, y, count, colors, speed = 160, size = 4) {
+      if (state.particles.length > 260) return;
+      for (let i = 0; i < count; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = speed * (0.35 + Math.random() * 0.8);
+        state.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * velocity,
+          vy: Math.sin(angle) * velocity - speed * 0.35,
+          age: 0,
+          life: 0.55 + Math.random() * 0.5,
+          color: colors[i % colors.length],
+          size: size * (0.7 + Math.random() * 0.7),
+          spin: Math.random() * Math.PI
+        });
+      }
+    }
+
+    function updateParticles(dt) {
+      for (const particle of state.particles) {
+        particle.age += dt;
+        particle.x += particle.vx * dt;
+        particle.y += particle.vy * dt;
+        particle.vy += 300 * dt;
+        particle.spin += dt * 9;
+      }
+      state.particles = state.particles.filter((particle) => particle.age < particle.life);
+      state.shake = Math.max(0, state.shake - dt);
     }
 
     function updateRewards(dt) {
@@ -2098,10 +2645,15 @@
         if (shot.age > 1.7 || shot.x < -50 || shot.x > state.width + 50 || shot.y < -50 || shot.y > state.height + 50) return false;
         for (const enemy of state.enemies) {
           const point = enemyPoint(enemy);
-          if (Math.hypot(shot.x - point.x, shot.y - point.y) < 25 * worldScale() + 4) {
+          if (!enemy.defeated && Math.hypot(shot.x - point.x, shot.y - point.y) < 25 * worldScale() + 4) {
             enemy.hp -= shot.power;
+            enemy.flash = 0.14;
             state.rewards.push({ type: "piece", x: point.x, y: point.y - 20, age: 0, label: "POW!" });
-            if (enemy.hp <= 0) enemy.defeated = true;
+            if (enemy.hp <= 0) {
+              defeatEnemy(enemy);
+            } else {
+              sfx("enemyHit");
+            }
             return false;
           }
         }
@@ -2111,12 +2663,31 @@
       updateChargeButton();
     }
 
+    function defeatEnemy(enemy) {
+      enemy.defeated = true;
+      const point = enemyPoint(enemy);
+      sfx("enemyDown");
+      spawnParticles(point.x, point.y - 10, 22, [enemy.color, "#fff2a8", "#ffffff"], 190, 5);
+      state.run.enemiesDefeated += 1;
+      state.islandStats.enemiesDefeated += 1;
+      // Recompensa: o bichinho derrotado deixa um pacote (dentro da parte segura).
+      const length = Math.hypot(enemy.u, enemy.v);
+      const factor = length > 0.7 ? 0.7 / length : 1;
+      const reward = newPackage();
+      reward.u = enemy.u * factor;
+      reward.v = enemy.v * factor;
+      reward.hidden = false;
+      reward.dropped = 0.01;
+      state.packages.push(reward);
+      showTip("Bichinho derrotado! Ele deixou um pacote.");
+    }
+
     function updateHazards(dt) {
       state.player.fallCooldown = Math.max(0, state.player.fallCooldown - dt);
       state.dangerTimer -= dt;
       if (state.dangerTimer <= 0) {
         spawnDangerZone();
-        state.dangerTimer = 4 + Math.random() * 2.3;
+        state.dangerTimer = difficulty().dangerBase + Math.random() * 2.3;
       }
 
       for (const zone of state.dangerZones) {
@@ -2125,7 +2696,7 @@
           // Testa os pés do personagem contra a mesma elipse que aparece na tela.
           if (insideDangerZone(zone, state.player.x, state.player.y + 16 * worldScale())) {
             zone.triggered = true;
-            loseLife("O chão vermelho desabou com você em cima!");
+            loseLife("O chão vermelho desabou com você em cima!", "floor");
           }
         }
       }
@@ -2144,7 +2715,7 @@
         player.teeter += dt;
         if (player.teeter >= EDGE_FALL_TIME) {
           player.teeter = 0;
-          loseLife("Ficou na beirada e caiu da ilha!");
+          loseLife("Ficou na beirada e caiu da ilha!", "edge");
         }
       } else {
         player.teeter = Math.max(0, player.teeter - dt * 2);
@@ -2249,7 +2820,7 @@
       const dx = state.player.x - point.x;
       const dy = state.player.y - point.y;
       const length = Math.max(1, Math.hypot(dx, dy));
-      const speed = 115 + state.islandIndex * 18;
+      const speed = difficulty().powerSpeed;
       state.powers.push({
         x: point.x,
         y: point.y - 18,
@@ -2264,19 +2835,37 @@
     function handlePowerHit() {
       if (state.player.hitCooldown > 0) return;
       state.player.hitCooldown = 1.35;
-      state.hits = Math.min(7, state.hits + 1);
+      state.hits = Math.min(SHIELD_MAX, state.hits + 1);
+      state.run.hitsTaken += 1;
+      state.islandStats.hitsTaken += 1;
       sfx("hurt");
-      if (state.hits >= 7) {
-        loseLife("Os bichinhos acertaram 7 poderes!");
+      spawnParticles(state.player.x, state.player.y - 20, 8, ["#ffffff", "#9fd8ff"], 120, 3);
+      if (state.hits >= SHIELD_MAX) {
+        loseLife("Os bichinhos acertaram 7 poderes e o escudo quebrou!", "powers");
+        state.hits = Math.min(state.hits, SHIELD_MAX - 1);
       } else {
-        showTip(`O poder acertou! Faltam ${7 - state.hits} acertos para perder uma vida.`);
+        const left = SHIELD_MAX - state.hits;
+        showTip(`O poder acertou! O escudo aguenta mais ${left} ${left === 1 ? "acerto" : "acertos"}.`);
       }
       updateHud();
+      bumpHud(hudShield);
     }
 
-    function loseLife(reason) {
+    // Dicas que explicam o que deu errado, para a próxima tentativa ser melhor.
+    const lifeHints = {
+      edge: "Dica: fique dentro da linha tracejada.",
+      floor: "Dica: quando o chão piscar vermelho, saia de cima rápido.",
+      powers: "Dica: use o ATAQUE, ele mira sozinho no bichinho mais perto. E desvie quando a varinha brilhar."
+    };
+
+    function loseLife(reason, kind = "") {
       if (state.player.fallCooldown > 0) return;
       sfx("life");
+      state.lastLossKind = kind;
+      state.run.livesLost += 1;
+      state.islandStats.livesLost += 1;
+      if (!reduceMotion) state.shake = 0.35;
+      spawnParticles(state.player.x, state.player.y, 16, ["#ff6b6b", "#ffd166", "#ffffff"], 170, 4);
       state.lives -= 1;
       state.hits = 0;
       state.player.hitCooldown = 1.4;
@@ -2289,7 +2878,9 @@
         return;
       }
       respawnPlayer();
-      showTip(`${reason} Perdeu uma vida. Vidas: ${state.lives}.`);
+      bumpHud(hudShield);
+      const hint = lifeHints[kind] ? ` ${lifeHints[kind]}` : "";
+      showTip(`${reason} Perdeu um coração (${state.lives === 1 ? "resta 1" : `restam ${state.lives}`}).${hint}`);
     }
 
     function respawnPlayer() {
@@ -2309,9 +2900,18 @@
       state.rapidAttackHeld = false;
       controls.classList.add("hidden");
       hud.classList.add("hidden");
-      gameOverText.textContent = `${reason} As vidas acabaram.`;
-      gameOverDialog.classList.remove("hidden");
       stopMusic();
+      sfx("gameover");
+      const hint = lifeHints[state.lastLossKind] || "";
+      gameOverText.textContent = `${reason} Os corações acabaram, mas a ilha continua esperando.`;
+      gameOverStats.innerHTML = `
+        <span><strong>${state.bananas}/${BANANAS_TO_WIN}</strong> bananas nesta ilha</span>
+        <span><strong>${state.run.enemiesDefeated}</strong> ${state.run.enemiesDefeated === 1 ? "bichinho derrotado" : "bichinhos derrotados"}</span>
+      `;
+      gameOverHint.textContent = hint;
+      gameOverHint.classList.toggle("hidden", !hint);
+      gameOverDialog.classList.remove("hidden");
+      focusPrimary(gameOverDialog);
     }
 
     function clampPlayerToIsland() {
@@ -2336,30 +2936,53 @@
 
     function draw() {
       const theme = islands[state.islandIndex];
-      drawSky(theme);
+      drawSkyGradient(theme);
       drawDistantIslands(theme);
+      drawSkyDots();
       drawClouds();
-      drawIsland(theme);
+      ctx.save();
+      if (state.shake > 0) {
+        const power = state.shake * 16;
+        ctx.translate((Math.random() - 0.5) * power, (Math.random() - 0.5) * power);
+      }
+      drawIslandBody(theme);
+      drawEdgeLine();
       drawDangerZones();
-      drawDecorations(theme, false);
+      // Árvores ficam todas atrás: antes tapavam pacotes e bichinhos.
+      drawDecorations(theme);
+      drawSparkles(theme);
       drawPackages();
       drawEnemies();
+      drawMoveTarget();
+      drawPlayer();
       drawPowers();
       drawPlayerShots();
       drawRewards();
-      drawMoveTarget();
-      drawDecorations(theme, true);
-      drawPlayer();
-      drawSparkles(theme);
+      drawParticles();
+      ctx.restore();
     }
 
-    function drawSky(theme) {
+    function drawParticles() {
+      for (const particle of state.particles) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - particle.age / particle.life);
+        ctx.translate(particle.x, particle.y);
+        ctx.rotate(particle.spin);
+        ctx.fillStyle = particle.color;
+        ctx.fillRect(-particle.size / 2, -particle.size / 3, particle.size, particle.size * 0.66);
+        ctx.restore();
+      }
+    }
+
+    function drawSkyGradient(theme) {
       const gradient = ctx.createLinearGradient(0, 0, 0, state.height);
       gradient.addColorStop(0, theme.skyTop);
       gradient.addColorStop(1, theme.skyBottom);
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, state.width, state.height);
+    }
 
+    function drawSkyDots() {
       ctx.save();
       ctx.globalAlpha = 0.35;
       ctx.fillStyle = "#ffffff";
@@ -2417,7 +3040,7 @@
       ctx.restore();
     }
 
-    function drawIsland(theme) {
+    function drawIslandBody(theme) {
       const island = islandShape();
       ctx.save();
       ctx.fillStyle = "rgba(61, 77, 70, 0.18)";
@@ -2469,7 +3092,12 @@
       ctx.ellipse(island.cx, island.cy, island.rx, island.ry, 0, 0, Math.PI * 2);
       ctx.ellipse(island.cx, island.cy, island.rx * EDGE_LIMIT, island.ry * EDGE_LIMIT, 0, 0, Math.PI * 2);
       ctx.fill("evenodd");
+      ctx.restore();
+    }
 
+    function drawEdgeLine() {
+      const island = islandShape();
+      ctx.save();
       // ...e uma linha tracejada que fica vermelha quando o personagem chega perto.
       const near = state.mode === "playing"
         ? Math.max(0, Math.min(1, (playerEdgeDistance() - 0.6) / (EDGE_LIMIT - 0.6)))
@@ -2508,15 +3136,13 @@
       }
     }
 
-    function drawDecorations(theme, frontLayer) {
+    function drawDecorations(theme) {
       // Em ilhas pequenas (celular) as árvores ficavam enormes e escondiam pacotes e bichinhos.
       // No celular deitado a ilha é baixa: usa também a altura para as árvores não taparem tudo.
+      // A lista já vem ordenada de trás para a frente (ordenada uma vez em setupIsland).
       const sizeFactor = worldScale();
-      const sorted = [...state.decorations].sort((a, b) => pointOnIsland(a.u, a.v).y - pointOnIsland(b.u, b.v).y);
-      for (const decoration of sorted) {
+      for (const decoration of state.decorations) {
         const point = pointOnIsland(decoration.u, decoration.v);
-        const isFront = point.y > state.player.y + 5;
-        if (isFront !== frontLayer) continue;
         const sway = Math.sin(state.time * 1.5 + decoration.sway) * 2;
         if (decoration.type === "tree") drawTree(point.x + sway, point.y, decoration.scale * sizeFactor, theme);
         if (decoration.type === "bush") drawBush(point.x, point.y, decoration.scale * sizeFactor, theme);
@@ -2629,6 +3255,16 @@
         const bob = Math.sin(state.time * 3 + packageItem.bob) * 4;
         if (packageItem.hidden) {
           drawHiddenLeaves(point.x, point.y + 7);
+        }
+        if (packageItem.dropped && packageItem.dropped < 1) {
+          // Pacote deixado por um bichinho: cai do alto com um pulinho.
+          packageItem.dropped = Math.min(1, packageItem.dropped + 0.03);
+          const t = packageItem.dropped;
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, t * 2);
+          drawGiftBox(point.x, point.y - (1 - t) * 40 + bob, false, packageItem.content);
+          ctx.restore();
+          continue;
         }
         drawGiftBox(point.x, point.y + bob, packageItem.hidden, packageItem.content);
       }
@@ -2753,12 +3389,27 @@
       ctx.scale(scale, scale);
       const bounce = Math.sin(state.time * 4 + enemy.phase) * 3;
       ctx.translate(0, bounce);
+      const appear = enemy.appear === undefined ? 1 : enemy.appear;
+      if (appear < 1) {
+        ctx.globalAlpha = appear;
+        ctx.scale(0.5 + appear * 0.5, 0.5 + appear * 0.5);
+      }
       ctx.fillStyle = "rgba(38, 36, 54, 0.22)";
       ctx.beginPath();
       ctx.ellipse(0, 20, 22, 7, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = enemy.color;
+      // Vida do bichinho (aparece depois do primeiro acerto).
+      if (enemy.maxHp && enemy.hp < enemy.maxHp) {
+        for (let i = 0; i < enemy.maxHp; i += 1) {
+          ctx.fillStyle = i < enemy.hp ? "#ff5d73" : "rgba(255,255,255,0.75)";
+          ctx.beginPath();
+          ctx.arc((i - (enemy.maxHp - 1) / 2) * 9, -34, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.fillStyle = enemy.flash > 0 ? "#ffffff" : enemy.color;
       ctx.beginPath();
       ctx.moveTo(-18, -4);
       ctx.quadraticCurveTo(-24, -30, -7, -22);
@@ -2787,8 +3438,16 @@
       ctx.moveTo(16, 4);
       ctx.lineTo(28, -10);
       ctx.stroke();
-      ctx.fillStyle = "#fff2a8";
-      drawStar(30, -13, 3, 8, 5);
+      const charge = enemy.charge || 0;
+      if (charge > 0) {
+        // Aviso: a ponta da varinha cresce e brilha antes do tiro.
+        ctx.fillStyle = `rgba(255, 245, 160, ${0.25 + charge * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(30, -13, 6 + charge * 12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = charge > 0 ? "#ffffff" : "#fff2a8";
+      drawStar(30, -13, 3 + charge * 2, 8 + charge * 5, 5);
       ctx.restore();
     }
 
@@ -2832,6 +3491,14 @@
         ctx.globalAlpha = alpha;
         if (reward.type === "banana") {
           drawPeekingBanana(reward.x, reward.y);
+        } else if (reward.type === "text") {
+          ctx.font = "900 22px Trebuchet MS, sans-serif";
+          ctx.textAlign = "center";
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = "#ffffff";
+          ctx.strokeText(reward.label, reward.x, reward.y);
+          ctx.fillStyle = "#c27a00";
+          ctx.fillText(reward.label, reward.x, reward.y);
         } else {
           ctx.translate(reward.x, reward.y);
           drawPackageSpark(0, 0);
@@ -3060,6 +3727,7 @@
       state.last = seconds;
       state.time = seconds;
       updateClouds(dt);
+      updateParticles(dt);
       if (state.mode === "playing") {
         updatePlayer(dt);
         updateEnemies(dt);
@@ -3078,7 +3746,17 @@
       state.keys.right = false;
     }
 
+    // Só move o foco quando a pessoa está usando o teclado (evita contorno azul no toque).
+    let usingKeyboard = false;
+    window.addEventListener("keydown", () => {
+      usingKeyboard = true;
+    }, true);
+    window.addEventListener("pointerdown", () => {
+      usingKeyboard = false;
+    }, true);
+
     function focusPrimary(dialog) {
+      if (!usingKeyboard) return;
       const button = dialog.querySelector(".primary");
       if (button) button.focus({ preventScroll: true });
     }
@@ -3222,6 +3900,9 @@
     function init() {
       state.progress = loadProgress();
       loadSettings();
+      loadJourney();
+      if (!state.progress[state.selectedId] || !state.progress[state.selectedId].unlocked) state.selectedId = "davi";
+      document.body.classList.toggle("touch", window.matchMedia("(hover: none) and (pointer: coarse)").matches);
       resize();
       setupIsland();
       renderCharacterCards(startCharacters, true);
@@ -3244,6 +3925,7 @@
         renderLocker();
         lockerDialog.classList.remove("hidden");
         setMode("locker");
+        focusPrimary(lockerDialog);
       });
       document.querySelector("#closeLockerButton").addEventListener("click", () => {
         lockerDialog.classList.add("hidden");
@@ -3251,18 +3933,26 @@
       });
       document.querySelector("#pauseButton").addEventListener("click", pauseGame);
       document.querySelector("#resumeButton").addEventListener("click", resumeGame);
+      document.querySelector("#howtoButton").addEventListener("click", () => openHowto("paused"));
+      document.querySelector("#howtoStartButton").addEventListener("click", closeHowto);
       document.querySelector("#menuButton").addEventListener("click", () => {
         pauseDialog.classList.add("hidden");
         setMode("welcome");
         startMusic();
         renderCharacterCards(startCharacters, true);
+        focusPrimary(welcomeScreen);
       });
       document.querySelector("#resetButton").addEventListener("click", () => {
         if (!window.confirm("Reiniciar o progresso? Os personagens liberados voltam a ficar trancados.")) return;
         state.progress = defaultProgress();
         state.selectedId = "davi";
+        state.journey = { islandIndex: 0, lap: 0, stars: {}, bestLevel: 0, howtoSeen: state.journey.howtoSeen };
+        state.islandIndex = 0;
+        state.lap = 0;
         saveProgress();
+        saveJourney();
         renderCharacterCards(startCharacters, true);
+        updateJourneyInfo();
         showTip("Progresso reiniciado.");
       });
       document.querySelector("#retryButton").addEventListener("click", () => {
