@@ -38,13 +38,68 @@
       margin: 0;
       overflow: hidden;
       color: var(--ink);
-      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      font-family: "Trebuchet MS", "Segoe UI", "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       background: #a8e5ff;
       touch-action: none;
       user-select: none;
     }
 
+    /* Japonês: prefere fontes japonesas antes das chinesas (formas dos kanji). */
+    html[lang="ja"] body {
+      font-family: "Trebuchet MS", "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic", "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    html[lang="zh-CN"] body,
+    html[lang="ja"] body {
+      line-break: strict;
+      word-break: normal;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .lang-picker {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 46px;
+      padding: 0 6px 0 12px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 18px rgba(29, 49, 58, 0.1);
+      color: #2f4a55;
+    }
+
+    .lang-select {
+      min-height: 44px;
+      border: 0;
+      background: transparent;
+      font: inherit;
+      font-weight: 800;
+      color: var(--ink);
+      cursor: pointer;
+      max-width: 210px;
+    }
+
+    .lang-select:focus-visible {
+      outline: 3px solid #1f5fbf;
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+
+    .lang-picker-pause {
+      margin-top: 12px;
+    }
+
     button {
+      overflow-wrap: anywhere;
       border: 0;
       font: inherit;
       color: inherit;
@@ -554,7 +609,7 @@
       flex: 1 1 0;
       min-width: 0;
       padding-inline: 10px;
-      white-space: nowrap;
+      line-height: 1.15;
     }
 
     .primary,
@@ -579,10 +634,32 @@
     }
 
     .tiny-action {
-      min-height: 34px;
+      min-height: 44px;
       padding: 0 12px;
       border-radius: 10px;
       font-size: 0.85rem;
+    }
+
+    .tiny-action:disabled {
+      cursor: default;
+      color: #5d6d72;
+      background: #eef3ef;
+      box-shadow: none;
+    }
+
+    button:focus-visible {
+      outline: 3px solid #1f5fbf;
+      outline-offset: 3px;
+    }
+
+    .primary:hover,
+    .secondary:hover {
+      filter: brightness(1.04);
+    }
+
+    .primary:active,
+    .secondary:active {
+      transform: translateY(1px);
     }
 
     #hud {
@@ -616,14 +693,216 @@
 
     .hud-button {
       pointer-events: auto;
-      min-width: 42px;
-      min-height: 42px;
+      min-width: 46px;
+      min-height: 46px;
       border-radius: 12px;
       display: grid;
       place-items: center;
       background: rgba(255, 255, 255, 0.9);
       box-shadow: 0 8px 20px rgba(29, 49, 58, 0.14);
       font-weight: 900;
+    }
+
+    .hud-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .banana-icon {
+      display: inline-block;
+      width: 18px;
+      height: 11px;
+      border: solid #f2b705;
+      border-width: 0 0 5px 0;
+      border-radius: 0 0 18px 18px;
+      transform: rotate(-12deg) translateY(-3px);
+    }
+
+    .mini-bar {
+      display: inline-block;
+      width: 46px;
+      height: 8px;
+      border-radius: 999px;
+      background: #e1ebe2;
+      overflow: hidden;
+    }
+
+    .mini-bar span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #ffca4d, #f29d12);
+      transition: width 0.25s ease;
+    }
+
+    .hearts {
+      letter-spacing: 1px;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .heart {
+      color: #e8435a;
+    }
+
+    .heart.lost {
+      color: #c9d2d6;
+    }
+
+    .shield {
+      display: inline-flex;
+      gap: 3px;
+    }
+
+    .pip {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3e8edb;
+    }
+
+    .pip.lost {
+      background: transparent;
+      box-shadow: inset 0 0 0 1.5px #9fb3c4;
+    }
+
+    .bump {
+      animation: bump 0.32s ease;
+    }
+
+    @keyframes bump {
+      40% { transform: scale(1.14); }
+    }
+
+    .banner {
+      position: fixed;
+      left: 50%;
+      top: 22%;
+      z-index: 24;
+      transform: translateX(-50%);
+      padding: 14px 24px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow);
+      text-align: center;
+      pointer-events: none;
+      display: grid;
+      gap: 4px;
+      max-width: calc(100vw - 32px);
+    }
+
+    .banner strong {
+      font-size: clamp(1.3rem, 4.5vw, 2rem);
+      color: #243b58;
+    }
+
+    .banner span {
+      color: #46636a;
+      font-weight: 700;
+    }
+
+    .banner.show {
+      animation: banner-in 2.6s ease forwards;
+    }
+
+    @keyframes banner-in {
+      0% { opacity: 0; transform: translate(-50%, -14px) scale(0.92); }
+      12% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      80% { opacity: 1; }
+      100% { opacity: 0; transform: translate(-50%, -8px); }
+    }
+
+    .stars {
+      font-size: 2.4rem;
+      line-height: 1.1;
+      color: #f2a900;
+      letter-spacing: 6px;
+      margin: 2px 0 8px;
+      text-shadow: 0 2px 0 rgba(150, 90, 0, 0.18);
+    }
+
+    .stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px 14px;
+      margin: 12px 0 4px;
+      font-size: 0.92rem;
+      color: #3c5560;
+    }
+
+    .stats-row:empty {
+      display: none;
+    }
+
+    .hint-box {
+      margin: 12px auto 2px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #fff6d6;
+      color: #5a4300;
+      font-weight: 700;
+      max-width: 440px;
+    }
+
+    .journey-info {
+      font-weight: 800;
+      color: #2f6a3b;
+    }
+
+    .card-bar {
+      width: 80%;
+      height: 8px;
+    }
+
+    .dialog-card.howto-card {
+      text-align: left;
+    }
+
+    .dialog-card.howto-card h2 {
+      text-align: center;
+    }
+
+    .howto-list {
+      list-style: none;
+      margin: 8px 0 4px;
+      padding: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .howto-list li {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 10px;
+      align-items: center;
+      line-height: 1.3;
+    }
+
+    .howto-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 1.2rem;
+      color: #ffffff;
+    }
+
+    .howto-icon.gift {
+      background: linear-gradient(90deg, #ffd66b 0 42%, #8d62d7 42% 58%, #ffd66b 58%);
+      box-shadow: inset 0 9px 0 #ff9f2f;
+    }
+
+    .howto-icon.move { background: #3e8edb; }
+    .howto-icon.attack { background: #f2a900; }
+    .howto-icon.danger { background: #d6403a; }
+    .howto-icon.heart { background: #e8435a; }
+
+    .touch .for-keys,
+    body:not(.touch) .for-touch {
+      display: none;
     }
 
     #controls {
@@ -676,6 +955,13 @@
       z-index: 0;
     }
 
+    /* Palavra do botão nunca quebra no meio (ex.: "ANGRIFF" em alemão). */
+    .attack-button {
+      padding: 0;
+      overflow-wrap: normal;
+      white-space: nowrap;
+    }
+
     .attack-button span:not(.charge-fill) {
       position: relative;
       z-index: 1;
@@ -694,8 +980,27 @@
       box-shadow: 0 8px 22px rgba(29, 49, 58, 0.14);
       font-weight: 800;
       text-align: center;
-      z-index: 11;
+      z-index: 46;
+      pointer-events: none;
       transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    /* No menu a dica aparece em cima, longe dos botões de começar. */
+    .pause-keys {
+      margin-top: 12px;
+    }
+
+    #tip.on-menu {
+      top: max(14px, env(safe-area-inset-top));
+      bottom: auto;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      max-width: min(420px, calc(100vw - 140px));
+    }
+
+    #tip.on-menu.fade {
+      transform: translate(-50%, -8px);
     }
 
     #tip.fade {
@@ -739,9 +1044,14 @@
       text-align: left;
     }
 
+    .progress-row strong {
+      white-space: nowrap;
+    }
+
     .progress-row {
       display: grid;
-      grid-template-columns: 88px 1fr auto;
+      /* Nomes longos (おばあちゃん, Onkel Nuno) não quebram: a barra encolhe. */
+      grid-template-columns: minmax(74px, max-content) minmax(36px, 1fr) auto;
       gap: 10px;
       align-items: center;
       padding: 10px;
@@ -840,6 +1150,10 @@
         font-size: 0.84rem;
       }
 
+      .mini-bar {
+        width: 34px;
+      }
+
       #controls {
         gap: 10px;
       }
@@ -863,7 +1177,7 @@
       }
 
       .progress-row {
-        grid-template-columns: 74px 1fr auto;
+        grid-template-columns: minmax(64px, max-content) minmax(32px, 1fr) auto;
         font-size: 0.9rem;
       }
     }
@@ -873,41 +1187,204 @@
         opacity: 0.78;
       }
     }
+
+    /* Celular deitado e telas baixas: tudo precisa caber sem rolar a página. */
+    @media (max-height: 520px) {
+      #welcomeScreen {
+        padding: 10px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
+      }
+
+      .welcome-card {
+        min-height: 0;
+        height: calc(100dvh - 20px);
+        padding: 12px 18px;
+        gap: 6px;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+
+      .welcome-title h1 {
+        font-size: clamp(1.5rem, 8vh, 2.4rem);
+      }
+
+      .welcome-title .subtitle {
+        font-size: 0.9rem;
+      }
+
+      .welcome-scene {
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .cover-island {
+        width: 560px;
+        height: 330px;
+        min-height: 0;
+        bottom: 0;
+        transform: translateX(-50%) scale(0.5);
+        transform-origin: 50% 100%;
+      }
+
+      .rainbow-bridge {
+        bottom: 6%;
+        height: 60px;
+      }
+
+      .sun-badge {
+        width: 70px;
+        top: 4%;
+      }
+
+      .welcome-title,
+      .title-row {
+        padding-inline: 52px;
+      }
+
+      #startScreen {
+        padding: 8px max(12px, env(safe-area-inset-right)) 84px max(12px, env(safe-area-inset-left));
+      }
+
+      #startScreen .menu-card {
+        max-height: calc(100dvh - 92px);
+        padding: 12px 16px;
+      }
+
+      #startScreen h1 {
+        font-size: clamp(1.4rem, 7vh, 2rem);
+      }
+
+      .title-row {
+        margin-bottom: 6px;
+        gap: 4px;
+      }
+
+      .title-row .subtitle {
+        font-size: 0.88rem;
+      }
+
+      .character-grid {
+        grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+        margin: 8px 0;
+        gap: 8px;
+      }
+
+      .character-card {
+        min-height: 0;
+        padding: 8px;
+        gap: 4px;
+      }
+
+      .avatar-preview {
+        width: 56px;
+        height: 56px;
+      }
+
+      .avatar-preview .mini-person {
+        transform: scale(0.8);
+        transform-origin: 50% 100%;
+      }
+
+      .start-actions {
+        bottom: 8px;
+        padding: 6px;
+      }
+
+      .hud-pill {
+        min-height: 32px;
+        padding: 6px 9px;
+        font-size: 0.82rem;
+      }
+
+      #controls {
+        bottom: max(12px, env(safe-area-inset-bottom));
+        gap: 8px;
+      }
+
+      .attack-button {
+        width: 62px;
+        height: 62px;
+        font-size: 0.76rem;
+      }
+
+      #tip {
+        left: max(12px, env(safe-area-inset-left));
+        right: auto;
+        bottom: 8px;
+        transform: none;
+        max-width: min(320px, 38vw);
+        font-size: 0.8rem;
+        padding: 8px 10px;
+      }
+
+      #tip.fade {
+        transform: translateY(8px);
+      }
+
+      .dialog-card {
+        padding: 14px 18px;
+      }
+
+      .dialog h2 {
+        font-size: 1.5rem;
+        margin-bottom: 6px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      /* No celular em pé, o nome do personagem já aparece no próprio boneco. */
+      #hudCharacter {
+        display: none;
+      }
+
+      .howto-list li {
+        font-size: 0.92rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
 <body>
-  <canvas id="game" aria-label="Aventura das Ilhas Voadoras"></canvas>
+  <canvas id="game" aria-label="Aventura das Ilhas Voadoras" data-i18n-aria="meta.title"></canvas>
 
   <div id="hud" class="hidden">
     <div class="hud-left">
       <div class="hud-pill" id="hudCharacter">Davi</div>
-      <div class="hud-pill" id="hudIsland">Ilha das Bananas</div>
-      <div class="hud-pill" id="hudBananas">Bananas 0/10</div>
-      <div class="hud-pill" id="hudShield">Vidas 3 | Acertos 0/7</div>
+      <div class="hud-pill" id="hudIsland"></div>
+      <div class="hud-pill hud-bananas" id="hudBananas" role="img"></div>
+      <div class="hud-pill hud-lives" id="hudShield" role="img"></div>
     </div>
     <div class="hud-right">
-      <button class="hud-button" id="charactersButton" type="button" aria-label="Personagens">P</button>
-      <button class="hud-button" id="musicButton" type="button" aria-label="Ligar ou desligar música">♪</button>
-      <button class="hud-button" id="pauseButton" type="button" aria-label="Pausar">II</button>
+      <button class="hud-button" id="charactersButton" type="button" aria-label="Personagens" title="Personagens" data-i18n-aria="hud.characters" data-i18n-title="hud.characters">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="9" cy="8" r="3.4" fill="currentColor"/><path d="M2.8 20c.4-4 3-6.3 6.2-6.3s5.8 2.3 6.2 6.3z" fill="currentColor"/><circle cx="17" cy="9" r="2.6" fill="currentColor" opacity=".6"/><path d="M14.6 14.2c.8-.4 1.6-.6 2.4-.6 2.5 0 4.4 1.9 4.7 5.2h-4.8" fill="currentColor" opacity=".6"/></svg>
+      </button>
+      <button class="hud-button" id="musicButton" type="button" aria-label="Desligar som">♪</button>
+      <button class="hud-button" id="pauseButton" type="button" aria-label="Pausar" data-i18n-aria="hud.pause">II</button>
     </div>
   </div>
 
-  <div id="controls" class="hidden" aria-label="Ataques">
-    <button class="attack-button quick-attack" id="quickAttackButton" type="button" aria-label="Ataque rápido"><span>ATAQUE</span></button>
-    <button class="attack-button burst-attack" id="burstAttackButton" type="button" aria-label="Explosão carregada">
+  <div id="controls" class="hidden" aria-label="Ataques" data-i18n-aria="hud.attacks">
+    <button class="attack-button quick-attack" id="quickAttackButton" type="button" aria-label="Ataque rápido" data-i18n-aria="attack.quickAria"><span data-i18n="attack.quick">ATAQUE</span></button>
+    <button class="attack-button burst-attack" id="burstAttackButton" type="button" aria-label="Explosão carregada" data-i18n-aria="attack.burstAria">
       <span class="charge-fill" id="chargeFill"></span>
       <span id="chargeLabel">0%</span>
     </button>
   </div>
 
-  <div id="tip" class="hidden">Pegue pacotes para achar bananas e surpresas.</div>
+  <div id="tip" class="hidden" role="status" aria-live="polite"></div>
+  <div id="banner" class="banner hidden" role="status" aria-live="polite"></div>
 
   <section id="welcomeScreen" class="screen">
-    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar música">♪</button>
     <div class="welcome-card">
       <div class="welcome-title">
-        <h1>Aventura das Ilhas Voadoras</h1>
-        <p class="subtitle">Davi, Daniel e Gabriela em uma floresta encantada cheia de pacotes, bananas e ilhas no céu.</p>
+        <h1 data-i18n="meta.title">Aventura das Ilhas Voadoras</h1>
+        <p class="subtitle" data-i18n="cover.subtitle">Davi, Daniel e Gabriela em uma floresta encantada cheia de pacotes, bananas e ilhas no céu.</p>
       </div>
       <div class="welcome-scene" aria-hidden="true">
         <div class="sun-badge"></div>
@@ -926,72 +1403,971 @@
         </div>
       </div>
       <div class="welcome-actions">
-        <button id="enterSelectionButton" class="primary" type="button">Entrar na aventura</button>
+        <button id="enterSelectionButton" class="primary" type="button" data-i18n="cover.enter">Entrar na aventura</button>
+        <label class="lang-picker">
+          <span class="lang-globe" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c2.6 2.8 3.8 5.8 3.8 9s-1.2 6.2-3.8 9c-2.6-2.8-3.8-5.8-3.8-9S9.4 5.8 12 3z" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+          <span class="sr-only" data-i18n="lang.label">Idioma</span>
+          <select class="lang-select" aria-label="Idioma" data-i18n-aria="lang.label"></select>
+        </label>
       </div>
     </div>
+    <!-- Depois do cartão no HTML: no teclado, o Tab chega primeiro em "Entrar na aventura". -->
+    <button class="menu-music-toggle" type="button">♪</button>
   </section>
 
   <section id="startScreen" class="screen hidden">
-    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar música">♪</button>
     <div class="menu-card">
       <div class="title-row">
-        <h1>Aventura das Ilhas Voadoras</h1>
-        <p class="subtitle">Escolha um personagem, abra pacotes e junte 10 bananas para viajar para outra ilha.</p>
+        <h1 data-i18n="meta.title">Aventura das Ilhas Voadoras</h1>
+        <p class="subtitle" data-i18n="menu.subtitle">Escolha um personagem, abra pacotes e junte 10 bananas para viajar para outra ilha.</p>
+        <p id="journeyInfo" class="journey-info"></p>
       </div>
       <div id="startCharacters" class="character-grid"></div>
     </div>
     <div class="actions start-actions">
-      <button id="startButton" class="primary" type="button">Começar aventura</button>
-      <button id="resetButton" class="secondary" type="button">Reiniciar progresso</button>
+      <button id="startButton" class="primary" type="button" data-i18n="menu.start">Começar aventura</button>
+      <button id="resetButton" class="secondary" type="button" data-i18n="menu.reset">Reiniciar progresso</button>
     </div>
+    <button class="menu-music-toggle" type="button">♪</button>
   </section>
 
-  <div id="levelDialog" class="dialog hidden" role="dialog" aria-modal="true">
+  <div id="levelDialog" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="levelTitle">
     <div class="dialog-card">
-      <h2>Fase completa!</h2>
-      <p id="levelText" class="subtitle">Você juntou 10 bananas.</p>
+      <h2 id="levelTitle"></h2>
+      <p id="levelStars" class="stars" role="img">★★★</p>
+      <p id="levelText" class="subtitle"></p>
+      <p id="levelStats" class="stats-row"></p>
       <div class="actions">
-        <button id="nextIslandButton" class="primary" type="button">Ir para a próxima ilha</button>
+        <button id="nextIslandButton" class="primary" type="button"></button>
       </div>
     </div>
   </div>
 
   <div id="lockerDialog" class="dialog hidden" role="dialog" aria-modal="true">
     <div class="dialog-card">
-      <h2>Personagens</h2>
-      <p class="subtitle">Ache 5 pacotes do mesmo personagem para desbloquear.</p>
+      <h2 data-i18n="locker.title">Personagens</h2>
+      <p class="subtitle" data-i18n="locker.text">Junte 5 peças do mesmo personagem (elas vêm em pacotes raros) para liberar.</p>
       <div id="lockerList" class="progress-list"></div>
       <div class="actions">
-        <button id="closeLockerButton" class="primary" type="button">Voltar ao jogo</button>
+        <button id="closeLockerButton" class="primary" type="button" data-i18n="locker.back">Voltar ao jogo</button>
       </div>
     </div>
   </div>
 
-  <div id="pauseDialog" class="dialog hidden" role="dialog" aria-modal="true">
+  <div id="pauseDialog" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
     <div class="dialog-card">
-      <h2>Pausado</h2>
-      <p class="subtitle">A ilha fica esperando enquanto vocês respiram.</p>
+      <h2 id="pauseTitle" data-i18n="pause.title">Pausado</h2>
+      <p class="subtitle" data-i18n="pause.text">A ilha fica esperando enquanto vocês respiram.</p>
       <div class="actions">
-        <button id="resumeButton" class="primary" type="button">Continuar</button>
-        <button id="menuButton" class="secondary" type="button">Voltar ao menu</button>
+        <button id="resumeButton" class="primary" type="button" data-i18n="pause.resume">Continuar</button>
+        <button id="howtoButton" class="secondary" type="button" data-i18n="pause.howto">Como jogar</button>
+        <button id="musicOnlyButton" class="secondary" type="button" aria-pressed="true"></button>
+        <button id="menuButton" class="secondary" type="button" data-i18n="pause.menu">Voltar ao menu</button>
+      </div>
+      <label class="lang-picker lang-picker-pause">
+        <span class="lang-globe" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c2.6 2.8 3.8 5.8 3.8 9s-1.2 6.2-3.8 9c-2.6-2.8-3.8-5.8-3.8-9S9.4 5.8 12 3z" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+        <span class="sr-only" data-i18n="lang.label">Idioma</span>
+        <select class="lang-select" aria-label="Idioma" data-i18n-aria="lang.label"></select>
+      </label>
+      <p class="small pause-keys for-keys" data-i18n="pause.keys">No teclado: Esc ou P pausa e continua.</p>
+    </div>
+  </div>
+
+  <div id="howtoDialog" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="howtoTitle">
+    <div class="dialog-card howto-card">
+      <h2 id="howtoTitle" data-i18n="pause.howto">Como jogar</h2>
+      <ul class="howto-list" id="howtoList"></ul>
+      <div class="actions">
+        <button id="howtoStartButton" class="primary" type="button" data-i18n="howto.go">Vamos lá!</button>
       </div>
     </div>
   </div>
 
   <div id="gameOverDialog" class="dialog hidden" role="dialog" aria-modal="true">
     <div class="dialog-card">
-      <h2>Fim de jogo!</h2>
-      <p id="gameOverText" class="subtitle">As ilhas ainda esperam por vocês.</p>
+      <h2 data-i18n="gameover.title">Fim de jogo!</h2>
+      <p id="gameOverText" class="subtitle"></p>
+      <p id="gameOverStats" class="stats-row"></p>
+      <p id="gameOverHint" class="hint-box hidden"></p>
       <div class="actions">
-        <button id="retryButton" class="primary" type="button">Tentar de novo</button>
-        <button id="gameOverMenuButton" class="secondary" type="button">Voltar ao início</button>
+        <button id="retryButton" class="primary" type="button" data-i18n="gameover.retry">Tentar de novo</button>
+        <button id="gameOverMenuButton" class="secondary" type="button" data-i18n="gameover.menu">Voltar ao início</button>
       </div>
     </div>
   </div>
 
   <script>
+    // ===== Idiomas =====
+    // Cada texto visível passa por t(chave, parâmetros). Valores com { one, other }
+    // escolhem a forma do plural pelas regras do próprio idioma (Intl.PluralRules).
+    const LANGS = [
+      { code: "pt-BR", label: "Português (Brasil)" },
+      { code: "pt-PT", label: "Português (Portugal)" },
+      { code: "en", label: "English" },
+      { code: "es", label: "Español" },
+      { code: "zh-CN", label: "中文" },
+      { code: "ja", label: "日本語" },
+      { code: "de", label: "Deutsch" }
+    ];
+    const LANG_KEY = "ilhas-voadoras-idioma-v1";
+
+    const I18N = {
+      "pt-BR": {
+        "meta.title": "Aventura das Ilhas Voadoras",
+        "meta.description": "Davi, Daniel e Gabriela abrem pacotes, juntam bananas e viajam entre ilhas no céu. Jogo da Quanta Aulas para computador e celular.",
+        "lang.label": "Idioma",
+        "cover.subtitle": "Davi, Daniel e Gabriela em uma floresta encantada cheia de pacotes, bananas e ilhas no céu.",
+        "cover.enter": "Entrar na aventura",
+        "menu.subtitle": "Escolha um personagem, abra pacotes e junte {n} bananas para viajar para outra ilha.",
+        "menu.start": "Começar aventura",
+        "menu.reset": "Reiniciar progresso",
+        "menu.resetConfirm": "Reiniciar o progresso? Os personagens liberados voltam a ficar trancados.",
+        "menu.resetDone": "Progresso reiniciado.",
+        "journey.first": "Primeira parada: {island}.",
+        "journey.continue": "Vocês continuam na {island}.",
+        "journey.stars": "Estrelas ganhas: {n} ★",
+        "lap.label": " (volta {n})",
+        "island.0": "Ilha das Bananas",
+        "island.1": "Ilha dos Cogumelos",
+        "island.2": "Ilha das Estrelas",
+        "char.davi.name": "Davi",
+        "char.daniel.name": "Daniel",
+        "char.gabriela.name": "Gabriela",
+        "char.vo.name": "Vó",
+        "char.tio.name": "Tio Nuno",
+        "char.mamae.name": "Mamãe",
+        "char.papai.name": "Papai",
+        "char.davi.note": "mais velho e aventureiro",
+        "char.daniel.note": "do meio e ligeiro",
+        "char.gabriela.note": "a criadora das bananas",
+        "char.rareNote.f": "liberada nos pacotes raros",
+        "char.rareNote.m": "liberado nos pacotes raros",
+        "char.locked": "Trancado: {n}/5 peças",
+        "char.lockedAria": "{name}, trancado, {n} de 5 peças",
+        "char.joined": "{name} entrou na aventura.",
+        "char.missing": { one: "Falta {n} peça para liberar {name}. Ela vem em pacotes raros.", other: "Faltam {n} peças para liberar {name}. Elas vêm em pacotes raros." },
+        "locker.title": "Personagens",
+        "locker.text": "Junte 5 peças do mesmo personagem (elas vêm em pacotes raros) para liberar.",
+        "locker.back": "Voltar ao jogo",
+        "locker.play": "Jogar",
+        "locker.playing": "Jogando",
+        "locker.pieces": "{n}/5 peças",
+        "hud.characters": "Personagens",
+        "hud.soundOff": "Desligar som",
+        "hud.soundOn": "Ligar som",
+        "hud.soundTitleOn": "Som ligado (clique para desligar)",
+        "hud.soundTitleOff": "Som desligado (clique para ligar)",
+        "hud.pause": "Pausar",
+        "hud.bananasAria": "Bananas: {n} de {total}",
+        "hud.livesAria": "Corações: {lives}. Escudo: {shield} de {max}",
+        "hud.attacks": "Ataques",
+        "attack.quick": "ATAQUE",
+        "attack.quickAria": "Ataque rápido",
+        "attack.burstAria": "Explosão carregada",
+        "attack.burstReady": "EXP!",
+        "burst.charging": "A explosão ainda está carregando.",
+        "burst.go": "Explosão mágica!",
+        "tip.start": "{island}: abra pacotes e junte {n} bananas.",
+        "tip.soundOn": "Som ligado.",
+        "tip.soundOff": "Som desligado.",
+        "unlock.banner.f": "{name} foi liberada!",
+        "unlock.banner.m": "{name} foi liberado!",
+        "unlock.bannerSub": "Escolha no botão de personagens.",
+        "unlock.tip": "Pacote raro: {name} entrou para o time!",
+        "piece.tip": "Pacote raro: peça de {name} ({n}/5). Não conta como banana.",
+        "banana.left": { one: "Banana! {got}/{total}. Falta só 1!", other: "Banana! {got}/{total}. Faltam {n}." },
+        "banana.done": "Banana! {got}/{total}.",
+        "level.title": "Fase completa!",
+        "level.finalTitle": "As 3 ilhas foram salvas!",
+        "level.text": "{island} completa. Próxima parada: {next}. {hint}",
+        "level.finalText": "{island} completa. Vocês visitaram todas as ilhas voadoras! A próxima volta tem mais bichinhos e poderes mais rápidos. {hint}",
+        "level.next": "Ir para a próxima ilha",
+        "level.nextLap": "Começar a volta {n}",
+        "level.starsAria": "{n} de 3 estrelas",
+        "level.hint3": "Para 3 estrelas: termine sem perder coração e levando no máximo 3 poderes.",
+        "level.perfectAgain": "Três estrelas de novo!",
+        "level.perfect": "Três estrelas! Perfeito!",
+        "stats.time": "<strong>{n}s</strong> de viagem",
+        "stats.enemies": { one: "<strong>{n}</strong> bichinho derrotado", other: "<strong>{n}</strong> bichinhos derrotados" },
+        "stats.hits": { one: "<strong>{n}</strong> poder levado", other: "<strong>{n}</strong> poderes levados" },
+        "stats.bananas": "<strong>{got}/{total}</strong> bananas nesta ilha",
+        "island.bannerSub": "Junte {n} bananas",
+        "island.lapSub": "Volta {n}",
+        "island.welcome": "Bem-vindos à {island}!",
+        "enemy.defeated": "Bichinho derrotado! Ele deixou um pacote.",
+        "edge.warn": "Cuidado! A borda está esfarelando. Volte para o meio!",
+        "hit.tip": { one: "O poder acertou! O escudo aguenta mais {n} acerto.", other: "O poder acertou! O escudo aguenta mais {n} acertos." },
+        "reason.floor": "O chão vermelho desabou com você em cima!",
+        "reason.edge": "Ficou na beirada e caiu da ilha!",
+        "reason.powers": "Os bichinhos acertaram 7 poderes e o escudo quebrou!",
+        "hint.edge": "Dica: fique dentro da linha tracejada.",
+        "hint.floor": "Dica: quando o chão piscar vermelho, saia de cima rápido.",
+        "hint.powers": "Dica: use o ATAQUE, ele mira sozinho no bichinho mais perto. E desvie quando a varinha brilhar.",
+        "life.lost": { one: "{reason} Perdeu um coração (resta 1). {hint}", other: "{reason} Perdeu um coração (restam {n}). {hint}" },
+        "gameover.title": "Fim de jogo!",
+        "gameover.text": "{reason} Os corações acabaram, mas a ilha continua esperando.",
+        "gameover.retry": "Tentar de novo",
+        "gameover.menu": "Voltar ao início",
+        "pause.title": "Pausado",
+        "pause.text": "A ilha fica esperando enquanto vocês respiram.",
+        "pause.resume": "Continuar",
+        "pause.howto": "Como jogar",
+        "pause.musicOn": "Música: ligada",
+        "pause.musicOff": "Música: desligada",
+        "pause.menu": "Voltar ao menu",
+        "pause.keys": "No teclado: Esc ou P pausa e continua.",
+        "howto.gift": "<strong>Abra pacotes</strong> encostando neles. Junte <strong>{n} bananas</strong> para voar até a próxima ilha. Arbusto balançando com brilho roxo esconde pacote: chegue perto! Pacotes raros trazem peças de novos personagens.",
+        "howto.move.touch": "<strong>Para andar:</strong> toque ou arraste o dedo na ilha.",
+        "howto.move.keys": "<strong>Para andar:</strong> setas ou W A S D (ou clique na ilha).",
+        "howto.attack.touch": "<strong>Ataque</strong> (botão amarelo) mira sozinho no bichinho mais perto. A <strong>explosão</strong> (botão roxo) acerta tudo em volta quando chega a 100%.",
+        "howto.attack.keys": "<strong>Ataque</strong> (Espaço) mira sozinho no bichinho mais perto. A <strong>explosão</strong> (tecla Q) acerta tudo em volta quando chega a 100%.",
+        "howto.danger": "<strong>Fuja do chão vermelho</strong> que pisca e <strong>não fique na beirada</strong>, depois da linha tracejada. Quando a varinha de um bichinho brilha, ele vai atirar.",
+        "howto.heart": "Você tem <strong>3 corações</strong>. O escudo aguenta <strong>7 poderes</strong>; no 7º, vai um coração.",
+        "howto.heartKeys": " Esc ou P pausa.",
+        "howto.go": "Vamos lá!",
+        "reward.pow": "POW!"
+      },
+
+      "pt-PT": {
+        "meta.title": "Aventura das Ilhas Voadoras",
+        "meta.description": "O Davi, o Daniel e a Gabriela abrem pacotes, apanham bananas e viajam entre ilhas no céu. Jogo da Quanta Aulas para computador e telemóvel.",
+        "lang.label": "Idioma",
+        "cover.subtitle": "O Davi, o Daniel e a Gabriela numa floresta encantada cheia de pacotes, bananas e ilhas no céu.",
+        "cover.enter": "Entrar na aventura",
+        "menu.subtitle": "Escolhe uma personagem, abre pacotes e junta {n} bananas para viajar para outra ilha.",
+        "menu.start": "Começar a aventura",
+        "menu.reset": "Recomeçar do zero",
+        "menu.resetConfirm": "Recomeçar do zero? As personagens desbloqueadas voltam a ficar bloqueadas.",
+        "menu.resetDone": "Progresso apagado.",
+        "journey.first": "Primeira paragem: {island}.",
+        "journey.continue": "Continuam na {island}.",
+        "journey.stars": "Estrelas conquistadas: {n} ★",
+        "lap.label": " (volta {n})",
+        "island.0": "Ilha das Bananas",
+        "island.1": "Ilha dos Cogumelos",
+        "island.2": "Ilha das Estrelas",
+        "char.davi.name": "Davi",
+        "char.daniel.name": "Daniel",
+        "char.gabriela.name": "Gabriela",
+        "char.vo.name": "Avó",
+        "char.tio.name": "Tio Nuno",
+        "char.mamae.name": "Mamã",
+        "char.papai.name": "Papá",
+        "char.davi.note": "o mais velho e aventureiro",
+        "char.daniel.note": "o do meio, muito rápido",
+        "char.gabriela.note": "a inventora das bananas",
+        "char.rareNote.f": "desbloqueada nos pacotes raros",
+        "char.rareNote.m": "desbloqueado nos pacotes raros",
+        "char.locked": "Por desbloquear: {n}/5 peças",
+        "char.lockedAria": "{name}, por desbloquear, {n} de 5 peças",
+        "char.joined": "{name} entrou na aventura.",
+        "char.missing": { one: "Falta {n} peça para desbloquear {name}. Aparece nos pacotes raros.", other: "Faltam {n} peças para desbloquear {name}. Aparecem nos pacotes raros." },
+        "locker.title": "Personagens",
+        "locker.text": "Junta 5 peças da mesma personagem (aparecem nos pacotes raros) para a desbloquear.",
+        "locker.back": "Voltar ao jogo",
+        "locker.play": "Jogar",
+        "locker.playing": "A jogar",
+        "locker.pieces": "{n}/5 peças",
+        "hud.characters": "Personagens",
+        "hud.soundOff": "Desligar o som",
+        "hud.soundOn": "Ligar o som",
+        "hud.soundTitleOn": "Som ligado (carrega para desligar)",
+        "hud.soundTitleOff": "Som desligado (carrega para ligar)",
+        "hud.pause": "Pausa",
+        "hud.bananasAria": "Bananas: {n} de {total}",
+        "hud.livesAria": "Corações: {lives}. Escudo: {shield} de {max}",
+        "hud.attacks": "Ataques",
+        "attack.quick": "ATAQUE",
+        "attack.quickAria": "Ataque rápido",
+        "attack.burstAria": "Explosão carregada",
+        "attack.burstReady": "EXP!",
+        "burst.charging": "A explosão ainda está a carregar.",
+        "burst.go": "Explosão mágica!",
+        "tip.start": "{island}: abre pacotes e junta {n} bananas.",
+        "tip.soundOn": "Som ligado.",
+        "tip.soundOff": "Som desligado.",
+        "unlock.banner.f": "{name} foi desbloqueada!",
+        "unlock.banner.m": "{name} foi desbloqueado!",
+        "unlock.bannerSub": "Já podes escolher no botão das personagens.",
+        "unlock.tip": "Pacote raro: {name} juntou-se à equipa!",
+        "piece.tip": "Pacote raro: peça de {name} ({n}/5). Não conta como banana.",
+        "banana.left": { one: "Banana! {got}/{total}. Só falta 1!", other: "Banana! {got}/{total}. Faltam {n}." },
+        "banana.done": "Banana! {got}/{total}.",
+        "level.title": "Nível concluído!",
+        "level.finalTitle": "As 3 ilhas foram salvas!",
+        "level.text": "{island} concluída. Próxima paragem: {next}. {hint}",
+        "level.finalText": "{island} concluída. Visitaram todas as ilhas voadoras! A próxima volta tem mais bichinhos e poderes mais rápidos. {hint}",
+        "level.next": "Ir para a próxima ilha",
+        "level.nextLap": "Começar a volta {n}",
+        "level.starsAria": "{n} de 3 estrelas",
+        "level.hint3": "Para 3 estrelas: termina sem perder corações e apanhando no máximo 3 poderes.",
+        "level.perfectAgain": "Três estrelas outra vez!",
+        "level.perfect": "Três estrelas! Perfeito!",
+        "stats.time": "<strong>{n} s</strong> de viagem",
+        "stats.enemies": { one: "<strong>{n}</strong> bichinho derrotado", other: "<strong>{n}</strong> bichinhos derrotados" },
+        "stats.hits": { one: "<strong>{n}</strong> poder apanhado", other: "<strong>{n}</strong> poderes apanhados" },
+        "stats.bananas": "<strong>{got}/{total}</strong> bananas nesta ilha",
+        "island.bannerSub": "Junta {n} bananas",
+        "island.lapSub": "Volta {n}",
+        "island.welcome": "Bem-vindos à {island}!",
+        "enemy.defeated": "Bichinho derrotado! Deixou um pacote.",
+        "edge.warn": "Cuidado! A beira está a desfazer-se. Volta para o meio!",
+        "hit.tip": { one: "O poder acertou! O escudo aguenta mais {n} toque.", other: "O poder acertou! O escudo aguenta mais {n} toques." },
+        "reason.floor": "O chão vermelho desabou contigo em cima!",
+        "reason.edge": "Ficaste na beira e caíste da ilha!",
+        "reason.powers": "Os bichinhos acertaram-te 7 vezes e o escudo partiu-se!",
+        "hint.edge": "Dica: fica dentro da linha tracejada.",
+        "hint.floor": "Dica: quando o chão piscar a vermelho, sai de cima depressa.",
+        "hint.powers": "Dica: usa o ATAQUE, que aponta sozinho ao bichinho mais perto. E desvia-te quando a varinha brilhar.",
+        "life.lost": { one: "{reason} Perdeste um coração (resta 1). {hint}", other: "{reason} Perdeste um coração (restam {n}). {hint}" },
+        "gameover.title": "Fim do jogo!",
+        "gameover.text": "{reason} Os corações acabaram, mas a ilha continua à vossa espera.",
+        "gameover.retry": "Tentar outra vez",
+        "gameover.menu": "Voltar ao início",
+        "pause.title": "Em pausa",
+        "pause.text": "A ilha fica à espera enquanto recuperam o fôlego.",
+        "pause.resume": "Continuar",
+        "pause.howto": "Como jogar",
+        "pause.musicOn": "Música: ligada",
+        "pause.musicOff": "Música: desligada",
+        "pause.menu": "Voltar ao menu",
+        "pause.keys": "No teclado: Esc ou P põe em pausa e continua.",
+        "howto.gift": "<strong>Abre pacotes</strong> encostando-te a eles. Junta <strong>{n} bananas</strong> para voar até à próxima ilha. Um arbusto a abanar com brilho roxo esconde um pacote: chega-te perto! Os pacotes raros trazem peças de novas personagens.",
+        "howto.move.touch": "<strong>Para andar:</strong> toca ou arrasta o dedo no ecrã, em cima da ilha.",
+        "howto.move.keys": "<strong>Para andar:</strong> setas ou W A S D (ou carrega na ilha com o rato).",
+        "howto.attack.touch": "O <strong>ataque</strong> (botão amarelo) aponta sozinho ao bichinho mais perto. A <strong>explosão</strong> (botão roxo) atinge tudo à volta quando chega aos 100%.",
+        "howto.attack.keys": "O <strong>ataque</strong> (barra de espaços) aponta sozinho ao bichinho mais perto. A <strong>explosão</strong> (tecla Q) atinge tudo à volta quando chega aos 100%.",
+        "howto.danger": "<strong>Foge do chão vermelho</strong> que pisca e <strong>não fiques na beira</strong>, depois da linha tracejada. Quando a varinha de um bichinho brilha, ele vai disparar.",
+        "howto.heart": "Tens <strong>3 corações</strong>. O escudo aguenta <strong>7 poderes</strong>; ao 7.º, perdes um coração.",
+        "howto.heartKeys": " Esc ou P põe em pausa.",
+        "howto.go": "Vamos a isso!",
+        "reward.pow": "POW!"
+      },
+
+      en: {
+        "meta.title": "Floating Islands Adventure",
+        "meta.description": "Davi, Daniel and Gabriela open presents, collect bananas and travel between islands in the sky. A Quanta Aulas game for computer and phone.",
+        "lang.label": "Language",
+        "cover.subtitle": "Davi, Daniel and Gabriela in an enchanted forest full of presents, bananas and islands in the sky.",
+        "cover.enter": "Start the adventure",
+        "menu.subtitle": "Pick a character, open presents and collect {n} bananas to fly to another island.",
+        "menu.start": "Start adventure",
+        "menu.reset": "Reset progress",
+        "menu.resetConfirm": "Reset your progress? Unlocked characters will be locked again.",
+        "menu.resetDone": "Progress reset.",
+        "journey.first": "First stop: {island}.",
+        "journey.continue": "Next up: {island}.",
+        "journey.stars": "Stars earned: {n} ★",
+        "lap.label": " (round {n})",
+        "island.0": "Banana Island",
+        "island.1": "Mushroom Island",
+        "island.2": "Star Island",
+        "char.davi.name": "Davi",
+        "char.daniel.name": "Daniel",
+        "char.gabriela.name": "Gabriela",
+        "char.vo.name": "Grandma",
+        "char.tio.name": "Uncle Nuno",
+        "char.mamae.name": "Mom",
+        "char.papai.name": "Dad",
+        "char.davi.note": "the oldest, loves adventure",
+        "char.daniel.note": "the middle one, super quick",
+        "char.gabriela.note": "the one who invented the bananas",
+        "char.rareNote.f": "unlocked from rare presents",
+        "char.rareNote.m": "unlocked from rare presents",
+        "char.locked": "Locked: {n}/5 pieces",
+        "char.lockedAria": "{name}, locked, {n} of 5 pieces",
+        "char.joined": "{name} joins the adventure!",
+        "char.missing": { one: "{n} more piece to unlock {name}. Look for rare presents!", other: "{n} more pieces to unlock {name}. Look for rare presents!" },
+        "locker.title": "Characters",
+        "locker.text": "Collect 5 pieces of the same character (they come in rare presents) to unlock them.",
+        "locker.back": "Back to the game",
+        "locker.play": "Play",
+        "locker.playing": "Playing",
+        "locker.pieces": "{n}/5 pieces",
+        "hud.characters": "Characters",
+        "hud.soundOff": "Turn sound off",
+        "hud.soundOn": "Turn sound on",
+        "hud.soundTitleOn": "Sound on (click to turn off)",
+        "hud.soundTitleOff": "Sound off (click to turn on)",
+        "hud.pause": "Pause",
+        "hud.bananasAria": "Bananas: {n} of {total}",
+        "hud.livesAria": "Hearts: {lives}. Shield: {shield} of {max}",
+        "hud.attacks": "Attacks",
+        "attack.quick": "ATTACK",
+        "attack.quickAria": "Quick attack",
+        "attack.burstAria": "Charged blast",
+        "attack.burstReady": "BOOM!",
+        "burst.charging": "The blast is still charging.",
+        "burst.go": "Magic blast!",
+        "tip.start": "{island}: open presents and collect {n} bananas.",
+        "tip.soundOn": "Sound on.",
+        "tip.soundOff": "Sound off.",
+        "unlock.banner.f": "{name} unlocked!",
+        "unlock.banner.m": "{name} unlocked!",
+        "unlock.bannerSub": "Find them under the characters button.",
+        "unlock.tip": "Rare present: {name} joined the team!",
+        "piece.tip": "Rare present: a piece of {name} ({n}/5). It doesn't count as a banana.",
+        "banana.left": { one: "Banana! {got}/{total}. Just 1 to go!", other: "Banana! {got}/{total}. {n} to go." },
+        "banana.done": "Banana! {got}/{total}.",
+        "level.title": "Level complete!",
+        "level.finalTitle": "All 3 islands saved!",
+        "level.text": "{island} done! Next stop: {next}. {hint}",
+        "level.finalText": "{island} done! You've visited every floating island! The next round has more critters and faster spells. {hint}",
+        "level.next": "Fly to the next island",
+        "level.nextLap": "Start round {n}",
+        "level.starsAria": "{n} of 3 stars",
+        "level.hint3": "For 3 stars: finish without losing a heart and get hit by 3 spells at most.",
+        "level.perfectAgain": "Three stars again!",
+        "level.perfect": "Three stars! Perfect!",
+        "stats.time": "<strong>{n}s</strong> on the island",
+        "stats.enemies": { one: "<strong>{n}</strong> critter defeated", other: "<strong>{n}</strong> critters defeated" },
+        "stats.hits": { one: "<strong>{n}</strong> spell taken", other: "<strong>{n}</strong> spells taken" },
+        "stats.bananas": "<strong>{got}/{total}</strong> bananas on this island",
+        "island.bannerSub": "Collect {n} bananas",
+        "island.lapSub": "Round {n}",
+        "island.welcome": "Welcome to {island}!",
+        "enemy.defeated": "Critter defeated! It left a present behind.",
+        "edge.warn": "Careful! The edge is crumbling. Go back to the middle!",
+        "hit.tip": { one: "A spell hit you! The shield can take {n} more.", other: "A spell hit you! The shield can take {n} more." },
+        "reason.floor": "The red ground collapsed under you!",
+        "reason.edge": "You stayed on the edge and fell off the island!",
+        "reason.powers": "The critters hit you with 7 spells and the shield broke!",
+        "hint.edge": "Tip: stay inside the dashed line.",
+        "hint.floor": "Tip: when the ground flashes red, step off it fast.",
+        "hint.powers": "Tip: use ATTACK, it aims at the nearest critter by itself. And dodge when a wand starts to glow.",
+        "life.lost": { one: "{reason} You lost a heart (1 left). {hint}", other: "{reason} You lost a heart ({n} left). {hint}" },
+        "gameover.title": "Game over!",
+        "gameover.text": "{reason} You're out of hearts, but the island is still waiting for you.",
+        "gameover.retry": "Try again",
+        "gameover.menu": "Back to start",
+        "pause.title": "Paused",
+        "pause.text": "The island will wait while you catch your breath.",
+        "pause.resume": "Resume",
+        "pause.howto": "How to play",
+        "pause.musicOn": "Music: on",
+        "pause.musicOff": "Music: off",
+        "pause.menu": "Back to menu",
+        "pause.keys": "Keyboard: Esc or P pauses and resumes.",
+        "howto.gift": "<strong>Open presents</strong> by walking into them. Collect <strong>{n} bananas</strong> to fly to the next island. A wiggling bush with a purple sparkle hides a present: get close! Rare presents hold pieces of new characters.",
+        "howto.move.touch": "<strong>To move:</strong> tap or drag your finger on the island.",
+        "howto.move.keys": "<strong>To move:</strong> arrow keys or W A S D (or click the island).",
+        "howto.attack.touch": "<strong>Attack</strong> (yellow button) aims at the nearest critter by itself. The <strong>blast</strong> (purple button) hits everything around you when it reaches 100%.",
+        "howto.attack.keys": "<strong>Attack</strong> (Space) aims at the nearest critter by itself. The <strong>blast</strong> (Q key) hits everything around you when it reaches 100%.",
+        "howto.danger": "<strong>Run from the red ground</strong> when it flashes, and <strong>don't stay on the edge</strong> past the dashed line. When a critter's wand glows, it's about to shoot.",
+        "howto.heart": "You have <strong>3 hearts</strong>. The shield can take <strong>7 spells</strong>; on the 7th, you lose a heart.",
+        "howto.heartKeys": " Esc or P pauses.",
+        "howto.go": "Let's go!",
+        "reward.pow": "POW!"
+      },
+
+      es: {
+        "meta.title": "Aventura en las Islas Voladoras",
+        "meta.description": "Davi, Daniel y Gabriela abren regalos, juntan bananas y viajan entre islas en el cielo. Un juego de Quanta Aulas para computadora y celular.",
+        "lang.label": "Idioma",
+        "cover.subtitle": "Davi, Daniel y Gabriela en un bosque encantado lleno de regalos, bananas e islas en el cielo.",
+        "cover.enter": "Entrar a la aventura",
+        "menu.subtitle": "Elige un personaje, abre regalos y junta {n} bananas para viajar a otra isla.",
+        "menu.start": "Empezar aventura",
+        "menu.reset": "Reiniciar progreso",
+        "menu.resetConfirm": "¿Reiniciar el progreso? Los personajes desbloqueados volverán a quedar bloqueados.",
+        "menu.resetDone": "Progreso reiniciado.",
+        "journey.first": "Primera parada: {island}.",
+        "journey.continue": "Siguen en la {island}.",
+        "journey.stars": "Estrellas ganadas: {n} ★",
+        "lap.label": " (vuelta {n})",
+        "island.0": "Isla de las Bananas",
+        "island.1": "Isla de los Hongos",
+        "island.2": "Isla de las Estrellas",
+        "char.davi.name": "Davi",
+        "char.daniel.name": "Daniel",
+        "char.gabriela.name": "Gabriela",
+        "char.vo.name": "Abuela",
+        "char.tio.name": "Tío Nuno",
+        "char.mamae.name": "Mamá",
+        "char.papai.name": "Papá",
+        "char.davi.note": "el mayor y aventurero",
+        "char.daniel.note": "el del medio, muy veloz",
+        "char.gabriela.note": "la creadora de las bananas",
+        "char.rareNote.f": "desbloqueada en regalos raros",
+        "char.rareNote.m": "desbloqueado en regalos raros",
+        "char.locked": "Bloqueado: {n}/5 piezas",
+        "char.lockedAria": "{name}, bloqueado, {n} de 5 piezas",
+        "char.joined": "¡{name} se une a la aventura!",
+        "char.missing": { one: "Falta {n} pieza para desbloquear a {name}. Sale en regalos raros.", other: "Faltan {n} piezas para desbloquear a {name}. Salen en regalos raros." },
+        "locker.title": "Personajes",
+        "locker.text": "Junta 5 piezas del mismo personaje (salen en regalos raros) para desbloquearlo.",
+        "locker.back": "Volver al juego",
+        "locker.play": "Jugar",
+        "locker.playing": "Jugando",
+        "locker.pieces": "{n}/5 piezas",
+        "hud.characters": "Personajes",
+        "hud.soundOff": "Apagar sonido",
+        "hud.soundOn": "Activar sonido",
+        "hud.soundTitleOn": "Sonido activado (haz clic para apagarlo)",
+        "hud.soundTitleOff": "Sonido apagado (haz clic para activarlo)",
+        "hud.pause": "Pausa",
+        "hud.bananasAria": "Bananas: {n} de {total}",
+        "hud.livesAria": "Corazones: {lives}. Escudo: {shield} de {max}",
+        "hud.attacks": "Ataques",
+        "attack.quick": "ATAQUE",
+        "attack.quickAria": "Ataque rápido",
+        "attack.burstAria": "Explosión cargada",
+        "attack.burstReady": "¡BUM!",
+        "burst.charging": "La explosión todavía se está cargando.",
+        "burst.go": "¡Explosión mágica!",
+        "tip.start": "{island}: abre regalos y junta {n} bananas.",
+        "tip.soundOn": "Sonido activado.",
+        "tip.soundOff": "Sonido apagado.",
+        "unlock.banner.f": "¡{name} desbloqueada!",
+        "unlock.banner.m": "¡{name} desbloqueado!",
+        "unlock.bannerSub": "Ya puedes elegir en el botón de personajes.",
+        "unlock.tip": "Regalo raro: ¡{name} se unió al equipo!",
+        "piece.tip": "Regalo raro: pieza de {name} ({n}/5). No cuenta como banana.",
+        "banana.left": { one: "¡Banana! {got}/{total}. ¡Solo falta 1!", other: "¡Banana! {got}/{total}. Faltan {n}." },
+        "banana.done": "¡Banana! {got}/{total}.",
+        "level.title": "¡Nivel completado!",
+        "level.finalTitle": "¡Las 3 islas están a salvo!",
+        "level.text": "¡{island} completada! Próxima parada: {next}. {hint}",
+        "level.finalText": "¡{island} completada! ¡Visitaron todas las islas voladoras! La próxima vuelta tiene más bichitos y hechizos más rápidos. {hint}",
+        "level.next": "Ir a la siguiente isla",
+        "level.nextLap": "Empezar la vuelta {n}",
+        "level.starsAria": "{n} de 3 estrellas",
+        "level.hint3": "Para 3 estrellas: termina sin perder corazones y recibiendo como máximo 3 hechizos.",
+        "level.perfectAgain": "¡Tres estrellas otra vez!",
+        "level.perfect": "¡Tres estrellas! ¡Perfecto!",
+        "stats.time": "<strong>{n} s</strong> de viaje",
+        "stats.enemies": { one: "<strong>{n}</strong> bichito derrotado", other: "<strong>{n}</strong> bichitos derrotados" },
+        "stats.hits": { one: "<strong>{n}</strong> hechizo recibido", other: "<strong>{n}</strong> hechizos recibidos" },
+        "stats.bananas": "<strong>{got}/{total}</strong> bananas en esta isla",
+        "island.bannerSub": "Junta {n} bananas",
+        "island.lapSub": "Vuelta {n}",
+        "island.welcome": "¡Bienvenidos a la {island}!",
+        "enemy.defeated": "¡Bichito derrotado! Dejó un regalo.",
+        "edge.warn": "¡Cuidado! El borde se está desmoronando. ¡Vuelve al centro!",
+        "hit.tip": { one: "¡Te dio un hechizo! El escudo aguanta {n} golpe más.", other: "¡Te dio un hechizo! El escudo aguanta {n} golpes más." },
+        "reason.floor": "¡El suelo rojo se derrumbó contigo encima!",
+        "reason.edge": "¡Te quedaste en la orilla y te caíste de la isla!",
+        "reason.powers": "¡Los bichitos te dieron 7 hechizos y el escudo se rompió!",
+        "hint.edge": "Consejo: quédate dentro de la línea punteada.",
+        "hint.floor": "Consejo: cuando el suelo parpadee en rojo, sal rápido de ahí.",
+        "hint.powers": "Consejo: usa el ATAQUE, apunta solo al bichito más cercano. Y esquiva cuando brille la varita.",
+        "life.lost": { one: "{reason} Perdiste un corazón (queda 1). {hint}", other: "{reason} Perdiste un corazón (quedan {n}). {hint}" },
+        "gameover.title": "¡Fin del juego!",
+        "gameover.text": "{reason} Se acabaron los corazones, pero la isla te sigue esperando.",
+        "gameover.retry": "Intentar de nuevo",
+        "gameover.menu": "Volver al inicio",
+        "pause.title": "En pausa",
+        "pause.text": "La isla te espera mientras recuperas el aliento.",
+        "pause.resume": "Continuar",
+        "pause.howto": "Cómo jugar",
+        "pause.musicOn": "Música: sí",
+        "pause.musicOff": "Música: no",
+        "pause.menu": "Volver al menú",
+        "pause.keys": "Con el teclado: Esc o P pausa y continúa.",
+        "howto.gift": "<strong>Abre regalos</strong> tocándolos. Junta <strong>{n} bananas</strong> para volar a la siguiente isla. Un arbusto que se mueve con un brillo morado esconde un regalo: ¡acércate! Los regalos raros traen piezas de nuevos personajes.",
+        "howto.move.touch": "<strong>Para moverte:</strong> toca o arrastra el dedo por la isla.",
+        "howto.move.keys": "<strong>Para moverte:</strong> flechas o W A S D (o haz clic en la isla).",
+        "howto.attack.touch": "El <strong>ataque</strong> (botón amarillo) apunta solo al bichito más cercano. La <strong>explosión</strong> (botón morado) golpea todo a tu alrededor cuando llega al 100 %.",
+        "howto.attack.keys": "El <strong>ataque</strong> (Espacio) apunta solo al bichito más cercano. La <strong>explosión</strong> (tecla Q) golpea todo a tu alrededor cuando llega al 100 %.",
+        "howto.danger": "<strong>Huye del suelo rojo</strong> que parpadea y <strong>no te quedes en la orilla</strong>, pasada la línea punteada. Cuando la varita de un bichito brilla, va a disparar.",
+        "howto.heart": "Tienes <strong>3 corazones</strong>. El escudo aguanta <strong>7 hechizos</strong>; con el 7.º, pierdes un corazón.",
+        "howto.heartKeys": " Esc o P pausa el juego.",
+        "howto.go": "¡Vamos!",
+        "reward.pow": "¡PUM!"
+      },
+
+      "zh-CN": {
+        "meta.title": "飞岛大冒险",
+        "meta.description": "大卫、丹尼尔和加布里埃拉打开礼物盒、收集香蕉，在天空中的小岛之间旅行。Quanta Aulas 出品，电脑和手机都能玩。",
+        "lang.label": "语言",
+        "cover.subtitle": "大卫、丹尼尔和加布里埃拉来到一片魔法森林，这里有好多礼物盒和香蕉，还有飘在天上的小岛。",
+        "cover.enter": "进入冒险",
+        "menu.subtitle": "选一个角色，打开礼物盒，收集 {n} 根香蕉，就能飞往下一座岛。",
+        "menu.start": "开始冒险",
+        "menu.reset": "重置进度",
+        "menu.resetConfirm": "确定要重置进度吗？已解锁的角色会重新锁上。",
+        "menu.resetDone": "进度已重置。",
+        "journey.first": "第一站：{island}。",
+        "journey.continue": "你们现在在{island}。",
+        "journey.stars": "已获得星星：{n} ★",
+        "lap.label": "（第 {n} 轮）",
+        "island.0": "香蕉岛",
+        "island.1": "蘑菇岛",
+        "island.2": "星星岛",
+        "char.davi.name": "大卫",
+        "char.daniel.name": "丹尼尔",
+        "char.gabriela.name": "加布里埃拉",
+        "char.vo.name": "奶奶",
+        "char.tio.name": "努诺叔叔",
+        "char.mamae.name": "妈妈",
+        "char.papai.name": "爸爸",
+        "char.davi.note": "老大，最爱冒险",
+        "char.daniel.note": "老二，跑得飞快",
+        "char.gabriela.note": "香蕉的发明者",
+        "char.rareNote.f": "从稀有礼物盒解锁",
+        "char.rareNote.m": "从稀有礼物盒解锁",
+        "char.locked": "未解锁：碎片 {n}/5",
+        "char.lockedAria": "{name}，未解锁，碎片 {n}/5",
+        "char.joined": "{name}加入冒险！",
+        "char.missing": "还差 {n} 块碎片就能解锁{name}。碎片藏在稀有礼物盒里。",
+        "locker.title": "角色",
+        "locker.text": "集齐同一个角色的 5 块碎片（藏在稀有礼物盒里）就能解锁。",
+        "locker.back": "回到游戏",
+        "locker.play": "选它",
+        "locker.playing": "使用中",
+        "locker.pieces": "碎片 {n}/5",
+        "hud.characters": "角色",
+        "hud.soundOff": "关闭声音",
+        "hud.soundOn": "打开声音",
+        "hud.soundTitleOn": "声音已打开（点击关闭）",
+        "hud.soundTitleOff": "声音已关闭（点击打开）",
+        "hud.pause": "暂停",
+        "hud.bananasAria": "香蕉：{n}/{total}",
+        "hud.livesAria": "爱心：{lives}。护盾：{shield}/{max}",
+        "hud.attacks": "攻击",
+        "attack.quick": "攻击",
+        "attack.quickAria": "快速攻击",
+        "attack.burstAria": "蓄力大爆炸",
+        "attack.burstReady": "爆！",
+        "burst.charging": "大爆炸还在蓄力中。",
+        "burst.go": "魔法大爆炸！",
+        "tip.start": "{island}：打开礼物盒，收集 {n} 根香蕉。",
+        "tip.soundOn": "声音已打开。",
+        "tip.soundOff": "声音已关闭。",
+        "unlock.banner.f": "{name}解锁啦！",
+        "unlock.banner.m": "{name}解锁啦！",
+        "unlock.bannerSub": "点击角色按钮就能选择。",
+        "unlock.tip": "稀有礼物盒：{name}加入队伍啦！",
+        "piece.tip": "稀有礼物盒：{name}的碎片（{n}/5）。它不算香蕉哦。",
+        "banana.left": "香蕉！{got}/{total}，还差 {n} 根。",
+        "banana.done": "香蕉！{got}/{total}。",
+        "level.title": "过关啦！",
+        "level.finalTitle": "三座岛都得救啦！",
+        "level.text": "{island}完成！下一站：{next}。{hint}",
+        "level.finalText": "{island}完成！你们去过所有的飞岛啦！下一轮会有更多小怪兽，魔法弹也飞得更快。{hint}",
+        "level.next": "飞往下一座岛",
+        "level.nextLap": "开始第 {n} 轮",
+        "level.starsAria": "{n}/3 颗星",
+        "level.hint3": "想拿 3 颗星：不丢爱心，最多被魔法弹打中 3 次。",
+        "level.perfectAgain": "又是三颗星！",
+        "level.perfect": "三颗星！太完美了！",
+        "stats.time": "用时 <strong>{n} 秒</strong>",
+        "stats.enemies": "打败 <strong>{n}</strong> 只小怪兽",
+        "stats.hits": "被打中 <strong>{n}</strong> 次",
+        "stats.bananas": "本岛香蕉 <strong>{got}/{total}</strong>",
+        "island.bannerSub": "收集 {n} 根香蕉",
+        "island.lapSub": "第 {n} 轮",
+        "island.welcome": "欢迎来到{island}！",
+        "enemy.defeated": "打败小怪兽！它留下了一个礼物盒。",
+        "edge.warn": "小心！岛边在碎裂，快回到中间！",
+        "hit.tip": "被魔法弹打中了！护盾还能挡 {n} 次。",
+        "reason.floor": "红色地面塌了，你掉下去了！",
+        "reason.edge": "在岛边待太久，掉下去了！",
+        "reason.powers": "被小怪兽的魔法弹打中 7 次，护盾碎了！",
+        "hint.edge": "小提示：待在虚线里面。",
+        "hint.floor": "小提示：地面闪红光时，赶快离开。",
+        "hint.powers": "小提示：用“攻击”，它会自动瞄准最近的小怪兽。魔杖发光时记得躲开。",
+        "life.lost": "{reason}失去一颗爱心（还剩 {n} 颗）。{hint}",
+        "gameover.title": "游戏结束！",
+        "gameover.text": "{reason}爱心用完了，不过小岛还在等你哦。",
+        "gameover.retry": "再试一次",
+        "gameover.menu": "回到开始",
+        "pause.title": "暂停中",
+        "pause.text": "歇口气吧，小岛会等你。",
+        "pause.resume": "继续",
+        "pause.howto": "怎么玩",
+        "pause.musicOn": "音乐：开",
+        "pause.musicOff": "音乐：关",
+        "pause.menu": "回到菜单",
+        "pause.keys": "键盘：按 Esc 或 P 暂停／继续。",
+        "howto.gift": "走到<strong>礼物盒</strong>旁边就能打开。收集 <strong>{n} 根香蕉</strong>，就能飞到下一座岛。闪着紫光、晃来晃去的灌木里藏着礼物盒：靠近看看！稀有礼物盒里有新角色的碎片。",
+        "howto.move.touch": "<strong>移动：</strong>在岛上点一下，或按住手指拖动。",
+        "howto.move.keys": "<strong>移动：</strong>方向键或 W A S D（也可以点击小岛）。",
+        "howto.attack.touch": "<strong>攻击</strong>（黄色按钮）会自动瞄准最近的小怪兽。<strong>大爆炸</strong>（紫色按钮）蓄满 100% 时，能打中周围所有东西。",
+        "howto.attack.keys": "<strong>攻击</strong>（空格键）会自动瞄准最近的小怪兽。<strong>大爆炸</strong>（Q 键）蓄满 100% 时，能打中周围所有东西。",
+        "howto.danger": "<strong>快躲开闪红光的地面</strong>，也<strong>别待在虚线外的岛边</strong>。小怪兽的魔杖一发光，它就要发射魔法弹了。",
+        "howto.heart": "你有 <strong>3 颗爱心</strong>。护盾能挡 <strong>7 次魔法弹</strong>，第 7 次会失去一颗爱心。",
+        "howto.heartKeys": "按 Esc 或 P 暂停。",
+        "howto.go": "出发！",
+        "reward.pow": "砰！"
+      },
+
+      ja: {
+        "meta.title": "そらとぶ島の大ぼうけん",
+        "meta.description": "ダヴィ、ダニエル、ガブリエラが、プレゼントをあけてバナナをあつめ、空にうかぶ島をめぐります。パソコンでもスマホでもあそべる Quanta Aulas のゲームです。",
+        "lang.label": "ことば",
+        "cover.subtitle": "ダヴィ、ダニエル、ガブリエラが、プレゼントとバナナがいっぱいの魔法の森へ。空には島がうかんでいるよ。",
+        "cover.enter": "ぼうけんに出発",
+        "menu.subtitle": "キャラクターをえらんで、プレゼントをあけよう。バナナを{n}本あつめると、つぎの島へ行けるよ。",
+        "menu.start": "ぼうけんスタート",
+        "menu.reset": "きろくをリセット",
+        "menu.resetConfirm": "きろくをリセットしますか？なかまになったキャラクターも、またロックされます。",
+        "menu.resetDone": "きろくをリセットしました。",
+        "journey.first": "さいしょの行き先：{island}",
+        "journey.continue": "いまは{island}にいるよ。",
+        "journey.stars": "あつめた星：{n} ★",
+        "lap.label": "（{n}周目）",
+        "island.0": "バナナ島",
+        "island.1": "キノコ島",
+        "island.2": "星の島",
+        "char.davi.name": "ダヴィ",
+        "char.daniel.name": "ダニエル",
+        "char.gabriela.name": "ガブリエラ",
+        "char.vo.name": "おばあちゃん",
+        "char.tio.name": "ヌーノおじさん",
+        "char.mamae.name": "ママ",
+        "char.papai.name": "パパ",
+        "char.davi.note": "いちばん上。ぼうけん大すき",
+        "char.daniel.note": "まん中の子。とってもすばやい",
+        "char.gabriela.note": "バナナを考えた人",
+        "char.rareNote.f": "レアなプレゼントでなかまに",
+        "char.rareNote.m": "レアなプレゼントでなかまに",
+        "char.locked": "ロック中：かけら {n}/5",
+        "char.lockedAria": "{name}、ロック中、かけら {n}/5",
+        "char.joined": "{name}がぼうけんに参加！",
+        "char.missing": "{name}のかけらは、あと{n}こ。レアなプレゼントに入っているよ。",
+        "locker.title": "キャラクター",
+        "locker.text": "同じキャラクターのかけらを5こあつめると、なかまになるよ（かけらはレアなプレゼントに入っています）。",
+        "locker.back": "ゲームにもどる",
+        "locker.play": "えらぶ",
+        "locker.playing": "プレイ中",
+        "locker.pieces": "かけら {n}/5",
+        "hud.characters": "キャラクター",
+        "hud.soundOff": "音を消す",
+        "hud.soundOn": "音を出す",
+        "hud.soundTitleOn": "音あり（クリックで消す）",
+        "hud.soundTitleOff": "音なし（クリックで出す）",
+        "hud.pause": "ポーズ",
+        "hud.bananasAria": "バナナ：{n}/{total}",
+        "hud.livesAria": "ハート：{lives}。シールド：{shield}/{max}",
+        "hud.attacks": "こうげき",
+        "attack.quick": "こうげき",
+        "attack.quickAria": "すばやいこうげき",
+        "attack.burstAria": "ためてドカン",
+        "attack.burstReady": "ドカン!",
+        "burst.charging": "ドカンはまだチャージ中だよ。",
+        "burst.go": "まほうのドカン！",
+        "tip.start": "{island}：プレゼントをあけて、バナナを{n}本あつめよう。",
+        "tip.soundOn": "音を出します。",
+        "tip.soundOff": "音を消しました。",
+        "unlock.banner.f": "{name}がなかまになった！",
+        "unlock.banner.m": "{name}がなかまになった！",
+        "unlock.bannerSub": "キャラクターボタンからえらべるよ。",
+        "unlock.tip": "レアなプレゼント：{name}がなかまに入った！",
+        "piece.tip": "レアなプレゼント：{name}のかけら（{n}/5）。バナナには数えないよ。",
+        "banana.left": "バナナ！{got}/{total}。あと{n}本！",
+        "banana.done": "バナナ！{got}/{total}。",
+        "level.title": "クリア！",
+        "level.finalTitle": "3つの島をぜんぶすくった！",
+        "level.text": "{island}クリア！つぎは{next}だよ。{hint}",
+        "level.finalText": "{island}クリア！そらとぶ島をぜんぶまわったね！つぎの周は、モンスターがふえて、まほうもはやくなるよ。{hint}",
+        "level.next": "つぎの島へ",
+        "level.nextLap": "{n}周目をはじめる",
+        "level.starsAria": "星 {n}/3",
+        "level.hint3": "星3つのコツ：ハートをへらさず、まほうに当たるのは3回まで。",
+        "level.perfectAgain": "また星3つ！",
+        "level.perfect": "星3つ！かんぺき！",
+        "stats.time": "タイム <strong>{n}秒</strong>",
+        "stats.enemies": "たおしたモンスター <strong>{n}</strong>",
+        "stats.hits": "当たったまほう <strong>{n}</strong>",
+        "stats.bananas": "この島のバナナ <strong>{got}/{total}</strong>",
+        "island.bannerSub": "バナナを{n}本あつめよう",
+        "island.lapSub": "{n}周目",
+        "island.welcome": "{island}へようこそ！",
+        "enemy.defeated": "モンスターをたおした！プレゼントをおとしたよ。",
+        "edge.warn": "あぶない！はしっこがくずれているよ。まん中にもどって！",
+        "hit.tip": "まほうに当たった！シールドはあと{n}回たえられるよ。",
+        "reason.floor": "赤いじめんがくずれて、おちちゃった！",
+        "reason.edge": "はしっこにいすぎて、島からおちちゃった！",
+        "reason.powers": "まほうに7回当たって、シールドがこわれた！",
+        "hint.edge": "ヒント：点線の内がわにいよう。",
+        "hint.floor": "ヒント：じめんが赤く光ったら、すぐにはなれよう。",
+        "hint.powers": "ヒント：「こうげき」は、いちばん近いモンスターを自動でねらうよ。つえが光ったら、よけよう。",
+        "life.lost": "{reason}ハートが1つへった（のこり{n}）。{hint}",
+        "gameover.title": "ゲームオーバー！",
+        "gameover.text": "{reason}ハートがなくなっちゃった。でも、島はまってるよ。",
+        "gameover.retry": "もういちど",
+        "gameover.menu": "はじめにもどる",
+        "pause.title": "ポーズ中",
+        "pause.text": "ひと休みしているあいだ、島はまっているよ。",
+        "pause.resume": "つづける",
+        "pause.howto": "あそびかた",
+        "pause.musicOn": "音楽：オン",
+        "pause.musicOff": "音楽：オフ",
+        "pause.menu": "メニューにもどる",
+        "pause.keys": "キーボード：Esc か P でポーズ／つづける。",
+        "howto.gift": "<strong>プレゼント</strong>にさわるとあくよ。<strong>バナナを{n}本</strong>あつめると、つぎの島へとべるよ。むらさきに光ってゆれている草むらには、プレゼントがかくれているよ。近づいてみよう！レアなプレゼントには、新しいキャラクターのかけらが入っているよ。",
+        "howto.move.touch": "<strong>うごくには：</strong>島をタッチするか、ゆびでなぞってね。",
+        "howto.move.keys": "<strong>うごくには：</strong>矢印キーか W A S D（島をクリックしてもOK）。",
+        "howto.attack.touch": "<strong>こうげき</strong>（きいろのボタン）は、いちばん近いモンスターを自動でねらうよ。<strong>ドカン</strong>（むらさきのボタン）は、100%になったら、まわりぜんぶに当たるよ。",
+        "howto.attack.keys": "<strong>こうげき</strong>（スペースキー）は、いちばん近いモンスターを自動でねらうよ。<strong>ドカン</strong>（Qキー）は、100%になったら、まわりぜんぶに当たるよ。",
+        "howto.danger": "<strong>赤く光るじめんからにげて</strong>、点線の外の<strong>はしっこにはいないでね</strong>。モンスターのつえが光ったら、まほうがとんでくるよ。",
+        "howto.heart": "ハートは<strong>3つ</strong>。シールドは<strong>まほう7回</strong>までたえられて、7回目でハートが1つへるよ。",
+        "howto.heartKeys": "Esc か P でポーズ。",
+        "howto.go": "レッツゴー！",
+        "reward.pow": "バシッ！"
+      },
+
+      de: {
+        "meta.title": "Abenteuer auf den Schwebeinseln",
+        "meta.description": "Davi, Daniel und Gabriela öffnen Geschenke, sammeln Bananen und reisen zwischen Inseln am Himmel. Ein Spiel von Quanta Aulas für Computer und Handy.",
+        "lang.label": "Sprache",
+        "cover.subtitle": "Davi, Daniel und Gabriela in einem Zauberwald voller Geschenke, Bananen und Inseln am Himmel.",
+        "cover.enter": "Ab ins Abenteuer",
+        "menu.subtitle": "Wähle eine Figur, öffne Geschenke und sammle {n} Bananen, um zur nächsten Insel zu fliegen.",
+        "menu.start": "Abenteuer starten",
+        "menu.reset": "Neu anfangen",
+        "menu.resetConfirm": "Wirklich neu anfangen? Freigeschaltete Figuren werden wieder gesperrt.",
+        "menu.resetDone": "Alles zurückgesetzt.",
+        "journey.first": "Erster Halt: {island}.",
+        "journey.continue": "Weiter geht's auf der {island}.",
+        "journey.stars": "Gesammelte Sterne: {n} ★",
+        "lap.label": " (Runde {n})",
+        "island.0": "Bananeninsel",
+        "island.1": "Pilzinsel",
+        "island.2": "Sterneninsel",
+        "char.davi.name": "Davi",
+        "char.daniel.name": "Daniel",
+        "char.gabriela.name": "Gabriela",
+        "char.vo.name": "Oma",
+        "char.tio.name": "Onkel Nuno",
+        "char.mamae.name": "Mama",
+        "char.papai.name": "Papa",
+        "char.davi.note": "der Älteste, liebt Abenteuer",
+        "char.daniel.note": "der Mittlere, superflink",
+        "char.gabriela.note": "die Erfinderin der Bananen",
+        "char.rareNote.f": "aus seltenen Geschenken",
+        "char.rareNote.m": "aus seltenen Geschenken",
+        "char.locked": "Gesperrt: {n}/5 Teile",
+        "char.lockedAria": "{name}, gesperrt, {n} von 5 Teilen",
+        "char.joined": "{name} ist dabei!",
+        "char.missing": { one: "Noch {n} Teil, dann ist {name} frei. Es steckt in seltenen Geschenken.", other: "Noch {n} Teile, dann ist {name} frei. Sie stecken in seltenen Geschenken." },
+        "locker.title": "Figuren",
+        "locker.text": "Sammle 5 Teile derselben Figur (sie stecken in seltenen Geschenken), um sie freizuschalten.",
+        "locker.back": "Zurück zum Spiel",
+        "locker.play": "Spielen",
+        "locker.playing": "Aktiv",
+        "locker.pieces": "{n}/5 Teile",
+        "hud.characters": "Figuren",
+        "hud.soundOff": "Ton aus",
+        "hud.soundOn": "Ton an",
+        "hud.soundTitleOn": "Ton an (zum Ausschalten klicken)",
+        "hud.soundTitleOff": "Ton aus (zum Einschalten klicken)",
+        "hud.pause": "Pause",
+        "hud.bananasAria": "Bananen: {n} von {total}",
+        "hud.livesAria": "Herzen: {lives}. Schild: {shield} von {max}",
+        "hud.attacks": "Angriffe",
+        "attack.quick": "ANGRIFF",
+        "attack.quickAria": "Schneller Angriff",
+        "attack.burstAria": "Aufgeladene Explosion",
+        "attack.burstReady": "BUMM!",
+        "burst.charging": "Die Explosion lädt noch.",
+        "burst.go": "Zauber-Explosion!",
+        "tip.start": "{island}: Öffne Geschenke und sammle {n} Bananen.",
+        "tip.soundOn": "Ton an.",
+        "tip.soundOff": "Ton aus.",
+        "unlock.banner.f": "{name} ist freigeschaltet!",
+        "unlock.banner.m": "{name} ist freigeschaltet!",
+        "unlock.bannerSub": "Wähle die Figur über den Figuren-Knopf.",
+        "unlock.tip": "Seltenes Geschenk: {name} ist jetzt im Team!",
+        "piece.tip": "Seltenes Geschenk: ein Teil von {name} ({n}/5). Zählt nicht als Banane.",
+        "banana.left": { one: "Banane! {got}/{total}. Nur noch 1!", other: "Banane! {got}/{total}. Noch {n}." },
+        "banana.done": "Banane! {got}/{total}.",
+        "level.title": "Level geschafft!",
+        "level.finalTitle": "Alle 3 Inseln gerettet!",
+        "level.text": "{island} geschafft! Nächster Halt: {next}. {hint}",
+        "level.finalText": "{island} geschafft! Ihr habt alle Schwebeinseln besucht! In der nächsten Runde gibt es mehr Monsterchen und schnellere Zauber. {hint}",
+        "level.next": "Zur nächsten Insel",
+        "level.nextLap": "Runde {n} starten",
+        "level.starsAria": "{n} von 3 Sternen",
+        "level.hint3": "Für 3 Sterne: Verliere kein Herz und lass dich höchstens 3-mal von Zaubern treffen.",
+        "level.perfectAgain": "Wieder drei Sterne!",
+        "level.perfect": "Drei Sterne! Perfekt!",
+        "stats.time": "<strong>{n} s</strong> Reisezeit",
+        "stats.enemies": { one: "<strong>{n}</strong> Monsterchen besiegt", other: "<strong>{n}</strong> Monsterchen besiegt" },
+        "stats.hits": { one: "<strong>{n}</strong> Zauber abbekommen", other: "<strong>{n}</strong> Zauber abbekommen" },
+        "stats.bananas": "<strong>{got}/{total}</strong> Bananen auf dieser Insel",
+        "island.bannerSub": "Sammle {n} Bananen",
+        "island.lapSub": "Runde {n}",
+        "island.welcome": "Willkommen auf der {island}!",
+        "enemy.defeated": "Monsterchen besiegt! Es hat ein Geschenk dagelassen.",
+        "edge.warn": "Vorsicht! Der Rand bröckelt. Zurück zur Mitte!",
+        "hit.tip": { one: "Ein Zauber hat getroffen! Der Schild hält noch {n} Treffer aus.", other: "Ein Zauber hat getroffen! Der Schild hält noch {n} Treffer aus." },
+        "reason.floor": "Der rote Boden ist unter dir eingestürzt!",
+        "reason.edge": "Zu lange am Rand – du bist von der Insel gefallen!",
+        "reason.powers": "7 Zauber haben getroffen – der Schild ist kaputt!",
+        "hint.edge": "Tipp: Bleib innerhalb der gestrichelten Linie.",
+        "hint.floor": "Tipp: Wenn der Boden rot blinkt, schnell runter da!",
+        "hint.powers": "Tipp: Nutze ANGRIFF, er zielt von selbst auf das nächste Monsterchen. Und weich aus, wenn ein Zauberstab leuchtet.",
+        "life.lost": { one: "{reason} Ein Herz ist weg (noch 1). {hint}", other: "{reason} Ein Herz ist weg (noch {n}). {hint}" },
+        "gameover.title": "Spiel vorbei!",
+        "gameover.text": "{reason} Keine Herzen mehr, aber die Insel wartet auf dich.",
+        "gameover.retry": "Nochmal versuchen",
+        "gameover.menu": "Zum Start",
+        "pause.title": "Pause",
+        "pause.text": "Die Insel wartet, während du verschnaufst.",
+        "pause.resume": "Weiter",
+        "pause.howto": "So geht's",
+        "pause.musicOn": "Musik: an",
+        "pause.musicOff": "Musik: aus",
+        "pause.menu": "Zum Menü",
+        "pause.keys": "Tastatur: Esc oder P pausiert und macht weiter.",
+        "howto.gift": "<strong>Öffne Geschenke</strong>, indem du hinläufst. Sammle <strong>{n} Bananen</strong>, um zur nächsten Insel zu fliegen. Ein wackelnder Busch mit lila Funkeln versteckt ein Geschenk: geh nah ran! Seltene Geschenke enthalten Teile neuer Figuren.",
+        "howto.move.touch": "<strong>Laufen:</strong> Tippe auf die Insel oder zieh den Finger darüber.",
+        "howto.move.keys": "<strong>Laufen:</strong> Pfeiltasten oder W A S D (oder auf die Insel klicken).",
+        "howto.attack.touch": "<strong>Angriff</strong> (gelber Knopf) zielt von selbst auf das nächste Monsterchen. Die <strong>Explosion</strong> (lila Knopf) trifft alles um dich herum, wenn sie 100 % erreicht.",
+        "howto.attack.keys": "<strong>Angriff</strong> (Leertaste) zielt von selbst auf das nächste Monsterchen. Die <strong>Explosion</strong> (Taste Q) trifft alles um dich herum, wenn sie 100 % erreicht.",
+        "howto.danger": "<strong>Lauf weg vom roten Boden</strong>, wenn er blinkt, und <strong>bleib nicht am Rand</strong> hinter der gestrichelten Linie. Wenn der Zauberstab eines Monsterchens leuchtet, schießt es gleich.",
+        "howto.heart": "Du hast <strong>3 Herzen</strong>. Der Schild hält <strong>7 Zauber</strong> aus; beim 7. ist ein Herz weg.",
+        "howto.heartKeys": " Esc oder P pausiert.",
+        "howto.go": "Los geht's!",
+        "reward.pow": "PENG!"
+      }
+    };
+
+    let currentLang = "pt-BR";
+    const CANVAS_FONT = '"Trebuchet MS", "Noto Sans CJK SC", "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif';
+    const pluralCache = {};
+
+    function t(key, params = {}) {
+      const table = I18N[currentLang] || I18N["pt-BR"];
+      let value = table[key];
+      if (value === undefined) value = I18N["pt-BR"][key];
+      if (value === undefined) return key;
+      if (typeof value === "object") {
+        const n = Number(params.n) || 0;
+        if (!pluralCache[currentLang]) pluralCache[currentLang] = new Intl.PluralRules(currentLang);
+        value = value[pluralCache[currentLang].select(n)] || value.other;
+      }
+      return value.replace(/\{(\w+)\}/g, (match, name) => (params[name] !== undefined ? String(params[name]) : match)).trim();
+    }
+
+    function detectLanguage() {
+      try {
+        const saved = localStorage.getItem(LANG_KEY);
+        if (saved && I18N[saved]) return saved;
+      } catch (error) {
+        // sem armazenamento: detecta de novo
+      }
+      const wanted = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""])
+        .map((tag) => String(tag).toLowerCase());
+      for (const tag of wanted) {
+        if (tag === "pt-pt" || tag.startsWith("pt-pt")) return "pt-PT";
+        if (tag.startsWith("pt")) return "pt-BR";
+        if (tag.startsWith("zh")) return "zh-CN";
+        if (tag.startsWith("en")) return "en";
+        if (tag.startsWith("es")) return "es";
+        if (tag.startsWith("ja")) return "ja";
+        if (tag.startsWith("de")) return "de";
+      }
+      return "en";
+    }
+
     const canvas = document.querySelector("#game");
-    const ctx = canvas.getContext("2d");
+    const mainCtx = canvas.getContext("2d");
+    // As funções de desenho usam "ctx"; ele aponta para uma camada guardada quando ela é (re)montada.
+    let ctx = mainCtx;
+    const layers = { sky: document.createElement("canvas"), island: document.createElement("canvas"), key: "" };
     const hud = document.querySelector("#hud");
     const controls = document.querySelector("#controls");
     const welcomeScreen = document.querySelector("#welcomeScreen");
@@ -1013,13 +2389,35 @@
     const chargeLabel = document.querySelector("#chargeLabel");
     const levelText = document.querySelector("#levelText");
     const gameOverText = document.querySelector("#gameOverText");
+    const gameOverStats = document.querySelector("#gameOverStats");
+    const gameOverHint = document.querySelector("#gameOverHint");
+    const levelTitle = document.querySelector("#levelTitle");
+    const levelStars = document.querySelector("#levelStars");
+    const levelStats = document.querySelector("#levelStats");
+    const nextIslandButton = document.querySelector("#nextIslandButton");
+    const howtoDialog = document.querySelector("#howtoDialog");
+    const banner = document.querySelector("#banner");
+    const journeyInfo = document.querySelector("#journeyInfo");
 
     const STORAGE_KEY = "ilhas-voadoras-progresso-v1";
+    const SETTINGS_KEY = "ilhas-voadoras-config-v1";
+    const JOURNEY_KEY = "ilhas-voadoras-jornada-v1";
+    const SHIELD_MAX = 7;
+    // Ritmo: menos pacotes de uma vez, e o próximo aparece longe, para explorar a ilha.
+    const PACKAGES_ON_ISLAND = 5;
+    const PACKAGE_RESPAWN_TIME = 2.2;
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const BANANAS_TO_WIN = 10;
+    // A partir desta distância do centro (1 = borda desenhada) o chão esfarela.
+    const EDGE_LIMIT = 0.82;
+    // Toques e cliques nunca levam o personagem além deste ponto.
+    const SAFE_TAP_LIMIT = 0.76;
+    const EDGE_FALL_TIME = 0.8;
 
     const characters = [
       {
         id: "davi",
+        gender: "m",
         name: "Davi",
         note: "mais velho e aventureiro",
         unlockedAtStart: true,
@@ -1033,6 +2431,7 @@
       },
       {
         id: "daniel",
+        gender: "m",
         name: "Daniel",
         note: "do meio e ligeiro",
         unlockedAtStart: true,
@@ -1046,6 +2445,7 @@
       },
       {
         id: "gabriela",
+        gender: "f",
         name: "Gabriela",
         note: "a criadora das bananas",
         unlockedAtStart: true,
@@ -1059,8 +2459,9 @@
       },
       {
         id: "vo",
+        gender: "f",
         name: "Vó",
-        note: "pacotes 0/5",
+        note: "liberada nos pacotes raros",
         skin: "#f0c39a",
         hair: "#d8d8dd",
         shirt: "#b889d8",
@@ -1071,8 +2472,9 @@
       },
       {
         id: "tio",
+        gender: "m",
         name: "Tio Nuno",
-        note: "pacotes 0/5",
+        note: "liberado nos pacotes raros",
         skin: "#e7b180",
         hair: "#33231b",
         shirt: "#3e8edb",
@@ -1083,8 +2485,9 @@
       },
       {
         id: "mamae",
+        gender: "f",
         name: "Mamãe",
-        note: "pacotes 0/5",
+        note: "liberada nos pacotes raros",
         skin: "#edb98a",
         hair: "#593222",
         shirt: "#ef6f73",
@@ -1095,8 +2498,9 @@
       },
       {
         id: "papai",
+        gender: "m",
         name: "Papai",
-        note: "pacotes 0/5",
+        note: "liberado nos pacotes raros",
         skin: "#eab385",
         hair: "#233347",
         shirt: "#f19b45",
@@ -1152,6 +2556,13 @@
       time: 0,
       selectedId: "davi",
       islandIndex: 0,
+      lap: 0,
+      journey: { islandIndex: 0, lap: 0, stars: {}, bestLevel: 0, howtoSeen: false },
+      run: { livesLost: 0, hitsTaken: 0, enemiesDefeated: 0, totalBananas: 0 },
+      particles: [],
+      shake: 0,
+      enemyRespawnTimer: 0,
+      howtoReturn: "playing",
       bananas: 0,
       lives: 3,
       hits: 0,
@@ -1176,6 +2587,8 @@
         radius: 20,
         hitCooldown: 0,
         fallCooldown: 0,
+        teeter: 0,
+        edgeWarned: false,
         target: null
       },
       keys: {
@@ -1184,6 +2597,8 @@
         left: false,
         right: false
       },
+      sound: true,
+      audioUnlocked: false,
       music: {
         context: null,
         master: null,
@@ -1230,7 +2645,69 @@
     }
 
     function saveProgress() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+      } catch (error) {
+        // Sem armazenamento (aba anônima): o jogo continua, só não lembra.
+      }
+    }
+
+    function loadJourney() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(JOURNEY_KEY));
+        if (saved && typeof saved === "object") {
+          const index = Number(saved.islandIndex);
+          state.journey.islandIndex = Number.isInteger(index) && index >= 0 && index < islands.length ? index : 0;
+          state.journey.lap = Math.max(0, Math.min(20, Number(saved.lap) || 0));
+          state.journey.stars = saved.stars && typeof saved.stars === "object" ? saved.stars : {};
+          state.journey.bestLevel = Math.max(0, Number(saved.bestLevel) || 0);
+          state.journey.howtoSeen = Boolean(saved.howtoSeen);
+          if (typeof saved.selectedId === "string") state.selectedId = saved.selectedId;
+        }
+      } catch (error) {
+        // começa do zero
+      }
+      state.islandIndex = state.journey.islandIndex;
+      state.lap = state.journey.lap;
+    }
+
+    function saveJourney() {
+      try {
+        localStorage.setItem(JOURNEY_KEY, JSON.stringify({ ...state.journey, selectedId: state.selectedId }));
+      } catch (error) {
+        // ignora
+      }
+    }
+
+    function loadSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+        if (typeof saved.sound === "boolean") state.sound = saved.sound;
+        if (typeof saved.music === "boolean") state.music.enabled = saved.music;
+      } catch (error) {
+        // usa o padrão
+      }
+    }
+
+    function saveSettings() {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sound: state.sound, music: state.music.enabled }));
+      } catch (error) {
+        // ignora
+      }
+    }
+
+    function charName(character) {
+      return t(`char.${character.id}.name`);
+    }
+
+    function charNote(character) {
+      if (character.unlockedAtStart) return t(`char.${character.id}.note`);
+      return t(`char.rareNote.${character.gender}`);
+    }
+
+    function islandName(index) {
+      return t(`island.${index}`);
     }
 
     function characterById(id) {
@@ -1238,6 +2715,13 @@
     }
 
     function resize() {
+      // Guarda a posição relativa na ilha: ao girar o celular, o personagem
+      // continua no mesmo lugar da ilha (antes podia parar na beirada e cair).
+      let relative = null;
+      if (state.width && state.height && state.player.x) {
+        const old = islandShape();
+        relative = { u: (state.player.x - old.cx) / old.rx, v: (state.player.y - old.cy) / old.ry };
+      }
       state.dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
       state.width = Math.floor(window.innerWidth);
       state.height = Math.floor(window.innerHeight);
@@ -1246,13 +2730,18 @@
       canvas.style.width = `${state.width}px`;
       canvas.style.height = `${state.height}px`;
       ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
-      if (!state.player.x || !state.player.y) {
+      if (relative) {
+        const island = islandShape();
+        state.player.x = island.cx + relative.u * island.rx;
+        state.player.y = island.cy + relative.v * island.ry;
+        state.player.target = null;
+      } else if (!state.player.x || !state.player.y) {
         state.player.x = state.width / 2;
         state.player.y = state.height / 2 + 20;
       }
       clampPlayerToIsland();
       if (state.player.target) {
-        state.player.target = clampPointToIsland(state.player.target.x, state.player.target.y);
+        state.player.target = clampPointToIsland(state.player.target.x, state.player.target.y, SAFE_TAP_LIMIT);
       }
     }
 
@@ -1276,6 +2765,18 @@
       };
     }
 
+    // Escala do mundo: ilhas menores (celular) deixam bichos, chão vermelho e árvores menores.
+    function worldScale() {
+      const shape = islandShape();
+      return Math.max(0.6, Math.min(1, shape.rx / 400, shape.ry / 190));
+    }
+
+    // Velocidades acompanham o tamanho da ilha: na ilha pequena do celular,
+    // a mesma velocidade em pixels atravessava tudo num piscar.
+    function motionScale() {
+      return 0.4 + 0.6 * worldScale();
+    }
+
     function pointOnIsland(u, v) {
       const island = islandShape();
       return {
@@ -1284,9 +2785,9 @@
       };
     }
 
-    function randomPointInIsland(random) {
+    function randomPointInIsland(random, maxRadius = 0.82) {
       const angle = random() * Math.PI * 2;
-      const radius = Math.sqrt(random()) * 0.82;
+      const radius = Math.sqrt(random()) * maxRadius;
       return {
         u: Math.cos(angle) * radius,
         v: Math.sin(angle) * radius
@@ -1305,25 +2806,41 @@
       return { type: "banana" };
     }
 
-    function newPackage(random = Math.random) {
-      let spot = randomPointInIsland(random);
+    function newPackage(random = Math.random, minDistance = 95) {
+      // Pacotes ficam sempre na parte segura (longe da borda que esfarela).
+      let spot = randomPointInIsland(random, 0.72);
       let attempts = 0;
       while (attempts < 20) {
         const point = pointOnIsland(spot.u, spot.v);
         const dx = point.x - state.player.x;
         const dy = point.y - state.player.y;
-        if (Math.hypot(dx, dy) > 95) break;
-        spot = randomPointInIsland(random);
+        if (Math.hypot(dx, dy) > minDistance) break;
+        spot = randomPointInIsland(random, 0.72);
         attempts += 1;
       }
       return {
         id: `${Date.now()}-${Math.floor(random() * 100000)}`,
         u: spot.u,
         v: spot.v,
-        hidden: random() < 0.55,
+        // Pacote escondido: fica num arbusto que balança até alguém chegar perto.
+        hidden: random() < 0.4,
         bob: random() * Math.PI * 2,
         content: choosePackageContent(random),
         opened: false
+      };
+    }
+
+    // Curva de dificuldade: cada ilha (e cada volta completa) deixa os bichinhos
+    // um pouco mais numerosos e rápidos. A primeira ilha é a mais calma.
+    function difficulty() {
+      const level = state.islandIndex + state.lap * islands.length;
+      return {
+        level,
+        enemies: Math.min(5, 2 + level),
+        fireBase: Math.max(1.35, 2.5 - level * 0.22),
+        powerSpeed: Math.min(205, 105 + level * 17),
+        dangerBase: Math.max(2.8, 5.4 - level * 0.45),
+        enemyHp: level >= 4 ? 4 : 3
       };
     }
 
@@ -1341,9 +2858,12 @@
         u: spot.u,
         v: spot.v,
         phase: random() * Math.PI * 2,
-        cooldown: 0.7 + random() * 1.3,
-        fireEvery: 1.75 + random() * 0.65,
-        hp: 3,
+        cooldown: 0.9 + random() * 1.4,
+        fireEvery: difficulty().fireBase + random() * 0.7,
+        hp: difficulty().enemyHp,
+        maxHp: difficulty().enemyHp,
+        flash: 0,
+        appear: 0,
         color: index % 2 === 0 ? "#6d49b8" : "#d64d7f"
       };
     }
@@ -1354,12 +2874,17 @@
       const island = islandShape();
       state.player.x = island.cx;
       state.player.y = island.cy + island.ry * 0.15;
-      state.packages = Array.from({ length: 13 }, () => newPackage(random));
-      state.enemies = Array.from({ length: Math.min(4, 2 + state.islandIndex) }, (_, index) => newEnemy(random, index));
+      state.packages = Array.from({ length: PACKAGES_ON_ISLAND }, () => newPackage(random));
+      state.packageTimers = [];
+      state.enemies = Array.from({ length: difficulty().enemies }, (_, index) => newEnemy(random, index));
+      state.enemyRespawnTimer = 8;
+      state.particles = [];
       state.powers = [];
       state.playerShots = [];
       state.dangerZones = [];
-      state.dangerTimer = 2.4;
+      // Primeiros segundos sem chão caindo, para a criança se localizar.
+      state.dangerTimer = 4.5;
+      state.islandStats = { livesLost: 0, hitsTaken: 0, enemiesDefeated: 0, startedAt: performance.now() };
       state.rewards = [];
       state.decorations = Array.from({ length: 24 }, (_, index) => {
         const spot = randomPointInIsland(random);
@@ -1376,7 +2901,7 @@
           scale: 0.72 + random() * 0.68,
           sway: random() * Math.PI * 2
         };
-      });
+      }).sort((a, b) => a.v - b.v);
       state.clouds = Array.from({ length: 9 }, (_, index) => ({
         x: random() * state.width,
         y: state.height * (0.08 + random() * 0.34),
@@ -1384,7 +2909,10 @@
         scale: 0.65 + random() * 1.1,
         id: index
       }));
+      for (const enemy of state.enemies) enemy.cooldown += 1.6;
       state.player.target = null;
+      state.player.teeter = 0;
+      state.player.edgeWarned = false;
       state.player.fallCooldown = 1;
     }
 
@@ -1395,22 +2923,29 @@
         const card = document.createElement("button");
         card.type = "button";
         card.className = `character-card${state.selectedId === character.id ? " selected" : ""}${progress.unlocked ? "" : " locked"}`;
-        const status = progress.unlocked ? "Liberado" : `${progress.pieces}/5 pacotes`;
+        const status = progress.unlocked ? "" : t("char.locked", { n: progress.pieces });
         card.innerHTML = `
           <div class="avatar-preview">
             <div class="mini-person ${character.className}" style="--skin:${character.skin};--hair:${character.hair};--shirt:${character.shirt};--pants:${character.pants}"></div>
           </div>
-          <div class="name">${character.name}</div>
-          <div class="small">${progress.unlocked ? character.note : status}</div>
+          <div class="name">${charName(character)}</div>
+          <div class="small">${progress.unlocked ? charNote(character) : status}</div>
+          ${progress.unlocked ? "" : `<div class="bar card-bar" aria-hidden="true"><span style="width:${progress.pieces * 20}%"></span></div>`}
         `;
+        card.setAttribute("aria-pressed", String(state.selectedId === character.id));
+        if (!progress.unlocked) card.setAttribute("aria-label", t("char.lockedAria", { name: charName(character), n: progress.pieces }));
         card.addEventListener("click", () => {
           if (progress.unlocked) {
             state.selectedId = character.id;
+            saveJourney();
+            sfx("click");
             renderCharacterCards(container, selectingFromMenu);
             updateHud();
-            showTip(`${character.name} entrou na aventura.`);
+            showTip(t("char.joined", { name: charName(character) }));
           } else if (selectingFromMenu) {
-            showTip(`Ainda faltam ${5 - progress.pieces} pacotes para liberar ${character.name}.`);
+            const left = 5 - progress.pieces;
+            showTip(t("char.missing", { n: left, name: charName(character) }));
+            sfx("empty");
           }
         });
         container.appendChild(card);
@@ -1423,20 +2958,21 @@
         const progress = state.progress[character.id];
         const row = document.createElement("div");
         row.className = "progress-row";
-        const count = progress.unlocked ? "Liberado" : `${progress.pieces}/5`;
+        const count = t("locker.pieces", { n: progress.pieces });
         row.innerHTML = `
-          <strong>${character.name}</strong>
+          <strong>${charName(character)}</strong>
           <div class="bar"><span style="width:${Math.min(100, progress.pieces * 20)}%"></span></div>
-          <button class="tiny-action" type="button">${progress.unlocked ? "Jogar" : count}</button>
+          <button class="tiny-action" type="button">${progress.unlocked ? (state.selectedId === character.id ? t("locker.playing") : t("locker.play")) : count}</button>
         `;
         const button = row.querySelector("button");
         button.disabled = !progress.unlocked;
         button.addEventListener("click", () => {
           state.selectedId = character.id;
+          saveJourney();
           lockerDialog.classList.add("hidden");
           setMode("playing");
           updateHud();
-          showTip(`${character.name} escolhido.`);
+          showTip(t("char.joined", { name: charName(character) }));
         });
         lockerList.appendChild(row);
       }
@@ -1447,7 +2983,13 @@
       const playing = mode === "playing";
       hud.classList.toggle("hidden", !playing);
       controls.classList.toggle("hidden", !playing);
+      if (playing) fitAttackLabels();
       tip.classList.toggle("hidden", !playing);
+      tip.classList.toggle("on-menu", mode === "menu" || mode === "welcome");
+      if (!playing) {
+        state.rapidAttackHeld = false;
+        clearKeys();
+      }
       welcomeScreen.classList.toggle("hidden", mode !== "welcome");
       startScreen.classList.toggle("hidden", mode !== "menu");
       if (playing) {
@@ -1457,10 +2999,23 @@
       }
     }
 
+    function updateJourneyInfo() {
+      const index = state.journey.islandIndex;
+      const lap = state.journey.lap;
+      const starsWon = Object.values(state.journey.stars).reduce((sum, value) => sum + (Number(value) || 0), 0);
+      const where = index === 0 && lap === 0
+        ? t("journey.first", { island: islandName(0) })
+        : t("journey.continue", { island: `${islandName(index)}${lapLabel(lap)}` });
+      journeyInfo.textContent = starsWon > 0 ? `${where} ${t("journey.stars", { n: starsWon })}` : where;
+    }
+
     function enterSelection() {
+      state.islandIndex = state.journey.islandIndex;
+      state.lap = state.journey.lap;
+      updateJourneyInfo();
       renderCharacterCards(startCharacters, true);
       setMode("menu");
-      startMusic("menu");
+      startMusic();
     }
 
     function startGame() {
@@ -1470,19 +3025,81 @@
       state.burstCharge = 0;
       state.rapidAttackHeld = false;
       state.packagesOpened = 0;
+      state.run = { livesLost: 0, hitsTaken: 0, enemiesDefeated: 0, totalBananas: 0 };
       setupIsland();
+      saveJourney();
       setMode("playing");
-      startMusic("gameplay");
       updateHud();
-      showTip("Abra pacotes. As bananas estão escondidas dentro deles.");
+      if (!state.journey.howtoSeen) {
+        openHowto("playing");
+        return;
+      }
+      startMusic();
+      showTip(t("tip.start", { island: islandName(state.islandIndex), n: BANANAS_TO_WIN }));
+    }
+
+    function openHowto(returnTo) {
+      state.howtoReturn = returnTo;
+      pauseDialog.classList.add("hidden");
+      howtoDialog.classList.remove("hidden");
+      setMode("howto");
+      stopMusic();
+      focusPrimary(howtoDialog);
+    }
+
+    function closeHowto() {
+      howtoDialog.classList.add("hidden");
+      state.journey.howtoSeen = true;
+      saveJourney();
+      if (state.howtoReturn === "paused") {
+        pauseDialog.classList.remove("hidden");
+        setMode("paused");
+        focusPrimary(pauseDialog);
+        return;
+      }
+      setMode("playing");
+      startMusic();
+      showTip(t("tip.start", { island: islandName(state.islandIndex), n: BANANAS_TO_WIN }));
+    }
+
+    function lapLabel(lap) {
+      // Sem trim: o espaço antes do parêntese faz parte do texto em línguas latinas.
+      return lap > 0 ? (I18N[currentLang]["lap.label"] || I18N["pt-BR"]["lap.label"]).replace("{n}", lap + 1) : "";
     }
 
     function updateHud() {
       const character = characterById(state.selectedId);
-      hudCharacter.textContent = character.name;
-      hudIsland.textContent = islands[state.islandIndex].name;
-      hudBananas.textContent = `Bananas ${state.bananas}/${BANANAS_TO_WIN}`;
-      hudShield.textContent = `Vidas ${state.lives} | Acertos ${state.hits}/7`;
+      hudCharacter.textContent = charName(character);
+      hudIsland.textContent = `${islandName(state.islandIndex)}${lapLabel(state.lap)}`;
+      const percent = Math.round((state.bananas / BANANAS_TO_WIN) * 100);
+      hudBananas.innerHTML = `<span class="banana-icon" aria-hidden="true"></span><span>${state.bananas}/${BANANAS_TO_WIN}</span><span class="mini-bar" aria-hidden="true"><span style="width:${percent}%"></span></span>`;
+      hudBananas.setAttribute("aria-label", t("hud.bananasAria", { n: state.bananas, total: BANANAS_TO_WIN }));
+      let hearts = "";
+      for (let i = 0; i < 3; i += 1) {
+        hearts += `<span class="heart${i < state.lives ? "" : " lost"}" aria-hidden="true">♥</span>`;
+      }
+      let pips = "";
+      for (let i = 0; i < SHIELD_MAX; i += 1) {
+        pips += `<span class="pip${i < SHIELD_MAX - state.hits ? "" : " lost"}"></span>`;
+      }
+      hudShield.innerHTML = `<span class="hearts">${hearts}</span><span class="shield" aria-hidden="true">${pips}</span>`;
+      hudShield.setAttribute("aria-label", t("hud.livesAria", { lives: Math.max(0, state.lives), shield: SHIELD_MAX - state.hits, max: SHIELD_MAX }));
+    }
+
+    function bumpHud(element) {
+      element.classList.remove("bump");
+      void element.offsetWidth;
+      element.classList.add("bump");
+    }
+
+    let bannerTimer = 0;
+    function showBanner(title, text) {
+      banner.innerHTML = `<strong>${title}</strong>${text ? `<span>${text}</span>` : ""}`;
+      banner.classList.remove("hidden", "show");
+      void banner.offsetWidth;
+      banner.classList.add("show");
+      clearTimeout(bannerTimer);
+      bannerTimer = setTimeout(() => banner.classList.add("hidden"), 2600);
     }
 
     let tipTimer = 0;
@@ -1511,14 +3128,15 @@
       return true;
     }
 
-    function playNote(frequency, duration, volume = 0.16, type = "square") {
+    function playNote(frequency, duration, volume = 0.16, type = "square", delay = 0, slideTo = 0) {
       if (!state.music.context || !state.music.master || !frequency) return;
       const context = state.music.context;
-      const now = context.currentTime;
+      const now = context.currentTime + delay;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = type;
       oscillator.frequency.setValueAtTime(frequency, now);
+      if (slideTo) oscillator.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
       gain.gain.setValueAtTime(0.001, now);
       gain.gain.exponentialRampToValueAtTime(volume, now + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
@@ -1557,8 +3175,16 @@
     function updateMusicButton() {
       const buttons = document.querySelectorAll("#musicButton, .menu-music-toggle");
       for (const button of buttons) {
-      button.textContent = state.music.enabled ? "♪" : "×";
-      button.setAttribute("aria-label", state.music.enabled ? "Desligar música" : "Ligar música");
+        button.textContent = state.sound ? "♪" : "×";
+        button.setAttribute("aria-label", state.sound ? t("hud.soundOff") : t("hud.soundOn"));
+        button.setAttribute("aria-pressed", String(state.sound));
+        button.title = state.sound ? t("hud.soundTitleOn") : t("hud.soundTitleOff");
+      }
+      const musicOnly = document.querySelector("#musicOnlyButton");
+      if (musicOnly) {
+        const on = state.sound && state.music.enabled;
+        musicOnly.textContent = on ? t("pause.musicOn") : t("pause.musicOff");
+        musicOnly.setAttribute("aria-pressed", String(on));
       }
     }
 
@@ -1566,10 +3192,14 @@
       return state.mode === "playing" || state.mode === "level" ? "gameplay" : "menu";
     }
 
+    function canPlayMusic() {
+      return state.sound && state.music.enabled && state.audioUnlocked;
+    }
+
     function startMusic() {
       const track = currentMusicTrack();
-      if (!state.music.enabled || !ensureAudio()) {
-        updateMusicButton();
+      if (!canPlayMusic() || !ensureAudio()) {
+        stopMusic();
         return;
       }
       if (state.music.track !== track) {
@@ -1590,32 +3220,120 @@
       updateMusicButton();
     }
 
-    function toggleMusic() {
-      state.music.enabled = !state.music.enabled;
-      if (state.music.enabled) {
-        startMusic();
-        if (state.mode === "playing") showTip("Musiquinha 8-bit ligada.");
-      } else {
-        stopMusic();
-        if (state.mode === "playing") showTip("Musiquinha desligada.");
+    // O navegador só deixa tocar som depois do primeiro toque/tecla.
+    function unlockAudio() {
+      if (state.audioUnlocked) return;
+      state.audioUnlocked = true;
+      if (state.sound) {
+        ensureAudio();
+        if (state.mode !== "paused" && state.mode !== "gameover") startMusic();
       }
     }
 
-    function playPackageSound(kind) {
-      if (!state.music.context && !ensureAudio()) return;
-      if (kind === "piece") {
-        playNote(784, 0.08, 0.18, "square");
-        window.setTimeout(() => playNote(988, 0.1, 0.16, "square"), 80);
+    // Botão ♪: liga ou desliga TODO o som (música e efeitos).
+    function toggleSound() {
+      if (state.sound && !state.audioUnlocked) {
+        // O ícone já dizia "ligado", mas nada tocava ainda: o primeiro clique só começa a tocar.
+        unlockAudio();
+        updateMusicButton();
         return;
       }
-      playNote(523, 0.06, 0.15, "square");
-      window.setTimeout(() => playNote(659, 0.06, 0.14, "square"), 65);
+      state.audioUnlocked = true;
+      state.sound = !state.sound;
+      saveSettings();
+      if (state.sound) {
+        ensureAudio();
+        if (state.mode !== "paused") startMusic();
+        sfx("click");
+      } else {
+        stopMusic();
+      }
+      updateMusicButton();
+      if (state.mode === "playing") showTip(state.sound ? t("tip.soundOn") : t("tip.soundOff"));
     }
 
-    function playHitSound() {
-      if (!state.music.context && !ensureAudio()) return;
-      playNote(196, 0.08, 0.16, "sawtooth");
-      window.setTimeout(() => playNote(147, 0.12, 0.12, "square"), 75);
+    // No menu de pausa: só a musiquinha, os efeitos continuam.
+    function toggleMusicOnly() {
+      state.audioUnlocked = true;
+      if (!state.sound) {
+        state.sound = true;
+        state.music.enabled = true;
+      } else {
+        state.music.enabled = !state.music.enabled;
+      }
+      saveSettings();
+      if (!state.music.enabled) stopMusic();
+      else if (state.mode !== "paused") startMusic();
+      updateMusicButton();
+    }
+
+    function sfx(name) {
+      if (!state.sound || !state.audioUnlocked || !ensureAudio()) return;
+      switch (name) {
+        case "banana":
+          playNote(523, 0.06, 0.15, "square");
+          playNote(659, 0.06, 0.14, "square", 0.065);
+          playNote(784, 0.09, 0.12, "square", 0.13);
+          break;
+        case "piece":
+          playNote(784, 0.08, 0.18, "square");
+          playNote(988, 0.1, 0.16, "square", 0.08);
+          break;
+        case "unlock":
+          [523, 659, 784, 1046].forEach((f, i) => playNote(f, 0.12, 0.16, "square", i * 0.09));
+          playNote(1318, 0.28, 0.12, "triangle", 0.36);
+          break;
+        case "hurt":
+          playNote(196, 0.08, 0.16, "sawtooth");
+          playNote(147, 0.12, 0.12, "square", 0.075);
+          break;
+        case "life":
+          playNote(392, 0.14, 0.18, "sawtooth", 0, 180);
+          playNote(165, 0.28, 0.14, "square", 0.13, 90);
+          break;
+        case "shoot":
+          playNote(880, 0.045, 0.06, "square", 0, 1180);
+          break;
+        case "enemyHit":
+          playNote(330, 0.06, 0.1, "square", 0, 210);
+          break;
+        case "enemyDown":
+          playNote(660, 0.06, 0.12, "square");
+          playNote(990, 0.08, 0.1, "square", 0.06);
+          playNote(1320, 0.12, 0.08, "triangle", 0.12);
+          break;
+        case "burst":
+          playNote(988, 0.08, 0.14, "square");
+          playNote(1318, 0.12, 0.1, "square", 0.08);
+          playNote(220, 0.32, 0.12, "triangle", 0, 80);
+          break;
+        case "warn":
+          playNote(740, 0.07, 0.08, "triangle");
+          playNote(740, 0.07, 0.08, "triangle", 0.14);
+          break;
+        case "edge":
+          playNote(300, 0.1, 0.12, "triangle", 0, 230);
+          break;
+        case "level":
+          [523, 659, 784, 659, 784, 1046].forEach((f, i) => playNote(f, 0.15, 0.15, "square", i * 0.11));
+          playNote(262, 0.6, 0.1, "triangle", 0.55);
+          break;
+        case "gameover":
+          [392, 330, 262, 196].forEach((f, i) => playNote(f, 0.24, 0.14, "triangle", i * 0.2));
+          break;
+        case "reveal":
+          playNote(587, 0.05, 0.1, "triangle");
+          playNote(880, 0.07, 0.09, "triangle", 0.05);
+          break;
+        case "click":
+          playNote(660, 0.04, 0.08, "triangle");
+          break;
+        case "empty":
+          playNote(220, 0.06, 0.08, "triangle");
+          break;
+        default:
+          break;
+      }
     }
 
     function openPackage(packageItem) {
@@ -1632,26 +3350,39 @@
         const character = pieceCharacter;
         const progress = state.progress[character.id];
         progress.pieces = Math.min(5, progress.pieces + 1);
-        playPackageSound("piece");
-        state.rewards.push({ type: "piece", x: packagePoint.x, y: packagePoint.y - 12, age: 0, label: character.name });
+        state.rewards.push({ type: "piece", x: packagePoint.x, y: packagePoint.y - 12, age: 0, label: charName(character) });
+        spawnParticles(packagePoint.x, packagePoint.y - 10, 18, ["#9e69ff", "#fff2a8", character.shirt], 170, 4);
         if (progress.pieces >= 5) {
           progress.unlocked = true;
           saveProgress();
           renderCharacterCards(startCharacters, true);
-          showTip(`Pacote raro: ${character.name} foi desbloqueado!`);
+          sfx("unlock");
+          spawnParticles(state.width / 2, state.height * 0.35, 40, ["#ffd862", "#f0709d", "#4fa95d", "#3e8edb"], 260, 5);
+          showBanner(t(`unlock.banner.${character.gender}`, { name: charName(character) }), t("unlock.bannerSub"));
+          showTip(t("unlock.tip", { name: charName(character) }));
         } else {
           saveProgress();
-          showTip(`Pacote raro: peça de ${character.name} (${progress.pieces}/5).`);
+          sfx("piece");
+          showTip(t("piece.tip", { name: charName(character), n: progress.pieces }));
         }
       } else {
         state.bananas = Math.min(BANANAS_TO_WIN, state.bananas + 1);
-        playPackageSound("banana");
+        state.run.totalBananas += 1;
+        sfx("banana");
         state.rewards.push({ type: "banana", x: packagePoint.x, y: packagePoint.y - 12, age: 0 });
-        showTip(`Você achou uma banana no pacote (${state.bananas}/${BANANAS_TO_WIN}).`);
+        state.rewards.push({ type: "text", x: packagePoint.x + 22, y: packagePoint.y - 30, age: 0, label: "+1" });
+        spawnParticles(packagePoint.x, packagePoint.y - 6, 12, ["#ffd66b", "#ff9f2f", "#8d62d7"], 150, 4);
+        bumpHud(hudBananas);
+        const left = BANANAS_TO_WIN - state.bananas;
+        showTip(left > 0
+          ? t("banana.left", { got: state.bananas, total: BANANAS_TO_WIN, n: left })
+          : t("banana.done", { got: state.bananas, total: BANANAS_TO_WIN }));
       }
 
       state.packages = state.packages.filter((item) => item !== packageItem);
-      state.packages.push(newPackage());
+      if (state.packages.length + state.packageTimers.length < PACKAGES_ON_ISLAND) {
+        state.packageTimers.push(PACKAGE_RESPAWN_TIME);
+      }
       updateHud();
 
       if (state.bananas >= BANANAS_TO_WIN) {
@@ -1659,23 +3390,90 @@
       }
     }
 
+    function starsFor(stats) {
+      if (stats.livesLost === 0 && stats.hitsTaken <= 3) return 3;
+      if (stats.livesLost <= 1) return 2;
+      return 1;
+    }
+
+    function starText(count) {
+      return "★".repeat(count) + "☆".repeat(3 - count);
+    }
+
     function completeLevel() {
       setMode("level");
-      const current = islands[state.islandIndex].name;
-      const next = islands[(state.islandIndex + 1) % islands.length].name;
-      levelText.textContent = `${current} completa. Próxima parada: ${next}.`;
+      state.rapidAttackHeld = false;
+      sfx("level");
+      spawnParticles(state.width / 2, state.height * 0.4, 60, ["#ffd862", "#f0709d", "#4fa95d", "#3e8edb", "#ffffff"], 300, 5);
+
+      const stats = state.islandStats;
+      const stars = starsFor(stats);
+      const key = `${state.lap}-${state.islandIndex}`;
+      const previous = Number(state.journey.stars[key]) || 0;
+      state.journey.stars[key] = Math.max(previous, stars);
+
+      const isLast = state.islandIndex === islands.length - 1;
+      const nextIndex = (state.islandIndex + 1) % islands.length;
+      const nextLap = isLast ? state.lap + 1 : state.lap;
+      // Salva já a próxima ilha: se a criança fechar o jogo aqui, continua de lá.
+      state.journey.islandIndex = nextIndex;
+      state.journey.lap = nextLap;
+      state.journey.bestLevel = Math.max(state.journey.bestLevel, nextLap * islands.length + nextIndex);
+      saveJourney();
+
+      state.levelView = {
+        seconds: Math.round((performance.now() - stats.startedAt) / 1000),
+        stats: { ...stats },
+        stars,
+        previous,
+        isLast,
+        island: state.islandIndex,
+        nextIndex,
+        nextLap
+      };
+      renderLevelDialog();
       levelDialog.classList.remove("hidden");
+      focusPrimary(levelDialog);
+    }
+
+    function renderLevelDialog() {
+      const view = state.levelView;
+      if (!view) return;
+      const { stats, stars, previous } = view;
+      levelStars.textContent = starText(stars);
+      levelStars.setAttribute("aria-label", t("level.starsAria", { n: stars }));
+      levelStats.innerHTML = `
+        <span>${t("stats.time", { n: view.seconds })}</span>
+        <span>${t("stats.enemies", { n: stats.enemiesDefeated })}</span>
+        <span>${t("stats.hits", { n: stats.hitsTaken })}</span>
+      `;
+      const starHint = stars < 3
+        ? t("level.hint3")
+        : (previous === 3 ? t("level.perfectAgain") : t("level.perfect"));
+      const current = islandName(view.island);
+      if (view.isLast) {
+        levelTitle.textContent = t("level.finalTitle");
+        levelText.textContent = t("level.finalText", { island: current, hint: starHint });
+        nextIslandButton.textContent = t("level.nextLap", { n: view.nextLap + 1 });
+      } else {
+        levelTitle.textContent = t("level.title");
+        levelText.textContent = t("level.text", { island: current, next: islandName(view.nextIndex), hint: starHint });
+        nextIslandButton.textContent = t("level.next");
+      }
     }
 
     function nextIsland() {
-      state.islandIndex = (state.islandIndex + 1) % islands.length;
+      state.islandIndex = state.journey.islandIndex;
+      state.lap = state.journey.lap;
       state.bananas = 0;
       state.hits = 0;
       state.burstCharge = 0;
       setupIsland();
       updateHud();
       setMode("playing");
-      showTip(`Bem-vindos à ${islands[state.islandIndex].name}.`);
+      startMusic();
+      showBanner(islandName(state.islandIndex), state.lap > 0 ? t("island.lapSub", { n: state.lap + 1 }) : t("island.bannerSub", { n: BANANAS_TO_WIN }));
+      showTip(t("island.welcome", { island: islandName(state.islandIndex) }));
     }
 
     function updatePlayer(dt) {
@@ -1691,8 +3489,8 @@
         const length = Math.hypot(dx, dy);
         dx /= length;
         dy /= length;
-        state.player.x += dx * state.player.speed * dt;
-        state.player.y += dy * state.player.speed * dt;
+        state.player.x += dx * state.player.speed * motionScale() * dt;
+        state.player.y += dy * state.player.speed * motionScale() * dt;
         if (dx !== 0) state.player.facing = dx > 0 ? 1 : -1;
         clampPlayerToIsland();
       } else if (state.player.target) {
@@ -1702,7 +3500,7 @@
         if (distance < 7) {
           state.player.target = null;
         } else {
-          const step = Math.min(state.player.speed * 1.08 * dt, distance);
+          const step = Math.min(state.player.speed * motionScale() * 1.08 * dt, distance);
           state.player.x += (targetDx / distance) * step;
           state.player.y += (targetDy / distance) * step;
           if (Math.abs(targetDx) > 1) state.player.facing = targetDx > 0 ? 1 : -1;
@@ -1710,10 +3508,27 @@
         }
       }
 
+      // Pacotes novos chegam um pouco depois, do outro lado da ilha.
+      for (let i = state.packageTimers.length - 1; i >= 0; i -= 1) {
+        state.packageTimers[i] -= dt;
+        if (state.packageTimers[i] <= 0) {
+          state.packageTimers.splice(i, 1);
+          const fresh = newPackage(Math.random, islandShape().rx * 0.55);
+          if (!fresh.hidden) fresh.dropped = 0.01;
+          state.packages.push(fresh);
+        }
+      }
+
       for (const packageItem of state.packages) {
         const point = pointOnIsland(packageItem.u, packageItem.v);
         const distance = Math.hypot(point.x - state.player.x, point.y - state.player.y);
-        if (distance < state.player.radius + 19) {
+        if (packageItem.hidden && distance < 125 * worldScale()) {
+          packageItem.hidden = false;
+          packageItem.dropped = 0.01;
+          sfx("reveal");
+          spawnParticles(point.x, point.y, 12, [islands[state.islandIndex].grass, "#a9ef86", "#fff2a8"], 140, 5);
+        }
+        if (distance < (state.player.radius + 19) * worldScale()) {
           openPackage(packageItem);
           break;
         }
@@ -1730,10 +3545,23 @@
       for (const enemy of state.enemies) {
         enemy.u = enemy.homeU + Math.cos(state.time * 0.75 + enemy.phase) * 0.07;
         enemy.v = enemy.homeV + Math.sin(state.time * 0.9 + enemy.phase) * 0.07;
+        enemy.flash = Math.max(0, enemy.flash - dt);
+        enemy.appear = Math.min(1, enemy.appear + dt * 2.5);
         enemy.cooldown -= dt;
+        // Meio segundo antes de atirar, a varinha brilha: dá tempo de desviar.
+        enemy.charge = enemy.cooldown < 0.55 ? 1 - Math.max(0, enemy.cooldown) / 0.55 : 0;
         if (enemy.cooldown <= 0) {
           firePower(enemy);
           enemy.cooldown = enemy.fireEvery;
+        }
+      }
+
+      // Bichinhos derrotados voltam depois de um tempo, longe de quem está jogando.
+      if (state.enemies.length < difficulty().enemies) {
+        state.enemyRespawnTimer -= dt;
+        if (state.enemyRespawnTimer <= 0) {
+          spawnReturningEnemy();
+          state.enemyRespawnTimer = 9;
         }
       }
 
@@ -1748,12 +3576,57 @@
         if (power.age > 3.2) return false;
         if (power.x < -40 || power.x > state.width + 40 || power.y < -40 || power.y > state.height + 40) return false;
         const distance = Math.hypot(power.x - state.player.x, power.y - state.player.y);
-        if (distance < state.player.radius + 11) {
+        if (distance < (state.player.radius + 11) * worldScale()) {
           handlePowerHit();
           return false;
         }
         return true;
       });
+    }
+
+    function spawnReturningEnemy() {
+      const random = Math.random;
+      let enemy = newEnemy(random, state.enemies.length + Math.floor(random() * 10));
+      for (let i = 0; i < 12; i += 1) {
+        const point = pointOnIsland(enemy.homeU, enemy.homeV);
+        if (Math.hypot(point.x - state.player.x, point.y - state.player.y) > 180 * worldScale()) break;
+        enemy = newEnemy(random, state.enemies.length);
+      }
+      enemy.cooldown = 2;
+      state.enemies.push(enemy);
+      const point = enemyPoint(enemy);
+      spawnParticles(point.x, point.y - 10, 14, ["#ffffff", "#d9c8ff"], 110, 4);
+    }
+
+    function spawnParticles(x, y, count, colors, speed = 160, size = 4) {
+      if (state.particles.length > 260) return;
+      for (let i = 0; i < count; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = speed * (0.35 + Math.random() * 0.8);
+        state.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * velocity,
+          vy: Math.sin(angle) * velocity - speed * 0.35,
+          age: 0,
+          life: 0.55 + Math.random() * 0.5,
+          color: colors[i % colors.length],
+          size: size * (0.7 + Math.random() * 0.7),
+          spin: Math.random() * Math.PI
+        });
+      }
+    }
+
+    function updateParticles(dt) {
+      for (const particle of state.particles) {
+        particle.age += dt;
+        particle.x += particle.vx * dt;
+        particle.y += particle.vy * dt;
+        particle.vy += 300 * dt;
+        particle.spin += dt * 9;
+      }
+      state.particles = state.particles.filter((particle) => particle.age < particle.life);
+      state.shake = Math.max(0, state.shake - dt);
     }
 
     function updateRewards(dt) {
@@ -1782,10 +3655,15 @@
         if (shot.age > 1.7 || shot.x < -50 || shot.x > state.width + 50 || shot.y < -50 || shot.y > state.height + 50) return false;
         for (const enemy of state.enemies) {
           const point = enemyPoint(enemy);
-          if (Math.hypot(shot.x - point.x, shot.y - point.y) < 25) {
+          if (!enemy.defeated && Math.hypot(shot.x - point.x, shot.y - point.y) < 25 * worldScale() + 4) {
             enemy.hp -= shot.power;
-            state.rewards.push({ type: "piece", x: point.x, y: point.y - 20, age: 0, label: "POW!" });
-            if (enemy.hp <= 0) enemy.defeated = true;
+            enemy.flash = 0.14;
+            state.rewards.push({ type: "piece", x: point.x, y: point.y - 20, age: 0, label: t("reward.pow") });
+            if (enemy.hp <= 0) {
+              defeatEnemy(enemy);
+            } else {
+              sfx("enemyHit");
+            }
             return false;
           }
         }
@@ -1795,40 +3673,90 @@
       updateChargeButton();
     }
 
+    function defeatEnemy(enemy) {
+      enemy.defeated = true;
+      const point = enemyPoint(enemy);
+      sfx("enemyDown");
+      spawnParticles(point.x, point.y - 10, 22, [enemy.color, "#fff2a8", "#ffffff"], 190, 5);
+      state.run.enemiesDefeated += 1;
+      state.islandStats.enemiesDefeated += 1;
+      // Recompensa: o bichinho derrotado deixa um pacote (dentro da parte segura).
+      const length = Math.hypot(enemy.u, enemy.v);
+      const factor = length > 0.7 ? 0.7 / length : 1;
+      const reward = newPackage();
+      reward.u = enemy.u * factor;
+      reward.v = enemy.v * factor;
+      reward.hidden = false;
+      reward.dropped = 0.01;
+      if (state.packageTimers.length > 0) state.packageTimers.pop();
+      state.packages.push(reward);
+      showTip(t("enemy.defeated"));
+    }
+
     function updateHazards(dt) {
       state.player.fallCooldown = Math.max(0, state.player.fallCooldown - dt);
       state.dangerTimer -= dt;
       if (state.dangerTimer <= 0) {
         spawnDangerZone();
-        state.dangerTimer = 4 + Math.random() * 2.3;
+        state.dangerTimer = difficulty().dangerBase + Math.random() * 2.3;
       }
 
       for (const zone of state.dangerZones) {
         zone.age += dt;
-        const point = pointOnIsland(zone.u, zone.v);
         if (!zone.triggered && zone.age > 1.25 && zone.age < 2.8) {
-          const distance = Math.hypot(state.player.x - point.x, state.player.y - point.y);
-          if (distance < zone.radius) {
+          // Testa os pés do personagem contra a mesma elipse que aparece na tela.
+          if (insideDangerZone(zone, state.player.x, state.player.y + 16 * worldScale())) {
             zone.triggered = true;
-            loseLife("A parte vermelha da ilha caiu!");
+            loseLife("floor");
           }
         }
       }
       state.dangerZones = state.dangerZones.filter((zone) => zone.age < 3.1);
 
-      const island = islandShape();
-      const edgeDistance = Math.hypot((state.player.x - island.cx) / island.rx, (state.player.y - island.cy) / island.ry);
-      if (edgeDistance > 0.82) {
-        loseLife("Chegou muito perto da borda e caiu!");
+      // Borda: antes era morte instantânea numa faixa invisível. Agora o chão treme,
+      // aparece o aviso e só cai quem fica parado ali.
+      const edgeDistance = playerEdgeDistance();
+      const player = state.player;
+      if (edgeDistance > EDGE_LIMIT) {
+        if (!player.edgeWarned) {
+          player.edgeWarned = true;
+          showTip(t("edge.warn"));
+          sfx("edge");
+        }
+        player.teeter += dt;
+        if (player.teeter >= EDGE_FALL_TIME) {
+          player.teeter = 0;
+          loseLife("edge");
+        }
+      } else {
+        player.teeter = Math.max(0, player.teeter - dt * 2);
+        if (player.teeter === 0) player.edgeWarned = false;
       }
+    }
+
+    function playerEdgeDistance() {
+      const island = islandShape();
+      return Math.hypot((state.player.x - island.cx) / island.rx, (state.player.y - island.cy) / island.ry);
+    }
+
+    function insideDangerZone(zone, x, y) {
+      const point = pointOnIsland(zone.u, zone.v);
+      const dx = x - point.x;
+      const dy = y - point.y;
+      const cos = Math.cos(-zone.crack);
+      const sin = Math.sin(-zone.crack);
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+      return (lx / (zone.radius * 1.1)) ** 2 + (ly / (zone.radius * 0.72)) ** 2 < 1;
     }
 
     function spawnDangerZone() {
       const spot = randomPointInIsland(Math.random);
+      sfx("warn");
       state.dangerZones.push({
         u: spot.u,
         v: spot.v,
-        radius: 48 + Math.random() * 28,
+        radius: (48 + Math.random() * 28) * worldScale(),
         age: 0,
         crack: Math.random() * Math.PI * 2,
         triggered: false
@@ -1836,32 +3764,32 @@
     }
 
     function fireQuickAttack() {
-      state.attackCooldown = 0.16;
+      state.attackCooldown = 0.22;
       const direction = attackDirection();
-      spawnPlayerShot(direction.x, direction.y, 360, 1, "#66d9ff");
-      playNote(880, 0.045, 0.08, "square");
+      spawnPlayerShot(direction.x, direction.y, 360 * motionScale(), 1, "#66d9ff");
+      sfx("shoot");
     }
 
     function fireBurstAttack() {
       if (state.burstCharge < 1 || state.mode !== "playing") {
-        showTip("A explosão ainda está carregando.");
+        showTip(t("burst.charging"));
         return;
       }
       state.burstCharge = 0;
       const total = 18;
       for (let i = 0; i < total; i += 1) {
         const angle = (Math.PI * 2 * i) / total;
-        spawnPlayerShot(Math.cos(angle), Math.sin(angle), 310, 2, "#ffcf57");
+        spawnPlayerShot(Math.cos(angle), Math.sin(angle), 310 * motionScale(), 2, "#ffcf57");
       }
-      playNote(988, 0.08, 0.14, "square");
-      window.setTimeout(() => playNote(1318, 0.12, 0.1, "square"), 80);
+      sfx("burst");
       updateChargeButton();
-      showTip("Explosão mágica!");
+      showTip(t("burst.go"));
     }
 
     function attackDirection() {
+      // A mira automática só alcança bichinhos por perto: é preciso chegar mais perto deles.
       let nearest = null;
-      let nearestDistance = Infinity;
+      let nearestDistance = 330 * worldScale();
       for (const enemy of state.enemies) {
         const point = enemyPoint(enemy);
         const distance = Math.hypot(point.x - state.player.x, point.y - state.player.y);
@@ -1895,7 +3823,15 @@
     function updateChargeButton() {
       const percent = Math.round(state.burstCharge * 100);
       if (chargeFill) chargeFill.style.setProperty("--charge", `${percent}%`);
-      if (chargeLabel) chargeLabel.textContent = state.burstCharge >= 1 ? "EXP!" : `${percent}%`;
+      if (chargeLabel) {
+        const ready = state.burstCharge >= 1;
+        const wasReady = chargeLabel.dataset.ready === "1";
+        chargeLabel.textContent = ready ? t("attack.burstReady") : `${percent}%`;
+        if (ready !== wasReady) {
+          chargeLabel.dataset.ready = ready ? "1" : "0";
+          fitAttackLabels();
+        }
+      }
       if (burstAttackButton) burstAttackButton.classList.toggle("pressed", state.burstCharge >= 1);
     }
 
@@ -1904,7 +3840,7 @@
       const dx = state.player.x - point.x;
       const dy = state.player.y - point.y;
       const length = Math.max(1, Math.hypot(dx, dy));
-      const speed = 115 + state.islandIndex * 18;
+      const speed = difficulty().powerSpeed * motionScale();
       state.powers.push({
         x: point.x,
         y: point.y - 18,
@@ -1919,18 +3855,41 @@
     function handlePowerHit() {
       if (state.player.hitCooldown > 0) return;
       state.player.hitCooldown = 1.35;
-      state.hits += 1;
-      playHitSound();
-      if (state.hits >= 7) {
-        loseLife("Os bichinhos acertaram 7 poderes!");
+      state.hits = Math.min(SHIELD_MAX, state.hits + 1);
+      state.run.hitsTaken += 1;
+      state.islandStats.hitsTaken += 1;
+      sfx("hurt");
+      spawnParticles(state.player.x, state.player.y - 20, 8, ["#ffffff", "#9fd8ff"], 120, 3);
+      if (state.hits >= SHIELD_MAX) {
+        loseLife("powers");
+        state.hits = Math.min(state.hits, SHIELD_MAX - 1);
       } else {
-        showTip(`O poder acertou! Faltam ${7 - state.hits} acertos para perder uma vida.`);
+        showTip(t("hit.tip", { n: SHIELD_MAX - state.hits }));
       }
       updateHud();
+      bumpHud(hudShield);
     }
 
-    function loseLife(reason) {
+    // Dicas que explicam o que deu errado, para a próxima tentativa ser melhor.
+    const LIFE_KINDS = ["edge", "floor", "powers"];
+
+    function lifeHint(kind) {
+      return LIFE_KINDS.includes(kind) ? t(`hint.${kind}`) : "";
+    }
+
+    function lifeReason(kind) {
+      return LIFE_KINDS.includes(kind) ? t(`reason.${kind}`) : "";
+    }
+
+    function loseLife(kind) {
+      const reason = lifeReason(kind);
       if (state.player.fallCooldown > 0) return;
+      sfx("life");
+      state.lastLossKind = kind;
+      state.run.livesLost += 1;
+      state.islandStats.livesLost += 1;
+      if (!reduceMotion) state.shake = 0.35;
+      spawnParticles(state.player.x, state.player.y, 16, ["#ff6b6b", "#ffd166", "#ffffff"], 170, 4);
       state.lives -= 1;
       state.hits = 0;
       state.player.hitCooldown = 1.4;
@@ -1939,11 +3898,12 @@
       state.powers = [];
       updateHud();
       if (state.lives <= 0) {
-        gameOver(reason);
+        gameOver(kind);
         return;
       }
       respawnPlayer();
-      showTip(`${reason} Perdeu uma vida. Vidas: ${state.lives}.`);
+      bumpHud(hudShield);
+      showTip(t("life.lost", { reason, n: state.lives, hint: lifeHint(kind) }));
     }
 
     function respawnPlayer() {
@@ -1951,16 +3911,37 @@
       state.player.x = island.cx;
       state.player.y = island.cy + island.ry * 0.12;
       state.player.target = null;
+      state.player.teeter = 0;
+      state.player.edgeWarned = false;
+      // Não renasce em cima de um chão que vai cair, e os bichinhos esperam um pouco.
+      state.dangerZones = state.dangerZones.filter((zone) => !insideDangerZone(zone, state.player.x, state.player.y));
+      for (const enemy of state.enemies) enemy.cooldown = Math.max(enemy.cooldown, 1.2);
     }
 
-    function gameOver(reason) {
+    function gameOver(kind) {
       setMode("gameover");
       state.rapidAttackHeld = false;
       controls.classList.add("hidden");
       hud.classList.add("hidden");
-      gameOverText.textContent = `${reason} As vidas acabaram.`;
-      gameOverDialog.classList.remove("hidden");
       stopMusic();
+      sfx("gameover");
+      state.gameOverView = { kind, bananas: state.bananas, enemies: state.run.enemiesDefeated };
+      renderGameOver();
+      gameOverDialog.classList.remove("hidden");
+      focusPrimary(gameOverDialog);
+    }
+
+    function renderGameOver() {
+      const view = state.gameOverView;
+      if (!view) return;
+      const hint = lifeHint(view.kind);
+      gameOverText.textContent = t("gameover.text", { reason: lifeReason(view.kind) });
+      gameOverStats.innerHTML = `
+        <span>${t("stats.bananas", { got: view.bananas, total: BANANAS_TO_WIN })}</span>
+        <span>${t("stats.enemies", { n: view.enemies })}</span>
+      `;
+      gameOverHint.textContent = hint;
+      gameOverHint.classList.toggle("hidden", !hint);
     }
 
     function clampPlayerToIsland() {
@@ -1969,15 +3950,15 @@
       state.player.y = point.y;
     }
 
-    function clampPointToIsland(x, y) {
+    function clampPointToIsland(x, y, limit = 0.88) {
       const island = islandShape();
       const nx = (x - island.cx) / island.rx;
       const ny = (y - island.cy) / island.ry;
       const length = Math.hypot(nx, ny);
-      if (length > 0.88) {
+      if (length > limit) {
         return {
-          x: island.cx + (nx / length) * island.rx * 0.88,
-          y: island.cy + (ny / length) * island.ry * 0.88
+          x: island.cx + (nx / length) * island.rx * limit,
+          y: island.cy + (ny / length) * island.ry * limit
         };
       }
       return { x, y };
@@ -1985,30 +3966,78 @@
 
     function draw() {
       const theme = islands[state.islandIndex];
-      drawSky(theme);
-      drawDistantIslands(theme);
+      ensureLayers(theme);
+      ctx.drawImage(layers.sky, 0, 0, state.width, state.height);
+      drawSkyDots();
       drawClouds();
-      drawIsland(theme);
+      ctx.save();
+      if (state.shake > 0) {
+        const power = state.shake * 16;
+        ctx.translate((Math.random() - 0.5) * power, (Math.random() - 0.5) * power);
+      }
+      ctx.drawImage(layers.island, 0, 0, state.width, state.height);
+      drawEdgeLine();
       drawDangerZones();
-      drawDecorations(theme, false);
+      // Árvores ficam todas atrás: antes tapavam pacotes e bichinhos.
+      drawDecorations(theme);
+      drawSparkles(theme);
       drawPackages();
       drawEnemies();
+      drawMoveTarget();
+      drawPlayer();
       drawPowers();
       drawPlayerShots();
       drawRewards();
-      drawMoveTarget();
-      drawDecorations(theme, true);
-      drawPlayer();
-      drawSparkles(theme);
+      drawParticles();
+      ctx.restore();
     }
 
-    function drawSky(theme) {
+    function drawParticles() {
+      for (const particle of state.particles) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - particle.age / particle.life);
+        ctx.translate(particle.x, particle.y);
+        ctx.rotate(particle.spin);
+        ctx.fillStyle = particle.color;
+        ctx.fillRect(-particle.size / 2, -particle.size / 3, particle.size, particle.size * 0.66);
+        ctx.restore();
+      }
+    }
+
+    // Céu e corpo da ilha não mudam a cada quadro: são desenhados uma vez numa camada
+    // guardada (só refaz ao trocar de ilha ou de tamanho de tela). No celular isso
+    // economizava cerca de 8 ms por quadro.
+    function ensureLayers(theme) {
+      const key = `${canvas.width}x${canvas.height}:${state.dpr}:${state.islandIndex}`;
+      if (layers.key === key) return;
+      layers.key = key;
+      const paint = (layer, fn) => {
+        layer.width = canvas.width;
+        layer.height = canvas.height;
+        ctx = layer.getContext("2d");
+        ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+        try {
+          fn();
+        } finally {
+          ctx = mainCtx;
+        }
+      };
+      paint(layers.sky, () => {
+        drawSkyGradient(theme);
+        drawDistantIslands(theme);
+      });
+      paint(layers.island, () => drawIslandBody(theme));
+    }
+
+    function drawSkyGradient(theme) {
       const gradient = ctx.createLinearGradient(0, 0, 0, state.height);
       gradient.addColorStop(0, theme.skyTop);
       gradient.addColorStop(1, theme.skyBottom);
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, state.width, state.height);
+    }
 
+    function drawSkyDots() {
       ctx.save();
       ctx.globalAlpha = 0.35;
       ctx.fillStyle = "#ffffff";
@@ -2025,8 +4054,6 @@
     function drawClouds() {
       ctx.save();
       for (const cloud of state.clouds) {
-        cloud.x += cloud.speed * 0.016;
-        if (cloud.x > state.width + 90) cloud.x = -100;
         ctx.globalAlpha = 0.74;
         ctx.fillStyle = "#ffffff";
         const s = cloud.scale;
@@ -2068,7 +4095,7 @@
       ctx.restore();
     }
 
-    function drawIsland(theme) {
+    function drawIslandBody(theme) {
       const island = islandShape();
       ctx.save();
       ctx.fillStyle = "rgba(61, 77, 70, 0.18)";
@@ -2114,11 +4141,30 @@
       ctx.ellipse(island.cx, island.cy, island.rx, island.ry, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = "rgba(255,255,255,0.45)";
-      ctx.lineWidth = 5;
+      // Faixa da borda (onde o chão esfarela) um pouco mais escura...
+      ctx.fillStyle = "rgba(118, 84, 52, 0.17)";
       ctx.beginPath();
-      ctx.ellipse(island.cx - 6, island.cy - 8, island.rx * 0.82, island.ry * 0.76, 0, 0, Math.PI * 2);
+      ctx.ellipse(island.cx, island.cy, island.rx, island.ry, 0, 0, Math.PI * 2);
+      ctx.ellipse(island.cx, island.cy, island.rx * EDGE_LIMIT, island.ry * EDGE_LIMIT, 0, 0, Math.PI * 2);
+      ctx.fill("evenodd");
+      ctx.restore();
+    }
+
+    function drawEdgeLine() {
+      const island = islandShape();
+      ctx.save();
+      // ...e uma linha tracejada que fica vermelha quando o personagem chega perto.
+      const near = state.mode === "playing"
+        ? Math.max(0, Math.min(1, (playerEdgeDistance() - 0.6) / (EDGE_LIMIT - 0.6)))
+        : 0;
+      ctx.setLineDash([14, 12]);
+      ctx.lineDashOffset = -state.time * 16;
+      ctx.strokeStyle = near > 0 ? `rgba(214, 64, 58, ${0.35 + near * 0.55})` : "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = near > 0 ? 4 + near * 2 : 4;
+      ctx.beginPath();
+      ctx.ellipse(island.cx, island.cy, island.rx * EDGE_LIMIT, island.ry * EDGE_LIMIT, 0, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.setLineDash([]);
       ctx.restore();
     }
 
@@ -2145,14 +4191,13 @@
       }
     }
 
-    function drawDecorations(theme, frontLayer) {
+    function drawDecorations(theme) {
       // Em ilhas pequenas (celular) as árvores ficavam enormes e escondiam pacotes e bichinhos.
-      const sizeFactor = Math.max(0.62, Math.min(1, islandShape().rx / 400));
-      const sorted = [...state.decorations].sort((a, b) => pointOnIsland(a.u, a.v).y - pointOnIsland(b.u, b.v).y);
-      for (const decoration of sorted) {
+      // No celular deitado a ilha é baixa: usa também a altura para as árvores não taparem tudo.
+      // A lista já vem ordenada de trás para a frente (ordenada uma vez em setupIsland).
+      const sizeFactor = worldScale();
+      for (const decoration of state.decorations) {
         const point = pointOnIsland(decoration.u, decoration.v);
-        const isFront = point.y > state.player.y + 5;
-        if (isFront !== frontLayer) continue;
         const sway = Math.sin(state.time * 1.5 + decoration.sway) * 2;
         if (decoration.type === "tree") drawTree(point.x + sway, point.y, decoration.scale * sizeFactor, theme);
         if (decoration.type === "bush") drawBush(point.x, point.y, decoration.scale * sizeFactor, theme);
@@ -2264,26 +4309,62 @@
         const point = pointOnIsland(packageItem.u, packageItem.v);
         const bob = Math.sin(state.time * 3 + packageItem.bob) * 4;
         if (packageItem.hidden) {
-          drawHiddenLeaves(point.x, point.y + 7);
+          drawRustlingBush(point.x, point.y, packageItem.bob);
+          continue;
+        }
+        if (packageItem.dropped && packageItem.dropped < 1) {
+          // Pacote deixado por um bichinho: cai do alto com um pulinho.
+          packageItem.dropped = Math.min(1, packageItem.dropped + 0.03);
+          const t = packageItem.dropped;
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, t * 2);
+          drawGiftBox(point.x, point.y - (1 - t) * 40 + bob, false, packageItem.content);
+          ctx.restore();
+          continue;
         }
         drawGiftBox(point.x, point.y + bob, packageItem.hidden, packageItem.content);
       }
     }
 
-    function drawHiddenLeaves(x, y) {
+    function drawRustlingBush(x, y, seed) {
+      const scale = worldScale();
+      const theme = islands[state.islandIndex];
+      const shakeNow = Math.sin(state.time * 2.2 + seed) > 0.55;
+      const wiggle = shakeNow ? Math.sin(state.time * 32 + seed) * 2.5 : 0;
       ctx.save();
-      ctx.fillStyle = "rgba(47, 128, 71, 0.9)";
-      for (let i = 0; i < 5; i += 1) {
-        ctx.beginPath();
-        ctx.ellipse(x - 20 + i * 10, y + Math.sin(i) * 3, 13, 8, i * 0.35, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.translate(x + wiggle, y + 10 * scale);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "rgba(39, 58, 58, 0.16)";
+      ctx.beginPath();
+      ctx.ellipse(0, 10, 26, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = theme.grass;
+      ctx.beginPath();
+      ctx.arc(-14, -2, 14, 0, Math.PI * 2);
+      ctx.arc(2, -10, 18, 0, Math.PI * 2);
+      ctx.arc(17, -2, 14, 0, Math.PI * 2);
+      ctx.rect(-27, -2, 54, 12);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.beginPath();
+      ctx.arc(-2, -16, 6, 0, Math.PI * 2);
+      ctx.fill();
+      // Brilho de "tem coisa aqui" (o laço roxo do pacote aparecendo entre as folhas).
+      ctx.globalAlpha = 0.55 + Math.sin(state.time * 4 + seed) * 0.35;
+      ctx.translate(0, -30);
+      ctx.rotate(Math.sin(state.time * 3 + seed) * 0.25);
+      ctx.fillStyle = "#9e69ff";
+      drawStar(0, 0, 5, 14, 5);
+      ctx.fillStyle = "#fff2a8";
+      drawStar(0, 0, 2.5, 7, 5);
       ctx.restore();
     }
 
     function drawGiftBox(x, y, hidden, content) {
       ctx.save();
       ctx.translate(x, y);
+      const scale = worldScale();
+      ctx.scale(scale, scale);
       ctx.fillStyle = "rgba(39, 58, 58, 0.18)";
       ctx.beginPath();
       ctx.ellipse(0, 19, 22, 7, 0, 0, Math.PI * 2);
@@ -2383,14 +4464,31 @@
     function drawEnemy(x, y, enemy) {
       ctx.save();
       ctx.translate(x, y);
+      const scale = worldScale();
+      ctx.scale(scale, scale);
       const bounce = Math.sin(state.time * 4 + enemy.phase) * 3;
       ctx.translate(0, bounce);
+      const appear = enemy.appear === undefined ? 1 : enemy.appear;
+      if (appear < 1) {
+        ctx.globalAlpha = appear;
+        ctx.scale(0.5 + appear * 0.5, 0.5 + appear * 0.5);
+      }
       ctx.fillStyle = "rgba(38, 36, 54, 0.22)";
       ctx.beginPath();
       ctx.ellipse(0, 20, 22, 7, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = enemy.color;
+      // Vida do bichinho (aparece depois do primeiro acerto).
+      if (enemy.maxHp && enemy.hp < enemy.maxHp) {
+        for (let i = 0; i < enemy.maxHp; i += 1) {
+          ctx.fillStyle = i < enemy.hp ? "#ff5d73" : "rgba(255,255,255,0.75)";
+          ctx.beginPath();
+          ctx.arc((i - (enemy.maxHp - 1) / 2) * 9, -34, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.fillStyle = enemy.flash > 0 ? "#ffffff" : enemy.color;
       ctx.beginPath();
       ctx.moveTo(-18, -4);
       ctx.quadraticCurveTo(-24, -30, -7, -22);
@@ -2419,8 +4517,16 @@
       ctx.moveTo(16, 4);
       ctx.lineTo(28, -10);
       ctx.stroke();
-      ctx.fillStyle = "#fff2a8";
-      drawStar(30, -13, 3, 8, 5);
+      const charge = enemy.charge || 0;
+      if (charge > 0) {
+        // Aviso: a ponta da varinha cresce e brilha antes do tiro.
+        ctx.fillStyle = `rgba(255, 245, 160, ${0.25 + charge * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(30, -13, 6 + charge * 12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = charge > 0 ? "#ffffff" : "#fff2a8";
+      drawStar(30, -13, 3 + charge * 2, 8 + charge * 5, 5);
       ctx.restore();
     }
 
@@ -2464,13 +4570,21 @@
         ctx.globalAlpha = alpha;
         if (reward.type === "banana") {
           drawPeekingBanana(reward.x, reward.y);
+        } else if (reward.type === "text") {
+          ctx.font = `900 22px ${CANVAS_FONT}`;
+          ctx.textAlign = "center";
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = "#ffffff";
+          ctx.strokeText(reward.label, reward.x, reward.y);
+          ctx.fillStyle = "#c27a00";
+          ctx.fillText(reward.label, reward.x, reward.y);
         } else {
           ctx.translate(reward.x, reward.y);
           drawPackageSpark(0, 0);
           ctx.fillStyle = "#27313c";
-          ctx.font = "700 12px Trebuchet MS, sans-serif";
+          ctx.font = `700 12px ${CANVAS_FONT}`;
           ctx.textAlign = "center";
-          ctx.fillText(reward.label || "Novo", 0, 28);
+          ctx.fillText(reward.label || "", 0, 28);
         }
         ctx.restore();
       }
@@ -2495,14 +4609,41 @@
 
     function drawPlayer() {
       const character = characterById(state.selectedId);
-      if (state.player.hitCooldown > 0 && Math.floor(state.time * 16) % 2 === 0) {
-        ctx.save();
-        ctx.globalAlpha = 0.45;
-        drawAvatar(state.player.x, state.player.y, character, 1, state.player.facing);
-        ctx.restore();
-        return;
+      const player = state.player;
+      const scale = worldScale();
+      ctx.save();
+      if (player.teeter > 0) {
+        // Balança na beirada e mostra um "!" para avisar.
+        const wobble = Math.sin(state.time * 28) * 0.18 * Math.min(1, player.teeter / 0.3);
+        ctx.translate(player.x, player.y + 24 * scale);
+        ctx.rotate(wobble);
+        ctx.translate(-player.x, -(player.y + 24 * scale));
       }
-      drawAvatar(state.player.x, state.player.y, character, 1, state.player.facing);
+      if (player.hitCooldown > 0 && Math.floor(state.time * 16) % 2 === 0) {
+        ctx.globalAlpha = 0.45;
+      }
+      drawAvatar(player.x, player.y, character, scale, player.facing);
+      ctx.restore();
+      if (player.teeter > 0 && state.mode === "playing") {
+        drawAlertBubble(player.x, player.y - 70 * scale);
+      }
+    }
+
+    function drawAlertBubble(x, y) {
+      ctx.save();
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#d6403a";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, 13, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#d6403a";
+      ctx.font = `900 18px ${CANVAS_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("!", x, y + 1);
+      ctx.restore();
     }
 
     function drawAvatar(x, y, character, scale, facing) {
@@ -2652,11 +4793,20 @@
       ctx.fill();
     }
 
+    function updateClouds(dt) {
+      for (const cloud of state.clouds) {
+        cloud.x += cloud.speed * dt;
+        if (cloud.x > state.width + 90) cloud.x = -100;
+      }
+    }
+
     function loop(timestamp) {
       const seconds = timestamp / 1000;
       const dt = Math.min(0.033, seconds - (state.last || seconds));
       state.last = seconds;
       state.time = seconds;
+      updateClouds(dt);
+      updateParticles(dt);
       if (state.mode === "playing") {
         updatePlayer(dt);
         updateEnemies(dt);
@@ -2668,9 +4818,93 @@
       requestAnimationFrame(loop);
     }
 
+    function clearKeys() {
+      state.keys.up = false;
+      state.keys.down = false;
+      state.keys.left = false;
+      state.keys.right = false;
+    }
+
+    // Só move o foco quando a pessoa está usando o teclado (evita contorno azul no toque).
+    let usingKeyboard = false;
+    window.addEventListener("keydown", () => {
+      usingKeyboard = true;
+    }, true);
+    window.addEventListener("pointerdown", () => {
+      usingKeyboard = false;
+    }, true);
+
+    function focusPrimary(dialog) {
+      if (!usingKeyboard) return;
+      const button = dialog.querySelector(".primary");
+      // Espera um pouco: quem estava segurando Espaço para atacar não "aperta"
+      // o botão sem querer e pula a comemoração.
+      setTimeout(() => {
+        if (button && !dialog.classList.contains("hidden")) button.focus({ preventScroll: true });
+      }, 650);
+    }
+
+    function pauseGame() {
+      if (state.mode !== "playing") return;
+      pauseDialog.classList.remove("hidden");
+      setMode("paused");
+      stopMusic();
+      updateMusicButton();
+      focusPrimary(pauseDialog);
+    }
+
+    function resumeGame() {
+      if (state.mode !== "paused") return;
+      pauseDialog.classList.add("hidden");
+      setMode("playing");
+      startMusic();
+    }
+
     function bindControls() {
+      const unlockOnce = (event) => {
+        if (event.target && event.target.closest && event.target.closest(".menu-music-toggle, #musicButton, #musicOnlyButton")) return;
+        unlockAudio();
+      };
+      window.addEventListener("pointerdown", unlockOnce, true);
+      window.addEventListener("keydown", unlockOnce, true);
+
+      window.addEventListener("blur", () => {
+        clearKeys();
+        state.rapidAttackHeld = false;
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          pauseGame();
+          if (state.music.context && state.music.context.state === "running") state.music.context.suspend();
+        } else if (state.music.context && state.sound) {
+          state.music.context.resume();
+        }
+      });
+
       window.addEventListener("keydown", (event) => {
         const key = event.key.toLowerCase();
+        if ((key === "escape" || key === "p") && !event.repeat) {
+          if (state.mode === "playing") {
+            event.preventDefault();
+            pauseGame();
+            return;
+          }
+          if (state.mode === "paused") {
+            event.preventDefault();
+            resumeGame();
+            return;
+          }
+          if (state.mode === "locker" && key === "escape") {
+            lockerDialog.classList.add("hidden");
+            setMode("playing");
+            return;
+          }
+          if (state.mode === "howto" && key === "escape") {
+            closeHowto();
+            return;
+          }
+        }
+        if (state.mode !== "playing") return;
         if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)) {
           state.player.target = null;
         }
@@ -2678,12 +4912,14 @@
         if (key === "arrowdown" || key === "s") state.keys.down = true;
         if (key === "arrowleft" || key === "a") state.keys.left = true;
         if (key === "arrowright" || key === "d") state.keys.right = true;
-        if (key === " " && state.mode === "playing") {
+        if (key === " ") {
           event.preventDefault();
-          state.rapidAttackHeld = true;
-          fireQuickAttack();
+          if (!event.repeat) {
+            state.rapidAttackHeld = true;
+            fireQuickAttack();
+          }
         }
-        if (key === "q" && state.mode === "playing") {
+        if (key === "q" && !event.repeat) {
           fireBurstAttack();
         }
       });
@@ -2693,7 +4929,11 @@
         if (key === "arrowdown" || key === "s") state.keys.down = false;
         if (key === "arrowleft" || key === "a") state.keys.left = false;
         if (key === "arrowright" || key === "d") state.keys.right = false;
-        if (key === " ") state.rapidAttackHeld = false;
+        if (key === " ") {
+          state.rapidAttackHeld = false;
+          // Evita que o espaço "aperte" um botão do HUD que ficou com foco.
+          if (state.mode === "playing") event.preventDefault();
+        }
       });
 
       if (quickAttackButton) {
@@ -2727,7 +4967,8 @@
         if (state.mode !== "playing") return;
         event.preventDefault();
         const rect = canvas.getBoundingClientRect();
-        const point = clampPointToIsland(event.clientX - rect.left, event.clientY - rect.top);
+        // Tocar perto da borda leva só até a parte segura da ilha.
+        const point = clampPointToIsland(event.clientX - rect.left, event.clientY - rect.top, SAFE_TAP_LIMIT);
         state.player.target = point;
       };
       canvas.addEventListener("pointerdown", (event) => {
@@ -2748,8 +4989,92 @@
       });
     }
 
+    function renderHowto() {
+      const list = document.querySelector("#howtoList");
+      const mode = document.body.classList.contains("touch") ? "touch" : "keys";
+      const items = [
+        ["gift", "", t("howto.gift", { n: BANANAS_TO_WIN })],
+        ["move", "➜", t(`howto.move.${mode}`)],
+        ["attack", "★", t(`howto.attack.${mode}`)],
+        ["danger", "!", t("howto.danger")],
+        ["heart", "♥", t("howto.heart") + (mode === "keys" ? t("howto.heartKeys").replace(/^(?=\S)/, currentLang === "zh-CN" || currentLang === "ja" ? "" : " ") : "")]
+      ];
+      list.innerHTML = items.map(([icon, glyph, html]) => `
+        <li>
+          <span class="howto-icon ${icon}" aria-hidden="true">${glyph}</span>
+          <span>${html}</span>
+        </li>`).join("");
+    }
+
+    // Troca o idioma ao vivo: textos fixos (data-i18n) e tudo o que é montado por código.
+    function applyLanguage(lang) {
+      currentLang = I18N[lang] ? lang : "pt-BR";
+      document.documentElement.lang = currentLang;
+      document.title = t("meta.title");
+      const description = document.querySelector('meta[name="description"]');
+      if (description) description.setAttribute("content", t("meta.description"));
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute("content", t("meta.title"));
+      const ogDescription = document.querySelector('meta[property="og:description"]');
+      if (ogDescription) ogDescription.setAttribute("content", t("meta.description"));
+      const params = { n: BANANAS_TO_WIN };
+      for (const element of document.querySelectorAll("[data-i18n]")) element.textContent = t(element.dataset.i18n, params);
+      for (const element of document.querySelectorAll("[data-i18n-aria]")) element.setAttribute("aria-label", t(element.dataset.i18nAria, params));
+      for (const element of document.querySelectorAll("[data-i18n-title]")) element.title = t(element.dataset.i18nTitle, params);
+      document.querySelector("#pauseButton").title = `${t("hud.pause")} (Esc)`;
+      for (const select of document.querySelectorAll(".lang-select")) select.value = currentLang;
+      // Dica e faixa antigas estavam no idioma anterior: some com elas.
+      tip.textContent = "";
+      tip.classList.add("fade");
+      banner.classList.add("hidden");
+      renderHowto();
+      renderCharacterCards(startCharacters, true);
+      if (!lockerDialog.classList.contains("hidden")) renderLocker();
+      updateJourneyInfo();
+      updateHud();
+      updateMusicButton();
+      updateChargeButton();
+      renderLevelDialog();
+      renderGameOver();
+      fitAttackLabels();
+    }
+
+    // Diminui a letra do botão redondo até a palavra caber (ATTACK, ANGRIFF, こうげき...).
+    function fitAttackLabels() {
+      for (const span of document.querySelectorAll(".attack-button span:not(.charge-fill)")) {
+        const button = span.closest(".attack-button");
+        span.style.fontSize = "";
+        if (!button.offsetWidth) continue;
+        let size = parseFloat(getComputedStyle(span).fontSize);
+        while (span.getBoundingClientRect().width > button.clientWidth - 8 && size > 9) {
+          size -= 0.5;
+          span.style.fontSize = `${size}px`;
+        }
+      }
+    }
+
+    function setupLanguagePickers() {
+      for (const select of document.querySelectorAll(".lang-select")) {
+        select.innerHTML = LANGS.map((lang) => `<option value="${lang.code}" lang="${lang.code}">${lang.label}</option>`).join("");
+        select.addEventListener("change", () => {
+          try {
+            localStorage.setItem(LANG_KEY, select.value);
+          } catch (error) {
+            // sem armazenamento: vale só nesta visita
+          }
+          applyLanguage(select.value);
+        });
+      }
+    }
+
     function init() {
       state.progress = loadProgress();
+      loadSettings();
+      loadJourney();
+      if (!state.progress[state.selectedId] || !state.progress[state.selectedId].unlocked) state.selectedId = "davi";
+      document.body.classList.toggle("touch", window.matchMedia("(hover: none) and (pointer: coarse)").matches);
+      setupLanguagePickers();
+      applyLanguage(detectLanguage());
       resize();
       setupIsland();
       renderCharacterCards(startCharacters, true);
@@ -2763,40 +5088,44 @@
       document.querySelector("#enterSelectionButton").addEventListener("click", enterSelection);
       document.querySelector("#startButton").addEventListener("click", startGame);
       document.querySelector("#nextIslandButton").addEventListener("click", nextIsland);
-      document.querySelector("#musicButton").addEventListener("click", toggleMusic);
+      document.querySelector("#musicButton").addEventListener("click", toggleSound);
       for (const button of document.querySelectorAll(".menu-music-toggle")) {
-        button.addEventListener("click", toggleMusic);
+        button.addEventListener("click", toggleSound);
       }
+      document.querySelector("#musicOnlyButton").addEventListener("click", toggleMusicOnly);
       document.querySelector("#charactersButton").addEventListener("click", () => {
         renderLocker();
         lockerDialog.classList.remove("hidden");
         setMode("locker");
+        focusPrimary(lockerDialog);
       });
       document.querySelector("#closeLockerButton").addEventListener("click", () => {
         lockerDialog.classList.add("hidden");
         setMode("playing");
       });
-      document.querySelector("#pauseButton").addEventListener("click", () => {
-        pauseDialog.classList.remove("hidden");
-        setMode("paused");
-      });
-      document.querySelector("#resumeButton").addEventListener("click", () => {
-        pauseDialog.classList.add("hidden");
-        setMode("playing");
-      });
+      document.querySelector("#pauseButton").addEventListener("click", pauseGame);
+      document.querySelector("#resumeButton").addEventListener("click", resumeGame);
+      document.querySelector("#howtoButton").addEventListener("click", () => openHowto("paused"));
+      document.querySelector("#howtoStartButton").addEventListener("click", closeHowto);
       document.querySelector("#menuButton").addEventListener("click", () => {
         pauseDialog.classList.add("hidden");
         setMode("welcome");
         startMusic();
         renderCharacterCards(startCharacters, true);
+        focusPrimary(welcomeScreen);
       });
       document.querySelector("#resetButton").addEventListener("click", () => {
-        if (!window.confirm("Reiniciar o progresso? Os personagens liberados voltam a ficar trancados.")) return;
+        if (!window.confirm(t("menu.resetConfirm"))) return;
         state.progress = defaultProgress();
         state.selectedId = "davi";
+        state.journey = { islandIndex: 0, lap: 0, stars: {}, bestLevel: 0, howtoSeen: state.journey.howtoSeen };
+        state.islandIndex = 0;
+        state.lap = 0;
         saveProgress();
+        saveJourney();
         renderCharacterCards(startCharacters, true);
-        showTip("Progresso reiniciado.");
+        updateJourneyInfo();
+        showTip(t("menu.resetDone"));
       });
       document.querySelector("#retryButton").addEventListener("click", () => {
         gameOverDialog.classList.add("hidden");
@@ -2807,7 +5136,10 @@
         setMode("welcome");
         startMusic();
       });
-      window.addEventListener("resize", resize);
+      window.addEventListener("resize", () => {
+        resize();
+        fitAttackLabels();
+      });
     }
 
     init();
