@@ -37,7 +37,7 @@
       min-height: 100svh;
       background: #111827;
       color: var(--ink);
-      font-family: Arial, "Trebuchet MS", Verdana, "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+      font-family: Arial, "Trebuchet MS", Verdana, "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       overflow: hidden;
       touch-action: manipulation;
     }
@@ -485,7 +485,7 @@
       display: inline-block;
       position: relative;
       color: #fff2ad;
-      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       font-size: clamp(2.15rem, 11vw, 5.4rem);
       line-height: .86;
       letter-spacing: 1px;
@@ -697,7 +697,14 @@
     /* Japonês com glifos japoneses (sem isso o navegador pode usar a fonte chinesa). */
     :lang(ja) body,
     body:lang(ja) {
-      font-family: Arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, "Noto Sans SC", sans-serif;
+      font-family: Arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic", Meiryo, "IPAexGothic", "IPAGothic", sans-serif;
+    }
+
+    :lang(ja) h1,
+    :lang(ja) .finale-card strong,
+    :lang(ja) .finale-card::before,
+    :lang(ja) .finale-card::after {
+      font-family: Impact, "Arial Black", Arial, "Hiragino Sans", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic", Meiryo, "IPAexGothic", "IPAGothic", sans-serif;
     }
 
     /* Palavras longas (alemão) quebram dentro do botão em vez de estourar. */
@@ -2157,7 +2164,7 @@
       position: absolute;
       top: 12px;
       color: rgba(255, 242, 173, .85);
-      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       font-size: .72rem;
       text-shadow: 2px 2px 0 #4c1635;
       animation: finalePraise 1.2s steps(3) infinite;
@@ -2176,7 +2183,7 @@
     .finale-card strong {
       display: block;
       color: #fff2ad;
-      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+      font-family: Impact, "Arial Black", Arial, "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
       font-size: clamp(1.2rem, 5vw, 1.75rem);
       text-shadow: 2px 2px 0 #62223a, 0 0 10px rgba(255, 212, 92, .65);
       letter-spacing: 0;
