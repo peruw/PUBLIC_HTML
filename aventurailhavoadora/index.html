@@ -371,6 +371,10 @@
       padding-bottom: max(108px, calc(env(safe-area-inset-bottom) + 96px));
     }
 
+    #startScreen .menu-card {
+      max-height: calc(100dvh - max(18px, env(safe-area-inset-top)) - max(108px, calc(env(safe-area-inset-bottom) + 96px)));
+    }
+
     .title-row {
       display: grid;
       grid-template-columns: 1fr;
@@ -788,6 +792,12 @@
         width: min(300px, 100%);
       }
 
+      /* Espaço para o botão de música não ficar por cima do título. */
+      .welcome-title,
+      .title-row {
+        padding-inline: 40px;
+      }
+
       .menu-card {
         border-radius: 16px;
       }
@@ -867,14 +877,14 @@
     </div>
     <div class="hud-right">
       <button class="hud-button" id="charactersButton" type="button" aria-label="Personagens">P</button>
-      <button class="hud-button" id="musicButton" type="button" aria-label="Ligar ou desligar musica">♪</button>
+      <button class="hud-button" id="musicButton" type="button" aria-label="Ligar ou desligar música">♪</button>
       <button class="hud-button" id="pauseButton" type="button" aria-label="Pausar">II</button>
     </div>
   </div>
 
   <div id="controls" class="hidden" aria-label="Ataques">
-    <button class="attack-button quick-attack" id="quickAttackButton" type="button" aria-label="Ataque rapido"><span>ATAQUE</span></button>
-    <button class="attack-button burst-attack" id="burstAttackButton" type="button" aria-label="Explosao carregada">
+    <button class="attack-button quick-attack" id="quickAttackButton" type="button" aria-label="Ataque rápido"><span>ATAQUE</span></button>
+    <button class="attack-button burst-attack" id="burstAttackButton" type="button" aria-label="Explosão carregada">
       <span class="charge-fill" id="chargeFill"></span>
       <span id="chargeLabel">0%</span>
     </button>
@@ -883,7 +893,7 @@
   <div id="tip" class="hidden">Pegue pacotes para achar bananas e surpresas.</div>
 
   <section id="welcomeScreen" class="screen">
-    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar musica">♪</button>
+    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar música">♪</button>
     <div class="welcome-card">
       <div class="welcome-title">
         <h1>Aventura das Ilhas Voadoras</h1>
@@ -912,7 +922,7 @@
   </section>
 
   <section id="startScreen" class="screen hidden">
-    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar musica">♪</button>
+    <button class="menu-music-toggle" type="button" aria-label="Ligar ou desligar música">♪</button>
     <div class="menu-card">
       <div class="title-row">
         <h1>Aventura das Ilhas Voadoras</h1>
@@ -1330,6 +1340,10 @@
 
     function setupIsland() {
       const random = mulberry32(1200 + state.islandIndex * 97 + state.packagesOpened);
+      // Posiciona o jogador antes de sortear os pacotes, para nenhum pacote nascer em cima dele.
+      const island = islandShape();
+      state.player.x = island.cx;
+      state.player.y = island.cy + island.ry * 0.15;
       state.packages = Array.from({ length: 13 }, () => newPackage(random));
       state.enemies = Array.from({ length: Math.min(4, 2 + state.islandIndex) }, (_, index) => newEnemy(random, index));
       state.powers = [];
@@ -1360,9 +1374,6 @@
         scale: 0.65 + random() * 1.1,
         id: index
       }));
-      const island = islandShape();
-      state.player.x = island.cx;
-      state.player.y = island.cy + island.ry * 0.15;
       state.player.target = null;
       state.player.fallCooldown = 1;
     }
@@ -1537,7 +1548,7 @@
       const buttons = document.querySelectorAll("#musicButton, .menu-music-toggle");
       for (const button of buttons) {
       button.textContent = state.music.enabled ? "♪" : "×";
-      button.setAttribute("aria-label", state.music.enabled ? "Desligar musica" : "Ligar musica");
+      button.setAttribute("aria-label", state.music.enabled ? "Desligar música" : "Ligar música");
       }
     }
 
@@ -2125,17 +2136,19 @@
     }
 
     function drawDecorations(theme, frontLayer) {
+      // Em ilhas pequenas (celular) as árvores ficavam enormes e escondiam pacotes e bichinhos.
+      const sizeFactor = Math.max(0.62, Math.min(1, islandShape().rx / 400));
       const sorted = [...state.decorations].sort((a, b) => pointOnIsland(a.u, a.v).y - pointOnIsland(b.u, b.v).y);
       for (const decoration of sorted) {
         const point = pointOnIsland(decoration.u, decoration.v);
         const isFront = point.y > state.player.y + 5;
         if (isFront !== frontLayer) continue;
         const sway = Math.sin(state.time * 1.5 + decoration.sway) * 2;
-        if (decoration.type === "tree") drawTree(point.x + sway, point.y, decoration.scale, theme);
-        if (decoration.type === "bush") drawBush(point.x, point.y, decoration.scale, theme);
-        if (decoration.type === "banana") drawBananaPlant(point.x, point.y, decoration.scale);
-        if (decoration.type === "mushroom") drawMushroom(point.x, point.y, decoration.scale);
-        if (decoration.type === "star") drawStarFlower(point.x, point.y, decoration.scale);
+        if (decoration.type === "tree") drawTree(point.x + sway, point.y, decoration.scale * sizeFactor, theme);
+        if (decoration.type === "bush") drawBush(point.x, point.y, decoration.scale * sizeFactor, theme);
+        if (decoration.type === "banana") drawBananaPlant(point.x, point.y, decoration.scale * sizeFactor);
+        if (decoration.type === "mushroom") drawMushroom(point.x, point.y, decoration.scale * sizeFactor);
+        if (decoration.type === "star") drawStarFlower(point.x, point.y, decoration.scale * sizeFactor);
       }
     }
 
@@ -2768,6 +2781,7 @@
         renderCharacterCards(startCharacters, true);
       });
       document.querySelector("#resetButton").addEventListener("click", () => {
+        if (!window.confirm("Reiniciar o progresso? Os personagens liberados voltam a ficar trancados.")) return;
         state.progress = defaultProgress();
         state.selectedId = "davi";
         saveProgress();
