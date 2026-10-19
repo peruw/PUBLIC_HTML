@@ -190,6 +190,7 @@ async function init() {
     world.cc = CLASSES['100cc'];
     for (const k of karts) {
       k.isPlayer = false;
+      k.assist = false;
       k.frozen = false;
     }
     const order = karts.slice().sort(() => Math.random() - 0.5);
@@ -224,7 +225,10 @@ async function init() {
     const grid = others.slice();
     grid.splice(PLAYER_SLOT, 0, player);
     setupGrid(grid);
-    for (const k of karts) k.isPlayer = k === player;
+    for (const k of karts) {
+      k.isPlayer = k === player;
+      k.assist = k === player && opts.assist !== false;
+    }
     world.player = player;
     items.reset(karts);
     effects.reset();
