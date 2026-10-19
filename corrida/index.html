@@ -970,10 +970,14 @@
   const sun = new T.DirectionalLight(0xffffff, 0.75); sun.position.set(-6, 12, 8); scene.add(sun);
 
   let W = 0, H = 0, PX = 3, qBottom = 0;
+  // qualidade automática: num aparelho que não aguenta, a cena é desenhada com pixels maiores
+  // (0 = normal; 1 e 2 = mais leve). Fica guardada no aparelho e volta a subir se sobrar folga.
+  let quality = clamp(+store.get('quanta-corrida-q', 0) || 0, 0, 2);
+  const perf = { t: 0, n: 0, slow: 0 };
   const measureQuestion = () => { qBottom = $('question').getBoundingClientRect().bottom; };
   function resize() {
     W = window.innerWidth; H = window.innerHeight;
-    PX = clamp(Math.round(Math.min(H, W * 1.2) / 250), 2, 5);
+    PX = clamp(Math.round(Math.min(H, W * 1.2) / 250), 2, 5) + quality;
     renderer.setSize(Math.ceil(W / PX), Math.ceil(H / PX), false);
     const aspect = W / H;
     camera.aspect = aspect;
@@ -1017,24 +1021,39 @@
   const postGeo = new T.BoxGeometry(0.4, 0.7, 0.4);
   const capGeo = new T.BoxGeometry(0.46, 0.16, 0.46);
   const capMat = new T.MeshBasicMaterial(); tint(capMat.color, 'rail');
-  const rowDashes = [];
+  // Desempenho: a pista era feita de ~290 peças separadas (cada bloco de 6 faces = 6 desenhos por quadro).
+  // Agora cada tipo de peça é um InstancedMesh (1 desenho para todas) e a pista inteira anda junta:
+  // o desenho se repete a cada 2 blocos (8 u), então basta deslocar o grupo em z módulo 8.
+  const track = new T.Group();
+  const TRACK_PERIOD = CFG.rowLen * 2;
+  const mtx = new T.Object3D();
+  const half = CFG.rows / 2;
+  const slabs = [0, 1].map((k) => { const m = new T.InstancedMesh(rowGeo, tileMats[k], half); track.add(m); return m; });
+  const posts = new T.InstancedMesh(postGeo, sideMat, CFG.rows * 2);
+  const caps = new T.InstancedMesh(capGeo, capMat, CFG.rows * 2);
+  const dashes = new T.InstancedMesh(dashGeo, dashMat, half * 3);
+  track.add(posts, caps, dashes);
+  const rowZ = (i) => 8 - i * CFG.rowLen;
   for (let i = 0; i < CFG.rows; i++) {
-    const row = new T.Group();
-    const slab = new T.Mesh(rowGeo, tileMats[i % 2]); slab.position.y = -0.4; row.add(slab);
-    if (i % 2 === 0) for (let k = 0; k < 3; k++) { const d = new T.Mesh(dashGeo, dashMat); d.position.y = 0.02; row.add(d); rowDashes.push(d); }
-    for (const sx of [-4.4, 4.4]) {
-      const p = new T.Mesh(postGeo, sideMat); p.position.set(sx, 0.35, 0); row.add(p);
-      const cp = new T.Mesh(capGeo, capMat); cp.position.set(sx, 0.76, 0); row.add(cp);
-    }
-    row.position.z = 12 - i * CFG.rowLen;
-    scene.add(row); moving.push({ obj: row, span: trackSpan, limit: 14 });
-  }
-  function setTrackLanes(n) {
-    rowDashes.forEach((d, j) => {
-      const k = j % 3;
-      d.visible = k < n - 1;
-      d.position.x = -ROAD / 2 + (ROAD / n) * (k + 1);
+    mtx.position.set(0, -0.4, rowZ(i)); mtx.scale.set(1, 1, 1); mtx.updateMatrix();
+    slabs[i % 2].setMatrixAt(i >> 1, mtx.matrix);
+    [-4.4, 4.4].forEach((sx, j) => {
+      mtx.position.set(sx, 0.35, rowZ(i)); mtx.updateMatrix(); posts.setMatrixAt(i * 2 + j, mtx.matrix);
+      mtx.position.set(sx, 0.76, rowZ(i)); mtx.updateMatrix(); caps.setMatrixAt(i * 2 + j, mtx.matrix);
     });
+  }
+  // o grupo inteiro se move; a caixa envolvente de cada malha não é recalculada, então não deixa o three.js descartá-las
+  [...slabs, posts, caps, dashes].forEach((m) => { m.frustumCulled = false; });
+  scene.add(track);
+  let trackOff = 0;
+  function setTrackLanes(n) {
+    for (let r = 0; r < half; r++) for (let k = 0; k < 3; k++) {
+      mtx.position.set(-ROAD / 2 + (ROAD / n) * (k + 1), 0.02, rowZ(r * 2));
+      mtx.scale.setScalar(k < n - 1 ? 1 : 0); mtx.updateMatrix();
+      dashes.setMatrixAt(r * 3 + k, mtx.matrix);
+    }
+    mtx.scale.setScalar(1);
+    dashes.instanceMatrix.needsUpdate = true;
   }
   setTrackLanes(2);
   const railGeo = new T.BoxGeometry(0.14, 0.12, trackSpan + 20);
@@ -1043,7 +1062,16 @@
   }
 
   // prédios da cidade digital
-  const bldGeo = new T.BoxGeometry(1, 1, 1);
+  // caixa só com as faces que a câmera vê (laterais e frente com janelas, teto); as faces de baixo e de trás
+  // nunca aparecem. Com as faces de janela juntas, cada prédio custa 2 desenhos por quadro em vez de 6.
+  const bldGeo = (() => {
+    const g = new T.BoxGeometry(1, 1, 1);
+    const idx = g.index.array, out = [];
+    for (const f of [0, 1, 4, 2]) for (let k = 0; k < 6; k++) out.push(idx[f * 6 + k]); // +x, -x, +z | +y
+    g.setIndex(out);
+    g.clearGroups(); g.addGroup(0, 18, 0); g.addGroup(18, 6, 1);
+    return g;
+  })();
   const bldTexs = [windowsTex(), windowsTex(), windowsTex()];
   const roofMat = new T.MeshBasicMaterial(); tint(roofMat.color, 'roof');
   const cityZone = 170;
@@ -1053,7 +1081,7 @@
     const tex = bldTexs[i % 3].clone(); tex.needsUpdate = true;
     tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(Math.round(w), Math.round(h / 2));
     const wm = new T.MeshLambertMaterial({ map: tex }); tint(wm.color, 'windows');
-    const m = new T.Mesh(bldGeo, [wm, wm, roofMat, sideMat, wm, sideMat]);
+    const m = new T.Mesh(bldGeo, [wm, roofMat]);
     m.scale.set(w, h, d);
     m.position.set(side * rnd(10, 28), -10 + h / 2 + rnd(0, 6), 14 - Math.random() * cityZone);
     scene.add(m); moving.push({ obj: m, span: cityZone, limit: 16 });
@@ -1077,12 +1105,13 @@
   const streakGeo = new T.BoxGeometry(0.05, 0.05, 4);
   const streakMat = new T.MeshBasicMaterial({ transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false }); tint(streakMat.color, 'streak');
   const streaks = [];
+  const streakMesh = new T.InstancedMesh(streakGeo, streakMat, 40);
+  streakMesh.frustumCulled = false;
   for (let i = 0; i < 40; i++) {
-    const s = new T.Mesh(streakGeo, streakMat);
     let x, y; do { x = rnd(-11, 11); y = rnd(-0.5, 9); } while (Math.abs(x) < 4.8 && y < 5);
-    s.position.set(x, y, rnd(-60, 10));
-    scene.add(s); streaks.push(s);
+    streaks.push({ x, y, z: rnd(-60, 10) });
   }
+  scene.add(streakMesh);
 
   // criaturas malucas de cada fase (módulo opcional)
   const creatures = QC.Creatures ? QC.Creatures.create(T, scene) : null;
@@ -2084,11 +2113,17 @@
     streakMat.opacity = playing ? Math.min(1, 0.12 + sf * 0.55 + (S.fever ? 0.25 : 0) + S.dash * 0.7) : 0.06;
     if (S.fever && playing) streakMat.color.setHSL((S.t * 1.5) % 1, 1, 0.6);
     else if (tintT >= 1 && themeIdx >= 0) streakMat.color.setHex(QC.THEMES[themeIdx].streak);
-    for (const s of streaks) {
-      s.position.z += dz * 1.6;
-      s.scale.z = 1 + sf * 2.5 + S.dash * 3;
-      if (s.position.z > 12) s.position.z -= 72;
-    }
+    const sl = 1 + sf * 2.5 + S.dash * 3;
+    streaks.forEach((s, i) => {
+      s.z += dz * 1.6;
+      if (s.z > 12) s.z -= 72;
+      mtx.position.set(s.x, s.y, s.z); mtx.scale.set(1, 1, sl); mtx.updateMatrix();
+      streakMesh.setMatrixAt(i, mtx.matrix);
+    });
+    mtx.scale.set(1, 1, 1);
+    streakMesh.instanceMatrix.needsUpdate = true;
+    trackOff = (trackOff + dz) % TRACK_PERIOD;
+    track.position.z = trackOff;
 
     // corredor
     if (!frozen) S.phase += dt * (4 + v * 0.42) * (1 - S.locker * 0.8);
@@ -2208,8 +2243,22 @@
   }
 
   let last = performance.now();
+  function watchPerf(raw) {
+    if (S.mode !== 'play' || S.count > 0 || raw > 0.5) return;
+    perf.t += raw; perf.n++;
+    if (perf.t < 3) return;
+    const f = perf.n / perf.t;
+    perf.t = 0; perf.n = 0;
+    perf.slow = f < 42 ? perf.slow + 1 : 0;
+    let q = quality;
+    if (perf.slow >= 2 && q < 2) { q++; perf.slow = 0; perf.downed = true; }
+    else if (f > 58 && q > 0 && !perf.downed) q--;   // sobe de volta só se não precisou baixar nesta visita
+    if (q !== quality) { quality = q; store.set('quanta-corrida-q', q); resize(); }
+  }
   function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const raw = (now - last) / 1000;
+    const dt = Math.min(0.05, raw); last = now;
+    watchPerf(raw);
     update(dt);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
@@ -2269,6 +2318,9 @@
     document.querySelector(`.mode[data-mode="${modeId}"]`).focus({ preventScroll: true });
   });
   paintModes();
+
+  // diagnóstico para testes: /corrida/?debug
+  if (/[?&]debug\b/.test(location.search)) window.__qc = { renderer, scene, S, get quality() { return quality; } };
 
   resize();
   applyTheme(1, true);
