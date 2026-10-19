@@ -83,6 +83,9 @@ export class Menu {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
+      // a pausa abre no pointerdown do botão de pausa; o clique que sobra desse toque cairia no
+      // botão que apareceu embaixo do dedo (em tela baixa, o "Continuar"): ignora cliques logo depois
+      if (this.current === 'pause' && performance.now() - this.shownAt < 350) return;
       this.action(btn.dataset.action);
     });
     document.addEventListener('keydown', (e) => this.onKey(e));
@@ -177,7 +180,10 @@ export class Menu {
   }
 
   show(name) {
-    if (name !== this.current) this.prev = this.current;
+    if (name !== this.current) {
+      this.prev = this.current;
+      this.shownAt = performance.now();
+    }
     this.current = name;
     if (name !== 'results') this.res = null;
     for (const s of SCREENS) $('screen-' + s)?.classList.toggle('hidden', s !== name);
