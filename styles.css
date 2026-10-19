@@ -1176,7 +1176,7 @@ html.lang-en [data-lang-inline="pt"] {
   color: var(--ink-mute);
   text-transform: uppercase;
 }
-.countries-row span {
+.countries-row > span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1331,3 +1331,20 @@ html.lang-en [data-lang-inline="pt"] {
 }
 .method-step:focus-visible { border-radius: var(--radius); }
 .faq-item.open .faq-a { cursor: auto; }
+
+/* Nav: de 901px a ~1170px os links + PT/EN + "Agendar" não cabiam (o botão saía da tela e
+   criava rolagem horizontal). Nessa faixa usa o menu hambúrguer, como no celular. */
+@media (max-width: 1180px) {
+  .nav-links .nav-link,
+  .nav-links .lang-toggle { display: none; }
+  .nav-links .lang-toggle.lang-toggle-mobile-show { display: inline-flex; }
+  .menu-toggle { display: inline-flex; }
+  .nav .mobile-panel {
+    bottom: auto;
+    height: calc(100vh - 72px);
+    height: calc(100dvh - 72px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--bg);
+  }
+}
