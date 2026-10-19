@@ -30,7 +30,7 @@ function isEditable(el) {
 const STYLE_ID = 'tc-style';
 const CSS = `
 .tc-root{position:fixed;inset:0;z-index:25;pointer-events:none;user-select:none;-webkit-user-select:none;
-  -webkit-touch-callout:none;touch-action:none;font-family:'Fredoka','Trebuchet MS',system-ui,sans-serif}
+  -webkit-touch-callout:none;touch-action:none;font-family:var(--font,'Fredoka','Trebuchet MS',system-ui,sans-serif)}
 .tc-root.tc-hidden{display:none}
 .tc-zone{position:absolute;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
 .tc-btn{position:absolute;display:grid;place-items:center;border-radius:50%;color:#fff;font-weight:700;
@@ -39,6 +39,8 @@ const CSS = `
   text-shadow:0 2px 3px rgba(0,0,0,.6);
   transition:transform .06s ease,background .1s ease,border-color .1s ease;pointer-events:none;box-sizing:border-box}
 .tc-btn small{display:block;font-size:11px;text-transform:uppercase;font-weight:600;opacity:.85;margin-top:3px;letter-spacing:0}
+.tc-btn.tc-long{font-size:clamp(10px,3vmin,13px);line-height:1.05;text-align:center;letter-spacing:0}
+.tc-btn small{max-width:100%;overflow-wrap:anywhere}
 .tc-btn.tc-on{transform:scale(.92);background:rgba(255,255,255,.38);border-color:#fff}
 .tc-steer{width:clamp(78px,22vmin,94px);height:clamp(78px,22vmin,94px);font-size:clamp(34px,10vmin,44px);border-radius:26px}
 .tc-drift{width:clamp(88px,25vmin,104px);height:clamp(88px,25vmin,104px);font-size:clamp(17px,5vmin,21px);
@@ -295,6 +297,24 @@ export class Input {
     }
   }
 
+  // Textos dos botões de toque (traduzidos em main.js).
+  setLabels(l) {
+    this._labels = l = { drift: 'DRIFT', jump: 'pular', item: 'ITEM', brake: 'FREIO', gas: 'acelerar', ...(l || {}) };
+    const b = this._btn;
+    if (!b) return;
+    const esc = (x) => String(x).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+    b.drift.innerHTML = `<span>${esc(l.drift)}<small>${esc(l.jump)}</small></span>`;
+    b.item.textContent = l.item;
+    b.brake.textContent = l.brake;
+    b.gas.innerHTML = `<span>▲<small>${esc(l.gas)}</small></span>`;
+    // rótulos longos (alemão, japonês) ganham letra menor
+    // (o freio e o item são menores que o drift: limite de 5 letras)
+    for (const [k, el, max] of [['drift', b.drift, 6], ['item', b.item, 5], ['brake', b.brake, 5]]) {
+      const len = [...String(l[k])].length * (/[\u3000-\u9fff\uff00-\uffef]/.test(l[k]) ? 1.8 : 1);
+      el.classList.toggle('tc-long', len > max);
+    }
+  }
+
   // ---------- toque ----------
   _buildTouch() {
     if (typeof document === 'undefined') return;
@@ -320,11 +340,12 @@ export class Input {
     this._btn = {
       left: mk('tc-steer', '◀'),
       right: mk('tc-steer', '▶'),
-      drift: mk('tc-drift', '<span>DRIFT<small>pular</small></span>'),
-      item: mk('tc-item', 'ITEM'),
-      brake: mk('tc-brake', 'FREIO'),
-      gas: mk('tc-gas', '<span>▲<small>acelerar</small></span>'),
+      drift: mk('tc-drift', ''),
+      item: mk('tc-item', ''),
+      brake: mk('tc-brake', ''),
+      gas: mk('tc-gas', ''),
     };
+    this.setLabels(this._labels);
     this._gasBtn = this._btn.gas;
     this._gasBtn.style.display = this._autoAccelerate ? 'none' : '';
 
@@ -381,7 +402,14 @@ export class Input {
     const dx = W - sr - size.drift;
     pos.drift = [dx, sb];
     pos.brake = [dx - size.brake - gap * 1.2, sb];
-    if (this._autoAccelerate) {
+    const portrait = H > W;
+    if (portrait) {
+      // celular em pé: não há espaço ao lado do DRIFT (bateria em ◀ ▶); ITEM e FREIO sobem em coluna
+      const cx = (s) => W - sr - size.drift / 2 - s / 2;
+      pos.item = [cx(size.item), sb + size.drift + gap];
+      pos.brake = [cx(size.brake), sb + size.drift + size.item + gap * 2];
+      pos.gas = [W - sr - size.drift - gap - size.gas, sb + size.drift * 0.6 + gap];
+    } else if (this._autoAccelerate) {
       pos.item = [dx - size.item * 0.55, sb + size.drift + gap * 0.6];
       pos.gas = [W - sr - size.gas, sb + size.drift + gap * 0.7];
     } else {
@@ -416,7 +444,7 @@ export class Input {
     const rd = rect.drift;
     setZone(this._zones.drift, { x: rd.x, y: rd.y, w: W - rd.x, h: H - rd.y });
     const rb = rect.brake;
-    setZone(this._zones.brake, { x: rb.x, y: rb.y, w: rb.w, h: H - rb.y });
+    setZone(this._zones.brake, portrait ? rb : { x: rb.x, y: rb.y, w: rb.w, h: H - rb.y });
     setZone(this._zones.item, rect.item);
     setZone(this._zones.gas, rect.gas);
     this._zones.gas.style.display = this._autoAccelerate ? 'none' : '';

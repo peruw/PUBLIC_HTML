@@ -15,7 +15,7 @@ Todo o visual e o áudio são procedurais: não há arquivos de imagem, modelo o
   - Luzes pontuais: no máximo 2 e só na qualidade `alta`.
   - O brilho é feito com sprites aditivos e materiais emissivos. Não há pós-processamento.
 - Não crie objetos por quadro (`new Vector3` dentro de `update`). Reutilize vetores temporários.
-- Todo texto visível ao jogador é em português do Brasil.
+- Todo texto visível ao jogador passa por `js/i18n.js` (`t('chave')`), com dicionários em `js/lang/<idioma>.js`. Nada de texto fixo nos módulos nem no HTML sem `data-i18n` (ver "Idiomas").
 
 ## Objeto `world` (passado para os `update`)
 ```js
@@ -36,6 +36,7 @@ world = {
 ```
 
 ## Pista: `js/track.js` (mundo)
+`buildTrack(scene, quality, labels)` recebe os textos das faixas e placas (`SIGN_LABELS`); `track.setLabels(labels)` redesenha o atlas no idioma novo.
 ```js
 export function buildTrack(scene, quality) -> track
 track.name                        // 'Campus da Ciência'
@@ -65,7 +66,7 @@ track.update(dt, t)
 
 ## Ambiente: `js/environment.js` (mundo)
 ```js
-export function buildEnvironment(scene, track, quality, renderer) -> { update(dt, t, camera), sun }
+export function buildEnvironment(scene, track, quality, renderer, labels) -> { update(dt, t, camera), sun, setLabels(labels) }
 ```
 - Cuida do céu, da neblina, das luzes (a sombra direcional só existe com `quality.shadows`), do terreno em volta e do cenário temático.
 - Nenhum objeto sólido invade o corredor. Elementos acima da pista (arcos, faixas, túnel) ficam com vão livre de pelo menos 6 m.
@@ -85,9 +86,10 @@ export class Kart {
   drifting, driftDir (-1|0|1), driftLevel (0..3), boostTime, starTime, shrinkTime, spinTime, tumbleTime
   frozen          // true durante a contagem (não se move)
   speedFactor     // multiplicador extra de velocidade (IA usa para rubber-band), padrão 1
+  assist          // ajuda na direção (só o jogador, opção do menu): perto da borda, puxa de volta para a pista
   get maxSpeed(); get invincible(); get stunned(); get recovering()   // recovering: atordoado + 1 s de proteção (hit() recusa)
   item, itemCount, roulette       // controlados por items.js: roulette = { time, showing, result } | null
-  lap, progress, place, finished, finishTime   // controlados por race.js
+  lap, progress, place, finished, finishTime, lapTimes   // controlados por race.js (lapTimes: s de cada volta completa)
   placeAt(slot)                   // reposiciona no grid, zera estados
   update(dt, world)
   applyBoost(duration, strength = 1, source = 'item')
@@ -109,7 +111,7 @@ export class AIDriver {
   update(dt, world)                     // escreve kart.controls (inclusive useItem)
 }
 ```
-Segue `racingLine`, faz drift nas curvas, desvia de itens no chão e usa itens com tática (maçã quando há alguém atrás, elétron quando há alguém à frente). Faz rubber-band leve via `kart.speedFactor`.
+Segue `racingLine`, faz drift nas curvas, desvia de itens no chão e usa itens com tática (maçã quando há alguém atrás, elétron quando há alguém à frente). Faz rubber-band leve via `kart.speedFactor`, com a força definida por classe em `CLASSES` (`aiSpeed`, `aiCatchUp`, `aiSlowDown`, `aiSlowFrom`, `aiSlowRange`): no 50cc a IA alivia bem mais quando o jogador fica para trás.
 
 ## Entrada: `js/input.js` (direção)
 ```js
@@ -123,7 +125,7 @@ export class Input {
   setAutoAccelerate(bool)
 }
 ```
-- **Teclado:** W/↑ acelera, S/↓ freia/ré, A/D ou ←/→ vira, Espaço = drift/pulo, E/X/Shift = item, C = olhar para trás, Esc/P = pausa, M = mudo, Enter = confirmar.
+- **Teclado:** W/↑ acelera, S/↓ freia/ré, A/D ou ←/→ vira, Espaço = drift/pulo, E/X/Shift = item, C = olhar para trás, Esc/P = pausa, M = mudo, Enter = confirmar. R reinicia (na pausa e no resultado, tratado no menu.js); 1–3 respondem a pergunta do resultado.
 - **Gamepad:** A/RT acelera, B/LT freia, analógico esquerdo vira, RB/X = drift, LB/Y = item, Start = pausa.
 - **Toque:** o próprio `input.js` cria o DOM e o CSS (injetado) dos botões dentro de `touchLayer`.
   - Esquerda: ◀ ▶ grandes.
@@ -211,13 +213,56 @@ export class AudioSystem {
 ## Jogo e interface (integração)
 `main.js` (loop, estados, renderer), `race.js` (contagem, voltas, posições, chegada, largada-foguete), `hud.js`, `menu.js`, `index.html`, `css/styles.css`.
 
+- **Qualidade automática (`main.js`):** abaixo de ~28 fps por 2,5 s (na corrida ou na demonstração da tela inicial), o 1º passo é desligar as sombras sem recarregar (no meio da corrida, espera a próxima pausa/tela, porque recompila os shaders); depois baixa a resolução até 0,75. A próxima visita abre em `baixa`.
+- **Celular em pé:** o aviso de girar tem o botão "Jogar com o celular em pé" (`localStorage corrida-portraitOK`). Com a tela em pé, `body.portrait` ajusta o HUD e o `input.js` empilha ITEM e FREIO acima do DRIFT.
+- **Idiomas:** ver a seção "Idiomas" abaixo.
+- **Tremor e vibração:** `main.js` chama `rig.shake` e `navigator.vibrate` nas batidas do jogador (muro, item, trombada, pouso alto). Com `prefers-reduced-motion`, o tremor cai para 25% e `effects.flash` para 30%.
+
+## Progresso e conteúdo educativo: `js/progress.js`
+```js
+export class Progress {
+  constructor({ bus, store })     // store = { get, set } do menu.js (localStorage 'corrida-progress')
+  startRace(player)               // zera as estatísticas da corrida (turbos de drift, itens, batidas, manobras)
+  finishRace(results, player, { cc, laps }) -> resumo  // atualiza recorde, melhor volta e troféu
+     // resumo: { place, time, bestLap, stats, newRecord, firstRecord, newBestLap, newMedal, ... }
+  record(cc, laps); bestLapOf(cc); bestPlace(charId, cc); medalCount()
+  nextFact(charId, avoid) -> índice   // alterna entre as curiosidades do cientista
+  randomFact() -> { c, idx }          // para a tela de carregamento
+  pickQuiz(charId) -> { id, about, order }   // order = alternativas embaralhadas
+  answerQuiz(id, ok); quizScore() -> { right, total }
+}
+export function quizText(id, order) -> { q, options, correct, explain, words }  // texto no idioma atual
+```
+- O texto (3 curiosidades e a pergunta `{ q, options, explain }` de cada cientista; `quiz { q, options }` dos itens) fica nos dicionários. Em `config.js` só fica `quiz: { answer }`, o índice da resposta certa, igual em todos os idiomas. Para itens, a explicação é o `fact` do item.
+- O resultado guarda só índices (curiosidade escolhida, ordem das alternativas, resposta dada); por isso, trocar o idioma redesenha a tela sem sortear outra pergunta.
+- A tela de resultado mostra classificação, números da corrida, uma curiosidade do cientista escolhido (e do vencedor) e a pergunta-relâmpago (teclas 1–3). Troféus aparecem na escolha do cientista e o placar na tela inicial.
+- Todo fato novo precisa ser conferido em fonte confiável antes de entrar no jogo.
+
+## Idiomas: `js/i18n.js` e `js/lang/*.js`
+```js
+LANGS                       // [{ id, name }] pt-BR, pt-PT, en, es, zh-CN, ja, de (name na própria língua)
+initI18n() / setLang(id)    // carrega js/lang/<id>.js (import dinâmico), ajusta <html lang> e avisa onLangChange
+t(chave, params)            // texto com {marcadores}; objetos { one, other } viram plural com params.n
+tv(chave)                   // valor bruto (listas, objetos)
+plural(chave, n); ord(n); ordSuffix(n)   // Intl.PluralRules (ordinal: 1º, 1st, 1.º, 1., 第1名, 1位)
+fmtNum(n)                   // Intl.NumberFormat do idioma (300.000 / 300,000 / 300 000; 9,8 / 9.8)
+charText(id); itemText(id)  // textos do cientista e do item
+applyStatic()               // preenche data-i18n, data-i18n-html, data-i18n-aria, data-i18n-title, <title> e description
+canvasFont()                // fonte para texto em canvas (com fontes CJK em zh-CN/ja)
+```
+- **Escolha:** `localStorage corrida-lang` (try/catch); senão `navigator.languages`: pt-PT → pt-PT; pt/pt-BR → pt-BR; zh* → zh-CN; en, es, ja, de pelo prefixo; senão en. O script em linha do `index.html` repete essa regra para traduzir a tela de carregamento e o aviso de erro antes de os módulos chegarem.
+- **Troca ao vivo** (seletor no menu inicial e na pausa): `main.js` escuta `onLangChange` e chama `menu.relocalize()`, `hud.relocalize()`, `input.setLabels()`, `track.setLabels()` e `env.setLabels()`. As placas 3D são redesenhadas no mesmo canvas do atlas (as regiões de UV não mudam). O "BRASIL" pintado no foguete fica igual em todos os idiomas.
+- **Fontes:** Fredoka (Google Fonts) para letras latinas; em zh-CN/ja, `html:lang(...)` no CSS acrescenta fontes CJK do sistema (Noto Sans SC/JP, Noto Sans CJK, PingFang, Hiragino, YaHei, Yu Gothic, Meiryo), com as japonesas antes em japonês.
+- **Novo texto:** acrescente a chave nos 7 dicionários. pt-BR é a base; o teste fora do repositório compara a estrutura, os `{marcadores}`, as 3 alternativas de cada pergunta e os números das respostas e curiosidades entre os idiomas.
+- Tempos de volta ficam no formato de cronômetro (`1:27.00`) em todos os idiomas.
+
 ## Eventos do bus
 | Evento | Dados |
 |---|---|
 | `race:countdown` | `{ n }` (3, 2, 1) |
 | `race:go` | `{}` |
 | `race:reset` | `{}` (volta ao menu ou nova corrida: apaga as luzes de largada) |
-| `race:lap` | `{ kart, lap }` |
+| `race:lap` | `{ kart, lap, lapTime }` (lapTime: s da volta que acabou) |
 | `race:finalLap` | `{ kart }` (só o jogador) |
 | `race:finish` | `{ kart, place, time }` |
 | `race:end` | `{ results }` |

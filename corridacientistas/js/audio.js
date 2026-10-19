@@ -716,7 +716,7 @@ export class AudioSystem {
 
 // Intervalo mínimo entre repetições do mesmo efeito (s)
 const GAPS = { boost: 0.15, lightning: 0.4, finish: 1, finalLap: 1, go: 0.5, countdown: 0.3, roulette: 0.045, blackhole: 0.3, lap: 0.5 };
-const PRIORITY = { go: 1, countdown: 1, finish: 1, finalLap: 1, lap: 1, lightning: 1, itemGet: 1 };
+const PRIORITY = { record: 1, quizRight: 1, quizWrong: 1, go: 1, countdown: 1, finish: 1, finalLap: 1, lap: 1, lightning: 1, itemGet: 1 };
 
 // Geradores de efeitos: this = AudioSystem; recebem (saída, instante) e devolvem a duração
 const SFX = {
@@ -824,6 +824,23 @@ const SFX = {
     this._noise(o, t + 10 * q, 1.4, 0.14, 'highpass', 4500, 4500, 0.5);
     this._kick(t + 10 * q, o, 0.5);
     return 2.2;
+  },
+  quizRight(o, t) {
+    this._notes(o, 'square', [['E6', 0, 0.08], ['G6', 0.08, 0.08], ['C7', 0.16, 0.22]], t, 0.1);
+    this._notes(o, 'triangle', [['C5', 0, 0.08], ['E5', 0.08, 0.08], ['G5', 0.16, 0.22]], t, 0.22);
+    return 0.45;
+  },
+  quizWrong(o, t) {
+    // suave, sem "buzina" de erro
+    this._notes(o, 'triangle', [['E5', 0, 0.12], ['C5', 0.12, 0.22]], t, 0.22);
+    return 0.4;
+  },
+  record(o, t) {
+    const q = 0.09;
+    this._notes(o, 'square', [['G5', 0, q], ['C6', q, q], ['E6', 2 * q, q], ['G6', 3 * q, q], ['C7', 4 * q, q * 4]], t, 0.1);
+    this._notes(o, 'triangle', [['C4', 0, q * 4], ['G4', 4 * q, q * 4]], t, 0.25);
+    this._noise(o, t + 4 * q, 0.6, 0.08, 'highpass', 6000, 6000, 0.6);
+    return 0.9;
   },
   menuMove(o, t) {
     this._tone(o, 'triangle', 880, 880, t, 0.05, 0.18);

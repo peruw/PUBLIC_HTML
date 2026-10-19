@@ -474,7 +474,7 @@ export class AIDriver {
       target = (cc.aiSpeed ?? 1) * (0.93 + 0.07 * sk);
       if (!p.finished) {
         if (gap > 0) target *= 1 + (cc.aiCatchUp ?? 0.1) * clamp((gap - 15) / 120, 0, 1) * (0.5 + 0.5 * sk);
-        else target *= 1 - 0.07 * clamp((-gap - 25) / 150, 0, 1) * (1.25 - 0.5 * sk);
+        else target *= 1 - (cc.aiSlowDown ?? 0.07) * clamp((-gap - (cc.aiSlowFrom ?? 25)) / (cc.aiSlowRange ?? 150), 0, 1) * (1.25 - 0.5 * sk);
       }
     }
     k.speedFactor = damp(k.speedFactor, target, 0.6, dt);

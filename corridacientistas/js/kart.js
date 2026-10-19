@@ -82,6 +82,9 @@ export const TUNING = {
   bumpRestitution: 0.5,
   bumpMinSep: 2.6, // m/s mínimos de separação numa batida
   maxSubstep: 1 / 60,
+  // ajuda na direção (opção do jogador): perto da borda do asfalto, puxa de volta para a pista
+  assistMargin: 1.2, // m antes da borda em que a ajuda começa
+  assistStrength: 0.75, // fração do giro máximo
   // suspensão visual
   suspK: 190,
   suspC: 13,
@@ -162,6 +165,7 @@ export class Kart {
     this.trickWindow = 0;
     this.frozen = false;
     this.speedFactor = 1;
+    this.assist = false; // ajuda na direção (só o jogador, se ligada)
 
     // controlados por items.js e race.js
     this.item = null;
@@ -517,6 +521,17 @@ export class Kart {
         yawT = this.steer * this.turnRate(vt) * sign;
       }
       if (!this.onGround) yawT *= this.drifting ? 0.85 : T.airSteer;
+      // ajuda na direção: só fora do drift e quando o kart aponta para fora da pista
+      if (this.assist && !this.drifting && this.onGround && va > 4) {
+        const edge = Math.abs(this.lateral) - (this.halfWidth - T.assistMargin);
+        if (edge > 0) {
+          const side = this.lateral > 0 ? 1 : -1;
+          const dh = wrapAngle(this.heading - Math.atan2(this._tx, this._tz)); // + = apontando para a esquerda
+          const out = -dh * side; // > 0 = apontando para fora
+          const k = clamp(edge / 2, 0, 1) * clamp(0.3 + out * 4, 0, 1);
+          yawT -= side * this.turnRate(va) * T.assistStrength * k;
+        }
+      }
     }
     this.yawVel = damp(this.yawVel, yawT, T.yawResponse, dt);
     this.heading = wrapAngle(this.heading - this.yawVel * dt);

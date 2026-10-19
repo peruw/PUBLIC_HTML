@@ -15,6 +15,8 @@ import { AudioSystem } from './audio.js';
 import { RaceManager } from './race.js';
 import { Hud } from './hud.js';
 import { Menu, store } from './menu.js';
+import { Progress } from './progress.js';
+import { initI18n, setLang, onLangChange, t, tv, fmtNum, canvasFont } from './i18n.js';
 
 const STEP = 1 / 60; // passo fixo da simulação
 const PLAYER_SLOT = 5; // o jogador larga em 6º
@@ -22,6 +24,8 @@ const RESULTS_DELAY = 3.2; // s entre a chegada e a tela de resultado
 
 // Só 'pointer: coarse' conta como celular/tablet (notebooks com tela de toque têm ontouchstart).
 const isTouch = matchMedia('(pointer: coarse)').matches;
+// Movimento reduzido (preferência do sistema): menos tremor de câmera e clarões.
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 if (isTouch) document.body.classList.add('touch');
 // Quem usar a tela de toque mesmo assim ganha o layout de toque.
 addEventListener('pointerdown', (e) => {
@@ -36,9 +40,20 @@ const game = {
   opts: null,
 };
 
+// Textos pintados nas placas 3D, no idioma atual.
+const signLabels = () => ({
+  ...tv('signs'),
+  luz: `c ≈ ${fmtNum(300000)} km/s`,
+  grav: `g = ${fmtNum(9.8)} m/s²`,
+  font: canvasFont(),
+});
+const envLabels = () => ({ elements: tv('elements'), campus: t('signs.campus'), obs: t('signs.obs'), lab: t('signs.lab'), font: canvasFont() });
+
 async function init() {
+  await initI18n();
   let audio = null;
   let input = null;
+  const progress = new Progress({ bus, store });
   const menu = new Menu({
     sfx: (n) => audio?.sfx(n),
     onStart: (opts) => startRace(opts),
@@ -52,18 +67,26 @@ async function init() {
     onQuit: () => enterTitle(),
     onToggleSound: () => toggleSound(),
     onToggleQuality: () => toggleQuality(),
+    onToggleAssist: (on) => {
+      if (game.opts) game.opts.assist = on;
+      if (world.player) world.player.assist = on;
+    },
+    onLang: (id) => setLang(id),
     onToggleAuto: () => {
       input.setAutoAccelerate(!input.autoAccelerate);
       store.set('auto', input.autoAccelerate);
       menu.setAutoLabel(input.autoAccelerate);
     },
-  });
+  }, progress);
   menu.show('loading');
-  menu.setLoading(0.1, 'Preparando o laboratório…');
+  menu.setLoading(0.1, 'loading.prep');
+  {
+    const f = progress.randomFact();
+    menu.setLoadingFact(f.c, f.idx);
+  }
 
   if (!webglAvailable()) {
-    document.getElementById('error-text').textContent =
-      'Seu navegador não suporta gráficos 3D (WebGL). Tente outro navegador, como Chrome ou Firefox.';
+    document.getElementById('error-text').textContent = t('error.webgl');
     menu.show('error');
     window.__gameReady = true;
     return;
@@ -95,15 +118,15 @@ async function init() {
   const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, quality.drawDistance + 400);
 
   await nextFrame();
-  menu.setLoading(0.25, 'Asfaltando o Campus da Ciência…');
+  menu.setLoading(0.25, 'loading.track');
   await nextFrame();
-  const track = buildTrack(scene, quality);
+  const track = buildTrack(scene, quality, signLabels());
 
-  menu.setLoading(0.5, 'Montando o observatório…');
+  menu.setLoading(0.5, 'loading.env');
   await nextFrame();
-  const env = buildEnvironment(scene, track, quality, renderer);
+  const env = buildEnvironment(scene, track, quality, renderer, envLabels());
 
-  menu.setLoading(0.7, 'Chamando os cientistas…');
+  menu.setLoading(0.7, 'loading.chars');
   await nextFrame();
   const effects = new Effects({ scene, bus, quality });
   const items = new ItemSystem({ scene, track, bus, effects, quality });
@@ -114,7 +137,7 @@ async function init() {
     return kart;
   });
 
-  menu.setLoading(0.85, 'Tirando as fotos oficiais…');
+  menu.setLoading(0.85, 'loading.photos');
   await nextFrame();
   try {
     menu.setPortraits(await Promise.resolve(renderPortraits(renderer, 256, { ss: quality.id === 'baixa' ? 1 : 2 })));
@@ -135,8 +158,10 @@ async function init() {
   });
   pauseBtn.addEventListener('click', () => setPaused(true));
   input.showTouch(false);
+  input.setLabels(tv('touch'));
   input.setAutoAccelerate(store.get('auto', input.touchEnabled));
   menu.setAutoLabel(input.autoAccelerate);
+  menu.setAssistLabel(menu.opts.assist);
   const race = new RaceManager({ bus });
   const hud = new Hud({ bus });
 
@@ -179,6 +204,7 @@ async function init() {
     world.cc = CLASSES['100cc'];
     for (const k of karts) {
       k.isPlayer = false;
+      k.assist = false;
       k.frozen = false;
     }
     const order = karts.slice().sort(() => Math.random() - 0.5);
@@ -213,7 +239,10 @@ async function init() {
     const grid = others.slice();
     grid.splice(PLAYER_SLOT, 0, player);
     setupGrid(grid);
-    for (const k of karts) k.isPlayer = k === player;
+    for (const k of karts) {
+      k.isPlayer = k === player;
+      k.assist = k === player && opts.assist !== false;
+    }
     world.player = player;
     items.reset(karts);
     effects.reset();
@@ -225,8 +254,10 @@ async function init() {
     );
     playerAI = new AIDriver(player, track, { skill: 0.9 });
     race.start(world.karts, { laps: opts.laps, player, track, cc });
+    progress.startRace(player);
     world.phase = 'countdown';
-    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track });
+    const tipN = progress.races;
+    hud.setRace({ player, karts: world.karts, totalLaps: opts.laps, track, tip: () => countdownTip(tipN) });
     hud.show(true);
     input.showTouch(input.touchEnabled);
     rig.follow(player);
@@ -244,11 +275,25 @@ async function init() {
   function showResults() {
     game.state = 'results';
     const results = race.buildResults();
+    const summary = progress.finishRace(results, world.player, { cc: world.cc.id, laps: world.totalLaps });
     hud.show(false);
     input.showTouch(false);
     rig.setMode('orbit', { target: world.player, radius: 7, height: 2.6, speed: 0.35 });
-    menu.showResults(results, world.player);
+    menu.showResults(results, world.player, summary);
     audio.playMusic('results');
+    if (summary.newRecord || summary.newMedal) setTimeout(() => audio.sfx('record'), 700);
+  }
+
+  // Dica da contagem: alterna entre largada-foguete, drift e itens.
+  function countdownTip(n) {
+    const touch = input.touchEnabled;
+    const auto = touch && input.autoAccelerate;
+    const tips = [
+      touch ? (auto ? 'tips.rocketTouchAuto' : 'tips.rocketTouch') : 'tips.rocketKeys',
+      touch ? 'tips.driftTouch' : 'tips.driftKeys',
+      touch ? 'tips.itemTouch' : 'tips.itemKeys',
+    ];
+    return t(tips[n % tips.length]);
   }
 
   function setPaused(on, silent) {
@@ -276,7 +321,7 @@ async function init() {
   function toggleQuality() {
     const next = quality.id === 'alta' ? 'baixa' : 'alta';
     store.set('quality', next);
-    menu.setQualityLabel(next + ' (recarregando…)');
+    menu.setQualityLabel(next, true);
     setTimeout(() => location.reload(), 250);
   }
 
@@ -307,14 +352,24 @@ async function init() {
 
   // ---------- redimensionamento e orientação ----------
   const rotateHint = document.getElementById('rotate-hint');
+  // Quem não pode girar (rotação travada, iPhone sem tela cheia) joga em pé mesmo.
+  let portraitOK = store.get('portraitOK', false);
+  document.getElementById('btn-portrait').addEventListener('click', () => {
+    portraitOK = true;
+    store.set('portraitOK', true);
+    audio?.sfx('menuSelect');
+    onResize();
+  });
   function onResize() {
     renderer.setSize(innerWidth, innerHeight);
     needsRender = true; // setSize limpa o canvas
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     const portrait = isTouch && innerHeight > innerWidth && Math.min(screen.width, screen.height) < 600;
-    rotateHint.classList.toggle('hidden', !portrait);
-    if (portrait && game.state === 'race' && !game.paused) setPaused(true);
+    document.body.classList.toggle('portrait', isTouch && innerHeight > innerWidth);
+    const block = portrait && !portraitOK;
+    rotateHint.classList.toggle('hidden', !block);
+    if (block && game.state === 'race' && !game.paused) setPaused(true);
   }
   addEventListener('resize', onResize);
   onResize();
@@ -430,6 +485,39 @@ async function init() {
     if (kart === world.player) resultsTimer = RESULTS_DELAY;
   });
 
+  // ---------- sensação de impacto: tremor de câmera e vibração ----------
+  const shake = (i, d) => {
+    if (game.state !== 'race') return;
+    rig.shake(i * (reduceMotion.matches ? 0.25 : 1), d);
+  };
+  const vibrate = (ms) => {
+    if (!input.touchEnabled || audio.muted) return;
+    try {
+      navigator.vibrate?.(ms);
+    } catch {
+      /* sem vibração */
+    }
+  };
+  bus.on('kart:wall', ({ kart, strength }) => {
+    if (kart !== world.player) return;
+    shake(0.06 + 0.22 * strength, 0.25);
+    if (strength > 0.4) vibrate(25);
+  });
+  bus.on('kart:bump', ({ a, b, strength }) => {
+    if (a === world.player || b === world.player) shake(0.05 + 0.15 * strength, 0.2);
+  });
+  bus.on('kart:hit', ({ kart, type }) => {
+    if (kart !== world.player) return;
+    shake(type === 'tumble' ? 0.45 : 0.3, type === 'tumble' ? 0.6 : 0.4);
+    vibrate(type === 'tumble' ? 90 : 50);
+  });
+  bus.on('kart:land', ({ kart, airTime }) => {
+    if (kart === world.player && airTime > 0.45) shake(Math.min(0.25, airTime * 0.18), 0.25);
+  });
+  bus.on('item:lightning', ({ by }) => {
+    if (world.player && by !== world.player && !world.player.invincible) shake(0.3, 0.45);
+  });
+
   // ---------- loop ----------
   const clock = new THREE.Clock();
   let acc = 0;
@@ -489,6 +577,7 @@ async function init() {
     }
 
     // Resolução adaptativa: reduz se o aparelho não aguenta e volta a subir quando melhora.
+    if (shadowsPending && (game.paused || game.state !== 'race' || world.phase === 'countdown')) disableShadows();
     dtAvg += (dt - dtAvg) * 0.05;
     adaptResolution(dt);
   }
@@ -498,15 +587,30 @@ async function init() {
     pixelRatio = r;
     renderer.setPixelRatio(r);
   }
+  // Sombras desligadas na hora (o que mais pesa na qualidade 'alta' sem borrar a imagem).
+  let shadowsOff = !quality.shadows;
+  let shadowsPending = false;
+  function disableShadows() {
+    shadowsOff = true;
+    shadowsPending = false;
+    renderer.shadowMap.enabled = false;
+    scene.traverse((o) => {
+      if (o.isLight) o.castShadow = false;
+      if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.needsUpdate = true;
+    });
+    needsRender = true;
+  }
   function adaptResolution(dt) {
-    if (game.state !== 'race' || game.paused) {
+    // corrida e demonstração da tela inicial (assim a 1ª corrida já começa leve)
+    const active = (game.state === 'race' || menu.current === 'title') && !game.paused;
+    if (!active) {
       slowTime = fastTime = 0;
       return;
     }
     if (checkTime > 0) {
       // Reduziu e não melhorou pelo menos 8%: volta e para de reduzir.
       checkTime -= dt;
-      if (checkTime <= 0 && dtAvg > dtBefore * 0.92) {
+      if (checkTime <= 0 && dtAvg > dtBefore * 0.92 && pixelRatio !== prBefore) {
         setPR(prBefore);
         noLower = true;
       }
@@ -517,7 +621,18 @@ async function init() {
       slowTime += dt;
       if (slowTime > 2.5) {
         slowTime = 0;
-        if (!noLower && pixelRatio > PR_MIN) {
+        if (!shadowsOff && !shadowsPending) {
+          // 1º passo: sem sombras; a próxima visita já abre em 'baixa'.
+          // Desligar recompila os shaders (travadinha): no meio da corrida, fica para a próxima pausa/tela.
+          store.set('quality', 'baixa');
+          if (game.state === 'race' && world.phase === 'racing') shadowsPending = true;
+          else {
+            disableShadows();
+            checkTime = 1.5;
+            dtBefore = dtAvg;
+            prBefore = pixelRatio;
+          }
+        } else if (!noLower && pixelRatio > PR_MIN) {
           dtBefore = dtAvg;
           prBefore = pixelRatio;
           setPR(Math.max(PR_MIN, pixelRatio - 0.15));
@@ -526,7 +641,7 @@ async function init() {
           // Ainda lento em 'alta' (reduzir não resolve mais): a próxima visita já começa em 'baixa'.
           slowWarned = true;
           store.set('quality', 'baixa');
-          hud.toast?.('<p class="toast-full">Jogo lento? Da próxima vez o jogo abre em <strong>Qualidade: baixa</strong> (dá para trocar no menu inicial).</p>', 6000);
+          hud.toast?.(`<p class="toast-full">${t('hud.slow')}</p>`, 6000);
         }
       }
     } else if (dtAvg < 1 / 50 && pixelRatio < maxPR) {
@@ -579,9 +694,23 @@ async function init() {
     setPixelRatio(r) {
       setPR(r);
     },
+    progress,
+    get shadowsOff() {
+      return shadowsOff;
+    },
   };
 
-  menu.setLoading(1, 'Pronto!');
+  // Troca de idioma (menu inicial ou pausa): textos da tela, HUD, botões de toque e placas 3D.
+  onLangChange(() => {
+    menu.relocalize();
+    hud.relocalize();
+    input.setLabels(tv('touch'));
+    track.setLabels(signLabels());
+    env.setLabels(envLabels());
+    needsRender = true;
+  });
+
+  menu.setLoading(1, 'loading.ready');
   await nextFrame();
   enterTitle();
   window.__gameReady = true;
@@ -608,6 +737,8 @@ init().catch((err) => {
   console.error(err);
   window.__gameReady = true;
   document.getElementById('screen-loading')?.classList.add('hidden');
-  document.getElementById('error-text').textContent = 'Algo deu errado ao iniciar o jogo. Recarregue a página.';
+  // sem dicionário carregado, fica o aviso de carregamento já traduzido pelo index.html
+  const msg = t('error.crash');
+  if (msg !== 'error.crash') document.getElementById('error-text').textContent = msg;
   document.getElementById('screen-error')?.classList.remove('hidden');
 });
